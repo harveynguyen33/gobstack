@@ -1,0 +1,45 @@
+# roles.yaml — the role catalogue. A ROLE is what the work needs; a PROFILE is a worker
+# identity. They are kept separate on purpose: five documents once gave five different model
+# answers because a role name was used as a model name.
+#
+# THIS FILE NAMES NO MODEL. It names a capability and the default profile that carries it.
+# The machine-specific mapping (profile -> provider/model/effort) is read at run time from
+# the mapping file declared as models_file: in .goblin/goblin.yaml — the single documented
+# install-time machine input. bin/goblin-model resolves a role through it.
+#
+# profiles: a list. One lane runs per entry, so the LIST LENGTH is the lane count — that is
+# how the review panel is bounded by configuration rather than by code.
+
+role-code:
+  capability: fast, cheap, mechanical correctness
+  profiles: [coder]
+  used_by: P2, P4, P5, P10
+  budget: one effort token per role, read from the mapping file
+
+role-judgment:
+  capability: strongest available reasoning and prose
+  profiles: [architect]
+  used_by: P1, P3 (spec half), P6, P8, P9
+
+role-review-panel:
+  capability: N independent verdict lanes, each its own lane
+  profiles: [reviewer, architect]
+  used_by: P7 at stakes S3 and above
+  budget: bounded — lanes only at S3+, because five parallel lanes cost about five times the tokens
+
+role-synthesis:
+  capability: merges many outputs into one artifact
+  profiles: [architect]
+  used_by: P11, P12
+
+role-investigate:
+  capability: read-only exploration returning a distilled summary
+  profiles: [researcher]
+  used_by: P1 (read-only half)
+
+# Role-pinned fan-out goes through the kanban, never through a bare subagent spawn:
+# delegate_task takes no model or provider parameter, so it cannot honour a role.
+# kanban_create takes both. docs/ROLES.md states this as a rule.
+fanout:
+  carrier: kanban
+  rule: one card per lane, each carrying the resolved provider/model, the pinned SHA, the diff and one focus
