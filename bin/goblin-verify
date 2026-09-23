@@ -129,7 +129,8 @@ row_part() {
   case "$1" in
     HP-*) echo handoff ;;
     SP-*) echo spec ;;
-    GT-*) echo gate ;;
+    GT-01|GT-02|GT-03) echo gate ;;
+    GT-04|GT-05) echo ratchet ;;
     HS-01|HS-03) echo gate ;;
     HS-02) echo replay ;;
     PG-*) echo pr-gate ;;
@@ -235,7 +236,7 @@ check_gt_05() {
   n=$(g_yaml_block_scalar "$CONFIG" ratchet name)
   c=$(g_yaml_block_scalar "$CONFIG" ratchet cmd)
   ceil=$(g_yaml_block_scalar "$CONFIG" ratchet ceiling)
-  [ -n "$n" ] && [ -n "$c" ] || return 3
+  [ -n "$n" ] && [ -n "$c" ] || { printf 'no ratchet declared for this class - skipped\n'; return 3; }
   val=$( cd "$ROOT" && bash -c "$c" 2>/dev/null | tr -d '[:space:]' )
   case "$val" in ''|*[!0-9]*) printf 'ratchet cmd produced a non-number: %s\n' "$val"; return 1 ;; esac
   if [ -f "$ROOT/.goblin/ratchet-last" ]; then prev=$(cat "$ROOT/.goblin/ratchet-last"); fi
@@ -252,7 +253,7 @@ check_gt_05() {
 
 check_hs_01() {
   local d="$GOBLIN_HARNESS_DIR" f base asserting=0 reporting=0 bad=0
-  [ -n "$d" ] || return 3
+  [ -n "$d" ] || { printf 'no harness dir (%s absent) - nothing to assert\n' "$GOBLIN_HARNESS_REL"; return 3; }
   for f in "$d"/*; do
     [ -f "$f" ] || continue
     base=$(basename "$f")
