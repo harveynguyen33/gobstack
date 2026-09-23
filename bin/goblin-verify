@@ -213,6 +213,7 @@ run_gates() {
       line="$line · $rname $rval (ceiling $(g_yaml_block_scalar "$CONFIG" ratchet ceiling))"
     fi
     printf '%s · measured %s\n' "${line# }" "$(date +%F)" > "$ROOT/.goblin/last-gate-line"
+    cat "$ROOT/.goblin/last-gate-line"
   fi
   return $bad
 }
