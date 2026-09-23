@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# goblin-lib.sh — shared helpers for goblin-stack.
+#
+# Sourced by bin/goblin-install, bin/goblin-verify and bin/goblin-model.
+# Dependencies: bash 4+, git, awk, sed, grep, sha256sum (or shasum).
+# No npm, no jq, no yq, no network.
+#
+# The config format is a FLAT, LINE-ORIENTED YAML SUBSET. It is parsed here, never by a
+# YAML library, so the same file parses identically on any machine:
+#
+#   key: value                 top-level scalar
+#   key:                       block or list header
+#     member: value            two-space-indented block member
+#     - item                   two-space-indented list item
+#   gates:
+#     - name: typecheck        four-space-indented second member of a list entry
+#       cmd: npx tsc --noEmit
+
+GOBLIN_LIB_VERSION="0.1.0"
+
+# ---------------------------------------------------------------- output -----
+g_pass() { printf 'PASS  %-6s %s\n' "$1" "$2"; }
+g_fail() { printf 'FAIL  %-6s %s\n' "$1" "$2"; }
+g_adv()  { printf 'ADV   %-6s %s\n' "$1" "$2"; }
+g_skip() { printf 'SKIP  %-6s %s\n' "$1" "$2"; }
+g_info() { printf '%s\n' "$*"; }
+g_err()  { printf 'error: %s\n' "$*" >&2; }
+
+# ------------------------------------------------------------------ hash -----
+g_sha256_file() {
+  if [ -f "$1" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      sha256sum "$1" | awk '{print $1}'
+    else
+      shasum -a 256 "$1" | awk '{print $1}'
+    fi
+  else
+    printf 'missing\n'
+  fi
+}
+
+g_sha256_text() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    printf '%s' "$1" | sha256sum | awk '{print $1}'
+  else
+    printf '%s' "$1" | shasum -a 256 | awk '{print $1}'
+  fi
+}
+
+# ------------------------------------------------------------------ paths ----
+# g_abspath <path> — absolute path without requiring the file to exist.
+g_abspath() {
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    "~"|"~/"*) printf '%s\n' "$HOME/${1#\~/}" ;;
+    *) printf '%s\n' "$PWD/$1" ;;
+  esac
+}
+
+# g_expand_tilde <path>
+g_expand_tilde() {
+  case "$1" in
+    "~"|"~/"*) printf '%s\n' "$HOME/${1#\~/}" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+# ------------------------------------------------------------------ yaml -----
+# g_yaml_scalar <file> <key> — value of a top-level scalar key (empty if absent).
+g_yaml_scalar() {
+  sed -n "s/^$2:[[:space:]]*//p" "$1" | head -n 1
+}
+
+# g_yaml_block_scalar <file> <block> <key> — value of a 2-space-indented block member.
+g_yaml_block_scalar() {
+  awk -v b="$2" -v k="$3" '
+    $0 ~ ("^" b ":[[:space:]]*$") { inb = 1; next }
+    inb && /^[^ ]/ { inb = 0 }
+    inb && $0 ~ ("^  " k ":") {
+      v = $0; sub("^  " k ":[[:space:]]*", "", v); print v; exit
+    }
+  ' "$1"
+}
+
+# g_yaml_list <file> <key> — 2-space-indented list items under a top-level list key.
+g_yaml_list() {
+  awk -v k="$2" '
+    $0 ~ ("^" k ":[[:space:]]*$") { inb = 1; next }
+    inb && /^[^ ]/ { inb = 0 }
+    inb && /^  - / { v = $0; sub(/^  - /, "", v); print v }
+  ' "$1"
+}
+
+# g_yaml_gates <file> — one "name<TAB>cmd" line per declared gate.
+g_yaml_gates() {
+  awk '
+    /^gates:[[:space:]]*$/ { inb = 1; next }
+    inb && /^[^ ]/ { inb = 0 }
+    inb && /^  - name:/ { n = $0; sub(/^  - name:[[:space:]]*/, "", n); name = n; next }
+    inb && /^    cmd:/ { c = $0; sub(/^    cmd:[[:space:]]*/, "", c);
+      if (name != "") { print name "\t" c; name = "" } }
+  ' "$1"
+}
+
+# g_yaml_disabled <file> — inline list of disabled parts, one per line.
+g_yaml_disabled() {
+  local v
+  v=$(g_yaml_scalar "$1" disabled)
+  case "$v" in
+    ""|"[]") return 0 ;;
+  esac
+  v=${v#[}; v=${v%]}
+  printf '%s\n' "$v" | tr ',' '\n' \
+    | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' || true
+}
+
+# g_part_disabled <config> <part>
+g_part_disabled() {
+  g_yaml_disabled "$1" | grep -qx "$2"
+}
+
+# ------------------------------------------------------------- class data ----
+# g_class_need <classes.tsv> <class> <part> -> R | O | -
+g_class_need() {
+  awk -F'\t' -v c="$2" -v p="$3" '
+    NR > 1 && $1 == c && $2 == p { print $3; found = 1; exit }
+    END { if (!found) print "-" }
+  ' "$1"
+}
+
+# ---------------------------------------------------------------- json -------
+# installed.json is emitted by goblin-install in a fixed, line-oriented shape so it can
+# be read without a JSON library. g_installed_files <installed.json> -> "path<TAB>hash".
+g_installed_files() {
+  awk '
+    /"files"[[:space:]]*:[[:space:]]*\{/ { inf = 1; next }
+    inf && /^[[:space:]]*\}/ { inf = 0 }
+    inf && /"/ {
+      line = $0
+      sub(/^[[:space:]]*"/, "", line)
+      p = line; sub(/".*/, "", p)
+      h = line; sub(/^[^"]*"[[:space:]]*:[[:space:]]*"/, "", h); sub(/".*/, "", h)
+      if (p != "") print p "\t" h
+    }
+  ' "$1"
+}
+
+g_installed_scalar() {
+  sed -n "s/^[[:space:]]*\"$2\"[[:space:]]*:[[:space:]]*\"\{0,1\}\([^\",]*\)\"\{0,1\},\{0,1\}$/\1/p" "$1" | head -n 1
+}
+
+# ------------------------------------------------------------- self-test -----
+# Proves the parser actually parses. Every assertion is a real comparison against a
+# value written to a temp file in this function — blank the awk in g_yaml_scalar and
+# this exits non-zero (that is the RED control for the reader itself).
+g_self_test() {
+  local tmp rc=0
+  tmp=$(mktemp -d 2>/dev/null || mktemp -d -t goblin) || { g_err "mktemp failed"; return 2; }
+  cat > "$tmp/g.yaml" <<'YAML'
+class: B
+branch: master
+archive: false
+disabled: [spec, tokens]
+gates:
+  - name: typecheck
+    cmd: npx tsc --noEmit
+ratchet:
+  name: hex
+  ceiling: 160
+runtime_data:
+  - .goblin/state.json
+YAML
+
+  local got
+  got=$(g_yaml_scalar "$tmp/g.yaml" class)
+  [ "$got" = "B" ] || { g_err "scalar: expected B, got '$got'"; rc=1; }
+  got=$(g_yaml_scalar "$tmp/g.yaml" branch)
+  [ "$got" = "master" ] || { g_err "scalar: expected master, got '$got'"; rc=1; }
+  got=$(g_yaml_scalar "$tmp/g.yaml" nosuchkey)
+  [ -z "$got" ] || { g_err "scalar: absent key should be empty, got '$got'"; rc=1; }
+  got=$(g_yaml_block_scalar "$tmp/g.yaml" ratchet ceiling)
+  [ "$got" = "160" ] || { g_err "block scalar: expected 160, got '$got'"; rc=1; }
+  got=$(g_yaml_block_scalar "$tmp/g.yaml" ratchet name)
+  [ "$got" = "hex" ] || { g_err "block scalar: expected hex, got '$got'"; rc=1; }
+  got=$(g_yaml_gates "$tmp/g.yaml" | tr '\t' ':')
+  [ "$got" = "typecheck:npx tsc --noEmit" ] || { g_err "gates: got '$got'"; rc=1; }
+  got=$(g_yaml_list "$tmp/g.yaml" runtime_data | tr '\n' ',')
+  [ "$got" = ".goblin/state.json," ] || { g_err "list: got '$got'"; rc=1; }
+  got=$(g_yaml_disabled "$tmp/g.yaml" | tr '\n' ',')
+  [ "$got" = "spec,tokens," ] || { g_err "disabled: got '$got'"; rc=1; }
+
+  rm -rf "$tmp"
+  if [ "$rc" -eq 0 ]; then
+    printf 'OK\n'
+  else
+    printf 'SELF-TEST FAILED\n' >&2
+  fi
+  return "$rc"
+}
+
+# Allow `bash bin/goblin-lib.sh --self-test` and `source bin/goblin-lib.sh`.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  case "${1:-}" in
+    --self-test) g_self_test ;;
+    --version)   printf '%s\n' "$GOBLIN_LIB_VERSION" ;;
+    *)           printf 'usage: goblin-lib.sh --self-test\n' >&2; exit 2 ;;
+  esac
+  exit $?
+fi
