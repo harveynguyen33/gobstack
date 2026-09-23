@@ -11,6 +11,7 @@ note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
 printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n  reviewer:\n    model: model-review\n    provider: prov-review\n    effort: high\n' > "$WORK/models.yaml"
+printf '# a fixture standard\nthe house style lives here\n' > "$WORK/standard.md"
 
 mkdir -p "$WORK/target" && cd "$WORK/target"
 git init -q -b main
@@ -20,7 +21,7 @@ printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 PRE_CHANGE=$(git rev-parse --short HEAD)
 
-bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --models "$WORK/models.yaml" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install goblin-stack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
@@ -35,6 +36,7 @@ cp -a .goblin/goblin.yaml "$BK/goblin.yaml"
 cp -a .goblin/manifest/enforcement.tsv "$BK/enforcement.tsv"
 cp -a .hermes/skills/goblin-mode/SKILL.md "$BK/SKILL.md"
 cp -a ROUND-000-SPEC.md "$BK/ROUND-000-SPEC.md"
+cp -a "$WORK/standard.md" "$BK/standard.md"
 
 restore_all() {
   cp -a "$BK/HANDOFF.md" HANDOFF.md
@@ -42,6 +44,7 @@ restore_all() {
   cp -a "$BK/enforcement.tsv" .goblin/manifest/enforcement.tsv
   cp -a "$BK/SKILL.md" .hermes/skills/goblin-mode/SKILL.md
   cp -a "$BK/ROUND-000-SPEC.md" ROUND-000-SPEC.md
+  cp -a "$BK/standard.md" "$WORK/standard.md"
   rm -f checks/green.mjs newfile.txt reviews/fixture-*.md
   rm -rf .github
   git add -A >/dev/null 2>&1
@@ -67,6 +70,7 @@ m_drop_heading()  { sed -i 's/^## Gates$/## Gate numbers/' HANDOFF.md; git add -
 m_blank_row()     { sed -i -E 's/^(HP-05\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t)[^\t]*/\1/' .goblin/manifest/enforcement.tsv; }
 m_break_gate()    { sed -i 's|^    cmd: git rev-parse --verify --quiet HEAD|    cmd: false|' .goblin/goblin.yaml; }
 m_drop_spec()     { rm -f ./*-SPEC.md; git add -A >/dev/null 2>&1; git commit -q -m "test: drop spec" >/dev/null 2>&1; }
+m_edit_practice() { printf '# an edited byte\n' >> "$WORK/standard.md"; }
 m_model_leak()    { printf '\nmodel: deepseek-v9-turbo\n' >> .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
 m_wrong_branch()  { sed -i 's/^branch: main/branch: trunk/' .goblin/goblin.yaml; }
@@ -82,6 +86,7 @@ expect_red "a HANDOFF heading renamed"      HP-02 1 m_drop_heading
 expect_red "a manifest row with no check"   IN-03 3 m_blank_row
 expect_red "a gate that exits non-zero"     GT-02 1 m_break_gate
 expect_red "no SPEC"                        SP-01 1 m_drop_spec
+expect_red "one edited byte of the standard" IN-02 1 m_edit_practice
 expect_red "a hardcoded model name"         MD-01 1 m_model_leak
 expect_red "an edited installed skill"      SK-02 1 m_skill_drift
 expect_red "the declared branch is wrong"   PT-02 1 m_wrong_branch

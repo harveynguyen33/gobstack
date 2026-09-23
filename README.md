@@ -64,7 +64,7 @@ Every run prints what it cannot see.
 
     bash tests/run-tests.sh
 
-Runs the source-scope rules (PR-01..PR-04) and four scripts, including `t-verify-red.sh` — 14
+Runs the source-scope rules (PR-01..PR-04) and four scripts, including `t-verify-red.sh` — 15
 mutations, one per check class, each required to go RED and then restored. **A verifier that
 only ever prints GREEN is a failure**, so that file is the one that matters most.
 

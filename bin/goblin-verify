@@ -153,7 +153,23 @@ check_in_02() {
     fi
   done < <(g_installed_files "$INSTALLED")
   [ "$n" -gt 0 ] || { printf 'installed.json lists no files\n'; return 1; }
-  printf '%d installed files hashed\n' "$n"
+  # The practice pin rides on this row (R6 section 2.1 requires the pin; section 5 has no row of
+  # its own for it). Both are the same statement: a recorded hash still matches the file on disk.
+  local pin=""
+  if [ -n "$PRACTICE" ] && [ -n "$PRACTICE_SHA" ]; then
+    if [ ! -e "$PRACTICE" ]; then
+      printf 'practice standard not found: %s\n' "$PRACTICE"; bad=1; pin=" | practice missing"
+    else
+      cur=$(g_sha256_file "$PRACTICE")
+      if [ "$cur" != "$PRACTICE_SHA" ]; then
+        printf 'practice standard edited: %s\n  recorded %s\n  now      %s\n' "$PRACTICE" "$PRACTICE_SHA" "$cur"
+        bad=1; pin=" | practice EDITED"
+      else
+        pin=" | practice pin ok"
+      fi
+    fi
+  fi
+  printf '%d installed files hashed%s\n' "$n" "$pin"
   [ "$bad" -eq 0 ]
 }
 
