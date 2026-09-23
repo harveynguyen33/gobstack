@@ -1,0 +1,6 @@
+# goblin-stack's own working files. Nothing here is installed into a target repo.
+.goblin/state.json
+.goblin/last-gate-line
+.goblin/.ds-report
+*.bak
+.DS_Store
