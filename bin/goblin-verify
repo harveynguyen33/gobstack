@@ -530,7 +530,12 @@ check_cl_01() {
       continue
     fi
     case "$need" in
-      R) if [ "$present" -ne 0 ]; then printf 'class %s requires part %s, artifact absent\n' "$CLASS" "$part"; bad=1; fi ;;
+      R)
+        if [ "$ARCHIVE" = "true" ]; then
+          printf 'part %s: waived (archive: true)\n' "$part"
+        elif [ "$present" -ne 0 ]; then
+          printf 'class %s requires part %s, artifact absent\n' "$CLASS" "$part"; bad=1
+        fi ;;
       -) if [ "$present" -eq 0 ]; then printf 'class %s forbids part %s, artifact present\n' "$CLASS" "$part"; bad=1; fi ;;
       O) printf 'part %s: optional, %s\n' "$part" "$([ "$present" -eq 0 ] && echo present || echo absent)" ;;
     esac
@@ -596,7 +601,14 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
       ;;
     *)
       detail=$( cd "$ROOT" && bash -c "$check" 2>&1 ); rc=$?
-      [ -n "$detail" ] || detail="($check)"
+      # A shell check has no advisory state: anything non-zero is a FAIL. Only builtins
+      # (the 'goblin-verify --only <ID>' marker rows) may return 2 = advisory or 3 = skip.
+      if [ "$rc" -eq 0 ]; then
+        [ -n "$detail" ] || detail="($check)"
+      else
+        detail="($check -> exit $rc)"
+        rc=1
+      fi
       ;;
   esac
 

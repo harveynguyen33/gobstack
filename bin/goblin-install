@@ -89,6 +89,12 @@ if [ "$UNINSTALL" -eq 1 ]; then
     if [ "$DRY_RUN" -eq 1 ]; then g_info "would remove $p"; else rm -f "$TARGET/$p"; fi
     n=$((n + 1))
   done < <(g_installed_files "$INSTALLED")
+  # The config is goblin-stack's own file, so it goes too. HANDOFF/AGENTS/SPEC/reviews do not:
+  # they are the project's record, not the harness's.
+  if [ -f "$CONFIG" ]; then
+    [ "$DRY_RUN" -eq 1 ] || rm -f "$CONFIG"
+    g_info "removed .goblin/goblin.yaml (goblin-stack's own config)"
+  fi
   # empty directories goblin-stack created
   for d in .goblin/bin .goblin/manifest .goblin .hermes/skills .hermes; do
     if [ -d "$TARGET/$d" ] && [ -z "$(ls -A "$TARGET/$d" 2>/dev/null)" ]; then
@@ -101,7 +107,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
       printf '# goblin-stack uninstalled %s\n' "$STAMP" >> "$TARGET/.gitignore"
     fi
   fi
-  g_info "removed $n file(s). Left in place: HANDOFF.md, AGENTS.md, reviews/, the .gitignore block."
+  g_info "removed $n file(s). Left in place: HANDOFF.md, AGENTS.md, ROUND-000-SPEC.md, reviews/, the .gitignore block."
   exit 0
 fi
 
@@ -180,9 +186,13 @@ part_wanted() {
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 : > "$TMP/files.tsv"
-CREATED=0; UPDATED=0; UNCHANGED=0; SKIPPED=0
+: > "$TMP/owned.tsv"
 : > "$TMP/refused.tsv"
+CREATED=0; UPDATED=0; UNCHANGED=0; SKIPPED=0
 REFUSED_PATHS=""
+# Files a PREVIOUS run created and left to the user (never overwritten, never hash-checked).
+PREV_OWNED=""
+if [ -f "$INSTALLED" ]; then PREV_OWNED=$(g_json_object "$INSTALLED" owned | cut -f1); fi
 
 render() { # render <template> key value [key value ...]
   local tpl="$1"; shift
@@ -222,6 +232,32 @@ put() {
   printf '%s\t%s\n' "$rel" "$srch" >> "$TMP/files.tsv"
 }
 
+# put_once <relpath> <source-file> — created once, then YOURS. Never overwritten, never
+# hash-checked (you are meant to edit it), and left in place by --uninstall.
+put_once() {
+  local rel="$1" srcf="$2"
+  local dst="$TARGET/$rel" srch cur
+  srch=$(g_sha256_file "$srcf")
+  if [ -f "$dst" ]; then
+    SKIPPED=$((SKIPPED + 1))
+    if printf '%s\n' "$PREV_OWNED" | grep -qxF "$rel"; then
+      g_info "kept (yours, never overwritten): $rel"
+    else
+      cur=$(g_sha256_file "$dst")
+      printf '%s\t%s\n' "$rel" "$cur" >> "$TMP/refused.tsv"
+      REFUSED_PATHS="$REFUSED_PATHS $rel"
+      g_info "kept (existed before the install, never overwritten): $rel"
+    fi
+  else
+    CREATED=$((CREATED + 1))
+    if [ "$DRY_RUN" -eq 1 ]; then g_info "plan: $rel"; else
+      mkdir -p "$(dirname "$dst")"
+      cp "$srcf" "$dst"
+    fi
+  fi
+  printf '%s\t%s\n' "$rel" "$srch" >> "$TMP/owned.tsv"
+}
+
 # ------------------------------------------------------- generated content ---
 render_config() {
   local gates runtime
@@ -257,7 +293,7 @@ put ".goblin/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
 put ".goblin/manifest/playbooks.tsv" "$SRC/manifest/playbooks.tsv"
 put ".goblin/manifest/classes.tsv" "$SRC/manifest/classes.tsv"
 put ".goblin/manifest/glossary.tsv" "$SRC/manifest/glossary.tsv"
-put ".goblin/goblin.yaml" "$TMP/goblin.yaml" refuse
+put_once ".goblin/goblin.yaml" "$TMP/goblin.yaml"
 
 if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
   for d in "$SRC"/skills/*/; do
@@ -269,18 +305,18 @@ fi
 
 if [ "$WANT_SPEC" -eq 1 ] && part_wanted spec; then
   render "$SRC/templates/SPEC.md.tmpl" CLASS "$CLASS" DATE "$STAMP" > "$TMP/spec"
-  put "ROUND-000-SPEC.md" "$TMP/spec" refuse
+  put_once "ROUND-000-SPEC.md" "$TMP/spec"
 fi
 if [ "$ARCHIVE" != "true" ] && part_wanted handoff; then
   render "$SRC/templates/HANDOFF.md.tmpl" CLASS "$CLASS" DATE "$STAMP" HEAD "$HEAD_SHORT" BRANCH "$BRANCH" GATE_NAME "$GATE_NAME" GATE_CMD "$GATE_CMD" > "$TMP/handoff"
-  put "HANDOFF.md" "$TMP/handoff" refuse
+  put_once "HANDOFF.md" "$TMP/handoff"
 fi
 render "$SRC/templates/AGENTS.md.tmpl" CLASS "$CLASS" DATE "$STAMP" > "$TMP/agents"
-put "AGENTS.md" "$TMP/agents" refuse
+put_once "AGENTS.md" "$TMP/agents"
 
 if [ "$WANT_REVIEWS" -eq 1 ]; then
   printf '# Review verdicts live here: reviews/<slug>-<head7>.md, each naming the SHA it reviewed.\n' > "$TMP/gitkeep"
-  put "reviews/.gitkeep" "$TMP/gitkeep" refuse
+  put_once "reviews/.gitkeep" "$TMP/gitkeep"
 fi
 
 if [ "$SCAFFOLD" = "yes" ]; then
@@ -317,6 +353,9 @@ fi
   printf '  "options": {"skills": "%s", "archive": %s, "parts": "%s"},\n' "$SKILLS" "$ARCHIVE" "${PARTS:-all}"
   printf '  "files": {\n'
   awk -F'\t' 'NF==2 {printf "    \"%s\": \"%s\",\n", $1, $2}' "$TMP/files.tsv" | sed '$ s/,$//'
+  printf '  },\n'
+  printf '  "owned": {\n'
+  awk -F'\t' 'NF==2 {printf "    \"%s\": \"%s\",\n", $1, $2}' "$TMP/owned.tsv" | sed '$ s/,$//'
   printf '  },\n'
   printf '  "refused": {\n'
   awk -F'\t' 'NF==2 {printf "    \"%s\": \"%s\",\n", $1, $2}' "$TMP/refused.tsv" | sed '$ s/,$//'

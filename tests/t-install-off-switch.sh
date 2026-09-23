@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# t-install-off-switch.sh — the class matrix is a real switch, not a label.
+#   class D + --archive  -> no checks/, no HANDOFF, no SPEC, no reviews/, verify exits 0
+#   class A              -> the same shape fails HP-01 and CL-01
+# Run by tests/run-tests.sh.
+set -uo pipefail
+
+SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+WORK=$(mktemp -d)
+fail=0
+note() { printf '      %s\n' "$*"; }
+check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
+
+printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
+
+mkfix() {
+  mkdir -p "$1" && cd "$1"
+  git init -q -b main
+  git config user.name "Test Runner"
+  git config user.email "runner@example.com"
+  printf '# %s\n' "$(basename "$1")" > README.md
+  git add -A && git commit -q -m "chore: seed"
+}
+
+# ---- class D + --archive -----------------------------------------------------
+mkfix "$WORK/archived"
+bash "$SRC/bin/goblin-install" --target "$WORK/archived" --class D --archive --models "$WORK/models.yaml" >/dev/null 2>&1
+check "archive install exits 0" "$?"
+check "no checks/ directory" "$([ ! -d checks ] && echo 0 || echo 1)"
+check "no HANDOFF.md" "$([ ! -f HANDOFF.md ] && echo 0 || echo 1)"
+check "no *-SPEC.md" "$(ls ./*-SPEC.md >/dev/null 2>&1 && echo 1 || echo 0)"
+check "no reviews/ directory" "$([ ! -d reviews ] && echo 0 || echo 1)"
+check "no .goblin/tokens.yaml" "$([ ! -f .goblin/tokens.yaml ] && echo 0 || echo 1)"
+git add -A && git commit -q -m "chore: install (archive)"
+VERIFY_OUT=$(bash .goblin/bin/goblin-verify 2>&1); VERIFY_RC=$?
+note "verify exit=$VERIFY_RC"
+printf '%s' "$VERIFY_OUT" | grep -q 'SKIP  HP-01'
+check "HP-01 is skipped for an archive project" "$?"
+printf '%s' "$VERIFY_OUT" | grep -q 'SKIP  GT-01'
+check "GT-01 is skipped for an archive project" "$?"
+check "archive verify exits 0 without a HANDOFF" "$VERIFY_RC"
+printf '%s' "$VERIFY_OUT" | grep -q 'archive: true'
+check "the summary says why the rows were skipped" "$?"
+
+# ---- the same shape, class A: the switch is what made it pass ----------------
+mkfix "$WORK/notarchived"
+bash "$SRC/bin/goblin-install" --target "$WORK/notarchived" --class A --models "$WORK/models.yaml" >/dev/null 2>&1
+git add -A && git commit -q -m "chore: install (class A)"
+rm -f HANDOFF.md && git add -A && git commit -q -m "test: remove the HANDOFF"
+A_OUT=$(bash .goblin/bin/goblin-verify 2>&1); A_RC=$?
+note "class A without a HANDOFF: verify exit=$A_RC"
+printf '%s' "$A_OUT" | grep -q 'FAIL  HP-01'
+check "class A fails HP-01 when the HANDOFF is gone" "$?"
+printf '%s' "$A_OUT" | grep -q 'FAIL  CL-01'
+check "class A fails CL-01 when a required part is absent" "$?"
+check "and the run is not green" "$([ "$A_RC" -eq 1 ] && echo 0 || echo 1)"
+
+if [ "$fail" -eq 0 ]; then note "t-install-off-switch: PASS"; else note "t-install-off-switch: FAIL"; fi
+exit "$fail"
