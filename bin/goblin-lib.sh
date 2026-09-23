@@ -66,6 +66,43 @@ g_expand_tilde() {
 }
 
 # ------------------------------------------------------------------ yaml -----
+# g_models_field <mapping-file> <profile> <field> — read one field of one profile out of a
+# model mapping file. That file is two-level (a profile header, then its fields), so it is
+# read with python3 — the same way the fleet's own tool reads it. Prints nothing if absent.
+g_models_field() {
+  python3 -c '
+import re, sys
+path, profile, field = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    lines = open(path, encoding="utf-8", errors="replace").read().split("\n")
+except OSError:
+    sys.exit(0)
+start, base = None, 0
+for i, ln in enumerate(lines):
+    m = re.match(r"^(\s*)([A-Za-z_][\w.-]*):\s*$", ln)
+    if m and m.group(2) == profile:
+        start, base = i, len(m.group(1)); break
+if start is not None:
+    for ln in lines[start + 1:]:
+        if not ln.strip() or ln.lstrip().startswith("#"):
+            continue
+        if len(ln) - len(ln.lstrip()) <= base:
+            break
+        m = re.match(r"^\s*([A-Za-z_][\w.-]*):\s*(.*)$", ln)
+        if m and m.group(1) == field:
+            v = m.group(2).strip()
+            print(v[1:-1] if len(v) > 1 and v[0] == v[-1] and v[0] in "\"\x27" else v)
+            break
+' "$1" "$2" "$3"
+}
+
+# g_unquote <value> — strip one layer of surrounding double quotes.
+g_unquote() {
+  local v="$1"
+  v=${v%\"}; v=${v#\"}
+  printf '%s' "$v"
+}
+
 # g_yaml_scalar <file> <key> — value of a top-level scalar key (empty if absent).
 g_yaml_scalar() {
   sed -n "s/^$2:[[:space:]]*//p" "$1" | head -n 1
@@ -130,10 +167,10 @@ g_class_need() {
 
 # ---------------------------------------------------------------- json -------
 # installed.json is emitted by goblin-install in a fixed, line-oriented shape so it can
-# be read without a JSON library. g_installed_files <installed.json> -> "path<TAB>hash".
-g_installed_files() {
-  awk '
-    /"files"[[:space:]]*:[[:space:]]*\{/ { inf = 1; next }
+# be read without a JSON library. g_json_object <installed.json> <object-name> -> "key<TAB>value".
+g_json_object() {
+  awk -v name="$2" '
+    index($0, "\"" name "\"") && /:[[:space:]]*\{/ { inf = 1; next }
     inf && /^[[:space:]]*\}/ { inf = 0 }
     inf && /"/ {
       line = $0
@@ -144,6 +181,8 @@ g_installed_files() {
     }
   ' "$1"
 }
+
+g_installed_files() { g_json_object "$1" files; }
 
 g_installed_scalar() {
   sed -n "s/^[[:space:]]*\"$2\"[[:space:]]*:[[:space:]]*\"\{0,1\}\([^\",]*\)\"\{0,1\},\{0,1\}$/\1/p" "$1" | head -n 1

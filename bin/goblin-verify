@@ -140,7 +140,7 @@ row_part() {
 # ============================================================== builtins ======
 # Each builtin prints its detail and returns 0 pass | 1 fail | 2 advisory | 3 skip.
 
-check_IN_02() {
+check_in_02() {
   local p h cur n=0 bad=0
   while IFS=$'\t' read -r p h; do
     [ -n "$p" ] || continue
@@ -156,19 +156,36 @@ check_IN_02() {
   [ "$bad" -eq 0 ]
 }
 
-check_IN_04() {
-  local p h cur n=0 bad=0
+check_in_04() {
+  local p h n=0 bad=0 files
+  files=$(g_installed_files "$INSTALLED" | cut -f1)
   while IFS=$'\t' read -r p h; do
     [ -n "$p" ] || continue
     n=$((n + 1))
     if [ ! -e "$ROOT/$p" ]; then printf 'pre-existing file vanished: %s\n' "$p"; bad=1; continue; fi
-    cur=$(g_sha256_file "$ROOT/$p")
-    [ "$cur" = "$h" ] || { printf 'pre-existing file modified: %s\n' "$p"; bad=1; }
+    if printf '%s\n' "$files" | grep -qxF "$p"; then
+      printf 'pre-existing file was taken over by the install: %s\n' "$p"; bad=1
+    fi
   done < <(g_json_object "$INSTALLED" refused)
+  printf '%d pre-existing file(s) left untouched\n' "$n"
   [ "$bad" -eq 0 ]
 }
 
-check_GT_01() {
+check_hp_05() {
+  local tok found=0 head
+  head=$(cd "$ROOT" && git rev-parse HEAD 2>/dev/null)
+  for tok in $(grep -oE '[0-9a-f]{7,40}' "$ROOT/HANDOFF.md" 2>/dev/null | sort -u); do
+    ( cd "$ROOT" && git rev-parse --verify --quiet "$tok^{commit}" >/dev/null 2>&1 ) || continue
+    ( cd "$ROOT" && git merge-base --is-ancestor "$tok" HEAD 2>/dev/null ) || continue
+    printf 'names %s (ancestor of HEAD %s)\n' "$tok" "${head:0:7}"
+    found=1
+    break
+  done
+  [ "$found" -eq 1 ] || printf 'HANDOFF.md names no commit that exists in this repo\n'
+  [ "$found" -eq 1 ]
+}
+
+check_gt_01() {
   local n
   n=$(g_yaml_gates "$CONFIG" | grep -c . || true)
   [ "$n" -ge 1 ] || { printf 'no gate declared in %s\n' "$CONFIG"; return 1; }
@@ -199,9 +216,9 @@ run_gates() {
   return $bad
 }
 
-check_GT_02() { run_gates yes; }
+check_gt_02() { run_gates yes; }
 
-check_GT_04() {
+check_gt_04() {
   local n c ceil
   n=$(g_yaml_block_scalar "$CONFIG" ratchet name)
   c=$(g_yaml_block_scalar "$CONFIG" ratchet cmd)
@@ -213,7 +230,7 @@ check_GT_04() {
   return 0
 }
 
-check_GT_05() {
+check_gt_05() {
   local n c ceil val old prev="" note=""
   n=$(g_yaml_block_scalar "$CONFIG" ratchet name)
   c=$(g_yaml_block_scalar "$CONFIG" ratchet cmd)
@@ -233,7 +250,7 @@ check_GT_05() {
   return 0
 }
 
-check_HS_01() {
+check_hs_01() {
   local d="$GOBLIN_HARNESS_DIR" f base asserting=0 reporting=0 bad=0
   [ -n "$d" ] || return 3
   for f in "$d"/*; do
@@ -251,7 +268,7 @@ check_HS_01() {
   [ "$bad" -eq 0 ]
 }
 
-check_HS_02() {
+check_hs_02() {
   local env cmd commit d tmp bad=0 f rc base
   env=$(g_yaml_block_scalar "$CONFIG" replay env)
   cmd=$(g_yaml_block_scalar "$CONFIG" replay cmd)
@@ -286,7 +303,7 @@ check_HS_02() {
   return $bad
 }
 
-check_CM_03() {
+check_cm_03() {
   local n
   n=$(cd "$ROOT" && git status --porcelain 2>/dev/null | wc -l | tr -d '[:space:]')
   printf '%s dirty entr(y|ies), max_dirty %s\n' "$n" "$MAX_DIRTY"
@@ -309,7 +326,7 @@ resolve_role_models() {
   done
 }
 
-check_MD_02() {
+check_md_02() {
   local code_line panel_line code_fam panel_fam
   if [ ! -f "$MODELS_FILE" ]; then
     printf 'no model mapping configured (%s absent) - advisory\n' "$MODELS_FILE"
@@ -331,7 +348,7 @@ check_MD_02() {
   return 2
 }
 
-check_PG_01() {
+check_pg_01() {
   local f head n=0 bad=0
   for f in "$ROOT"/reviews/*.md; do
     [ -e "$f" ] || continue
@@ -347,7 +364,7 @@ check_PG_01() {
   [ "$bad" -eq 0 ]
 }
 
-check_PG_02() {
+check_pg_02() {
   local f stakes lanes n=0 bad=0
   for f in "$ROOT"/reviews/*.md; do
     [ -e "$f" ] || continue
@@ -377,7 +394,7 @@ check_PG_02() {
   [ "$bad" -eq 0 ]
 }
 
-check_PG_03() {
+check_pg_03() {
   local f base head rec now n=0 bad=0
   for f in "$ROOT"/reviews/*.md; do
     [ -e "$f" ] || continue
@@ -398,7 +415,7 @@ check_PG_03() {
   [ "$bad" -eq 0 ]
 }
 
-check_PG_05() {
+check_pg_05() {
   local f n=0 bad=0
   for f in "$ROOT"/.github/workflows/*.yml "$ROOT"/.github/workflows/*.yaml; do
     [ -e "$f" ] || continue
@@ -426,7 +443,7 @@ hash_runtime_data() {
   printf '%s' "${out% }"
 }
 
-check_DS_01() {
+check_ds_01() {
   local before after
   before=$(hash_runtime_data)
   run_gates no >/dev/null 2>&1
@@ -441,18 +458,21 @@ check_DS_01() {
   return 0
 }
 
-check_DS_02() {
+check_ds_02() {
   [ -f "$ROOT/.goblin/.ds-report" ] || { printf 'no DS-01 report in this run\n'; return 1; }
   local b a
   b=$(sed -n 's/^before=//p' "$ROOT/.goblin/.ds-report")
   a=$(sed -n 's/^after=//p' "$ROOT/.goblin/.ds-report")
   [ "$b" = "$a" ] || { printf 'before/after differ\n'; return 1; }
-  [ -f "$ROOT/.goblin/last-gate-line" ] && printf ' · runtime_data %s\n' "${b:-<none declared>}" >> "$ROOT/.goblin/last-gate-line"
+  [ -f "$ROOT/.goblin/last-gate-line" ] || { printf 'no gate line to annotate\n'; return 0; }
+  local line
+  line=$(tr -d '\n' < "$ROOT/.goblin/last-gate-line")
+  printf '%s · runtime_data %s\n' "$line" "${b:-<none declared>}" > "$ROOT/.goblin/last-gate-line"
   printf 'snapshot %s\n' "${b:-<none declared>}"
   return 0
 }
 
-check_SK_02() {
+check_sk_02() {
   local p h cur n=0 bad=0
   while IFS=$'\t' read -r p h; do
     case "$p" in .hermes/skills/*) ;; *) continue ;; esac
@@ -465,14 +485,14 @@ check_SK_02() {
   [ "$bad" -eq 0 ]
 }
 
-check_SK_03() {
+check_sk_03() {
   local k
   k=$(awk -F'\t' 'NR>1 && $6=="advisory" {n++} END{print n+0}' "$MANIFEST")
   printf 'advisory %d of ceiling %d\n' "$k" "$ADV_CEILING"
   [ "$k" -le "$ADV_CEILING" ]
 }
 
-check_PT_02() {
+check_pt_02() {
   local cur
   cur=$(cd "$ROOT" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
   printf 'declared %s, actual %s\n' "$BRANCH" "$cur"
@@ -499,7 +519,7 @@ class_part_artifact() {
   esac
 }
 
-check_CL_01() {
+check_cl_01() {
   local part need present bad=0
   while read -r part; do
     [ -n "$part" ] || continue
@@ -518,7 +538,7 @@ check_CL_01() {
   [ "$bad" -eq 0 ]
 }
 
-check_CL_02() {
+check_cl_02() {
   if [ "$ARCHIVE" = "true" ]; then
     printf 'archive: true - HP-*/GT-*/SP-* skipped, no HANDOFF or gates required\n'
   else

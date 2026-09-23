@@ -217,6 +217,7 @@ put() {
   if [ "$DRY_RUN" -eq 1 ]; then g_info "plan: $rel"; else
     mkdir -p "$(dirname "$dst")"
     cp "$srcf" "$dst"
+    [ -x "$srcf" ] && chmod +x "$dst"
   fi
   printf '%s\t%s\n' "$rel" "$srch" >> "$TMP/files.tsv"
 }
