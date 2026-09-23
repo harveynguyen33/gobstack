@@ -1,0 +1,21 @@
+term	definition	source
+playbook	A named, ordered procedure with a measurable verification step. goblin-stack ships 12.	R6 sec.3
+skill	A Hermes SKILL.md directory. goblin-stack installs its skills into the target repo at .hermes/skills/ (project tier), never into a profile.	R6 sec.0.1 / sec.7.3
+profile	A worker identity in the Hermes fleet (architect, coder, reviewer, ...). Owns memory and skills.	R4
+role	What the work needs: code | judgment | review-panel | synthesis | investigate. A role maps to a profile; it never names a model.	R6 sec.4.1
+class	A project category A-E that selects which parts are required, optional or off. See manifest/classes.tsv.	R7 sec.4
+part	One installable unit a class requires or forbids: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, playbooks, tokens.	R7 sec.5
+gate	A declared command that must exit 0. Declared per project, never inferred from the stack.	PP sec.4
+ratchet	A count that must not rise, with a declared ceiling; a rise is allowed only when re-anchored with the arithmetic (old + N new = new).	PP sec.4
+HANDOFF	The session-boundary contract at the repo root: START HERE / State / Gates / Next steps / NOT verified.	PP sec.1
+SPEC	A per-round document written before implementation: measured root cause plus an AC: list checkable without a human.	PP sec.2
+REPLAY	Re-running each assertion against the pinned pre-change commit and requiring it to be RED there. A check green on both trees proves nothing.	PP sec.3
+harness	An asserting check file: a failures counter, an assert(name, ok, detail) printer, and a non-zero exit on failure.	PP sec.3
+stakes	The S0-S4 ladder that chooses the review gate strength by the change, not by the repo.	R5 sec.3.2
+patch-id	git patch-id --stable of base..head. A new head voids a verdict; a matching commit message does not restore it.	R1 sec.10
+advisory	A rule with no executable check. Counted in the verify summary and capped by advisory_ceiling; never a silent pass.	R6 sec.5
+opt-out	A part recorded in disabled: so its required checks report SKIP (opt-out) instead of failing.	R6 sec.6.3
+archive	A class-D flag: verify requires no HANDOFF and no gates, and the summary says so.	R7 sec.2.4
+sweep	P11: the same change or question across many projects, enumerated by glob, one card each.	R6 sec.3
+overnight	P10: an unattended run over a checkable predicate written before iteration 1.	R6 sec.3
+review-panel	N independent verdict lanes, each its own card with its own resolved model. Only at stakes S3+.	R6 sec.4.3
