@@ -1,0 +1,366 @@
+#!/usr/bin/env bash
+# goblin-install — drop the harness into a target repo, idempotently.
+#
+# Usage: goblin-install --target <dir> [options]
+#   --target <dir>        required; the repo root to install into
+#   --class A|B|C|D|E     required unless --uninstall; anything else needs an explicit class
+#   --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)
+#   --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md)
+#   --parts <list>        comma list to install; default = every part the class requires
+#   --archive             mark the project archive: verify requires no HANDOFF and no gates
+#   --skills yes|no       install .hermes/skills (default yes; needs the one-time skills trust step)
+#   --dry-run             print the plan; write nothing
+#   --upgrade             re-install at the current version; report created/updated/unchanged/skipped
+#   --opt-out <part>      record the part in disabled: so its required checks are skipped
+#   --uninstall           remove exactly the files in installed.json
+#   --force               allow overwriting a file goblin-stack did not create
+#   --yes                 non-interactive; take the defaults above
+#
+# Exit codes: 0 success / no-op | 1 a refusal (with the path and the fix) | 2 bad input or a
+# missing dependency.
+
+set -uo pipefail
+
+GOBLIN_INSTALL_VERSION="0.1.0"
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SRC=$(cd "$SELF_DIR/.." && pwd)
+# shellcheck source=goblin-lib.sh
+. "$SELF_DIR/goblin-lib.sh"
+
+TARGET=""
+CLASS=""
+MODELS="${GOBLIN_MODELS:-$HOME/projects/fleet-model.yaml}"
+PRACTICE="${GOBLIN_PRACTICE:-$HOME/projects/PROJECT-PRACTICE.md}"
+PARTS=""
+ARCHIVE="false"
+SKILLS="yes"
+DRY_RUN=0
+UPGRADE=0
+UNINSTALL=0
+FORCE=0
+OPT_OUT=""
+
+usage() {
+  sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --target)    TARGET="${2:-}"; shift 2 ;;
+    --class)     CLASS="${2:-}"; shift 2 ;;
+    --models)    MODELS="${2:-}"; shift 2 ;;
+    --practice)  PRACTICE="${2:-}"; shift 2 ;;
+    --parts)     PARTS="${2:-}"; shift 2 ;;
+    --archive)   ARCHIVE="true"; shift ;;
+    --skills)    SKILLS="${2:-}"; shift 2 ;;
+    --dry-run)   DRY_RUN=1; shift ;;
+    --upgrade)   UPGRADE=1; shift ;;
+    --uninstall) UNINSTALL=1; shift ;;
+    --opt-out)   OPT_OUT="${2:-}"; shift 2 ;;
+    --force)     FORCE=1; shift ;;
+    --yes)       shift ;;
+    -h|--help)   usage; exit 0 ;;
+    *) g_err "unknown option: $1"; usage >&2; exit 2 ;;
+  esac
+done
+
+for dep in git awk sed grep; do
+  command -v "$dep" >/dev/null 2>&1 || { g_err "missing dependency: $dep"; exit 2; }
+done
+[ -n "$TARGET" ] || { g_err "--target is required"; exit 2; }
+TARGET=$(g_expand_tilde "$TARGET")
+[ -d "$TARGET" ] || { g_err "--target is not a directory: $TARGET"; exit 2; }
+TARGET=$(cd "$TARGET" && pwd)
+[ -f "$SRC/VERSION" ] || { g_err "no VERSION at $SRC — is this a goblin-stack checkout?"; exit 2; }
+
+VERSION=$(head -n 1 "$SRC/VERSION")
+CLASSES_TSV="$SRC/manifest/classes.tsv"
+INSTALLED="$TARGET/.goblin/installed.json"
+CONFIG="$TARGET/.goblin/goblin.yaml"
+STAMP=$(date +%F)
+
+# ------------------------------------------------------------- uninstall ------
+if [ "$UNINSTALL" -eq 1 ]; then
+  [ -f "$INSTALLED" ] || { g_err "nothing to uninstall: $INSTALLED is absent"; exit 2; }
+  n=0
+  while IFS=$'\t' read -r p h; do
+    [ -n "$p" ] || continue
+    [ -e "$TARGET/$p" ] || continue
+    if [ "$DRY_RUN" -eq 1 ]; then g_info "would remove $p"; else rm -f "$TARGET/$p"; fi
+    n=$((n + 1))
+  done < <(g_installed_files "$INSTALLED")
+  # empty directories goblin-stack created
+  for d in .goblin/bin .goblin/manifest .goblin .hermes/skills .hermes; do
+    if [ -d "$TARGET/$d" ] && [ -z "$(ls -A "$TARGET/$d" 2>/dev/null)" ]; then
+      [ "$DRY_RUN" -eq 1 ] || rmdir "$TARGET/$d" 2>/dev/null
+    fi
+  done
+  if [ "$DRY_RUN" -eq 0 ]; then
+    rm -f "$INSTALLED"
+    if [ -f "$TARGET/.gitignore" ]; then
+      printf '# goblin-stack uninstalled %s\n' "$STAMP" >> "$TARGET/.gitignore"
+    fi
+  fi
+  g_info "removed $n file(s). Left in place: HANDOFF.md, AGENTS.md, reviews/, the .gitignore block."
+  exit 0
+fi
+
+[ -n "$CLASS" ] || { g_err "--class is required (A|B|C|D|E)"; exit 2; }
+case "$CLASS" in A|B|C|D|E) ;; *) g_err "--class must be one of A B C D E, got '$CLASS'"; exit 2 ;; esac
+case "$SKILLS" in yes|no) ;; *) g_err "--skills must be yes or no"; exit 2 ;; esac
+
+PRESET=$(ls "$SRC"/presets/"$CLASS"-*.yaml 2>/dev/null | head -n 1)
+[ -n "$PRESET" ] || { g_err "no preset for class $CLASS"; exit 2; }
+
+preset() { local v; v=$(g_yaml_scalar "$PRESET" "$1"); printf '%s' "${v%\"}" | sed 's/^"//'; }
+
+HARNESS_DIR=$(preset harness_dir); [ -n "$HARNESS_DIR" ] || HARNESS_DIR=checks
+SCAFFOLD=$(preset scaffold_checks)
+GATE_NAME=$(preset gate_name)
+GATE_CMD=$(preset gate_cmd)
+RAT_NAME=$(preset ratchet_name)
+RAT_CMD=$(preset ratchet_cmd)
+RAT_CEIL=$(preset ratchet_ceiling)
+REPLAY_ENV=$(preset replay_env)
+REPLAY_CMD=$(preset replay_cmd)
+RUNTIME_DATA=$(preset runtime_data)
+ADV_CEILING=$(preset advisory_ceiling); [ -n "$ADV_CEILING" ] || ADV_CEILING=10
+
+need() { g_class_need "$CLASSES_TSV" "$CLASS" "$1"; }
+
+# parts that are OFF for this class become real opt-outs, not silent absences
+DISABLED=""
+for p in handoff spec gate replay ratchet pr-gate playbooks tokens; do
+  [ "$(need "$p")" = "-" ] && DISABLED="$DISABLED$p,"
+done
+[ "$SKILLS" = "no" ] && DISABLED="$DISABLED""playbooks,"
+if [ -n "$OPT_OUT" ]; then DISABLED="$DISABLED$OPT_OUT,"; fi
+DISABLED=$(printf '%s' "$DISABLED" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
+# parts the class forbids are never installed
+for p in spec replay ratchet pr-gate; do
+  [ "$(need "$p")" = "-" ] && SCAFFOLD=no
+done
+
+WANT_SPEC=1; [ "$(need spec)" = "-" ] && WANT_SPEC=0
+WANT_REVIEWS=0
+case "$(need pr-gate)$(need review-panel)" in *R*|*O*) WANT_REVIEWS=1 ;; esac
+WANT_RATCHET=1; [ "$(need ratchet)" = "-" ] && WANT_RATCHET=0
+[ "$ARCHIVE" = "true" ] && { WANT_SPEC=0; WANT_REVIEWS=0; SCAFFOLD=no; }
+
+OWNER_EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
+[ -n "$OWNER_EMAIL" ] || OWNER_EMAIL="you@example.com"
+BRANCH=$( cd "$TARGET" && git rev-parse --abbrev-ref HEAD 2>/dev/null )
+case "$BRANCH" in ""|HEAD) BRANCH=main ;; esac
+HEAD_SHORT=$( cd "$TARGET" && git rev-parse --short HEAD 2>/dev/null )
+[ -n "$HEAD_SHORT" ] || HEAD_SHORT="0000000"
+
+# practice pin
+if [ -f "$(g_expand_tilde "$PRACTICE")" ]; then
+  PRACTICE_SHA=$(g_sha256_file "$(g_expand_tilde "$PRACTICE")")
+else
+  PRACTICE=""
+  PRACTICE_SHA=""
+fi
+
+# ratchet ceiling: measured at install time, so the ratchet starts anchored to reality
+if [ "$RAT_CEIL" = "measure" ]; then
+  RAT_CEIL=$( cd "$TARGET" && bash -c "$RAT_CMD" 2>/dev/null | tr -d '[:space:]' )
+  case "$RAT_CEIL" in ''|*[!0-9]*) RAT_CEIL=0 ;; esac
+fi
+[ "$WANT_RATCHET" -eq 0 ] && { RAT_NAME=""; RAT_CMD=""; RAT_CEIL=0; }
+
+# parts selected with --parts
+part_wanted() {
+  [ -z "$PARTS" ] && return 0
+  case ",$PARTS," in *",$1,"*) return 0 ;; esac
+  return 1
+}
+
+# ------------------------------------------------------------------ plan -----
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+: > "$TMP/files.tsv"
+CREATED=0; UPDATED=0; UNCHANGED=0; SKIPPED=0
+: > "$TMP/refused.tsv"
+REFUSED_PATHS=""
+
+render() { # render <template> key value [key value ...]
+  local tpl="$1"; shift
+  local out; out=$(cat "$tpl")
+  while [ $# -ge 2 ]; do out=${out//"{{$1}}"/$2}; shift 2; done
+  printf '%s\n' "$out"
+}
+
+# put <relpath> <source-file> [refuse-overwrite]
+put() {
+  local rel="$1" srcf="$2" refuse="${3:-}"
+  local dst="$TARGET/$rel" srch cur
+  srch=$(g_sha256_file "$srcf")
+  if [ -f "$dst" ]; then
+    cur=$(g_sha256_file "$dst")
+    if [ "$cur" = "$srch" ]; then
+      UNCHANGED=$((UNCHANGED + 1))
+      printf '%s\t%s\n' "$rel" "$srch" >> "$TMP/files.tsv"
+      return 0
+    fi
+    if [ "$refuse" = "refuse" ] && [ "$FORCE" -eq 0 ]; then
+      SKIPPED=$((SKIPPED + 1))
+      printf '%s\t%s\n' "$rel" "$cur" >> "$TMP/refused.tsv"
+      REFUSED_PATHS="$REFUSED_PATHS $rel"
+      g_info "kept (exists, never overwritten): $rel"
+      return 0
+    fi
+    UPDATED=$((UPDATED + 1))
+  else
+    CREATED=$((CREATED + 1))
+  fi
+  if [ "$DRY_RUN" -eq 1 ]; then g_info "plan: $rel"; else
+    mkdir -p "$(dirname "$dst")"
+    cp "$srcf" "$dst"
+  fi
+  printf '%s\t%s\n' "$rel" "$srch" >> "$TMP/files.tsv"
+}
+
+# ------------------------------------------------------- generated content ---
+render_config() {
+  local gates runtime
+  gates="  - name: $GATE_NAME
+    cmd: $GATE_CMD"
+  runtime="  - $RUNTIME_DATA"
+  render "$SRC/templates/goblin.yaml.tmpl" \
+    CLASS "$CLASS" \
+    BRANCH "$BRANCH" \
+    MODELS_FILE "$MODELS" \
+    PRACTICE "$PRACTICE" \
+    PRACTICE_SHA "$PRACTICE_SHA" \
+    OWNER_EMAIL "$OWNER_EMAIL" \
+    ARCHIVE "$ARCHIVE" \
+    MAX_DIRTY "0" \
+    ADVISORY_CEILING "$ADV_CEILING" \
+    HARNESS_DIR "$HARNESS_DIR" \
+    GATES "$gates" \
+    RATCHET_NAME "$RAT_NAME" \
+    RATCHET_CMD "$RAT_CMD" \
+    RATCHET_CEILING "$RAT_CEIL" \
+    RUNTIME_DATA "$runtime" \
+    REPLAY_ENV "$REPLAY_ENV" \
+    REPLAY_CMD "$REPLAY_CMD" \
+    DISABLED "$DISABLED" > "$TMP/goblin.yaml"
+}
+
+render_config
+put ".goblin/bin/goblin-verify" "$SRC/bin/goblin-verify"
+put ".goblin/bin/goblin-lib.sh" "$SRC/bin/goblin-lib.sh"
+put ".goblin/roles.yaml" "$SRC/roles.yaml"
+put ".goblin/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
+put ".goblin/manifest/playbooks.tsv" "$SRC/manifest/playbooks.tsv"
+put ".goblin/manifest/classes.tsv" "$SRC/manifest/classes.tsv"
+put ".goblin/manifest/glossary.tsv" "$SRC/manifest/glossary.tsv"
+put ".goblin/goblin.yaml" "$TMP/goblin.yaml" refuse
+
+if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
+  for d in "$SRC"/skills/*/; do
+    [ -d "$d" ] || continue
+    name=$(basename "$d")
+    put ".hermes/skills/$name/SKILL.md" "$d/SKILL.md"
+  done
+fi
+
+if [ "$WANT_SPEC" -eq 1 ] && part_wanted spec; then
+  render "$SRC/templates/SPEC.md.tmpl" CLASS "$CLASS" DATE "$STAMP" > "$TMP/spec"
+  put "ROUND-000-SPEC.md" "$TMP/spec" refuse
+fi
+if [ "$ARCHIVE" != "true" ] && part_wanted handoff; then
+  render "$SRC/templates/HANDOFF.md.tmpl" CLASS "$CLASS" DATE "$STAMP" HEAD "$HEAD_SHORT" BRANCH "$BRANCH" GATE_NAME "$GATE_NAME" GATE_CMD "$GATE_CMD" > "$TMP/handoff"
+  put "HANDOFF.md" "$TMP/handoff" refuse
+fi
+render "$SRC/templates/AGENTS.md.tmpl" CLASS "$CLASS" DATE "$STAMP" > "$TMP/agents"
+put "AGENTS.md" "$TMP/agents" refuse
+
+if [ "$WANT_REVIEWS" -eq 1 ]; then
+  printf '# Review verdicts live here: reviews/<slug>-<head7>.md, each naming the SHA it reviewed.\n' > "$TMP/gitkeep"
+  put "reviews/.gitkeep" "$TMP/gitkeep" refuse
+fi
+
+if [ "$SCAFFOLD" = "yes" ]; then
+  put "$HARNESS_DIR/gate.sh" "$SRC/templates/checks/gate.sh.tmpl"
+  put "$HARNESS_DIR/assert.mjs" "$SRC/templates/checks/assert.mjs.tmpl"
+fi
+
+# .gitignore: one appended block, delimited by markers; never rewritten
+GI_MARK="# >>> goblin-stack >>>"
+if [ "$DRY_RUN" -eq 0 ]; then
+  if [ -f "$TARGET/.gitignore" ] && grep -qF "$GI_MARK" "$TARGET/.gitignore"; then
+    SKIPPED=$((SKIPPED + 1))
+    g_info "kept (.gitignore block already present)"
+  else
+    {
+      [ -f "$TARGET/.gitignore" ] && cat "$TARGET/.gitignore"
+      printf '\n%s\n' "$GI_MARK"
+      printf '# goblin-stack runtime state (gates write these; they are not fixture)\n'
+      printf '.goblin/last-gate-line\n.goblin/.ds-report\n.goblin/ratchet-last\n'
+      printf '# <<< goblin-stack <<<\n'
+    } > "$TMP/gitignore.new"
+    if [ -f "$TARGET/.gitignore" ]; then UPDATED=$((UPDATED + 1)); else CREATED=$((CREATED + 1)); fi
+    cp "$TMP/gitignore.new" "$TARGET/.gitignore"
+  fi
+fi
+
+# installed.json is the record; it is written LAST and never lists itself
+{
+  printf '{\n'
+  printf '  "version": "%s",\n' "$VERSION"
+  printf '  "source_sha": "%s",\n' "$( cd "$SRC" && git rev-parse HEAD 2>/dev/null || echo unknown )"
+  printf '  "class": "%s",\n' "$CLASS"
+  printf '  "installed_at": "%s",\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf '  "options": {"skills": "%s", "archive": %s, "parts": "%s"},\n' "$SKILLS" "$ARCHIVE" "${PARTS:-all}"
+  printf '  "files": {\n'
+  awk -F'\t' 'NF==2 {printf "    \"%s\": \"%s\",\n", $1, $2}' "$TMP/files.tsv" | sed '$ s/,$//'
+  printf '  },\n'
+  printf '  "refused": {\n'
+  awk -F'\t' 'NF==2 {printf "    \"%s\": \"%s\",\n", $1, $2}' "$TMP/refused.tsv" | sed '$ s/,$//'
+  printf '  }\n'
+  printf '}\n'
+} > "$TMP/installed.json"
+
+PREV_VERSION=""
+if [ -f "$INSTALLED" ]; then PREV_VERSION=$(g_installed_scalar "$INSTALLED" version); fi
+
+if [ "$DRY_RUN" -eq 0 ]; then
+  mkdir -p "$TARGET/.goblin"
+  if [ "$CREATED" -eq 0 ] && [ "$UPDATED" -eq 0 ] && [ "$PREV_VERSION" = "$VERSION" ]; then
+    g_info "no-op: $UNCHANGED files unchanged (v$VERSION already installed)"
+  else
+    cp "$TMP/installed.json" "$INSTALLED"
+    if [ -n "$PREV_VERSION" ] && [ "$PREV_VERSION" != "$VERSION" ]; then
+      g_info "upgraded $PREV_VERSION -> $VERSION"
+    fi
+    g_info "created $CREATED · updated $UPDATED · unchanged $UNCHANGED · skipped $SKIPPED"
+  fi
+  if [ -n "$OPT_OUT" ]; then
+    for p in $(printf '%s' "$OPT_OUT" | tr ',' ' '); do
+      if grep -q "^disabled:" "$CONFIG"; then
+        cur=$(g_yaml_scalar "$CONFIG" disabled)
+        cur=${cur#[}; cur=${cur%]}
+        new=$(printf '%s,%s' "$cur" "$p" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
+        sed -i "s|^disabled:.*|disabled: [$new]|" "$CONFIG"
+      fi
+    done
+    g_info "recorded opt-out: $OPT_OUT"
+  fi
+  g_info ""
+  g_info "next:"
+  g_info "  1. cd $TARGET && git add -A && git commit   # the install is a change like any other"
+  g_info "  2. .goblin/bin/goblin-verify   # or add .goblin/bin to PATH"
+  g_info "  3. edit .goblin/goblin.yaml: replace the default gate with your real commands (P8 step 3)"
+  if [ "$SKILLS" = "yes" ]; then
+    g_info "  4. hermes skills trust $TARGET   # one-time, so the project-tier skills load"
+  fi
+else
+  g_info "dry-run: created $CREATED · updated $UPDATED · unchanged $UNCHANGED · skipped $SKIPPED"
+fi
+
+if [ -n "$REFUSED_PATHS" ]; then
+  g_info "refused to overwrite:$REFUSED_PATHS (pass --force to take them over)"
+fi
+exit 0
