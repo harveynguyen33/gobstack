@@ -1,0 +1,43 @@
+# HANDOFF — the session-boundary contract. A new worker reads this FIRST.
+
+> Template. Written once by goblin-install and never overwritten. Update it every round:
+> every gate number carries `measured <date>`, the State line names the current HEAD, and the
+> NOT verified section is non-empty or says "nothing outstanding".
+
+## ▶ START HERE (new session)
+
+- Working dir: the repo root.
+- Gate set: `{{GATE_NAME}}` — `{{GATE_CMD}}`, plus whatever you add in `.goblin/goblin.yaml`.
+- Run the gates and the manifest checks: `.goblin/bin/goblin-verify`
+- One line of measured numbers for the round: `.goblin/bin/goblin-verify --only GT-02` writes `.goblin/last-gate-line`.
+- Read before working: the referenced standard, if `.goblin/goblin.yaml` declares `practice:`.
+
+## State
+
+- Branch: `{{BRANCH}}` · class: `{{CLASS}}` · goblin-stack installed {{DATE}}.
+- HEAD when this file was written: `{{HEAD}}`
+- In flight: nothing yet.
+- Done: the harness is installed.
+- Pushed: not yet.
+
+## Gates
+
+Every number here is a measurement with a date, never a copy from a previous round.
+
+- `{{GATE_NAME}}` = 0 · measured {{DATE}}
+- ratchet — declared in `.goblin/goblin.yaml`; re-measure it, do not copy it.
+- Example of the required form: `typecheck=0 · build=0 · ratchet <n> (ceiling <c>) · <n>/<n> harnesses green · measured {{DATE}}`
+
+## Next steps
+
+- Replace the default gate with this project's real commands (playbook P8 step 3).
+- Write the first round's SPEC (`*-SPEC.md`) before any code moves (playbook P3).
+- Write the first asserting harness in the harness dir, and pin its pre-change commit so
+  `replay.commit` can be set (playbook P6, then HS-02).
+
+## NOT verified
+
+- Nothing in this project has been proven by a human yet: the harness exists, its assertions
+  do not. Every gate number above is the value the declared command printed, and nothing more.
+- A stale sentence in this file is corrected in place with a dated parenthetical, never
+  silently deleted: deleting it erases the fact that it was once believed true.

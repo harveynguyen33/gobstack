@@ -1,0 +1,19 @@
+# AGENTS.md
+
+This repository uses **goblin-stack** (class `{{CLASS}}`, installed {{DATE}}). It is a pointer,
+not a rule dump — the rules live in one executable place, and facts beat requirements.
+
+- **Rules and their checks:** `.goblin/manifest/enforcement.tsv` (one row per rule; every row
+  carries a runnable check or the literal `advisory`).
+- **Verify:** `.goblin/bin/goblin-verify` — exit 0 pass, 1 a check failed, 2 could not run,
+  3 the manifest is broken.
+- **Procedures:** the skills installed at `.hermes/skills/` (Hermes project tier — highest
+  precedence, repo-owned). Start with `goblin-mode`, which routes a request to a playbook.
+- **Session state:** `HANDOFF.md` at the repo root. Read it before touching anything.
+- **Project config:** `.goblin/goblin.yaml` (class, branch, gates, ratchet, runtime data,
+  replay, opt-outs). Edit it in place; the installer never overwrites it.
+- **The referenced standard**, if configured, is named by `practice:` in `.goblin/goblin.yaml`.
+  Read it before starting work; this repo carries no copy of it.
+
+Two things this repo does not do: it does not choose models (a role resolves through the
+mapping file named by `models_file:`), and it does not write outside its own tree.

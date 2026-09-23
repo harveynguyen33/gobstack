@@ -1,0 +1,19 @@
+# presets/A-shipped-software.yaml — class A: shipped software.
+#
+# A class is not a stringency level. It selects WHICH PARTS are required, optional or off
+# (manifest/classes.tsv), and it supplies the default gate/ratchet shape below. The gate
+# command is a floor, not the project's gate set: replace it with the real commands
+# (playbook P8 step 3). goblin-stack never infers a gate from the stack it finds.
+label: Shipped software
+done_means: a gate set reports measured numbers, a round lands, the artifact deploys or publishes
+harness_dir: checks
+scaffold_checks: yes
+gate_name: commit
+gate_cmd: git rev-parse --verify --quiet HEAD
+ratchet_name: todo_markers
+ratchet_cmd: grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.py' --include='*.go' --include='*.rs' . 2>/dev/null | wc -l
+ratchet_ceiling: measure
+replay_env: GOBLIN_PRE_COMMIT
+replay_cmd: node checks/{name}.mjs
+runtime_data: .goblin/state.json
+notes: class A also requires a SPEC before every change, and the REPLAY on every new assertion.

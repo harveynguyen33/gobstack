@@ -1,0 +1,34 @@
+# ROUND-000-SPEC — <one line: what this round changes>
+
+> Template. Written once by goblin-install for classes that require a SPEC, then never
+> overwritten. Write one per round BEFORE implementation, and commit it with — or before —
+> the code it describes: an untracked `*-SPEC.md` is lost by a run that dies.
+
+Class: {{CLASS}} · written {{DATE}}
+
+## Measured root cause
+
+State *why*, backed by a command whose output is pasted here. A report of "X is broken" is
+not a root cause; a screenshot or a complaint is a hint for what to measure, never the
+measurement.
+
+    <the command>
+    <its real output>
+
+## What changes
+
+<the smallest change that removes the measured cause, and the data shape it introduces>
+
+## AC: acceptance criteria (each checkable without a human)
+
+- AC1: `<a command>` prints `<the expected value>` — i.e. the criterion is a comparison, not a feeling.
+- AC2: the same command exits 0 before the change and non-zero after it (the negative control).
+- AC3: `git status --short` is empty after the round's commit.
+
+## Device-test items (not checkable here)
+
+<the things only a human can judge, listed separately so they are never mistaken for the ACs>
+
+## What this spec cannot see
+
+<the surface the checks above do not reach>

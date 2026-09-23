@@ -1,0 +1,60 @@
+# .goblin/goblin.yaml — the project config. Generated once by goblin-install, then YOURS.
+# It is never overwritten after the first install: edit it in place.
+#
+# Format: a flat, line-oriented YAML subset, parsed by .goblin/bin/goblin-lib.sh. No YAML
+# library, no network, no npm. Keep one key per line and keep comments on their own line.
+
+# Which class this project is (A|B|C|D|E). Selects the required parts (manifest/classes.tsv).
+class: {{CLASS}}
+
+# The default branch, DECLARED, never assumed. A preset that assumes the wrong branch
+# silently skips a repo.
+branch: {{BRANCH}}
+
+# The model mapping — the ONE install-time machine input. goblin-stack READS this file and
+# never writes it. Absent on another machine: every model-dependent check reports advisory.
+models_file: {{MODELS_FILE}}
+
+# The referenced standard (optional). goblin-stack carries no copy of it; it pins its hash.
+practice: {{PRACTICE}}
+practice_sha256: {{PRACTICE_SHA}}
+
+# The commit identity this repo expects (CM-01).
+owner_email: {{OWNER_EMAIL}}
+
+# archive: true -> verify requires no HANDOFF and no gates, and says so.
+archive: {{ARCHIVE}}
+
+# Uncommitted entries allowed at verify time (CM-03). 0 means commit as you go.
+max_dirty: {{MAX_DIRTY}}
+
+# Unenforceable rules are counted; this is the cap that stops the matrix decaying into prose.
+advisory_ceiling: {{ADVISORY_CEILING}}
+
+# Where the asserting harnesses live.
+harness_dir: {{HARNESS_DIR}}
+
+# The gate set. DECLARED, never inferred from the stack. Replace the default below with the
+# real commands for this project; each must exit 0.
+gates:
+{{GATES}}
+
+# A count that must not rise, with its ceiling. The ceiling was measured at install time.
+ratchet:
+  name: {{RATCHET_NAME}}
+  cmd: {{RATCHET_CMD}}
+  ceiling: {{RATCHET_CEILING}}
+
+# Paths a probe must never write (DS-01/DS-02 hash them around every gate run).
+runtime_data:
+{{RUNTIME_DATA}}
+
+# How a harness proves RED on the pre-change tree (HS-02). Set commit: to the pinned
+# pre-change SHA once the round it guards has landed; until then HS-02 is skipped with a reason.
+replay:
+  env: {{REPLAY_ENV}}
+  cmd: {{REPLAY_CMD}}
+  commit: ""
+
+# Parts recorded as opt-out. Their required checks report SKIP (opt-out) rather than passing.
+disabled: [{{DISABLED}}]

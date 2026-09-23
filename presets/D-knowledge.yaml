@@ -1,0 +1,19 @@
+# presets/D-knowledge.yaml — class D: knowledge / research.
+#
+# "Done" means a question is answered with sources and the answer is findable. A research
+# note is not a spec, so the SPEC part is OFF, not optional. So are the REPLAY and the PR
+# gate: there is no pre-change tree to pin and no compiled artifact to gate.
+# Use --archive for an input directory that is not a build target at all.
+label: Knowledge / research
+done_means: a question is answered with sources and the answer is findable
+harness_dir: checks
+scaffold_checks: no
+gate_name: commit
+gate_cmd: git rev-parse --verify --quiet HEAD
+ratchet_name: ""
+ratchet_cmd: ""
+ratchet_ceiling: 0
+replay_env: GOBLIN_PRE_COMMIT
+replay_cmd: node checks/{name}.mjs
+runtime_data: .goblin/state.json
+notes: mark every unsourced claim [unverified]; the freshness/lint gate over notes is optional.

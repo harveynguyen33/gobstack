@@ -1,0 +1,17 @@
+# presets/E-fleet-config.yaml — class E: agent-fleet configuration.
+#
+# "Done" means a config change is applied, verified against the ARTIFACT, and versioned.
+# The gate therefore checks the artifact (a commit exists, dated), never the intention.
+label: Agent-fleet config
+done_means: a config change is applied, verified against the artifact, and versioned
+harness_dir: checks
+scaffold_checks: no
+gate_name: commit
+gate_cmd: git rev-parse --verify --quiet HEAD
+ratchet_name: todo_markers
+ratchet_cmd: grep -rniE '\b(TODO|FIXME)\b' --include='*.sh' --include='*.yaml' --include='*.yml' --include='*.md' . 2>/dev/null | wc -l
+ratchet_ceiling: measure
+replay_env: GOBLIN_PRE_COMMIT
+replay_cmd: node checks/{name}.mjs
+runtime_data: .goblin/state.json
+notes: the order is dry-run, then one profile, then verify, then apply-all.
