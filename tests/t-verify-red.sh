@@ -99,7 +99,7 @@ m_blank_row()     { sed -i -E 's/^(HP-05\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t)[^\t]
 m_in_04()         { sed -i 's|^  "refused": {|  "refused": {\n    "checks/gone.mjs": "deadbeef",|' .goblin/installed.json; }
 
 m_drop_handoff()  { rm -f HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: drop handoff" >/dev/null 2>&1; }
-m_drop_heading()  { sed -i 's/^## Gates$/## Gate numbers/' HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: rename heading" >/dev/null 2>&1; }
+m_drop_heading()  { sed -i 's/^## Gates$/#### Gates/' HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: demote the Gates heading" >/dev/null 2>&1; }
 m_no_date()       { sed -i -E 's/measured [0-9]{4}-[0-9]{2}-[0-9]{2}/measured/g' HANDOFF.md; }
 m_row_fails()     { awk -F'\t' -v OFS='\t' -v x="$1" 'NR==1{print;next} {if ($1==x) $6="false"; print}' .goblin/manifest/enforcement.tsv > .goblin/manifest/enforcement.tsv.new; mv .goblin/manifest/enforcement.tsv.new .goblin/manifest/enforcement.tsv; }
 m_hp_04()         { m_row_fails HP-04; }
@@ -173,7 +173,7 @@ expect_red "a manifest row with no check"          IN-03 3 m_blank_row
 expect_red "a pre-existing file the install recorded has vanished" IN-04 1 m_in_04
 
 expect_red "a missing HANDOFF"                     HP-01 1 m_drop_handoff
-expect_red "a HANDOFF heading renamed"             HP-02 1 m_drop_heading
+expect_red "a required HANDOFF heading demoted"     HP-02 1 m_drop_heading
 expect_red "a gate number with no measured date"   HP-03 1 m_no_date
 expect_red "HP-04 (advisory row: wired, not biting)" HP-04 1 m_hp_04
 expect_red "a HANDOFF naming no commit in the repo" HP-05 1 m_no_head
