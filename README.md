@@ -81,6 +81,16 @@ Removes the installed artifacts, `.goblin/goblin.yaml` and every directory that 
 leaves `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md`, `reviews/` and the `.gitignore` block —
 the project's record is not the harness's to delete.
 
+## Re-pin the referenced standard
+
+    bash bin/goblin-install --target <dir> --re-pin
+
+`practice_sha256:` pins the referenced standard and `IN-02` re-checks it, so editing that standard
+— a legitimate, intended edit — reds `IN-02` in every installed repo. `--re-pin` re-records that
+one line and prints the old and new hash; `IN-02` then reports `practice pin ok`. Nothing re-pins
+automatically, not even `--upgrade`, and the `practice EDITED` failure prints this command. The
+whole contract: `docs/CONTRACTS.md`, "An edited standard is not a dead end".
+
 ## Dependencies
 
 `bash`, `git`, `awk`, `sed`, `grep`, `python3`. No npm, no jq, no yq, no network.

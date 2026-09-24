@@ -236,6 +236,11 @@ check_in_02() {
       cur=$(g_sha256_file "$PRACTICE")
       if [ "$cur" != "$PRACTICE_SHA" ]; then
         printf 'practice standard edited: %s\n  recorded %s\n  now      %s\n' "$PRACTICE" "$PRACTICE_SHA" "$cur"
+        # The remedy, in the place the operator actually meets the failure. The pin exists to
+        # catch a SILENT edit, so re-pinning is a deliberate act: one explicit command, which
+        # prints the old and new hash (docs/CONTRACTS.md, "An edited standard is not a dead end").
+        printf '  if the edit is yours and intended, re-pin it deliberately:\n'
+        printf '    goblin-install --target %s --re-pin\n' "$ROOT"
         bad=1; pin=" | practice EDITED"
       else
         pin=" | practice pin ok"

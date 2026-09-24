@@ -3,7 +3,7 @@
 #
 # Usage: goblin-install --target <dir> [options]
 #   --target <dir>        required; the repo root to install into
-#   --class A|B|C|D|E     required unless --uninstall; anything else needs an explicit class
+#   --class A|B|C|D|E     required unless --uninstall or --re-pin; anything else needs an explicit class
 #   --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)
 #   --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md)
 #   --parts <list>        comma list to install; default = every part the class requires
@@ -13,6 +13,7 @@
 #   --upgrade             re-install at the current version; report created/updated/unchanged/skipped
 #   --opt-out <part>      record the part in disabled: so its required checks are skipped
 #   --uninstall           remove exactly the files in installed.json
+#   --re-pin              re-record practice_sha256: for an edited standard; nothing else changes
 #   --force               allow overwriting a file goblin-stack did not create
 #   --yes                 non-interactive; take the defaults above
 #
@@ -37,11 +38,15 @@ SKILLS="yes"
 DRY_RUN=0
 UPGRADE=0
 UNINSTALL=0
+RE_PIN=0
 FORCE=0
 OPT_OUT=""
 
 usage() {
-  sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  # The header comment runs from line 2 to the first blank line, so adding an option cannot
+  # truncate the help or leak code into it. The old fixed range ('2,22p') ended on the
+  # `set -uo pipefail` line and printed it as if it were an option.
+  sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 while [ $# -gt 0 ]; do
@@ -56,6 +61,7 @@ while [ $# -gt 0 ]; do
     --dry-run)   DRY_RUN=1; shift ;;
     --upgrade)   UPGRADE=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
+    --re-pin)    RE_PIN=1; shift ;;
     --opt-out)   OPT_OUT="${2:-}"; shift 2 ;;
     --force)     FORCE=1; shift ;;
     --yes)       shift ;;
@@ -131,6 +137,51 @@ if [ "$UNINSTALL" -eq 1 ]; then
       printf '.goblin\n.goblin/bin\n.goblin/manifest\n.hermes\n.hermes/skills\n'
     } | awk 'NF' | awk -F/ '{print NF " " $0}' | sort -rn | cut -d' ' -f2- | awk '!seen[$0]++')
   g_info "removed $n file(s) and $nd empty director(y|ies). Left in place: HANDOFF.md, AGENTS.md, ROUND-000-SPEC.md, reviews/, the .gitignore block."
+  exit 0
+fi
+
+# ---------------------------------------------------------------- re-pin ------
+# The practice pin (practice_sha256: in .goblin/goblin.yaml, re-checked by IN-02) exists to catch
+# a SILENTLY edited standard. The standard itself is a living document edited in place, and
+# goblin.yaml is an `owned` file the installer never rewrites - so the remedy for an edit that IS
+# intended has to be explicit, printed and deliberate. This mode rewrites exactly one line and
+# reports the old and new hash. It is unreachable from --upgrade and from goblin-verify, by
+# design: an automatic re-pin would be the silent edit the pin exists to catch.
+# See docs/CONTRACTS.md, "An edited standard is not a dead end".
+if [ "$UNINSTALL" -eq 1 ] && [ "$RE_PIN" -eq 1 ]; then
+  g_err "--uninstall and --re-pin are different jobs; run them one at a time"
+  exit 2
+fi
+
+if [ "$RE_PIN" -eq 1 ]; then
+  [ -f "$CONFIG" ] || { g_err "nothing to re-pin: $CONFIG is absent (install first)"; exit 2; }
+  PIN_PATH=$(g_expand_tilde "$(g_yaml_scalar "$CONFIG" practice)")
+  [ -n "$PIN_PATH" ] || { g_err "no practice: recorded in $CONFIG — nothing to re-pin"; exit 2; }
+  [ -f "$PIN_PATH" ] || { g_err "the recorded standard is absent: $PIN_PATH"; exit 2; }
+  grep -q '^practice_sha256:' "$CONFIG" || { g_err "no practice_sha256: line in $CONFIG to rewrite"; exit 2; }
+  OLD_SHA=$(g_yaml_scalar "$CONFIG" practice_sha256)
+  NEW_SHA=$(g_sha256_file "$PIN_PATH")
+  if [ "$OLD_SHA" = "$NEW_SHA" ]; then
+    g_info "practice pin already current: $PIN_PATH"
+    g_info "  recorded $OLD_SHA"
+    exit 0
+  fi
+  if [ "$DRY_RUN" -eq 1 ]; then
+    g_info "would re-pin $PIN_PATH"
+    g_info "  recorded $OLD_SHA"
+    g_info "  now      $NEW_SHA"
+    exit 0
+  fi
+  # One line, in place. Every other line of the config - comments included - is untouched, so
+  # the `owned` contract holds for everything except the single value just asked for.
+  sed -i "s|^practice_sha256:.*|practice_sha256: $NEW_SHA|" "$CONFIG"
+  g_info "practice re-pinned: $PIN_PATH"
+  g_info "  recorded $OLD_SHA"
+  g_info "  now      $NEW_SHA"
+  g_info ""
+  g_info "next:"
+  g_info "  1. cd $TARGET && git add .goblin/goblin.yaml && git commit   # the re-pin is a change like any other"
+  g_info "  2. .goblin/bin/goblin-verify --only IN-02   # practice pin ok"
   exit 0
 fi
 

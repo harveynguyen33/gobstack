@@ -60,8 +60,10 @@ The split is by **kind**, and it is checkable.
 
 goblin-stack carries **no copy** of the standard's text. `.goblin/goblin.yaml` holds
 `practice:` and `practice_sha256:`; `goblin-verify` re-checks the hash, so a silently edited
-standard is visible rather than assumed. If no standard is configured, the checks that depend
-on it report advisory, never a failure — that is what makes the repo portable.
+standard is visible rather than assumed. An edit that *is* intended is re-pinned by one explicit,
+printed command (`goblin-install --target <dir> --re-pin`), never automatically — the pin exists
+to catch a silent edit, so it may not update itself. If no standard is configured, the checks that
+depend on it report advisory, never a failure — that is what makes the repo portable.
 
 ## Rejected alternatives
 

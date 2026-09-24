@@ -67,5 +67,10 @@ carries `practice:` and `practice_sha256:`; `goblin-verify` compares. The `pract
 is a pointer and a mandate — read the standard at the configured path before starting work; if
 the path is absent, say so and continue with the goblin-stack rules alone.
 
+An edit to the standard that **is** intended is re-recorded with one explicit command,
+`goblin-install --target <dir> --re-pin`, which rewrites that one config line and prints the old
+and new hash; nothing re-pins automatically, because a self-updating pin would be the silent edit
+it exists to catch (`docs/CONTRACTS.md`, "An edited standard is not a dead end").
+
 Three existing consumers of that standard have its path baked in, and goblin-stack is not one of
 them: it reads the path from config, so moving the standard is a one-line config change.

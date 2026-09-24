@@ -18,7 +18,10 @@ standard this repo references. goblin-stack carries **no copy of it**.
 1. Read `.goblin/goblin.yaml` and take `practice:`.
 2. If that path exists, **read the standard before starting work** in this repo. Its hash is
    pinned in `practice_sha256:`; `goblin-verify` re-checks it, so a silently edited standard
-   is visible rather than assumed.
+   is visible rather than assumed. If the standard has been edited **deliberately**, re-record
+   the pin deliberately: `goblin-install --target <repo> --re-pin` rewrites that one line and
+   prints the old and new hash. Nothing re-pins on its own — not `goblin-verify`, not
+   `--upgrade` (`docs/CONTRACTS.md`).
 3. If the path is absent or unset, **say so** and continue with the goblin-stack rules alone.
    Absent is not an error: goblin-stack is portable, and another machine has no such file.
 

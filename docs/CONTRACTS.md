@@ -9,7 +9,7 @@ same way the fleet's own tool reads it. Everything else is line-oriented shell.
     goblin-install --target <dir> [options]
 
     --target <dir>        required; the repo root to install into
-    --class A|B|C|D|E     required unless --uninstall
+    --class A|B|C|D|E     required unless --uninstall or --re-pin
     --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)
     --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md)
     --parts <list>        comma list to install; default = every part the class requires
@@ -19,6 +19,7 @@ same way the fleet's own tool reads it. Everything else is line-oriented shell.
     --upgrade             re-install at the current version; report created/updated/unchanged/skipped
     --opt-out <part>      record the part in disabled: so its required checks are skipped
     --uninstall           remove exactly the files in installed.json
+    --re-pin              re-record practice_sha256: for an edited standard; nothing else changes
     --force               allow overwriting a file goblin-stack did not create
     --yes                 non-interactive; take the defaults above
 
@@ -45,10 +46,51 @@ A `refused` path is not a dead end. For `HANDOFF.md` the remedy is the reconcili
 file, merge the five required sections and a dated gate line in, then verify. `--force` overwrites
 it and exists for a scaffold copy with nothing to keep.
 
+An **edited standard is not a dead end** either. `practice_sha256:` pins the referenced standard
+and `IN-02` re-checks it, so one intended edit to the standard reds `IN-02` in every installed
+repo. The remedy is the explicit re-pin below — not a hand-edit of the hash, and never an
+automatic one.
+
 `.gitignore` is not a file goblin-stack owns: it appends **one marked block** and never rewrites
 the rest. `.goblin/goblin.yaml` is generated once and is goblin-stack's own config, so
 `--uninstall` removes it; `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md` and `reviews/` are the
 project's record, not the harness's, and are left in place.
+
+### An edited standard is not a dead end
+
+`.goblin/goblin.yaml` records `practice:` and `practice_sha256:`, and `IN-02` re-checks that hash.
+The pin has exactly one purpose: to make a **silently** edited standard visible rather than
+assumed. The standard itself is a living document, corrected in place, so an edit that is
+*intended* needs a deliberate way to re-record the pin. That is all `--re-pin` is:
+
+    goblin-install --target <dir> --re-pin
+
+It rewrites one line of the config — nothing else — and prints both hashes:
+
+    practice re-pinned: /path/to/PROJECT-PRACTICE.md
+      recorded 81612b17ac3483b9d613aeb86e236539fc17403e38bf7903af708d369cf7918f
+      now      8334ac24f056c94c35fa97831253e7e12bace68ae5747c81ae3b696c42ddd33a
+
+`.goblin/bin/goblin-verify --only IN-02` then reports `practice pin ok`. Every other line of
+`goblin.yaml`, comments included, is untouched, so the `owned` contract holds for everything
+except the one value you just asked to re-record. Commit the config like any other change.
+`--dry-run` prints the plan and writes nothing; when there is nothing to do it prints
+`practice pin already current` and exits 0.
+
+Four things it deliberately is not:
+
+- **not automatic.** `goblin-verify` never re-pins, and neither does a plain `--upgrade`: a pin
+  that updated itself would be the very silent edit the pin exists to catch. The `practice EDITED`
+  failure detail names this command, so the remedy is printed where the operator meets the problem.
+- **not a hand-edit.** Editing `practice_sha256:` by hand does work, but nothing then checks that
+  you pasted the right hash — which is the one thing this command does for you.
+- **not `--force`.** `--force` is about overwriting a file goblin-stack did not create; it has no
+  opinion about the pin.
+- **not a re-point.** It re-records the hash of the path already in `practice:`. Pointing the repo
+  at a *different* standard is a deliberate config edit, not a re-pin.
+
+Refusals are exit `2`, each naming the path: no `.goblin/goblin.yaml`, no `practice:` recorded, the
+recorded path absent, or no `practice_sha256:` line to rewrite.
 
 ### Never a half-state
 
