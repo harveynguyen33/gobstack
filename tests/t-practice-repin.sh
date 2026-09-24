@@ -7,18 +7,29 @@
 # not the failure detail, not any file the installer wrote — named a way out.
 #
 # WHICH ASSERTIONS ARE CONTROLS AND WHICH ARE GUARDS — measured, not asserted.
-# A tree exported from cadf79b with this file copied into it fails 20 of the 36 assertions and
-# exits 1 (16 ok / 20 FAIL). Those 20 are the controls:
+# A tree exported from cadf79b — or from 6cabb50, this change's actual parent — with this file
+# copied into it fails 23 of the 40 assertions and exits 1 (17 ok / 23 FAIL). Those 23 are the
+# controls:
 #   * 4 name-the-remedy assertions: the `practice EDITED` detail, the installed verifier, the
 #     installed `practice` skill and docs/CONTRACTS.md all say nothing about `--re-pin` there;
 #   * 14 from the "the documented path clears it" block: `--re-pin` is an unknown option there
 #     (exit 2), so nothing is rewritten, nothing prints either hash, and IN-02 stays RED;
-#   * the 2 refusal *messages* ("nothing to re-pin", "no practice: recorded").
-# The other 16 pass on both trees by design — they are GUARDS, pinning behaviour that must not
+#   * the 2 refusal *messages* ("nothing to re-pin", "no practice: recorded");
+#   * 3 from the quoted-pin block (the verifier, `--re-pin` exiting 0, and "already current") —
+#     there the setup re-pin fails, so the pin is left stale and even the first of the three
+#     reds.
+# The other 17 pass on both trees by design — they are GUARDS, pinning behaviour that must not
 # change: installed.json is byte-identical after a re-pin, exactly one config line moves, a second
 # re-pin writes nothing, `--upgrade` never re-pins, `--re-pin --dry-run` writes nothing, and the
-# pin still reds a further edit. Four of them pass *trivially* on the pre-change tree (there is no
+# pin still reds a further edit. Several pass *trivially* on the pre-change tree (there is no
 # re-pin to observe), which is why they are labelled GUARD and not counted as proof.
+#
+# THE g_unquote CONTROL IS SEPARATE FROM THAT MEASUREMENT. The quoted-pin block exists for one
+# defect found in this change's own first cut: the verifier `g_unquote`s `practice_sha256:` but
+# the re-pin did not, so against a hand-quoted config the re-pin printed two identical hashes and
+# rewrote a line that already matched. Reverting only that one line of `bin/goblin-install` (from
+# 39c546c) reds exactly 2 of these 40 assertions — "reports the pin already current" and "rewrites
+# nothing" — and the whole file still exits 1.
 #
 # Run by tests/run-tests.sh.
 set -uo pipefail
@@ -161,6 +172,24 @@ bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --upgrade --models "
 check "--upgrade does not re-pin the standard by itself (GUARD)" "$?"
 out=$(bash .goblin/bin/goblin-verify --only IN-02 2>&1); rc=$?
 check "  and the stale pin is still RED after it (exit 1)" "$([ "$rc" -eq 1 ] && echo 0 || echo 1)"
+
+# ---- a hand-quoted pin is read the way goblin-verify reads it -----------------
+# goblin-verify g_unquotes practice_sha256:, so a quoted value verifies green. The re-pin must
+# agree, or it reports a spurious "re-pinned" with two identical hashes and rewrites a line that
+# already matched. Measured before the fix: `recorded "81612b17..."` / `now 81612b17...` and a
+# one-line diff, against a config the verifier called `practice pin ok`. This block runs last
+# because it leaves the pin CURRENT, which the --upgrade guard above needs it not to be.
+bash "$SRC/bin/goblin-install" --target "$TARGET" --re-pin >/dev/null 2>&1
+sed -i 's/^practice_sha256: \(.*\)$/practice_sha256: "\1"/' .goblin/goblin.yaml
+QUOTED=$(sha .goblin/goblin.yaml)
+out=$(bash .goblin/bin/goblin-verify --only IN-02 2>&1); rc=$?
+check "a hand-quoted pin still verifies green (exit 0)" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
+out=$(bash "$SRC/bin/goblin-install" --target "$TARGET" --re-pin 2>&1); rc=$?
+check "  and --re-pin agrees: it exits 0 (CONTROL)" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
+printf '%s' "$out" | grep -q 'already current'
+check "  and reports the pin already current (CONTROL)" "$?"
+[ "$(sha .goblin/goblin.yaml)" = "$QUOTED" ]
+check "  and rewrites nothing (GUARD)" "$?"
 
 if [ "$fail" -eq 0 ]; then note "t-practice-repin: PASS"; else note "t-practice-repin: FAIL"; fi
 exit "$fail"

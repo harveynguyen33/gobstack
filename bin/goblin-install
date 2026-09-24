@@ -159,7 +159,9 @@ if [ "$RE_PIN" -eq 1 ]; then
   [ -n "$PIN_PATH" ] || { g_err "no practice: recorded in $CONFIG — nothing to re-pin"; exit 2; }
   [ -f "$PIN_PATH" ] || { g_err "the recorded standard is absent: $PIN_PATH"; exit 2; }
   grep -q '^practice_sha256:' "$CONFIG" || { g_err "no practice_sha256: line in $CONFIG to rewrite"; exit 2; }
-  OLD_SHA=$(g_yaml_scalar "$CONFIG" practice_sha256)
+  # g_unquote, exactly as goblin-verify reads it: a hand-quoted value is accepted by the verifier,
+  # so it must not read as "different" here and trigger a rewrite of a line that already matches.
+  OLD_SHA=$(g_unquote "$(g_yaml_scalar "$CONFIG" practice_sha256)")
   NEW_SHA=$(g_sha256_file "$PIN_PATH")
   if [ "$OLD_SHA" = "$NEW_SHA" ]; then
     g_info "practice pin already current: $PIN_PATH"
