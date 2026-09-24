@@ -93,9 +93,11 @@ Each step is independently useful and the later ones build on the earlier:
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .goblin/bin/goblin-verify         # expect FAILs for the parts only a round can produce
+    .goblin/bin/goblin-verify         # fresh class A: 33 passed, 0 failed, 8 advisory, 1 skipped
     hermes skills trust <target>      # one-time, so the project-tier skills load
 
-A fresh install is **not** automatically green, and that is the design: the class's required
-parts that only a round can produce are reported as FAIL, and that list is the repo's
-first-step list.
+A fresh class-A install is **green** — `33 passed, 0 failed, 8 advisory, 1 skipped`, exit 0 — and
+that is measured, not assumed (`docs/CONTRACTS.md`). The single skip is `HS-02`, with no pinned
+pre-change commit yet. The class's required parts that only a round can produce pass *vacuously*
+(zero `reviews/*.md` to check; the declared gate is still the shipped floor), so the first-step
+list is a list of work, not a list of FAILs.

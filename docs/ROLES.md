@@ -39,6 +39,14 @@ Resolution:
     bin/goblin-model --list              # the roles and their capabilities
     bin/goblin-model review-panel        # the panel: one line per lane
 
+`bin/goblin-model` is **checkout-only**. `goblin-install` copies exactly two scripts into a
+target's `.goblin/bin/` — `goblin-verify` and `goblin-lib.sh` — so an adopted repo has no
+`goblin-model` command (`ls .goblin/bin/` → `goblin-lib.sh  goblin-verify`). The installed path
+for the same resolution is the `resolve_role_models` helper inside `.goblin/bin/goblin-verify`,
+which is what `MD-02` calls; `bin/goblin-model` exists for a human at a checkout, is covered only
+by `bash -n` in `tests/run-tests.sh`, and has no `enforcement.tsv` row because it enforces
+nothing — it prints. Naming it here is the alternative R6 §2.2 allows to shipping a row for it.
+
 Absent on this machine, every role resolves to `unknown` and the model-dependent checks report
 advisory. Absent is not an error — goblin-stack is portable, and another machine has no such
 file. That is the one documented exception to the portability rule, and `PT-01` enforces it:

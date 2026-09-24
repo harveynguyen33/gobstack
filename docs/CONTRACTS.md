@@ -73,22 +73,33 @@ is counted and capped.
 
 **What it cannot see** (printed at the end of every run): whether a check in the harness dir
 tests the right path rather than merely passing; whether the target repo has CI; whether a human
-read the diff; and whether the model mapping names a family that actually differs.
+read the diff; whether the model mapping names a family that actually differs; and whether
+`.goblin/installed.json` — the record every drift check trusts — was itself rewritten, since it
+is not signed (`docs/LIMITS.md` #18).
 
-### A fresh install is not automatically green
+### A fresh install verifies green
 
-The class's required parts that only a round can produce — a first review, a real gate that is
-not the shipped floor — are reported as FAIL on a fresh install. That list is the repo's
-first-step list, not a defect. `P8` (`goblin-bootstrap`) walks it in order.
+Measured on a fresh class-A install, committed with no hand edit: **`33 passed, 0 failed,
+8 advisory, 1 skipped`, exit 0.** The single skip is `HS-02` — no pre-change commit is pinned
+yet, so the REPLAY is not provable (`docs/LIMITS.md` #11).
+
+The class's required parts that only a round can produce do **not** fail on a fresh install; they
+pass **vacuously**, and that is the honest reading: `PG-01`..`PG-03` iterate over `reviews/*.md`
+and there are none, and the declared gate *is* the shipped floor until step 3 replaces it. `P8`
+(`goblin-bootstrap`) walks that first-step list because the work is not done, not because the
+verifier is reporting FAILs.
 
 ## Opting out, and uninstalling
 
 - **Per part:** `--opt-out <part>` records the part in `disabled:`. `goblin-verify` then reports
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a class's `-` (off) real.
-- **Whole harness:** `--uninstall` deletes the `files` list plus `.goblin/goblin.yaml`, leaves
-  `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md`, `reviews/` and the `.gitignore` block (with a
-  `# goblin-stack uninstalled <date>` marker inside it), and prints what it left.
+- **Whole harness:** `--uninstall` deletes the `files` list plus `.goblin/goblin.yaml`, removes
+  every directory that leaves empty (deepest first, after `installed.json` itself is gone — the
+  order that used to leave `.goblin/` and the fourteen `.hermes/skills/*` directories behind),
+  leaves `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md`, `reviews/` and the `.gitignore` block
+  (with a `# goblin-stack uninstalled <date>` marker inside it), and prints what it removed and
+  what it left.
 
 ## The two commands, verbatim
 

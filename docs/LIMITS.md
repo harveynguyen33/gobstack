@@ -66,10 +66,20 @@ deliberate trade or an unfilled gap.
     mechanised as *the HANDOFF names a commit that exists in this repo and is an ancestor of
     HEAD*, which still catches the defect the rule exists for (an artifact that names no commit
     at all). The deviation and its reason are in the row's own `if_not_why` column.
+18. **`.goblin/installed.json` is not signed, so nothing here proves it was not rewritten.** Every
+    drift check — `IN-02`, `SK-02`, and `HS-01`'s hash of the harness dir — reads its expected
+    hash out of that one file, and that file is the one file no check protects. Measured: append a
+    byte to `.goblin/bin/goblin-verify`, rewrite its recorded hash in `installed.json`, commit, and
+    the run is **fully GREEN** (`33 passed, 0 failed`, exit 0). One edit defeats three rows at
+    once, and it is the cheapest way to fake a green run. Doing better needs an anchor the target
+    cannot edit — a signature, or a hash held outside the repo — and goblin-stack has no such
+    trust root: the source checkout is not guaranteed to exist at verify time, and any value
+    stored in the tree is editable by the same hand. It is therefore **recorded here and printed
+    in the "cannot see" footer on every run**, not claimed away.
 
 ## What the harness refuses to do
 
 It does not claim a green run means the work is right. `goblin-verify` asserts that the installed
 files are the files on disk, that every rule with a command still passes, and that the
-untestable remainder is counted and capped — and it prints, on every single run, the four things
+untestable remainder is counted and capped — and it prints, on every single run, the five things
 it cannot see.
