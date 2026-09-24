@@ -43,6 +43,9 @@ run with the same arguments. It never overwrites `HANDOFF.md`, `AGENTS.md`, a `*
 `reviews/`, the `.gitignore` block or `.goblin/goblin.yaml`. Full option list and the three
 kinds of file it manages: `docs/CONTRACTS.md`.
 
+A repo that already has its own `HANDOFF.md` exits 1 on the refusal. That is the contract, not a
+failure: reconcile the file rather than forcing over it — `docs/ADOPTION.md`.
+
 After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other

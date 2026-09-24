@@ -463,7 +463,7 @@ else
 fi
 
 if [ -n "$REFUSED_PATHS" ]; then
-  g_info "refused to overwrite:$REFUSED_PATHS (pass --force to take them over)"
+  g_info "refused to overwrite:$REFUSED_PATHS (kept - reconcile it: docs/ADOPTION.md; --force would destroy it)"
   # Documented contract (docs/CONTRACTS.md, this file's header): exit 1 is "a refusal, with
   # the path and the fix". A wrapper has to be able to detect it (D2).
   exit 1

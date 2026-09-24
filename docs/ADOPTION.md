@@ -101,3 +101,48 @@ that is measured, not assumed (`docs/CONTRACTS.md`). The single skip is `HS-02`,
 pre-change commit yet. The class's required parts that only a round can produce pass *vacuously*
 (zero `reviews/*.md` to check; the declared gate is still the shipped floor), so the first-step
 list is a list of work, not a list of FAILs.
+
+## Adopting into a repo that already has a `HANDOFF.md`
+
+The installer never overwrites a `HANDOFF.md` that existed before the install. It prints
+`refused to overwrite: HANDOFF.md` and exits 1. **That exit is correct, and `--force` is not the
+remedy**: `--force` replaces the project's own record with the scaffold, which is the act the
+refusal exists to prevent. `--force` is for a scaffold copy with nothing to keep.
+
+The remedy is a reconciliation. The project's file stays the file of record; nothing is deleted
+(a stale sentence is corrected in place with a dated parenthetical, never removed).
+
+1. **Keep the file.** Do not re-install with `--force`, and do not delete it.
+2. **Give it the five sections it is missing**, each as an H2 or H3 heading whose *first word* is
+   the slot name — a marker or number prefix (`## ▶ START HERE`) is fine:
+
+   | section | accepted first words |
+   |---|---|
+   | orientation | `START HERE` |
+   | current state | `State` · `Status` |
+   | gates | `Gate` · `Gates` |
+   | next steps | `Next steps` · `Next` |
+   | what is not verified | `Not verified` · `Unverified` · `Not proven` · `Unproven` · `Pending <x> device test` |
+
+   `HP-02` is satisfied by the heading, not by the words appearing inside one: a `## BOARD STATE`
+   heading is not a `State` section.
+3. **Put the current gate numbers inside the `Gates` section, each with its date.** Every
+   gate-bearing line in that section must read `measured YYYY-MM-DD`. Gate numbers elsewhere (in
+   `State`, in a round block) are not the current gate line, and historical round gate lines are
+   exempt — they are the record and are kept:
+
+       - `tsc`=0 · `build`=0 · hex **144** (ceiling 160) · 38/38 harnesses green · measured 2026-09-24
+
+4. **Name the HEAD in `State`** (`HEAD when this file was written: <short sha>`) — `HP-05` wants a
+   commit that exists in this repo and is an ancestor of HEAD.
+5. **Commit, then verify:**
+
+       git add -A && git commit
+       .goblin/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
+
+   Success is the class's full green path (`33 passed, 0 failed, 8 advisory, 1 skipped`, exit 0 for
+   class A) with `git status --short` empty.
+
+The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three
+headings plus a `State` block, one dated gate line and a `Not verified` block, 15 lines, no line
+removed.

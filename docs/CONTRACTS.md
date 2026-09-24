@@ -40,6 +40,11 @@ files whose hash changed and prints `created C · updated U · unchanged N · sk
 | created once, then yours (`.goblin/goblin.yaml`, `HANDOFF.md`, `AGENTS.md`, `*-SPEC.md`, `reviews/.gitkeep`) | `owned` | never | no — you are meant to edit them | no, except the config |
 | pre-existing, left alone | `refused` | never | no — IN-04 only proves it was not taken over | no |
 
+A `refused` path is not a dead end. For `HANDOFF.md` the remedy is the reconciliation in
+`docs/ADOPTION.md` ("Adopting into a repo that already has a `HANDOFF.md`"): keep the project's
+file, merge the five required sections and a dated gate line in, then verify. `--force` overwrites
+it and exists for a scaffold copy with nothing to keep.
+
 `.gitignore` is not a file goblin-stack owns: it appends **one marked block** and never rewrites
 the rest. `.goblin/goblin.yaml` is generated once and is goblin-stack's own config, so
 `--uninstall` removes it; `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md` and `reviews/` are the
