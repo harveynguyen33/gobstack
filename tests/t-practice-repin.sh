@@ -7,9 +7,10 @@
 # not the failure detail, not any file the installer wrote — named a way out.
 #
 # WHICH ASSERTIONS ARE CONTROLS AND WHICH ARE GUARDS — measured, not asserted.
-# A tree exported from cadf79b — or from 6cabb50, this change's actual parent — with this file
-# copied into it fails 23 of the 40 assertions and exits 1 (17 ok / 23 FAIL). Those 23 are the
-# controls:
+#
+# BASELINE A, the pre-change tree (a tree exported from cadf79b — or from 6cabb50, this change's
+# actual parent — with this file copied in): 47 assertions, 23 pass and 24 fail, exit 1. Those 24
+# are the controls:
 #   * 4 name-the-remedy assertions: the `practice EDITED` detail, the installed verifier, the
 #     installed `practice` skill and docs/CONTRACTS.md all say nothing about `--re-pin` there;
 #   * 14 from the "the documented path clears it" block: `--re-pin` is an unknown option there
@@ -17,14 +18,31 @@
 #   * the 2 refusal *messages* ("nothing to re-pin", "no practice: recorded");
 #   * 3 from the quoted-pin block (the verifier, `--re-pin` exiting 0, and "already current") —
 #     there the setup re-pin fails, so the pin is left stale and even the first of the three
-#     reds.
-# The other 17 pass on both trees by design — they are GUARDS, pinning behaviour that must not
+#     reds;
+#   * 1 from the "--uninstall --re-pin" block ("different jobs"): there `--re-pin` is unknown, so
+#     the message is "unknown option: --re-pin", not the mutual-exclusion refusal.
+# The other 23 pass on the pre-change tree too — they are GUARDS, pinning behaviour that must not
 # change: installed.json is byte-identical after a re-pin, exactly one config line moves, a second
 # re-pin writes nothing, `--upgrade` never re-pins, `--re-pin --dry-run` writes nothing, and the
 # pin still reds a further edit. Several pass *trivially* on the pre-change tree (there is no
 # re-pin to observe), which is why they are labelled GUARD and not counted as proof.
 #
-# THE g_unquote CONTROL IS SEPARATE FROM THAT MEASUREMENT. The quoted-pin block exists for one
+# BASELINE B, bf7e9c9 — the tree where the feature exists but both round-1 defects do: the same
+# file fails exactly 5 of its 47 assertions (42 ok / 5 FAIL, exit 1), and all five are in the two
+# blocks that close the round-1 findings:
+#   * "a re-pin whose write cannot land exits non-zero" and "  and does not claim 'practice
+#     re-pinned'" — at bf7e9c9 a read-only .goblin/ made sed -i fail, yet the branch printed
+#     "practice re-pinned" with both hashes and exited 0;
+#   * "--uninstall --re-pin is refused, exit 2", "  and says they are different jobs" and "  and
+#     the target was not uninstalled" — at bf7e9c9 the guard sat below the uninstall branch, so
+#     the uninstall ran (exit 0, no message) and installed.json was gone.
+# The two remaining assertions of those blocks ("the config is byte-identical", "the pin is still
+# RED afterwards") are GUARDS: they pass at bf7e9c9 as well, because the write that failed left
+# the config alone. The five defect controls pass *vacuously* on Baseline A (there `--re-pin` is
+# an unknown option that exits 2 and writes nothing), which is why they are pinned to bf7e9c9 and
+# not to 6cabb50.
+#
+# THE g_unquote CONTROL IS SEPARATE FROM BOTH MEASUREMENTS. The quoted-pin block exists for one
 # defect found in this change's own first cut: the verifier `g_unquote`s `practice_sha256:` but
 # the re-pin did not, so against a hand-quoted config the re-pin printed two identical hashes and
 # rewrote a line that already matched. Reverting only that one line of `bin/goblin-install` (from
@@ -141,6 +159,28 @@ check "  and prints the plan" "$?"
 [ "$(sha .goblin/goblin.yaml)" = "$CONFIG_BEFORE_DRY" ]
 check "  and writes nothing (GUARD)" "$?"
 
+# ---- CONTROL: a re-pin whose one write does not land fails closed -------------
+# Before the fix the branch printed "practice re-pinned" with both hashes and exited 0 even when
+# sed -i could not write (measured at bf7e9c9: read-only .goblin/ -> "couldn't open temporary
+# file ... Permission denied", exit 0, config byte-identical, IN-02 still RED). That is the "hash
+# nobody verified" class this command exists to remove. The pin is stale here, so the branch
+# actually reaches the write.
+CONFIG_BEFORE_FAIL=$(sha .goblin/goblin.yaml)
+chmod 555 .goblin
+out=$(bash "$SRC/bin/goblin-install" --target "$TARGET" --re-pin 2>&1); rc=$?
+chmod 755 .goblin
+check "a re-pin whose write cannot land exits non-zero (CONTROL)" \
+  "$([ "$rc" -ne 0 ] && echo 0 || echo 1)"
+if printf '%s' "$out" | grep -q 'practice re-pinned'; then
+  check "  and does not claim 'practice re-pinned' (CONTROL)" 1
+else
+  check "  and does not claim 'practice re-pinned' (CONTROL)" 0
+fi
+[ "$(sha .goblin/goblin.yaml)" = "$CONFIG_BEFORE_FAIL" ]
+check "  and the config is byte-identical (GUARD)" "$?"
+out=$(bash .goblin/bin/goblin-verify --only IN-02 2>&1); rc=$?
+check "  and the pin is still RED afterwards (GUARD)" "$([ "$rc" -eq 1 ] && echo 0 || echo 1)"
+
 # ---- the two refusals: no config, and no practice: recorded ------------------
 mkdir -p "$WORK/noconfig"
 out=$(cd "$WORK/noconfig" && bash "$SRC/bin/goblin-install" --target "$WORK/noconfig" --re-pin 2>&1); rc=$?
@@ -162,6 +202,18 @@ out=$(bash "$SRC/bin/goblin-install" --target "$WORK/nostandard" --re-pin 2>&1);
 check "no practice: configured -> exit 2 (GUARD on the code)" "$([ "$rc" -eq 2 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'no practice: recorded'
 check "  and says there is no practice: to re-pin (CONTROL)" "$?"
+
+# ---- CONTROL: --uninstall and --re-pin are mutually exclusive -----------------
+# The guard sat below the uninstall branch, which ends `exit 0`, so `--uninstall --re-pin` ran the
+# uninstall and never saw the refusal (measured at bf7e9c9: exit 0, "different jobs" never
+# printed, and the target WAS uninstalled). Moved above the branch, the pair is refused and the
+# target is left alone. $WORK/nostandard is installed, so the uninstall branch would otherwise run.
+out=$(bash "$SRC/bin/goblin-install" --target "$WORK/nostandard" --uninstall --re-pin 2>&1); rc=$?
+check "--uninstall --re-pin is refused, exit 2 (CONTROL)" "$([ "$rc" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$out" | grep -q 'different jobs'
+check "  and says they are different jobs (CONTROL)" "$?"
+[ -f "$WORK/nostandard/.goblin/installed.json" ]
+check "  and the target was not uninstalled (CONTROL)" "$?"
 
 # ---- a plain --upgrade must never re-pin by itself ---------------------------
 cd "$TARGET"
