@@ -83,11 +83,13 @@ STAMP=$(date +%F)
 if [ "$UNINSTALL" -eq 1 ]; then
   [ -f "$INSTALLED" ] || { g_err "nothing to uninstall: $INSTALLED is absent"; exit 2; }
   n=0
+  PARENTS=""
   while IFS=$'\t' read -r p h; do
     [ -n "$p" ] || continue
     [ -e "$TARGET/$p" ] || continue
     if [ "$DRY_RUN" -eq 1 ]; then g_info "would remove $p"; else rm -f "$TARGET/$p"; fi
     n=$((n + 1))
+    case "$p" in */*) PARENTS="$PARENTS${p%/*}"$'\n' ;; esac
   done < <(g_installed_files "$INSTALLED")
   # The config is goblin-stack's own file, so it goes too. HANDOFF/AGENTS/SPEC/reviews do not:
   # they are the project's record, not the harness's.
@@ -95,25 +97,40 @@ if [ "$UNINSTALL" -eq 1 ]; then
     [ "$DRY_RUN" -eq 1 ] || rm -f "$CONFIG"
     g_info "removed .goblin/goblin.yaml (goblin-stack's own config)"
   fi
-  # Runtime state goblin-stack's own checks wrote. Unnamed, it leaves .goblin/ behind (D17).
+  # Runtime state goblin-stack's own checks wrote.
   for f in .goblin/last-gate-line .goblin/ratchet-last .goblin/.ds-report; do
     [ -f "$TARGET/$f" ] || continue
     [ "$DRY_RUN" -eq 1 ] || rm -f "$TARGET/$f"
     g_info "removed $f (runtime state)"
   done
-  # empty directories goblin-stack created
-  for d in .goblin/bin .goblin/manifest .goblin .hermes/skills .hermes; do
-    if [ -d "$TARGET/$d" ] && [ -z "$(ls -A "$TARGET/$d" 2>/dev/null)" ]; then
-      [ "$DRY_RUN" -eq 1 ] || rmdir "$TARGET/$d" 2>/dev/null
-    fi
-  done
+  # installed.json goes BEFORE the directory pass. While it was still on disk, .goblin/ was
+  # never empty when it was tested, so the directory survived unnamed (D17 / F2-7).
   if [ "$DRY_RUN" -eq 0 ]; then
     rm -f "$INSTALLED"
     if [ -f "$TARGET/.gitignore" ]; then
       printf '# goblin-stack uninstalled %s\n' "$STAMP" >> "$TARGET/.gitignore"
     fi
   fi
-  g_info "removed $n file(s). Left in place: HANDOFF.md, AGENTS.md, ROUND-000-SPEC.md, reviews/, the .gitignore block."
+  # Empty directories goblin-stack created: the parents of the files just removed, plus the
+  # harness roots. Deepest first, so a parent is only tested once its child has gone. The
+  # old fixed list never tried .hermes/skills/goblin-* and tested .goblin/ too early.
+  nd=0
+  while read -r d; do
+    [ -n "$d" ] || continue
+    [ -d "$TARGET/$d" ] || continue
+    if [ "$DRY_RUN" -eq 1 ]; then
+      g_info "would remove $d/ (if the files above leave it empty)"
+      nd=$((nd + 1))
+      continue
+    fi
+    if [ -z "$(ls -A "$TARGET/$d" 2>/dev/null)" ]; then
+      rmdir "$TARGET/$d" 2>/dev/null && { g_info "removed $d/ (empty)"; nd=$((nd + 1)); }
+    fi
+  done < <({
+      printf '%s' "$PARENTS"
+      printf '.goblin\n.goblin/bin\n.goblin/manifest\n.hermes\n.hermes/skills\n'
+    } | awk 'NF' | awk -F/ '{print NF " " $0}' | sort -rn | cut -d' ' -f2- | awk '!seen[$0]++')
+  g_info "removed $n file(s) and $nd empty director(y|ies). Left in place: HANDOFF.md, AGENTS.md, ROUND-000-SPEC.md, reviews/, the .gitignore block."
   exit 0
 fi
 
