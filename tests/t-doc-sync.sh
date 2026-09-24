@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# t-doc-sync.sh — the documents that claim to render the matrix must still render it.
+#
+#   F2-4  README calls docs/ENFORCEMENT.md "the matrix rendered for a human". Every row's check
+#         cell AND its "if it cannot be enforced, why" cell must equal manifest/enforcement.tsv.
+#         Measured stale at f23b371: checks IN-03, HP-02, SP-03, PT-01; whys IN-03, IN-04, HP-02,
+#         SP-03, HS-01, PT-01, CL-02.
+#   F2-8  docs/ROLES.md must say bin/goblin-model is checkout-only, because the installer does
+#         not install it (measured in t-uninstall.sh) and it has no enforcement.tsv row.
+#   F2-9  "A fresh install is not automatically green" is false as measured - a fresh class-A
+#         install verifies 33 passed, 0 failed, 8 advisory, 1 skipped, exit 0. The claim must be
+#         gone from all three places it was written, replaced by the measured line.
+#   F2-3  docs/LIMITS.md must admit that .goblin/installed.json is not signed, because one edit
+#         to it (plus the matching edit to the file it protects) yields a fully green run.
+#
+# Run by tests/run-tests.sh.
+set -uo pipefail
+
+SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$SRC"
+fail=0
+note() { printf '      %s\n' "$*"; }
+check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
+
+# norm <cell> — strip markdown code ticks, collapse whitespace, drop the doc's "(builtin)" note.
+norm() { printf '%s' "$1" | sed 's/`//g' | tr -s '[:space:]' ' ' | sed 's/^ //; s/ $//; s/ (builtin)$//'; }
+
+# doc_cell <file> <row id> <field index> — the nth pipe-separated cell of the row whose first
+# cell is the id. The cells escape their own pipes as \|, so unescape before splitting.
+doc_cell() {
+  awk -v id="$2" -v idx="$3" '
+    /^\| *`/ {
+      line = $0
+      gsub(/\\\|/, "\001", line)
+      n = split(line, f, "|")
+      first = f[2]; gsub(/[` ]/, "", first)
+      if (first != id) next
+      cell = f[idx]
+      gsub(/\001/, "|", cell)
+      print cell
+      exit
+    }
+  ' "$1"
+}
+
+# ---- F2-4: every cell of the rendered matrix equals the matrix ----------------
+CELLS=0; DRIFT=""
+while IFS=$'\t' read -r id scope rule by artifact check why; do
+  [ "$id" = "id" ] && continue
+  [ -n "$id" ] || continue
+  CELLS=$((CELLS + 1))
+  [ "$(norm "$(doc_cell docs/ENFORCEMENT.md "$id" 6)")" = "$(norm "$check")" ] || DRIFT="$DRIFT $id/check"
+  [ "$(norm "$(doc_cell docs/ENFORCEMENT.md "$id" 7)")" = "$(norm "$why")" ] || DRIFT="$DRIFT $id/why"
+done < manifest/enforcement.tsv
+if [ -n "$DRIFT" ]; then
+  note "docs/ENFORCEMENT.md has drifted from manifest/enforcement.tsv:$DRIFT"
+  note "  (re-sync the cell, not the doc: the tsv is the source of truth)"
+fi
+check "docs/ENFORCEMENT.md renders all $CELLS rows of the matrix, both columns" \
+  "$([ -z "$DRIFT" ] && echo 0 || echo 1)"
+
+# ---- F2-8: the checkout-only statement ---------------------------------------
+grep -qi 'checkout-only' docs/ROLES.md
+check "docs/ROLES.md states that bin/goblin-model is checkout-only (F2-8)" "$?"
+
+# ---- F2-9: the false claim is gone, the measured one is there ----------------
+FALSE_CLAIM=""
+for f in README.md docs/CONTRACTS.md docs/ADOPTION.md; do
+  grep -qi 'not automatically green' "$f" && FALSE_CLAIM="$FALSE_CLAIM $f"
+done
+[ -z "$FALSE_CLAIM" ] || note "still claims a fresh install is not green:$FALSE_CLAIM"
+check "no document claims a fresh install is not automatically green (F2-9)" \
+  "$([ -z "$FALSE_CLAIM" ] && echo 0 || echo 1)"
+
+GREEN_CLAIM=""
+for f in README.md docs/CONTRACTS.md docs/ADOPTION.md; do
+  grep -q '33 passed, 0 failed, 8 advisory, 1 skipped' "$f" || GREEN_CLAIM="$GREEN_CLAIM $f"
+done
+[ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
+check "README, CONTRACTS and ADOPTION state the measured class-A green path" \
+  "$([ -z "$GREEN_CLAIM" ] && echo 0 || echo 1)"
+
+# ---- F2-3: the unsigned record is admitted -----------------------------------
+grep -qi 'is not signed' docs/LIMITS.md
+check "docs/LIMITS.md admits that installed.json is not signed (F2-3)" "$?"
+grep -q 'not signed' bin/goblin-verify
+check "  and the verifier says so in its own 'cannot see' footer" "$?"
+
+if [ "$fail" -eq 0 ]; then note "t-doc-sync: PASS"; else note "t-doc-sync: FAIL"; fi
+exit "$fail"

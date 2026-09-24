@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-tests.sh — every source-scope rule (PR-01..PR-04) plus the five test scripts.
+# run-tests.sh — every source-scope rule (PR-01..PR-04) plus the test scripts.
 # Exits non-zero on any failure and prints one line per test.
 #
 #   bash tests/run-tests.sh
@@ -10,7 +10,10 @@
 # PR-04  the repo is portable: no personal path in a reusable rule -> the PT-01 body below
 #
 # The installer's own contract (a refusal exits 1, a file it did not create is never
-# overwritten) is t-install-refusal.sh.
+# overwritten) is t-install-refusal.sh. The verifier's refusal to read an enclosing repo
+# (F2-1) is t-verify-nested.sh; `--uninstall`'s directory cleanup (F2-7) is t-uninstall.sh;
+# and the documents that claim to render the matrix (F2-3, F2-4, F2-8, F2-9) are
+# t-doc-sync.sh.
 
 set -uo pipefail
 
@@ -31,7 +34,13 @@ if [ "$SYNTAX_OK" -eq 0 ]; then line "syntax (bash -n)" "ok"; else line "syntax 
 if out=$(bash bin/goblin-lib.sh --self-test 2>&1); then line "goblin-lib --self-test" "ok ($out)"; else line "goblin-lib --self-test" "FAIL"; FAIL=1; fi
 
 # ---- PR-04 / PT-01 over the SOURCE tree -------------------------------------
-PT=$(for d in skills manifest bin templates presets; do
+# PT-01's own directory list is the set an INSTALL writes (skills manifest bin templates presets
+# .goblin .hermes). This body is the same rule over the SOURCE tree, which also owns tests/ — the
+# directory the negative control lives in, and where a tenant string sat until F2-5 (1 repo-wide
+# hit at f23b371, 0 at b100b44, and PT-01 could not see it). tests/ is deliberately NOT added to
+# PT-01 itself: a target's own tests are its code, and a project may legitimately name its own
+# paths there.
+PT=$(for d in skills manifest bin templates presets tests; do
        [ -d "$d" ] || continue
        grep -rniE '(h[a]rvey|tech-g[o]blin|/h[o]me/[a-z]+|g[o]blin-ui|op[e]n-door|sup[r]eme|bb[t]ech|c[l]v)' "$d"
      done)
@@ -62,8 +71,9 @@ else
   line "IN-03 manifest self-check" "FAIL"; FAIL=1
 fi
 
-# ---- the four test scripts ---------------------------------------------------
-for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red; do
+# ---- the test scripts --------------------------------------------------------
+for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
+         t-verify-nested t-uninstall t-doc-sync; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi

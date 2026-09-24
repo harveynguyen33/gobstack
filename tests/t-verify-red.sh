@@ -143,7 +143,11 @@ m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
 m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 7/' .goblin/goblin.yaml; }
 
-m_tenant_leak()   { printf '\nsee /home/harvey/projects for the tenant list\n' >> .hermes/skills/goblin-mode/SKILL.md; }
+# The tenant string is built at run time. A literal here would be the repo's only tenant hit
+# (measured at f23b371: 1 repo-wide, 0 at b100b44) and PT-01, the rule that exists to catch
+# exactly that, does not scan tests/ - so the control was the leak it was meant to catch (F2-5).
+# $HOME expands to the same /home/<user>/projects the rule matches.
+m_tenant_leak()   { printf '\nsee %s/projects for the tenant list\n' "$HOME" >> .hermes/skills/goblin-mode/SKILL.md; }
 m_wrong_branch()  { sed -i 's/^branch: main/branch: trunk/' .goblin/goblin.yaml; }
 
 m_archive_flip()  { sed -i 's/^archive: false/archive: true/' .goblin/goblin.yaml; }
@@ -221,6 +225,16 @@ expect_red "the declared branch is wrong"          PT-02 1 m_wrong_branch
 
 expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip
+
+# ---- F2-6: --only must refuse a selection that runs no target row -------------
+# A valid SOURCE-scope id selects nothing in an installed repo, so the run printed
+# "0 passed, 0 failed" and exited 0: a pipeline gate built on `--only PR-01` was a no-op.
+out=$(bash .goblin/bin/goblin-verify --only PR-01 2>&1); rc=$?
+check "--only <source-scope id> refuses instead of reporting 0 passed" "$([ "$rc" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$out" | grep -q 'selects no target-scope row'
+check "  and the refusal says why" "$?"
+out=$(bash .goblin/bin/goblin-verify --only IN-01,PR-02 2>&1); rc=$?
+check "--only <target id mixed with a source id> still runs the target row" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 
 FINAL=$(bash .goblin/bin/goblin-verify 2>&1); FINAL_RC=$?
 [ "$FINAL_RC" -eq 0 ] || printf '%s\n' "$FINAL" | grep -E '^(FAIL|SKIP|ADV)' | sed 's/^/        /'

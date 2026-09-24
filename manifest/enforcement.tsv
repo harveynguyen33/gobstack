@@ -44,4 +44,4 @@ CL-02	target	An archive: true project verifies GREEN without a HANDOFF or gates.
 PR-01	source	The installer never writes outside its target.	test	tests/t-install-*	tests/run-tests.sh	—
 PR-02	source	A second install is a no-op, and an upgrade reports created/updated/unchanged.	test	tests/t-install-idempotent.sh	tests/run-tests.sh	—
 PR-03	source	Every target-scope check goes RED under its own violation.	test	tests/t-verify-red.sh	tests/run-tests.sh	— (the negative control the verifier re-runs)
-PR-04	source	The repo is portable: no personal path in any reusable rule.	lint	repo	tests/run-tests.sh (PT-01 body run over the source tree)	—
+PR-04	source	The repo is portable: no personal path in any reusable rule.	lint	repo	tests/run-tests.sh (the PT-01 body over the source tree, plus tests/)	—

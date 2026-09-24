@@ -36,6 +36,10 @@ INSTALLED_FILES=$(find . -path ./.git -prune -o -type f -print | wc -l | tr -d '
 check "first install creates the harness ($INSTALLED_FILES files in the tree)" \
   "$([ "$INSTALLED_FILES" -gt 20 ] && echo 0 || echo 1)"
 check "the verifier landed" "$([ -x .goblin/bin/goblin-verify ] && echo 0 || echo 1)"
+# The installer's write set under .goblin/bin is exactly the two shipped scripts: bin/goblin-model
+# is checkout-only (docs/ROLES.md, F2-8), and the same fixture is what t-uninstall.sh asserts.
+check ".goblin/bin holds exactly goblin-verify + goblin-lib.sh" \
+  "$([ "$(ls .goblin/bin | sort | tr '\n' ' ')" = "goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
 check "the project-tier skills landed" "$([ -f .hermes/skills/goblin-mode/SKILL.md ] && echo 0 || echo 1)"
 
 git add -A && git commit -q -m "chore: install"

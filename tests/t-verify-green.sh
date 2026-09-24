@@ -36,6 +36,8 @@ printf '%s' "$OUT" | grep -qE '[0-9]+ passed, 0 failed, [0-9]+ advisory'
 check "the summary line reports passed/failed/advisory" "$?"
 printf '%s' "$OUT" | grep -q 'cannot see'
 check "the run states what it cannot see" "$?"
+printf '%s' "$OUT" | grep -q 'not signed'
+check "the run says the record every drift check trusts is not signed (F2-3)" "$?"
 printf '%s' "$OUT" | grep -q 'SKIP  HS-02'
 check "HS-02 is skipped with a reason while no pre-change commit is pinned" "$?"
 printf '%s' "$OUT" | grep -q 'ADV   MD-02'
