@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-tests.sh — every source-scope rule (PR-01..PR-04) plus the four test scripts.
+# run-tests.sh — every source-scope rule (PR-01..PR-04) plus the five test scripts.
 # Exits non-zero on any failure and prints one line per test.
 #
 #   bash tests/run-tests.sh
@@ -8,6 +8,9 @@
 # PR-02  a second install is a no-op                     -> t-install-idempotent.sh
 # PR-03  every target-scope check goes RED under its own violation -> t-verify-red.sh
 # PR-04  the repo is portable: no personal path in a reusable rule -> the PT-01 body below
+#
+# The installer's own contract (a refusal exits 1, a file it did not create is never
+# overwritten) is t-install-refusal.sh.
 
 set -uo pipefail
 
@@ -53,14 +56,14 @@ else
 fi
 
 # ---- the manifest's own integrity -------------------------------------------
-if awk -F'\t' 'NR>1 && $6=="" {n++} END{exit n>0}' manifest/enforcement.tsv; then
+if awk -F'\t' 'NR>1 && ($6=="" || ($6=="advisory" && $4!="advisory")) {n++} END{exit n>0}' manifest/enforcement.tsv; then
   line "IN-03 manifest self-check" "ok"
 else
   line "IN-03 manifest self-check" "FAIL"; FAIL=1
 fi
 
 # ---- the four test scripts ---------------------------------------------------
-for t in t-install-idempotent t-install-off-switch t-verify-green t-verify-red; do
+for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi
