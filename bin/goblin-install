@@ -85,6 +85,15 @@ INSTALLED="$TARGET/.goblin/installed.json"
 CONFIG="$TARGET/.goblin/goblin.yaml"
 STAMP=$(date +%F)
 
+# --uninstall and --re-pin are different jobs, and this guard has to sit ABOVE the uninstall
+# branch: that branch ends `exit 0`, so the same check placed below it was unreachable and
+# `--uninstall --re-pin` ran the uninstall without ever seeing the refusal (measured at bf7e9c9:
+# exit 0, target uninstalled, "different jobs" never printed).
+if [ "$UNINSTALL" -eq 1 ] && [ "$RE_PIN" -eq 1 ]; then
+  g_err "--uninstall and --re-pin are different jobs; run them one at a time"
+  exit 2
+fi
+
 # ------------------------------------------------------------- uninstall ------
 if [ "$UNINSTALL" -eq 1 ]; then
   [ -f "$INSTALLED" ] || { g_err "nothing to uninstall: $INSTALLED is absent"; exit 2; }
@@ -148,11 +157,6 @@ fi
 # reports the old and new hash. It is unreachable from --upgrade and from goblin-verify, by
 # design: an automatic re-pin would be the silent edit the pin exists to catch.
 # See docs/CONTRACTS.md, "An edited standard is not a dead end".
-if [ "$UNINSTALL" -eq 1 ] && [ "$RE_PIN" -eq 1 ]; then
-  g_err "--uninstall and --re-pin are different jobs; run them one at a time"
-  exit 2
-fi
-
 if [ "$RE_PIN" -eq 1 ]; then
   [ -f "$CONFIG" ] || { g_err "nothing to re-pin: $CONFIG is absent (install first)"; exit 2; }
   PIN_PATH=$(g_expand_tilde "$(g_yaml_scalar "$CONFIG" practice)")
@@ -176,7 +180,14 @@ if [ "$RE_PIN" -eq 1 ]; then
   fi
   # One line, in place. Every other line of the config - comments included - is untouched, so
   # the `owned` contract holds for everything except the single value just asked for.
-  sed -i "s|^practice_sha256:.*|practice_sha256: $NEW_SHA|" "$CONFIG"
+  sed -i "s|^practice_sha256:.*|practice_sha256: $NEW_SHA|" "$CONFIG" \
+    || { g_err "could not rewrite the pin in $CONFIG"; exit 1; }
+  # Fail closed: never report a re-pin that did not land. The failure this command exists to
+  # remove is a hash nobody verified (measured at bf7e9c9: sed -i could not write to a read-only
+  # .goblin/, yet the branch printed "practice re-pinned" with both hashes and exited 0, leaving
+  # IN-02 RED and the config byte-identical).
+  grep -qxF "practice_sha256: $NEW_SHA" "$CONFIG" \
+    || { g_err "the new pin did not land in $CONFIG"; exit 1; }
   g_info "practice re-pinned: $PIN_PATH"
   g_info "  recorded $OLD_SHA"
   g_info "  now      $NEW_SHA"

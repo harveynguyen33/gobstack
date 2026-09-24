@@ -90,7 +90,11 @@ Four things it deliberately is not:
   at a *different* standard is a deliberate config edit, not a re-pin.
 
 Refusals are exit `2`, each naming the path: no `.goblin/goblin.yaml`, no `practice:` recorded, the
-recorded path absent, or no `practice_sha256:` line to rewrite.
+recorded path absent, or no `practice_sha256:` line to rewrite. A failed write is exit `1`, with
+the path — the command never reports a re-pin that did not land. One refusal guards the mode
+itself: `--uninstall --re-pin` is exit `2` with `--uninstall and --re-pin are different jobs; run
+them one at a time` — the two modes run one at a time, and the pair is refused before anything is
+removed.
 
 ### Never a half-state
 
