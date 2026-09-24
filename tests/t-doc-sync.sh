@@ -34,8 +34,10 @@ norm() { printf '%s' "$1" | sed 's/`//g' | tr -s '[:space:]' ' ' | sed 's/^ //; 
 # norm_text <file> — the whole file with markdown emphasis, code ticks and run-together whitespace
 # normalised away, so a claim cannot escape its own control by wearing **bold**. Emphasis markers
 # become spaces (not nothing) so that `**not** automatically` and `not**automatically**` both
-# normalise to the same readable phrase.
-norm_text() { sed 's/[*_`]/ /g' "$1" | tr -s '[:space:]' ' '; }
+# normalise to the same readable phrase. The case fold is the second axis: the control this one
+# replaced matched with `grep -qi`, and dropping the fold let `NOT automatically green` and a
+# sentence-initial `Not automatically green` walk through (F3-followup, measured at e196b3e).
+norm_text() { sed 's/[*_`]/ /g' "$1" | tr -s '[:space:]' ' ' | tr 'A-Z' 'a-z'; }
 
 # The claim, in the normalised form the matcher looks for.
 FALSE_RE='not[[:space:]]+automatically[[:space:]]+green'
@@ -84,15 +86,23 @@ grep -qi 'checkout-only' docs/ROLES.md
 check "docs/ROLES.md states that bin/goblin-model is checkout-only (F2-8)" "$?"
 
 # ---- F2-9: the false claim is gone, the measured one is there ----------------
-# The control's own control: the normalised matcher must still catch the claim wearing emphasis,
-# or the scan below reports ok on exactly the broken copy the round-1 review measured.
-if norm_text <(printf '%s\n' 'A fresh install is **not** automatically green, and that is the design.') \
-     | grep -qE "$FALSE_RE"; then
-  note "ok   the F2-9 matcher catches the claim in its emphasised form"
-else
-  note "FAIL the F2-9 matcher is defeated by markdown emphasis"
-  fail=1
-fi
+# The control's own control: the normalised matcher must still catch the claim wearing emphasis
+# OR carrying a capital, or the scan below reports ok on exactly the broken copy the round-1
+# review measured. The two capitalised forms are the ones F3-followup added: the round-1 control
+# used `grep -qi` and this one did not, so `NOT automatically green` and a sentence-initial
+# `Not automatically green` both passed until the fold above was restored.
+for claim in \
+  'A fresh install is **not** automatically green, and that is the design.' \
+  'A fresh install is NOT automatically green.' \
+  'Not automatically green: a fresh install needs a round.'
+do
+  if norm_text <(printf '%s\n' "$claim") | grep -qE "$FALSE_RE"; then
+    note "ok   the F2-9 matcher catches: $claim"
+  else
+    note "FAIL the F2-9 matcher is defeated by: $claim"
+    fail=1
+  fi
+done
 
 FALSE_CLAIM=""
 for f in $CLAIM_DOCS; do
