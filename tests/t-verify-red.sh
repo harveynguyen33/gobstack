@@ -6,6 +6,13 @@
 # One `expect_red` per target-scope row: 42 of 42. The `--only <id>` form is used so a mutation
 # in one row cannot be masked by another row failing first.
 #
+# PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
+# rows whose bodies F4 rewrote, so beyond the one `expect_red` each already had, four more controls
+# pin the new semantics: two are `expect_green` (a legitimate HANDOFF that the pre-change rows
+# rejected) and two are `expect_red` (a violation the pre-change rows let through). All four are
+# RED on the pre-change rows - measured by running this file against e196b3e with its old HP-02 and
+# HP-03 bodies restored, the F4 way of proving a control is not green on both trees.
+#
 # WHAT THE 8 ADVISORY-ROW CONTROLS DO AND DO NOT PROVE. Eight target rows are labelled
 # `advisory` by design (HP-04, HS-03, CM-02, MD-02, MD-03, PG-04, DOC-01, DOC-02): their rules
 # are not mechanically checkable, so there is no violation of the *rule* to produce. Their
@@ -92,6 +99,26 @@ function expect_red {
   if [ -n "$dir" ]; then ( cd "$dir" && "$restore" ); else "$restore"; fi
 }
 
+# expect_green <label> <row id> <mutate fn> [workdir] [restore fn]
+# The mirror of expect_red: F4 gave HP-02 a closed alias set and scoped HP-03 to the Gates
+# section, so two of its controls assert that a HANDOFF the pre-change rows rejected now passes.
+# Declared with `function` for the same reason expect_red is.
+function expect_green {
+  local label="$1" id="$2" mutate="$3" dir="${4:-}" restore="${5:-restore_all}"
+  local out rc
+  if [ -n "$dir" ]; then ( cd "$dir" && "$mutate" ); else "$mutate"; fi
+  if [ -n "$dir" ]; then out=$( cd "$dir" && bash .goblin/bin/goblin-verify --only "$id" 2>&1 ); rc=$?
+  else out=$(bash .goblin/bin/goblin-verify --only "$id" 2>&1); rc=$?; fi
+  if [ "$rc" = "0" ]; then
+    note "ok   $label -> $id exit 0 ($(printf '%s' "$out" | grep -m1 -E '^PASS' | cut -c1-88))"
+  else
+    note "FAIL $label -> $id exit $rc, wanted 0"
+    printf '%s\n' "$out" | sed 's/^/        /'
+    fail=1
+  fi
+  if [ -n "$dir" ]; then ( cd "$dir" && "$restore" ); else "$restore"; fi
+}
+
 # ---- mutations: the exact violation each row exists to catch ------------------
 m_in_01()         { sed -i '/"version"/d' .goblin/installed.json; }
 m_edit_practice() { printf '# an edited byte\n' >> "$WORK/standard.md"; }
@@ -101,6 +128,33 @@ m_in_04()         { sed -i 's|^  "refused": {|  "refused": {\n    "checks/gone.m
 m_drop_handoff()  { rm -f HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: drop handoff" >/dev/null 2>&1; }
 m_drop_heading()  { sed -i 's/^## Gates$/#### Gates/' HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: demote the Gates heading" >/dev/null 2>&1; }
 m_no_date()       { sed -i -E 's/measured [0-9]{4}-[0-9]{2}-[0-9]{2}/measured/g' HANDOFF.md; }
+
+# ---- F4's four controls: HP-02 slot-based, HP-03 scoped to the Gates section ------------------
+# Each is RED on the pre-change rows (the shipped `for h in 'State' 'Gates' ...` grep and the
+# whole-file awk), which is what makes it a control rather than a restatement:
+#   m_phantom_state  a heading that merely CONTAINS "State" - the old grep passed it (phantom);
+#   m_hist_lines     the record PROJECT-PRACTICE section 1 requires, which the old awk reddened;
+#   m_alias_vocab    the model repo's own vocabulary, which the old literal strings rejected;
+#   m_no_gate_line   a Gates section with nothing in it - the old awk had no n==0 clause.
+m_phantom_state() { sed -i 's|^## State$|## ⚠️ BOARD STATE|' HANDOFF.md; }
+m_alias_vocab()   { sed -i -e 's|^## State$|## Status|' -e 's|^## Gates$|## Gate|' \
+                         -e 's|^## Next steps$|### NEXT|' \
+                         -e 's|^## NOT verified$|## Pending his device test|' HANDOFF.md; }
+m_hist_lines()    { awk '
+  /^## Next steps$/ && !d {
+    print "## Round log"
+    for (i = 1; i <= 20; i++) print "- round " i ": tsc=0 · build=0 · " i "/" i " harnesses green"
+    print ""
+    d = 1
+  }
+  { print }
+' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md; }
+m_no_gate_line()  { awk '
+  /^## Gates$/ {print; inG = 1; next}
+  inG && /^#{1,3}[[:space:]]/ {inG = 0}
+  inG && /(tsc|build|hex|safelist|[0-9]+\/[0-9]+)[^=]*=/ {next}
+  {print}
+' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md; }
 m_row_fails()     { awk -F'\t' -v OFS='\t' -v x="$1" 'NR==1{print;next} {if ($1==x) $6="false"; print}' .goblin/manifest/enforcement.tsv > .goblin/manifest/enforcement.tsv.new; mv .goblin/manifest/enforcement.tsv.new .goblin/manifest/enforcement.tsv; }
 m_hp_04()         { m_row_fails HP-04; }
 m_no_head()       { sed -i -E 's/`[0-9a-f]{7,40}`/`deadbee`/' HANDOFF.md; }
@@ -181,6 +235,15 @@ expect_red "a required HANDOFF heading demoted"     HP-02 1 m_drop_heading
 expect_red "a gate number with no measured date"   HP-03 1 m_no_date
 expect_red "HP-04 (advisory row: wired, not biting)" HP-04 1 m_hp_04
 expect_red "a HANDOFF naming no commit in the repo" HP-05 1 m_no_head
+
+# ---- F4's controls for the two rows whose bodies moved ---------------------------------------
+# The five required sections become slots (first word of an H2/H3, closed alias set) and HP-03 is
+# scoped to the Gates section. Two of these assert the new leniency (a HANDOFF the old rows
+# rejected is correct), two assert the new strictness (a violation the old rows let through).
+expect_red   "F4: the only 'State' is a heading that merely contains the word" HP-02 1 m_phantom_state
+expect_green "F4: 20 historical undated gate lines outside the dated Gates section" HP-03 m_hist_lines
+expect_green "F4: the repo's own vocabulary (Status, Gate, NEXT, Pending ...)" HP-02 m_alias_vocab
+expect_red   "F4: a Gates section carrying no gate-bearing line" HP-03 1 m_no_gate_line
 
 expect_red "no SPEC"                               SP-01 1 m_drop_spec
 expect_red "an untracked SPEC"                     SP-02 1 m_untracked_spec
