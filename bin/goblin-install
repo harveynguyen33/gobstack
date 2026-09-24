@@ -95,6 +95,12 @@ if [ "$UNINSTALL" -eq 1 ]; then
     [ "$DRY_RUN" -eq 1 ] || rm -f "$CONFIG"
     g_info "removed .goblin/goblin.yaml (goblin-stack's own config)"
   fi
+  # Runtime state goblin-stack's own checks wrote. Unnamed, it leaves .goblin/ behind (D17).
+  for f in .goblin/last-gate-line .goblin/ratchet-last .goblin/.ds-report; do
+    [ -f "$TARGET/$f" ] || continue
+    [ "$DRY_RUN" -eq 1 ] || rm -f "$TARGET/$f"
+    g_info "removed $f (runtime state)"
+  done
   # empty directories goblin-stack created
   for d in .goblin/bin .goblin/manifest .goblin .hermes/skills .hermes; do
     if [ -d "$TARGET/$d" ] && [ -z "$(ls -A "$TARGET/$d" 2>/dev/null)" ]; then
@@ -121,7 +127,7 @@ PRESET=$(ls "$SRC"/presets/"$CLASS"-*.yaml 2>/dev/null | head -n 1)
 preset() { local v; v=$(g_yaml_scalar "$PRESET" "$1"); printf '%s' "${v%\"}" | sed 's/^"//'; }
 
 HARNESS_DIR=$(preset harness_dir); [ -n "$HARNESS_DIR" ] || HARNESS_DIR=checks
-SCAFFOLD=$(preset scaffold_checks)
+SCAFFOLD=$(preset scaffold_checks); [ -n "$SCAFFOLD" ] || SCAFFOLD=no
 GATE_NAME=$(preset gate_name)
 GATE_CMD=$(preset gate_cmd)
 RAT_NAME=$(preset ratchet_name)
@@ -136,7 +142,7 @@ need() { g_class_need "$CLASSES_TSV" "$CLASS" "$1"; }
 
 # parts that are OFF for this class become real opt-outs, not silent absences
 DISABLED=""
-for p in handoff spec gate replay ratchet pr-gate playbooks tokens; do
+for p in handoff spec gate replay ratchet pr-gate review-panel playbooks tokens; do
   [ "$(need "$p")" = "-" ] && DISABLED="$DISABLED$p,"
 done
 [ "$SKILLS" = "no" ] && DISABLED="$DISABLED""playbooks,"
@@ -174,6 +180,9 @@ if [ "$RAT_CEIL" = "measure" ]; then
   case "$RAT_CEIL" in ''|*[!0-9]*) RAT_CEIL=0 ;; esac
 fi
 [ "$WANT_RATCHET" -eq 0 ] && { RAT_NAME=""; RAT_CMD=""; RAT_CEIL=0; }
+# A part the class turns off must not be declared either: leaving replay.env/replay.cmd in the
+# config made CL-01's "class forbids this part" branch fire on the installer's own output (D10).
+[ "$(need replay)" = "-" ] && { REPLAY_ENV=""; REPLAY_CMD=""; }
 
 # parts selected with --parts
 part_wanted() {
@@ -192,7 +201,20 @@ CREATED=0; UPDATED=0; UNCHANGED=0; SKIPPED=0
 REFUSED_PATHS=""
 # Files a PREVIOUS run created and left to the user (never overwritten, never hash-checked).
 PREV_OWNED=""
-if [ -f "$INSTALLED" ]; then PREV_OWNED=$(g_json_object "$INSTALLED" owned | cut -f1); fi
+# Files a PREVIOUS run installed (the hash-checked 'files' map). A path that exists on disk
+# but is NOT in this map was not created by goblin-stack, so it is refused rather than
+# clobbered - the contract in docs/CONTRACTS.md. --force is the only way past it.
+PREV_FILES=""
+if [ -f "$INSTALLED" ]; then
+  PREV_OWNED=$(g_json_object "$INSTALLED" owned | cut -f1)
+  PREV_FILES=$(g_installed_files "$INSTALLED" | cut -f1)
+fi
+
+# prev_installed <relpath> - did a previous run install this exact path?
+prev_installed() {
+  [ -n "$PREV_FILES" ] || return 1
+  printf '%s\n' "$PREV_FILES" | grep -qxF "$1"
+}
 
 render() { # render <template> key value [key value ...]
   local tpl="$1"; shift
@@ -202,6 +224,9 @@ render() { # render <template> key value [key value ...]
 }
 
 # put <relpath> <source-file> [refuse-overwrite]
+# Refuses when the destination exists with different content and goblin-stack did not install
+# it: either the caller asked for it explicitly ('refuse') or the path is not in the previous
+# run's 'files' map. --force is the documented override.
 put() {
   local rel="$1" srcf="$2" refuse="${3:-}"
   local dst="$TARGET/$rel" srch cur
@@ -213,11 +238,11 @@ put() {
       printf '%s\t%s\n' "$rel" "$srch" >> "$TMP/files.tsv"
       return 0
     fi
-    if [ "$refuse" = "refuse" ] && [ "$FORCE" -eq 0 ]; then
+    if [ "$FORCE" -eq 0 ] && { [ "$refuse" = "refuse" ] || ! prev_installed "$rel"; }; then
       SKIPPED=$((SKIPPED + 1))
       printf '%s\t%s\n' "$rel" "$cur" >> "$TMP/refused.tsv"
       REFUSED_PATHS="$REFUSED_PATHS $rel"
-      g_info "kept (exists, never overwritten): $rel"
+      g_info "kept (exists, not installed by goblin-stack): $rel"
       return 0
     fi
     UPDATED=$((UPDATED + 1))
@@ -238,22 +263,37 @@ put_once() {
   local rel="$1" srcf="$2"
   local dst="$TARGET/$rel" srch cur
   srch=$(g_sha256_file "$srcf")
+  if [ -f "$dst" ] && [ "$FORCE" -eq 1 ] && ! printf '%s\n' "$PREV_OWNED" | grep -qxF "$rel"; then
+    # --force is the documented override for "a file goblin-stack did not create" (D11). A file
+    # a previous install created is 'yours' by contract, and --force does not take it back.
+    UPDATED=$((UPDATED + 1))
+    g_info "taken over (--force): $rel"
+    if [ "$DRY_RUN" -eq 0 ]; then cp "$srcf" "$dst"; fi
+    printf '%s\t%s\n' "$rel" "$srch" >> "$TMP/owned.tsv"
+    return 0
+  fi
   if [ -f "$dst" ]; then
     SKIPPED=$((SKIPPED + 1))
     if printf '%s\n' "$PREV_OWNED" | grep -qxF "$rel"; then
       g_info "kept (yours, never overwritten): $rel"
+      # Still recorded as yours, so the next install keeps treating it that way.
+      printf '%s\t%s\n' "$rel" "$srch" >> "$TMP/owned.tsv"
     else
       cur=$(g_sha256_file "$dst")
       printf '%s\t%s\n' "$rel" "$cur" >> "$TMP/refused.tsv"
       REFUSED_PATHS="$REFUSED_PATHS $rel"
       g_info "kept (existed before the install, never overwritten): $rel"
     fi
+    # A refused file is NOT recorded as owned: it was never goblin-stack's, so a later run
+    # must refuse it again rather than inherit ownership of it (D11).
+    return 0
+  fi
+  CREATED=$((CREATED + 1))
+  if [ "$DRY_RUN" -eq 1 ]; then
+    g_info "plan: $rel"
   else
-    CREATED=$((CREATED + 1))
-    if [ "$DRY_RUN" -eq 1 ]; then g_info "plan: $rel"; else
-      mkdir -p "$(dirname "$dst")"
-      cp "$srcf" "$dst"
-    fi
+    mkdir -p "$(dirname "$dst")"
+    cp "$srcf" "$dst"
   fi
   printf '%s\t%s\n' "$rel" "$srch" >> "$TMP/owned.tsv"
 }
@@ -275,6 +315,7 @@ render_config() {
     MAX_DIRTY "0" \
     ADVISORY_CEILING "$ADV_CEILING" \
     HARNESS_DIR "$HARNESS_DIR" \
+    SCAFFOLD_CHECKS "$SCAFFOLD" \
     GATES "$gates" \
     RATCHET_NAME "$RAT_NAME" \
     RATCHET_CMD "$RAT_CMD" \
@@ -324,23 +365,27 @@ if [ "$SCAFFOLD" = "yes" ]; then
   put "$HARNESS_DIR/assert.mjs" "$SRC/templates/checks/assert.mjs.tmpl"
 fi
 
-# .gitignore: one appended block, delimited by markers; never rewritten
+# .gitignore: one appended block, delimited by markers; never rewritten. The declared
+# runtime_data paths are listed too, because DS-01 asserts each of them is git-ignored.
 GI_MARK="# >>> goblin-stack >>>"
-if [ "$DRY_RUN" -eq 0 ]; then
-  if [ -f "$TARGET/.gitignore" ] && grep -qF "$GI_MARK" "$TARGET/.gitignore"; then
-    SKIPPED=$((SKIPPED + 1))
-    g_info "kept (.gitignore block already present)"
-  else
-    {
-      [ -f "$TARGET/.gitignore" ] && cat "$TARGET/.gitignore"
-      printf '\n%s\n' "$GI_MARK"
-      printf '# goblin-stack runtime state (gates write these; they are not fixture)\n'
-      printf '.goblin/last-gate-line\n.goblin/.ds-report\n.goblin/ratchet-last\n'
-      printf '# <<< goblin-stack <<<\n'
-    } > "$TMP/gitignore.new"
-    if [ -f "$TARGET/.gitignore" ]; then UPDATED=$((UPDATED + 1)); else CREATED=$((CREATED + 1)); fi
-    cp "$TMP/gitignore.new" "$TARGET/.gitignore"
-  fi
+if [ -f "$TARGET/.gitignore" ] && grep -qF "$GI_MARK" "$TARGET/.gitignore"; then
+  SKIPPED=$((SKIPPED + 1))
+  g_info "kept (.gitignore block already present)"
+else
+  {
+    [ -f "$TARGET/.gitignore" ] && cat "$TARGET/.gitignore"
+    printf '\n%s\n' "$GI_MARK"
+    printf '# goblin-stack runtime state (gates write these; they are not fixture)\n'
+    printf '.goblin/last-gate-line\n.goblin/.ds-report\n.goblin/ratchet-last\n'
+    if [ -n "$RUNTIME_DATA" ]; then
+      printf '# declared runtime_data (DS-01 hashes them around every gate run)\n'
+      printf '%s\n' "$RUNTIME_DATA"
+    fi
+    printf '# <<< goblin-stack <<<\n'
+  } > "$TMP/gitignore.new"
+  if [ -f "$TARGET/.gitignore" ]; then UPDATED=$((UPDATED + 1)); else CREATED=$((CREATED + 1)); fi
+  # Counted in --dry-run too: the plan must name every write it would make (D14).
+  if [ "$DRY_RUN" -eq 0 ]; then cp "$TMP/gitignore.new" "$TARGET/.gitignore"; fi
 fi
 
 # installed.json is the record; it is written LAST and never lists itself
@@ -402,5 +447,8 @@ fi
 
 if [ -n "$REFUSED_PATHS" ]; then
   g_info "refused to overwrite:$REFUSED_PATHS (pass --force to take them over)"
+  # Documented contract (docs/CONTRACTS.md, this file's header): exit 1 is "a refusal, with
+  # the path and the fix". A wrapper has to be able to detect it (D2).
+  exit 1
 fi
 exit 0

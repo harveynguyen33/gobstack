@@ -34,6 +34,10 @@ advisory_ceiling: {{ADVISORY_CEILING}}
 # Where the asserting harnesses live.
 harness_dir: {{HARNESS_DIR}}
 
+# Whether this class scaffolds that directory. A declared harness_dir that is absent FAILS
+# (HS-01) when this is yes; a class that ships no harness dir skips with a reason.
+scaffold_checks: {{SCAFFOLD_CHECKS}}
+
 # The gate set. DECLARED, never inferred from the stack. Replace the default below with the
 # real commands for this project; each must exit 0.
 gates:

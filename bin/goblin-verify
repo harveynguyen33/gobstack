@@ -58,8 +58,22 @@ for dep in git awk sed grep python3; do
   command -v "$dep" >/dev/null 2>&1 || { g_err "missing dependency: $dep"; exit 2; }
 done
 
-ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
-[ -n "$ROOT" ] || ROOT="$PWD"
+# Root resolution. `git rev-parse --show-toplevel` alone verifies the OUTER repo when the
+# target is nested inside another git repo (a monorepo subdirectory, anything under
+# ~/.hermes) — the installed config is the target's own marker, so it wins (D20).
+find_installed_root() {
+  local d="$PWD"
+  while :; do
+    if [ -f "$d/.goblin/goblin.yaml" ]; then printf '%s\n' "$d"; return 0; fi
+    [ "$d" = "/" ] && return 1
+    d=$(dirname "$d")
+  done
+}
+ROOT=$(find_installed_root) || ROOT=""
+if [ -z "$ROOT" ]; then
+  ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+  [ -n "$ROOT" ] || ROOT="$PWD"
+fi
 
 if [ -n "$SOURCE" ]; then
   MANIFEST="$SOURCE/manifest/enforcement.tsv"
@@ -90,30 +104,58 @@ if [ "$LIST" -eq 1 ]; then
   exit 0
 fi
 
+# --only must name rows the manifest actually has: a typo used to select nothing, emit no
+# rows and exit 0, turning a pipeline gate into a no-op (D15).
+if [ -n "$ONLY" ]; then
+  UNKNOWN=""
+  for want in $(printf '%s' "$ONLY" | tr ',' ' '); do
+    [ -n "$want" ] || continue
+    awk -F'\t' -v x="$want" 'NR>1 && $1==x {f=1} END{exit !f}' "$MANIFEST" \
+      || UNKNOWN="$UNKNOWN $want"
+  done
+  [ -z "$UNKNOWN" ] || { g_err "--only names id(s) not in the manifest:$UNKNOWN"; exit 2; }
+fi
+
 if [ ! -f "$CONFIG" ]; then
   g_err "not installed: $CONFIG is absent. Run: goblin-install --target $ROOT --class <A|B|C|D|E>"
   exit 2
 fi
 
 CLASS=$(g_yaml_scalar "$CONFIG" class)
+case "$CLASS" in
+  A|B|C|D|E) ;;
+  *) g_err "unknown class '${CLASS:-<empty>}' in $CONFIG (expected A|B|C|D|E)"; exit 2 ;;
+esac
 BRANCH=$(g_yaml_scalar "$CONFIG" branch)
 ARCHIVE=$(g_yaml_scalar "$CONFIG" archive)
 MAX_DIRTY=$(g_yaml_scalar "$CONFIG" max_dirty)
 ADV_CEILING=$(g_yaml_scalar "$CONFIG" advisory_ceiling)
 HARNESS_DIR_RAW=$(g_yaml_scalar "$CONFIG" harness_dir)
+SCAFFOLD_CHECKS=$(g_yaml_scalar "$CONFIG" scaffold_checks)
 MODELS_FILE=$(g_expand_tilde "$(g_yaml_scalar "$CONFIG" models_file)")
 PRACTICE=$(g_expand_tilde "$(g_yaml_scalar "$CONFIG" practice)")
 PRACTICE_SHA=$(g_unquote "$(g_yaml_scalar "$CONFIG" practice_sha256)")
 [ -n "$MAX_DIRTY" ] || MAX_DIRTY=0
 [ -n "$ADV_CEILING" ] || ADV_CEILING=10
 [ -n "$HARNESS_DIR_RAW" ] || HARNESS_DIR_RAW=checks
+# A config installed before this key existed declares no harness expectation: keep the old
+# skip behaviour rather than failing an adopted repo on an upgrade.
+[ -n "$SCAFFOLD_CHECKS" ] || SCAFFOLD_CHECKS=no
 
 if [ -d "$ROOT/$HARNESS_DIR_RAW" ]; then
   export GOBLIN_HARNESS_DIR="$ROOT/$HARNESS_DIR_RAW"
   export GOBLIN_HARNESS_REL="$HARNESS_DIR_RAW"
+  export GOBLIN_HARNESS_STATE=present
 else
   export GOBLIN_HARNESS_DIR=""
   export GOBLIN_HARNESS_REL="$HARNESS_DIR_RAW"
+  # 'absent' = the class scaffolds a harness dir and the declared one is missing -> FAIL.
+  # 'none'   = the class ships no harness dir -> SKIP with a reason (D7).
+  if [ "$SCAFFOLD_CHECKS" = "yes" ]; then
+    export GOBLIN_HARNESS_STATE=absent
+  else
+    export GOBLIN_HARNESS_STATE=none
+  fi
 fi
 export GOBLIN_ROOT="$ROOT"
 export GOBLIN_CONFIG="$CONFIG"
@@ -270,7 +312,19 @@ check_gt_05() {
 
 check_hs_01() {
   local d="$GOBLIN_HARNESS_DIR" f base asserting=0 reporting=0 bad=0
-  [ -n "$d" ] || { printf 'no harness dir (%s absent) - nothing to assert\n' "$GOBLIN_HARNESS_REL"; return 3; }
+  if [ -z "$d" ]; then
+    # A declared harness dir that is missing is a FAIL when the class scaffolds one; a class
+    # that ships none skips with a reason. Keying the skip off the PATH let a one-line config
+    # edit switch both HS rows off (D7).
+    if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
+      printf 'harness_dir %s is declared and class %s scaffolds it, but the directory is absent\n' \
+        "$GOBLIN_HARNESS_REL" "$CLASS"
+      return 1
+    fi
+    printf 'no harness dir (%s absent, class %s scaffolds none) - nothing to assert\n' \
+      "$GOBLIN_HARNESS_REL" "$CLASS"
+    return 3
+  fi
   for f in "$d"/*; do
     [ -f "$f" ] || continue
     base=$(basename "$f")
@@ -298,7 +352,14 @@ check_hs_02() {
     return 3
   fi
   d="$GOBLIN_HARNESS_DIR"
-  [ -n "$d" ] || { printf 'no harness dir to replay\n'; return 3; }
+  if [ -z "$d" ]; then
+    if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
+      printf 'harness_dir %s is declared and class %s scaffolds it, but the directory is absent\n' \
+        "$GOBLIN_HARNESS_REL" "$CLASS"
+      return 1
+    fi
+    printf 'no harness dir to replay\n'; return 3
+  fi
   tmp=$(mktemp -d)
   if ! git -C "$ROOT" worktree add -q --detach "$tmp/wt" "$commit" 2>/dev/null; then
     rm -rf "$tmp"; printf 'cannot create a worktree at %s\n' "$commit"; return 1
@@ -462,7 +523,14 @@ hash_runtime_data() {
 }
 
 check_ds_01() {
-  local before after
+  local before after bad=0 p
+  # Clause the row's own rule states and the old body dropped: every declared path must be
+  # git-ignored, or it is fixture, not runtime data (D12).
+  while read -r p; do
+    [ -n "$p" ] || continue
+    ( cd "$ROOT" && git check-ignore -q -- "$p" ) \
+      || { printf 'runtime_data path is not git-ignored: %s\n' "$p"; bad=1; }
+  done < <(g_yaml_list "$CONFIG" runtime_data)
   before=$(hash_runtime_data)
   run_gates no >/dev/null 2>&1
   after=$(hash_runtime_data)
@@ -471,7 +539,9 @@ check_ds_01() {
     printf 'a gate run wrote runtime data: %s -> %s\n' "$before" "$after"
     return 1
   fi
-  [ -n "$before" ] || { printf 'no runtime_data declared\n'; return 0; }
+  # Declaring nothing is not a pass: it is an unexercised rule, and it is reported as one.
+  [ -n "$before" ] || { printf 'no runtime_data declared\n'; return 2; }
+  [ "$bad" -eq 0 ] || return 1
   printf 'unchanged: %s\n' "$before"
   return 0
 }
@@ -505,7 +575,10 @@ check_sk_02() {
 
 check_sk_03() {
   local k
-  k=$(awk -F'\t' 'NR>1 && $6=="advisory" {n++} END{print n+0}' "$MANIFEST")
+  # Count what the run counts: a row is advisory if its check column says so OR its enforced_by
+  # does (MD-02 is advisory-labelled but its check column holds a builtin marker). Counting only
+  # the literal column printed 7 while the summary printed 8 (D13).
+  k=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "$MANIFEST")
   printf 'advisory %d of ceiling %d\n' "$k" "$ADV_CEILING"
   [ "$k" -le "$ADV_CEILING" ]
 }
@@ -543,6 +616,13 @@ check_cl_01() {
     [ -n "$part" ] || continue
     need=$(g_class_need "$CLASSES" "$CLASS" "$part")
     class_part_artifact "$part"; present=$?
+    # A class-forbidden part is forbidden whether or not the installer pre-disabled it: the
+    # opt-out branch used to mask the '-' branch for every part the class turns off, so only
+    # review-panel was ever enforced (D10).
+    if [ "$need" = "-" ]; then
+      if [ "$present" -eq 0 ]; then printf 'class %s forbids part %s, artifact present\n' "$CLASS" "$part"; bad=1; fi
+      continue
+    fi
     if g_part_disabled "$CONFIG" "$part"; then
       printf 'part %s: opt-out\n' "$part"
       continue
@@ -554,7 +634,6 @@ check_cl_01() {
         elif [ "$present" -ne 0 ]; then
           printf 'class %s requires part %s, artifact absent\n' "$CLASS" "$part"; bad=1
         fi ;;
-      -) if [ "$present" -eq 0 ]; then printf 'class %s forbids part %s, artifact present\n' "$CLASS" "$part"; bad=1; fi ;;
       O) printf 'part %s: optional, %s\n' "$part" "$([ "$present" -eq 0 ] && echo present || echo absent)" ;;
     esac
   done < <(awk -F'\t' 'NR>1 {print $2}' "$CLASSES" | sort -u)
@@ -562,8 +641,23 @@ check_cl_01() {
 }
 
 check_cl_02() {
+  # The archive flag is a switch with a contract, so it must be checkable (D6 - the old body
+  # printed a sentence and returned 0 in both branches, so the row could never be RED).
+  # Two falsifiable clauses: the value must be a boolean, and it must agree with what the
+  # install recorded - otherwise flipping `archive:` by hand silently waives the class.
+  case "$ARCHIVE" in
+    true|false) ;;
+    *) printf 'archive: must be true or false, got "%s"\n' "${ARCHIVE:-<empty>}"; return 1 ;;
+  esac
+  local recorded
+  recorded=$(sed -n 's/.*"archive"[[:space:]]*:[[:space:]]*\([a-z]*\).*/\1/p' "$INSTALLED" 2>/dev/null | head -n 1)
+  if [ -n "$recorded" ] && [ "$recorded" != "$ARCHIVE" ]; then
+    printf 'archive: is %s in %s but the install recorded %s - the waiver was flipped by hand\n' \
+      "$ARCHIVE" "$CONFIG" "$recorded"
+    return 1
+  fi
   if [ "$ARCHIVE" = "true" ]; then
-    printf 'archive: true - HP-*/GT-*/SP-* skipped, no HANDOFF or gates required\n'
+    printf 'archive: true (matches the install record) - HP-*/GT-*/SP-* skipped, no HANDOFF or gates required\n'
   else
     printf 'archive: false - the full class requirement applies\n'
   fi
@@ -575,9 +669,21 @@ check_cl_02() {
 PASS=0; FAIL=0; ADV=0; SKIP=0; BAD=0
 JSON_ROWS=""
 
+# json_escape <text> — a JSON string body. The detail of a check is arbitrary shell output
+# (quotes, backslashes, newlines), so it must be escaped or --json emits invalid JSON (D3).
+json_escape() {
+  local s="$1"
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  printf '%s' "$s"
+}
+
 emit() { # id status detail
   if [ "$JSON" -eq 1 ]; then
-    JSON_ROWS="$JSON_ROWS{\"id\":\"$1\",\"status\":\"$2\",\"detail\":\"$3\"},"
+    JSON_ROWS="$JSON_ROWS{\"id\":\"$(json_escape "$1")\",\"status\":\"$(json_escape "$2")\",\"detail\":\"$(json_escape "$3")\"},"
   else
     case "$2" in
       PASS) g_pass "$1" "$3" ;;
@@ -641,7 +747,7 @@ done < "$MANIFEST"
 
 if [ "$JSON" -eq 1 ]; then
   printf '{"root":"%s","class":"%s","passed":%d,"failed":%d,"advisory":%d,"skipped":%d,"rows":[%s]}\n' \
-    "$ROOT" "$CLASS" "$PASS" "$FAIL" "$ADV" "$SKIP" "${JSON_ROWS%,}"
+    "$(json_escape "$ROOT")" "$(json_escape "$CLASS")" "$PASS" "$FAIL" "$ADV" "$SKIP" "${JSON_ROWS%,}"
 else
   printf '      %d passed, %d failed, %d advisory, %d skipped\n' "$PASS" "$FAIL" "$ADV" "$SKIP"
   cat <<'SEE'
