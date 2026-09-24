@@ -114,6 +114,19 @@ if [ -n "$ONLY" ]; then
       || UNKNOWN="$UNKNOWN $want"
   done
   [ -z "$UNKNOWN" ] || { g_err "--only names id(s) not in the manifest:$UNKNOWN"; exit 2; }
+  # A valid id that is SOURCE-scope (PR-01..PR-04) selects no target row: the run emits
+  # nothing and exits 0, which is the same no-op gate D15 closed for a typo (F2-6).
+  TARGET_ROWS=0
+  for want in $(printf '%s' "$ONLY" | tr ',' ' '); do
+    [ -n "$want" ] || continue
+    awk -F'\t' -v x="$want" 'NR>1 && $1==x && $2=="target" {f=1} END{exit !f}' "$MANIFEST" \
+      && TARGET_ROWS=1
+  done
+  if [ "$TARGET_ROWS" -eq 0 ]; then
+    g_err "--only $ONLY selects no target-scope row, so this run would execute nothing and"
+    g_err "report success. Source-scope rows (PR-*) run in tests/run-tests.sh, not here."
+    exit 2
+  fi
 fi
 
 if [ ! -f "$CONFIG" ]; then
@@ -126,6 +139,24 @@ case "$CLASS" in
   A|B|C|D|E) ;;
   *) g_err "unknown class '${CLASS:-<empty>}' in $CONFIG (expected A|B|C|D|E)"; exit 2 ;;
 esac
+
+# Root vs git toplevel. find_installed_root resolves the CONFIG lookup correctly, but the
+# rows that shell out to git run in $ROOT and git resolves that to the ENCLOSING repo when
+# the target is not a repository of its own: a nested target then reports the outer repo's
+# index (30 "dirty entries" that belong to the outer repo) instead of its own state (F2-1).
+# Refuse up front, with the reason, rather than print a number about the wrong tree.
+ROOT_PHYS=$(cd "$ROOT" && pwd -P)
+GIT_TOP=$(cd "$ROOT" && git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$GIT_TOP" ] && [ "$GIT_TOP" != "$ROOT_PHYS" ]; then
+  g_err "target $ROOT_PHYS is inside the git repository $GIT_TOP but is not a repository of"
+  g_err "its own. CM-01 CM-03 GT-03 SP-02 PG-01 PG-03 DS-01 PT-02 and HP-05 shell out to git,"
+  g_err "and git would resolve every one of them to $GIT_TOP - the numbers would describe the"
+  g_err "outer repo, not this target."
+  g_err "fix: cd $ROOT_PHYS && git init   (make the target its own repo), or move it out of"
+  g_err "     $GIT_TOP."
+  exit 2
+fi
+
 BRANCH=$(g_yaml_scalar "$CONFIG" branch)
 ARCHIVE=$(g_yaml_scalar "$CONFIG" archive)
 MAX_DIRTY=$(g_yaml_scalar "$CONFIG" max_dirty)
@@ -754,7 +785,10 @@ else
       cannot see: whether a check in the harness dir tests the right path rather than
       merely passing; whether the target repo has CI; whether a human read the diff;
       whether the model mapping names a family that actually differs (MD-02 reports it
-      and cannot change it).
+      and cannot change it); and whether .goblin/installed.json — the record every drift
+      check trusts — was itself rewritten. It is not signed, so one edit to it (with the
+      matching edit to the file it protects) defeats IN-02, SK-02 and HS-01 at once
+      (docs/LIMITS.md #18).
 SEE
 fi
 
