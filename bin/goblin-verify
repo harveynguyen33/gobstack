@@ -19,7 +19,7 @@
 
 set -uo pipefail
 
-GOBLIN_VERIFY_VERSION="0.1.0"
+GOBLIN_VERIFY_VERSION="0.2.0"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=goblin-lib.sh
 . "$SELF_DIR/goblin-lib.sh"
@@ -207,6 +207,16 @@ row_part() {
     HS-01|HS-03) echo gate ;;
     HS-02) echo replay ;;
     PG-*) echo pr-gate ;;
+    # The automation rows and SK-04 ride the `playbooks` part: their artifacts are the shipped
+    # skills and the automation producers, and --skills no disables that part. An unmapped
+    # prefix returns "" and the row can never honour an opt-out (G3 section 4.3).
+    AU-*) echo playbooks ;;
+    SK-04) echo playbooks ;;
+    # SK-02 keys off the same part: with --skills no there are no installed skills to hash, and
+    # the row used to FAIL there (measured at v0.2.0-dev: "32 passed, 1 failed ... SK-02 0
+    # installed skill file(s) hashed"). An opt-out is the honest report; a FAIL on a repo that
+    # opted out of skills is not.
+    SK-02) echo playbooks ;;
     *) echo "" ;;
   esac
 }
@@ -594,6 +604,60 @@ check_ds_02() {
   printf '%s · runtime_data %s\n' "$line" "${b:-<none declared>}" > "$ROOT/.goblin/last-gate-line"
   printf 'snapshot %s\n' "${b:-<none declared>}"
   return 0
+}
+
+check_au_02() {
+  # The dedup key must be a function of the report's CONTENT only. Recompute it from the
+  # report's own repo+symptom and require the recorded value to equal it: a key derived from a
+  # date, a run id or a counter dedups nothing, and this is the row that says so.
+  local f n=0 bad=0 repo sym key want norm slug
+  for f in "$ROOT"/reports/*/report.yaml; do
+    [ -e "$f" ] || continue
+    n=$((n + 1))
+    slug=$(basename "$(dirname "$f")")
+    repo=$(sed -n 's/^repo:[[:space:]]*//p' "$f" | head -n 1)
+    sym=$(sed -n 's/^symptom:[[:space:]]*//p' "$f" | head -n 1)
+    key=$(sed -n 's/^dedup_key:[[:space:]]*//p' "$f" | head -n 1)
+    norm=$(printf '%s' "$sym" | tr 'A-Z' 'a-z' | tr -s '[:space:]' ' ' | sed 's/^ //; s/ $//')
+    want="bug:${repo}:$(g_sha256_text "$norm" | cut -c1-12)"
+    case "$key" in
+      '') printf '%s: no dedup_key recorded\n' "$slug"; bad=1; continue ;;
+    esac
+    if [ "$key" != "$want" ]; then
+      printf '%s: recorded key %s, recomputed %s\n' "$slug" "$key" "$want"; bad=1
+    fi
+    if printf '%s' "$key" | grep -qE '[0-9]{4}-[0-9]{2}-[0-9]{2}'; then
+      printf '%s: the key carries a date: %s\n' "$slug" "$key"; bad=1
+    fi
+  done
+  [ "$n" -gt 0 ] || { printf 'no reports/*/report.yaml - nothing to dedup\n'; return 3; }
+  printf '%d report(s): the key is content-only\n' "$n"
+  [ "$bad" -eq 0 ]
+}
+
+check_au_03() {
+  # A reporter's write surface is reports/** plus cards. Two falsifiable clauses: the tree is
+  # clean, and - when HEAD is a reporter commit - no path under the declared harness dir is in
+  # it. The harness clause only applies to a commit that touches reports/, so a normal round's
+  # commit is not mistaken for a reporter's.
+  local dirty bad=0 touched=""
+  [ -d "$ROOT/reports" ] || { printf 'no reports/ - no reporter run in this repo to audit\n'; return 3; }
+  dirty=$(cd "$ROOT" && git status --porcelain 2>/dev/null | wc -l | tr -d '[:space:]')
+  printf '%s dirty entr(y|ies), max_dirty %s\n' "$dirty" "$MAX_DIRTY"
+  if ( cd "$ROOT" && git rev-parse --verify --quiet HEAD~1 >/dev/null 2>&1 ); then
+    if ( cd "$ROOT" && git diff --name-only HEAD~1..HEAD 2>/dev/null | grep -q '^reports/' ); then
+      touched=$( cd "$ROOT" && git diff --name-only HEAD~1..HEAD 2>/dev/null \
+        | grep "^${GOBLIN_HARNESS_REL}/" || true )
+    else
+      printf 'HEAD is not a reporter commit - the harness clause does not apply\n'
+    fi
+  fi
+  if [ -n "$touched" ]; then
+    printf 'the reporter commit touched the harness: %s\n' "$(printf '%s' "$touched" | tr '\n' ' ')"
+    bad=1
+  fi
+  [ "$dirty" -le "$MAX_DIRTY" ] || { printf 'the reporter left the tree dirty\n'; bad=1; }
+  [ "$bad" -eq 0 ]
 }
 
 check_sk_02() {

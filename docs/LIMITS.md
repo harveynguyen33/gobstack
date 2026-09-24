@@ -15,7 +15,7 @@ deliberate trade or an unfilled gap.
 3. **No agent graph and no verdict-ledger daemon.** The board replaces both at a lower
    resolution: `parents` expresses ordering, not data flow, and sibling cards cannot see each
    other.
-4. **Twelve playbooks against twenty-three.** The cuts in `docs/FLOWS.md` are deliberate and each
+4. **Fourteen playbooks against twenty-three.** The cuts in `docs/FLOWS.md` are deliberate and each
    is argued, but real coverage is lost: performance hillclimbing, pixel parity, trace
    forensics, stack landing, worktree hygiene.
 5. **No swarm or arena fan-out.** The read-versus-write axis says that is correct for this work
@@ -70,12 +70,24 @@ deliberate trade or an unfilled gap.
     drift check — `IN-02`, `SK-02`, and `HS-01`'s hash of the harness dir — reads its expected
     hash out of that one file, and that file is the one file no check protects. Measured: append a
     byte to `.goblin/bin/goblin-verify`, rewrite its recorded hash in `installed.json`, commit, and
-    the run is **fully GREEN** (`33 passed, 0 failed`, exit 0). One edit defeats three rows at
+    the run is **fully GREEN** (`36 passed, 0 failed`, exit 0). One edit defeats three rows at
     once, and it is the cheapest way to fake a green run. Doing better needs an anchor the target
     cannot edit — a signature, or a hash held outside the repo — and goblin-stack has no such
     trust root: the source checkout is not guaranteed to exist at verify time, and any value
     stored in the tree is editable by the same hand. It is therefore **recorded here and printed
     in the "cannot see" footer on every run**, not claimed away.
+19. **No automation has ever run here.** Cost per run, the respawn guards under a nightly
+    producer, and whether `researcher` is the right reporter profile are all unmeasured; the
+    first watched run of A-02 is what produces those numbers. The producer's own ceiling is a
+    **run count**, not a dollar figure — no config key holds the spend cap, so no automation can
+    read it, and none pretends to.
+20. **The dedup key is a dedup, not a mutex.** The board's lookup runs before the write
+    transaction, so a concurrent create can insert twice and the next lookup stabilises on the
+    newest. The key stops a duplicate storm; it does not make one impossible.
+21. **`AU-02`'s normalisation is only measured on synthetic reports.** Two differently-typed
+    copies of one symptom give one key and a different symptom gives another, but whether a real
+    report set normalises well enough is unknown. Its failure mode is a duplicate card, never a
+    lost report.
 
 ## What the harness refuses to do
 

@@ -10,7 +10,7 @@ single source of truth).
 this repo via `tests/run-tests.sh`). `enforced_by` is one of four values, and the enum is
 closed: `script`, `lint`, `gate`, `advisory`.
 
-Measured shape of this table: **46 rows** - 42 target, 4 source; advisory 8, gate 13, lint 9, script 13, test 3.
+Measured shape of this table: **52 rows** - 47 target, 5 source; advisory 8, gate 14, lint 12, script 14, test 4.
 
 ## The rows
 
@@ -54,18 +54,24 @@ Measured shape of this table: **46 rows** - 42 target, 4 source; advisory 8, gat
 | `SK-01` | target | lint | Every shipped skill has name + description frontmatter. | `for f in .hermes/skills/*/SKILL.md; do [ -e "$f" ] \|\| continue; head -n 1 "$f" \| grep -qx -- '---' \|\| exit 1; awk 'NR==1{next} /^---/{exit} /^name:/{n=1} /^description:/{d=1} END{exit !(n&&d)}' "$f" \|\| exit 1; done` | — |
 | `SK-02` | target | script | The installed skills match their recorded hashes (no drift). | `goblin-verify --only SK-02` (builtin) | — |
 | `SK-03` | target | script | A rule with no mechanism is labelled advisory, and the advisory count is reported. | `goblin-verify --only SK-03` (builtin) | — |
+| `SK-04` | target | lint | Every shipped skill says what it cannot see. | `n=0; for f in .hermes/skills/*/SKILL.md; do [ -e "$f" ] \|\| continue; n=$((n+1)); grep -q "^## What this cannot see" "$f" \|\| { echo "missing cannot-see section: $f"; exit 1; }; done; [ "$n" -gt 0 ] \|\| { echo "no installed skill found"; exit 1; }; exit 0` | Partial: proves the section exists, not that what it says is complete or true - the limit every prose rule carries. Every shipped skill already carries it, so the row is GREEN on a fresh install and RED only under a real violation. |
 | `PT-01` | target | lint | No tenant-specific string inside a reusable rule. | `for d in skills manifest bin templates presets .goblin .hermes; do [ -d "$d" ] \|\| continue; grep -rniE --exclude=goblin.yaml '(h[a]rvey\|tech-g[o]blin\|/h[o]me/[a-z]+\|g[o]blin-ui\|op[e]n-door\|sup[r]eme\|bb[t]ech\|c[l]v)' "$d" && exit 1; done; exit 0` | — (the same directory list MD-01 uses: the rules an install actually writes live in `.goblin/` and `.hermes/`, not in the source layout. The one documented exception is `.goblin/goblin.yaml`, which holds `models_file:`/`practice:` - per-machine config, not a rule - and is excluded by name. The pattern is written with character classes so this row cannot match itself.) |
 | `PT-02` | target | gate | The default branch is declared, not assumed. | `goblin-verify --only PT-02` (builtin) | — |
 | `CL-01` | target | script | Every part the class requires is present, and every part it forbids is absent. | `goblin-verify --only CL-01` (builtin) | — |
 | `CL-02` | target | script | An archive: true project verifies GREEN without a HANDOFF or gates. | `goblin-verify --only CL-02` (builtin) | Falsifiable: FAILs when `archive:` is not `true`/`false`, and when the config's value disagrees with the one the install recorded in `.goblin/installed.json` (so the waiver cannot be flipped on by hand). It cannot observe the *effect* of the waiver on the other rows without re-entering the runner. |
+| `AU-01` | target | lint | An automation's producer is deterministic and network-free. | `n=0; for f in .goblin/automations/*.sh automations/*.sh automations/*/*.sh; do [ -e "$f" ] \|\| continue; n=$((n+1)); grep -nE "^[[:space:]]*(curl\|wget\|gh[[:space:]]\|npm[[:space:]]\|npx[[:space:]])" "$f" && exit 1; done; [ "$n" -gt 0 ] \|\| { echo "no automation producer found"; exit 1; }; exit 0` | Partial: proves that no line of an installed producer begins with a network or forge verb, not that the script is otherwise deterministic. A target with no producer FAILS rather than passing vacuously - goblin-install writes its own, so an absent producer means the install was tampered with (IN-02 catches that too). |
+| `AU-02` | target | script | A report's dedup key is a function of content only - no date, no run id. | `goblin-verify --only AU-02` (builtin) | Builtin: it recomputes the key from the report's own `repo` and `symptom` and requires the recorded `dedup_key` to equal it, then refuses a key carrying a date. Skipped with a reason when the repo holds no report - nothing to dedup. It cannot see whether two reports should have been one: a normalisation that merges two genuinely different symptoms is a duplicate card, not a lost report. |
+| `AU-03` | target | gate | A reporter run leaves the tree and the harness untouched. | `goblin-verify --only AU-03` (builtin) | Builtin: asserts a clean working tree, and - when HEAD is a reporter commit - that no path under the declared harness_dir appears in it. Skipped with a reason when the repo holds no reports/ - no reporter has run here. It cannot see a reporter that edited the tree and committed the edit as part of the report. |
+| `AU-04` | target | lint | An automation's skill declares its own write surface. | `n=0; for f in .hermes/skills/goblin-bugreporter/SKILL.md .hermes/skills/goblin-drift-audit/SKILL.md; do [ -e "$f" ] \|\| continue; n=$((n+1)); grep -q "^## Write surface" "$f" \|\| { echo "missing write surface: $f"; exit 1; }; done; [ "$n" -gt 0 ] \|\| { echo "no automation skill found"; exit 1; }; exit 0` | Partial: proves the heading exists, not that the surface it names is the right one. The heading is the contract a human reads before trusting an automation; the mechanical half is AU-03, which asserts the surface was respected. |
 | `PR-01` | source | test | The installer never writes outside its target. | `tests/run-tests.sh` | — |
 | `PR-02` | source | test | A second install is a no-op, and an upgrade reports created/updated/unchanged. | `tests/run-tests.sh` | — |
 | `PR-03` | source | test | Every target-scope check goes RED under its own violation. | `tests/run-tests.sh` | — (the negative control the verifier re-runs) |
 | `PR-04` | source | lint | The repo is portable: no personal path in any reusable rule. | `tests/run-tests.sh (the PT-01 body over the source tree, plus tests/)` | — |
+| `PR-05` | source | test | The automation producer is silent when there is nothing to report. | `tests/run-tests.sh` | — (the mutation is the control: the same producer, on the same fixture, with one installed file edited, must go from an empty stdout to a record and exit 1. A producer that stays quiet after the mutation is not silent, it is broken.) |
 
 ## Advisory rows, named
 
-8 of the 46 rows are labelled `advisory`. 7 carry no executable check at all
+8 of the 52 rows are labelled `advisory`. 7 carry no executable check at all
 (they are prose the matrix refuses to pretend about); 1 are advisory-labelled but still
 report their state.
 

@@ -93,12 +93,13 @@ Each step is independently useful and the later ones build on the earlier:
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .goblin/bin/goblin-verify         # fresh class A: 33 passed, 0 failed, 8 advisory, 1 skipped
+    .goblin/bin/goblin-verify         # fresh class A: 36 passed, 0 failed, 8 advisory, 3 skipped
     hermes skills trust <target>      # one-time, so the project-tier skills load
 
-A fresh class-A install is **green** — `33 passed, 0 failed, 8 advisory, 1 skipped`, exit 0 — and
-that is measured, not assumed (`docs/CONTRACTS.md`). The single skip is `HS-02`, with no pinned
-pre-change commit yet. The class's required parts that only a round can produce pass *vacuously*
+A fresh class-A install is **green** — `36 passed, 0 failed, 8 advisory, 3 skipped`, exit 0 — and
+that is measured, not assumed (`docs/CONTRACTS.md`). The three skips are `HS-02` (no pinned
+pre-change commit yet), `AU-02` and `AU-03` (no report has been filed in this repo, so there is
+nothing to dedup and no reporter run to audit). The class's required parts that only a round can produce pass *vacuously*
 (zero `reviews/*.md` to check; the declared gate is still the shipped floor), so the first-step
 list is a list of work, not a list of FAILs.
 
@@ -140,7 +141,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .goblin/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the class's full green path (`33 passed, 0 failed, 8 advisory, 1 skipped`, exit 0 for
+   Success is the class's full green path (`36 passed, 0 failed, 8 advisory, 3 skipped`, exit 0 for
    class A) with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three

@@ -10,7 +10,7 @@
 # The card named this as "the case that would bite ~/.hermes".
 #
 #   outer/sub   no .git of its own -> verify exits 2, names the outer repo and the fix
-#   outer/sub2  its own .git      -> verify exits 0, 33 passed / 0 failed / 8 advisory / 1 skipped
+#   outer/sub2  its own .git      -> verify exits 0, 36 passed / 0 failed / 8 advisory / 3 skipped
 #
 # Run by tests/run-tests.sh.
 set -uo pipefail
@@ -82,7 +82,7 @@ git add -A && git commit -q -m "docs: the handoff names the head"
 OUT2=$(bash .goblin/bin/goblin-verify 2>&1); RC2=$?
 printf '%s\n' "$OUT2" | sed 's/^/      /'
 check "a nested target with its own .git verifies (exit 0)" "$([ "$RC2" -eq 0 ] && echo 0 || echo 1)"
-printf '%s' "$OUT2" | grep -qE '^ *33 passed, 0 failed, 8 advisory, 1 skipped'
+printf '%s' "$OUT2" | grep -qE '^ *36 passed, 0 failed, 8 advisory, 3 skipped'
 check "  and it is the class-A green path (33/0/8/1)" "$?"
 
 if [ "$fail" -eq 0 ]; then note "t-verify-nested: PASS"; else note "t-verify-nested: FAIL"; fi

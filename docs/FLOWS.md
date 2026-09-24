@@ -1,4 +1,4 @@
-# The flow catalogue - 12 playbooks
+# The flow catalogue - 14 playbooks
 
 `manifest/playbooks.tsv` is the machine-readable form; this is the prose. Every playbook has
 the same six fields, and `verification` is always a *measurable* step that also names what it
@@ -100,7 +100,31 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 - **Profiles:** researcher
 - **Role:** synthesis
 
-## The cuts - pstack ships 23, this ships 12
+## P13 - `goblin-bugreporter`
+
+- **When:** an event delivered a report — a bug report file, a chat message turned into one, a webhook
+- **Steps:** 1 validate intake (the six required keys; a missing key is a refusal card with no assignee)<br>- 2 freeze `repo` + `revision` as immutable<br>- 3 reproduce (R1 a failing command, then R2 the REPLAY, then R3 a real-UI drive)<br>- 4 write `reports/<slug>/repro.md` with the `pre`/`post` table<br>- 5 create the fix card only on `reproduced`<br>- 6 complete its own card with the verdict
+- **Verification:** `repro.md` carries a command, a revision that exists in `git rev-list`, and a RED `pre` row; the fix card exists iff the verdict is `reproduced`; `git status --porcelain` is empty after the run (`AU-02`, `AU-03`)
+- **Profiles:** researcher
+- **Role:** investigate
+
+## P14 - `goblin-drift-audit`
+
+- **When:** a recorded claim disagrees with the artifact (drift)
+- **Steps:** 1 enumerate targets by glob, never by memory<br>- 2 compute the drift record per target<br>- 3 print nothing when clean<br>- 4 one card per drifting repo<br>- 5 report `n of m`, naming the skipped targets
+- **Verification:** the summary names each repo and the command it ran; a clean run prints nothing; skipped targets are named; a capped run prints its own line, so "silent because clean" and "silent because capped" are never confused
+- **Profiles:** architect
+- **Role:** judgment
+
+**Why a 13th and 14th playbook, rather than folding these into P1/P9.** Every other playbook is
+entered by a *human or orchestrator request* and delivers a *change*. These two are entered by an
+*event* and deliver a *card*. `P10` covers "an unattended run over a predicate" — a run over a
+*condition*, not a run *started by* a condition. Stretching P1 would lose the intake gate;
+stretching P9 would lose the reproduce-first gate. The producer half is
+`automations/drift-audit.sh` (no agent at all) and `automations/bugreporter-intake.sh`; the
+three-part model is in `automations/README.md`.
+
+## The cuts - pstack ships 23, this ships 12 (plus the two automations below)
 
 Each cut has a reason, and a cut is recorded rather than deleted silently.
 

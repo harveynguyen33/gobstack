@@ -16,6 +16,7 @@
 | K10 | **A fleet-config repo is the least-governed artifact in an estate** | The E-class preset plus an artifact-scoped gate (a commit exists). The underlying staleness bug in a backup job is named and escalated — goblin-stack can detect staleness but cannot fix another repository. | Escalated |
 | K11 | **The pre-change tree is unknown in a repo with no git history** | Repos with no `.git` are ordered *after* `git init`. `HS-02` is **skipped with a reason** rather than faked while no pinned commit exists. | Handled by ordering |
 | K12 | **A check green on both trees** (the failure mode the REPLAY exists for) | `HS-02` runs the harness set against the pinned pre-change commit and requires **every** harness to be RED there. The shipped scaffold harness is deliberately such a check and is therefore reported as unproven until it is replaced. | Handled by design; see `docs/LIMITS.md` |
+| K13 | **A nightly automation files the same defect twice, or files one that is not there** | A content-only dedup key (`--idempotency-key`, checked by `AU-02`) plus the board's own `recent_success` and `active_pr` guards; a report whose `revision` does not resolve is a refusal, not a card; `--max-runtime`, `--max-retries 1` and the failure limit auto-block a looping card. The producer's own ceiling bounds filings per day. | Handled by design; the key is a dedup, not a mutex (`docs/LIMITS.md` #20) |
 
 ## The advisory rows, named
 

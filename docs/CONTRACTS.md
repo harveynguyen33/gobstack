@@ -111,7 +111,7 @@ Output is one line per executed row, in manifest order:
     FAIL  GT-02  gate commit: false -> exit 1
     ADV   MD-02  code lane and review lane both resolve to the same family
     SKIP  HS-02  no pinned pre-change commit yet - REPLAY not provable
-          33 passed, 0 failed, 8 advisory, 1 skipped
+          36 passed, 0 failed, 8 advisory, 3 skipped
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -130,9 +130,10 @@ is not signed (`docs/LIMITS.md` #18).
 
 ### A fresh install verifies green
 
-Measured on a fresh class-A install, committed with no hand edit: **`33 passed, 0 failed,
-8 advisory, 1 skipped`, exit 0.** The single skip is `HS-02` — no pre-change commit is pinned
-yet, so the REPLAY is not provable (`docs/LIMITS.md` #11).
+Measured on a fresh class-A install, committed with no hand edit: **`36 passed, 0 failed,
+8 advisory, 3 skipped`, exit 0.** Three rows skip with a reason: `HS-02` — no pre-change commit
+is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — and `AU-02` and `AU-03`,
+which have no report to audit in a repo where no reporter has run.
 
 The class's required parts that only a round can produce do **not** fail on a fresh install; they
 pass **vacuously**, and that is the honest reading: `PG-01`..`PG-03` iterate over `reviews/*.md`
@@ -147,7 +148,7 @@ verifier is reporting FAILs.
   absent**. The same mechanism is what makes a class's `-` (off) real.
 - **Whole harness:** `--uninstall` deletes the `files` list plus `.goblin/goblin.yaml`, removes
   every directory that leaves empty (deepest first, after `installed.json` itself is gone — the
-  order that used to leave `.goblin/` and the fourteen `.hermes/skills/*` directories behind),
+  order that used to leave `.goblin/` and the sixteen `.hermes/skills/*` directories behind),
   leaves `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md`, `reviews/` and the `.gitignore` block
   (with a `# goblin-stack uninstalled <date>` marker inside it), and prints what it removed and
   what it left.

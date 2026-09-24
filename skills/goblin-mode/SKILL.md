@@ -24,6 +24,8 @@ into exactly one playbook, and it refuses to invent machinery that does not exis
 | an unattended run over a predicate | P10 | `goblin-overnight` |
 | the same change or question across projects | P11 | `goblin-sweep` |
 | a skill or prompt changed, and you want to know if it did anything | P12 | `goblin-eval` |
+| an event delivered a report (a bug report, a chat message, a webhook) | P13 | `goblin-bugreporter` |
+| a recorded claim disagrees with the artifact (drift) | P14 | `goblin-drift-audit` |
 
 If a request matches none of these, say so and ask — do not stretch a playbook to fit.
 

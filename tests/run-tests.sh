@@ -41,7 +41,7 @@ if out=$(bash bin/goblin-lib.sh --self-test 2>&1); then line "goblin-lib --self-
 # hit at f23b371, 0 at b100b44, and PT-01 could not see it). tests/ is deliberately NOT added to
 # PT-01 itself: a target's own tests are its code, and a project may legitimately name its own
 # paths there.
-PT=$(for d in skills manifest bin templates presets tests; do
+PT=$(for d in skills manifest bin templates presets automations tests; do
        [ -d "$d" ] || continue
        grep -rniE '(h[a]rvey|tech-g[o]blin|/h[o]me/[a-z]+|g[o]blin-ui|op[e]n-door|sup[r]eme|bb[t]ech|c[l]v)' "$d"
      done)
@@ -50,7 +50,7 @@ if [ -z "$PT" ]; then line "PR-04 portability (PT-01 body)" "ok (0 hits)"; else
 fi
 
 # ---- MD-01 over the source tree ---------------------------------------------
-MD=$(for d in skills manifest bin templates presets; do
+MD=$(for d in skills manifest bin templates presets automations; do
        [ -d "$d" ] || continue
        grep -rniE '(d[e]epseek|cl[a]ude|g[p]t-[0-9]|gr[o]k|g[e]mini|g[l]m-[0-9]|k[i]mi)[a-z0-9.:_-]*' "$d"
      done)
@@ -74,7 +74,7 @@ fi
 
 # ---- the test scripts --------------------------------------------------------
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
-         t-verify-nested t-uninstall t-doc-sync t-practice-repin; do
+         t-verify-nested t-uninstall t-doc-sync t-practice-repin t-automation-silent; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi

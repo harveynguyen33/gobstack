@@ -3,8 +3,9 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One `expect_red` per target-scope row: 42 of 42. The `--only <id>` form is used so a mutation
-# in one row cannot be masked by another row failing first.
+# One `expect_red` per target-scope row: 49 controls over the 47 target rows (42 at v0.1 plus
+# the five added with AU-01..AU-04 and SK-04), the two F4 extras included. The `--only <id>`
+# form is used so a mutation in one row cannot be masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
 # rows whose bodies F4 rewrote, so beyond the one `expect_red` each already had, four more controls
@@ -64,6 +65,9 @@ cp -a .goblin/manifest/enforcement.tsv "$BK/enforcement.tsv"
 cp -a .hermes/skills/goblin-mode/SKILL.md "$BK/SKILL.md"
 cp -a ROUND-000-SPEC.md "$BK/ROUND-000-SPEC.md"
 cp -a "$WORK/standard.md" "$BK/standard.md"
+cp -a .hermes/skills/goblin-drift-audit/SKILL.md "$BK/drift-audit-SKILL.md"
+cp -a .hermes/skills/goblin-bugreporter/SKILL.md "$BK/bugreporter-SKILL.md"
+cp -a .goblin/automations "$BK/automations"
 
 restore_all() {
   cp -a "$BK/HANDOFF.md" HANDOFF.md
@@ -73,9 +77,13 @@ restore_all() {
   cp -a "$BK/SKILL.md" .hermes/skills/goblin-mode/SKILL.md
   cp -a "$BK/ROUND-000-SPEC.md" ROUND-000-SPEC.md
   cp -a "$BK/standard.md" "$WORK/standard.md"
-  rm -f checks/green.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md \
+  cp -a "$BK/drift-audit-SKILL.md" .hermes/skills/goblin-drift-audit/SKILL.md
+  cp -a "$BK/bugreporter-SKILL.md" .hermes/skills/goblin-bugreporter/SKILL.md
+  cp -a "$BK/automations/." .goblin/automations/
+  rm -f checks/green.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
         .goblin/state.json .goblin/last-gate-line .goblin/.ds-report .goblin/ratchet-last
   rm -f reviews/fixture-*.md
+  rm -rf reports
   rm -rf .github
   git add -A >/dev/null 2>&1
   git commit -q -m "test: restore fixture" >/dev/null 2>&1 || true
@@ -197,6 +205,16 @@ m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
 m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 7/' .goblin/goblin.yaml; }
 
+# ---- the automation rows (G3): AU-01..AU-04, SK-04 -------------------------------------------
+# These five rows are NEW, so there is no pre-change tree for their controls: what the control
+# proves is that the rule bites on a real violation, and that the row is wired into the runner.
+# The wiring proof is IN-03/PR-03's enumeration plus one control per row here.
+m_au_01()         { printf '\ncurl https://example.invalid/thing\n' >> .goblin/automations/drift-audit.sh; }
+m_au_02()         { mkdir -p reports/fixture; printf 'repo: .\nsymptom: the panel shows the wrong total\ndedup_key: bug:.:2026-09-24\n' > reports/fixture/report.yaml; }
+m_au_03()         { mkdir -p reports/fixture; printf 'stray\n' > stray.txt; }
+m_au_04()         { sed -i 's|^## Write surface$|## Surface|' .hermes/skills/goblin-drift-audit/SKILL.md; }
+m_sk_04()         { sed -i 's|^## What this cannot see$|## Not seen|' .hermes/skills/goblin-drift-audit/SKILL.md; }
+
 # The tenant string is built at run time. A literal here would be the repo's only tenant hit
 # (measured at f23b371: 1 repo-wide, 0 at b100b44) and PT-01, the rule that exists to catch
 # exactly that, does not scan tests/ - so the control was the leak it was meant to catch (F2-5).
@@ -282,9 +300,15 @@ expect_red "DOC-02 (advisory row: wired, not biting)" DOC-02 1 m_doc_02
 expect_red "a skill with no frontmatter"           SK-01 1 m_skill_frontmatter
 expect_red "an edited installed skill"             SK-02 1 m_skill_drift
 expect_red "the advisory cap evaded by a builtin"  SK-03 1 m_adv_ceiling
+expect_red "a shipped skill with no cannot-see section" SK-04 1 m_sk_04
 
 expect_red "a tenant string in an installed rule"  PT-01 1 m_tenant_leak
 expect_red "the declared branch is wrong"          PT-02 1 m_wrong_branch
+
+expect_red "an automation producer with a network verb" AU-01 1 m_au_01
+expect_red "a dedup key outside the content-only form"  AU-02 1 m_au_02
+expect_red "a reporter leaving the tree dirty"          AU-03 1 m_au_03
+expect_red "an automation skill with no write surface"  AU-04 1 m_au_04
 
 expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip

@@ -22,7 +22,7 @@
 
 set -uo pipefail
 
-GOBLIN_INSTALL_VERSION="0.1.0"
+GOBLIN_INSTALL_VERSION="0.2.0"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC=$(cd "$SELF_DIR/.." && pwd)
 # shellcheck source=goblin-lib.sh
@@ -229,6 +229,11 @@ done
 [ "$SKILLS" = "no" ] && DISABLED="$DISABLED""playbooks,"
 if [ -n "$OPT_OUT" ]; then DISABLED="$DISABLED$OPT_OUT,"; fi
 DISABLED=$(printf '%s' "$DISABLED" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
+# The automation producers ride the `playbooks` part (they are the shipped automation files, and
+# --skills no disables that part), so they are written under exactly the condition that makes
+# AU-01..AU-04 and SK-04 honour an opt-out.
+PLAYBOOKS_ON=1
+case ",$DISABLED," in *,playbooks,*) PLAYBOOKS_ON=0 ;; esac
 # parts the class forbids are never installed
 for p in spec replay ratchet pr-gate; do
   [ "$(need "$p")" = "-" ] && SCAFFOLD=no
@@ -425,6 +430,20 @@ if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
   done
 fi
 
+# The automation producers. They land in the target so the target is self-contained and
+# IN-02/SK-02 hash them like every other installed file; the cron copy step then reads from
+# here (see the "next:" block and automations/README.md).
+if [ "$PLAYBOOKS_ON" -eq 1 ] && part_wanted playbooks; then
+  for f in "$SRC"/automations/drift-audit.sh "$SRC"/automations/bugreporter-intake.sh \
+           "$SRC"/automations/README.md "$SRC"/automations/report.schema.tsv; do
+    [ -f "$f" ] || continue
+    put ".goblin/automations/$(basename "$f")" "$f"
+  done
+  if [ -f "$SRC/templates/report.yaml.tmpl" ]; then
+    put ".goblin/automations/report.yaml.tmpl" "$SRC/templates/report.yaml.tmpl"
+  fi
+fi
+
 if [ "$WANT_SPEC" -eq 1 ] && part_wanted spec; then
   render "$SRC/templates/SPEC.md.tmpl" CLASS "$CLASS" DATE "$STAMP" > "$TMP/spec"
   put_once "ROUND-000-SPEC.md" "$TMP/spec"
@@ -522,6 +541,13 @@ if [ "$DRY_RUN" -eq 0 ]; then
   if [ "$SKILLS" = "yes" ]; then
     g_info "  4. hermes skills trust $TARGET   # one-time, so the project-tier skills load"
   fi
+  g_info ""
+  g_info "automations (optional; neither writes outside this repo, and A-02 has no agent in it):"
+  g_info "  bash $TARGET/.goblin/automations/drift-audit.sh --dry-run        # read the record first"
+  g_info "  cp $TARGET/.goblin/automations/drift-audit.sh ~/.hermes/scripts/"
+  g_info "  hermes cron create \"0 9 * * 1\" --name \"Drift audit - weekly\" --no-agent \\"
+  g_info "      --script drift-audit.sh --deliver <channel>"
+  g_info "  P13/P14 in docs/FLOWS.md; the whole model in automations/README.md"
 else
   g_info "dry-run: created $CREATED · updated $UPDATED · unchanged $UNCHANGED · skipped $SKIPPED"
 fi

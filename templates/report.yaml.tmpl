@@ -1,0 +1,16 @@
+# reports/<slug>/report.yaml — one report, one file, one schema.
+#
+# A report is a file with a schema, not prose in a card body: prose invites the agent to fill
+# the gaps by guessing, and a guess at intake poisons everything downstream. The validator is
+# `automations/bugreporter-intake.sh`; the schema it enforces is `automations/report.schema.tsv`.
+
+repo:                 # REQUIRED. path or remote of the repository the defect is in
+symptom:              # REQUIRED. one line, observable
+expected:             # REQUIRED. one line
+observed:             # REQUIRED. one line
+repro_steps:          # REQUIRED. ordered list, one item per line, 4-space indented
+  -
+revision:             # REQUIRED. a commit that exists in that repository
+dedup_key:            # REQUIRED. bug:<repo>:<sha256(normalised symptom)[:12]> - content only
+environment:          # optional. platform/version; absent is recorded as unknown, never guessed
+evidence:             # optional. paths to captures; evidence for a human, never harness proof

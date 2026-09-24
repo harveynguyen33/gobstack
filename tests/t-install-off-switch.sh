@@ -55,5 +55,26 @@ printf '%s' "$A_OUT" | grep -q 'FAIL  CL-01'
 check "class A fails CL-01 when a required part is absent" "$?"
 check "and the run is not green" "$([ "$A_RC" -eq 1 ] && echo 0 || echo 1)"
 
+# ---- the playbooks part: `--skills no` is a real switch, and it used to FAIL ---------------
+# Measured at v0.2.0-dev: `--skills no` gave "32 passed, 1 failed, 8 advisory, 6 skipped" with
+# "FAIL  SK-02  0 installed skill file(s) hashed" - a repo that opted OUT of the skills part was
+# failed by the row that hashes them. The five automation rows and SK-02/SK-04 skip instead.
+mkfix "$WORK/noskills"
+bash "$SRC/bin/goblin-install" --target "$WORK/noskills" --class A --skills no \
+  --models "$WORK/models.yaml" >/dev/null 2>&1
+check "--skills no installs" "$?"
+check "  and writes no automation producers either" \
+  "$([ ! -d .goblin/automations ] && echo 0 || echo 1)"
+git add -A && git commit -q -m "chore: install (--skills no)"
+sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
+git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
+NS_OUT=$(bash .goblin/bin/goblin-verify 2>&1); NS_RC=$?
+note "class A --skills no: verify exit=$NS_RC, $(printf '%s' "$NS_OUT" | grep -E '^ *[0-9]+ passed')"
+check "class A with --skills no verifies green" "$NS_RC"
+printf '%s' "$NS_OUT" | grep -q 'SKIP  AU-01  .*opt-out: playbooks'
+check "  and the automation rows are opt-out, not absent" "$?"
+printf '%s' "$NS_OUT" | grep -q 'SKIP  SK-02'
+check "  and SK-02 is opt-out rather than FAIL (the pre-fix defect)" "$?"
+
 if [ "$fail" -eq 0 ]; then note "t-install-off-switch: PASS"; else note "t-install-off-switch: FAIL"; fi
 exit "$fail"

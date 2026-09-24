@@ -21,7 +21,7 @@ vendored plugin paths do not exist in Hermes). Not a replacement for a project s
 | file | what it decides |
 |---|---|
 | `docs/DESIGN.md` | the thesis, the three load-bearing decisions, and every rejected alternative |
-| `docs/FLOWS.md` | the 12 playbooks, with the 11 cuts and a reason for each |
+| `docs/FLOWS.md` | the 14 playbooks, with the 11 cuts and a reason for each |
 | `docs/ROLES.md` | roles versus profiles, the model-mapping contract, the fan-out rule |
 | `docs/ENFORCEMENT.md` | the matrix rendered for a human, and how a rule is added |
 | `docs/CONTRACTS.md` | the installer/verifier interface, exit codes, idempotency, uninstall |
@@ -49,11 +49,12 @@ failure: reconcile the file rather than forcing over it — `docs/ADOPTION.md`.
 After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other
-    .goblin/bin/goblin-verify                 # a fresh class-A install: 33 passed, 0 failed
+    .goblin/bin/goblin-verify                 # a fresh class-A install: 36 passed, 0 failed
     hermes skills trust <target>              # one-time, so the project-tier skills load
 
-**A fresh class-A install verifies green: `33 passed, 0 failed, 8 advisory, 1 skipped`, exit 0.**
-Only `HS-02` skips (no pre-change commit is pinned yet, so the REPLAY is not provable). The parts
+**A fresh class-A install verifies green: `36 passed, 0 failed, 8 advisory, 3 skipped`, exit 0.**
+Only three rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
+`AU-02` and `AU-03` have no report to audit). The parts
 that only a round can produce — a first review note, a gate that is not the shipped floor — pass
 *vacuously* rather than failing, and `P8` (`goblin-bootstrap`) still walks them as work to do.
 The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
@@ -69,8 +70,8 @@ Every run prints what it cannot see.
 
     bash tests/run-tests.sh
 
-Runs the source-scope rules (PR-01..PR-04) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (42), each required to go RED and then restored. **A verifier
+Runs the source-scope rules (PR-01..PR-05) and the test scripts, including `t-verify-red.sh` —
+one control per target-scope row (47), each required to go RED and then restored. **A verifier
 that only ever prints GREEN is a failure**, so that file is the one that matters most.
 
 ## Uninstall
