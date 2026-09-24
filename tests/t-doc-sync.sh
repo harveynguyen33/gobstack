@@ -8,8 +8,14 @@
 #   F2-8  docs/ROLES.md must say bin/goblin-model is checkout-only, because the installer does
 #         not install it (measured in t-uninstall.sh) and it has no enforcement.tsv row.
 #   F2-9  "A fresh install is not automatically green" is false as measured - a fresh class-A
-#         install verifies 33 passed, 0 failed, 8 advisory, 1 skipped, exit 0. The claim must be
-#         gone from all three places it was written, replaced by the measured line.
+#         install verifies 33 passed, 0 failed, 8 advisory, 1 skipped, exit 0. The claim was
+#         written in FOUR places, not three: README.md, docs/CONTRACTS.md, docs/ADOPTION.md and
+#         skills/goblin-bootstrap/SKILL.md - the last one being the copy the installer writes
+#         into every target (bin/goblin-install:357-360), so a green target shipped the claim
+#         that a fresh install is not green. All four are scanned, on text normalised for
+#         markdown, because a literal grep is defeated by the claim's own emphasis: restored to
+#         docs/ADOPTION.md as "A fresh install is **not** automatically green", the round-1
+#         control printed ok and exited 0.
 #   F2-3  docs/LIMITS.md must admit that .goblin/installed.json is not signed, because one edit
 #         to it (plus the matching edit to the file it protects) yields a fully green run.
 #
@@ -24,6 +30,20 @@ check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; f
 
 # norm <cell> — strip markdown code ticks, collapse whitespace, drop the doc's "(builtin)" note.
 norm() { printf '%s' "$1" | sed 's/`//g' | tr -s '[:space:]' ' ' | sed 's/^ //; s/ $//; s/ (builtin)$//'; }
+
+# norm_text <file> — the whole file with markdown emphasis, code ticks and run-together whitespace
+# normalised away, so a claim cannot escape its own control by wearing **bold**. Emphasis markers
+# become spaces (not nothing) so that `**not** automatically` and `not**automatically**` both
+# normalise to the same readable phrase.
+norm_text() { sed 's/[*_`]/ /g' "$1" | tr -s '[:space:]' ' '; }
+
+# The claim, in the normalised form the matcher looks for.
+FALSE_RE='not[[:space:]]+automatically[[:space:]]+green'
+
+# The documents a user receives: the three prose docs plus every SHIPPED skill
+# (skills/*/SKILL.md is the installer's write set — bin/goblin-install:357-360).
+CLAIM_DOCS="README.md docs/CONTRACTS.md docs/ADOPTION.md"
+for f in skills/*/SKILL.md; do [ -f "$f" ] && CLAIM_DOCS="$CLAIM_DOCS $f"; done
 
 # doc_cell <file> <row id> <field index> — the nth pipe-separated cell of the row whose first
 # cell is the id. The cells escape their own pipes as \|, so unescape before splitting.
@@ -64,20 +84,32 @@ grep -qi 'checkout-only' docs/ROLES.md
 check "docs/ROLES.md states that bin/goblin-model is checkout-only (F2-8)" "$?"
 
 # ---- F2-9: the false claim is gone, the measured one is there ----------------
+# The control's own control: the normalised matcher must still catch the claim wearing emphasis,
+# or the scan below reports ok on exactly the broken copy the round-1 review measured.
+if norm_text <(printf '%s\n' 'A fresh install is **not** automatically green, and that is the design.') \
+     | grep -qE "$FALSE_RE"; then
+  note "ok   the F2-9 matcher catches the claim in its emphasised form"
+else
+  note "FAIL the F2-9 matcher is defeated by markdown emphasis"
+  fail=1
+fi
+
 FALSE_CLAIM=""
-for f in README.md docs/CONTRACTS.md docs/ADOPTION.md; do
-  grep -qi 'not automatically green' "$f" && FALSE_CLAIM="$FALSE_CLAIM $f"
+for f in $CLAIM_DOCS; do
+  norm_text "$f" | grep -qE "$FALSE_RE" && FALSE_CLAIM="$FALSE_CLAIM $f"
 done
 [ -z "$FALSE_CLAIM" ] || note "still claims a fresh install is not green:$FALSE_CLAIM"
-check "no document claims a fresh install is not automatically green (F2-9)" \
+check "no shipped doc or skill claims a fresh install is not automatically green (F2-9)" \
   "$([ -z "$FALSE_CLAIM" ] && echo 0 || echo 1)"
 
+# The three prose docs and the shipped bootstrap skill must carry the measured line; the other
+# shipped skills do not discuss a verify run and are not required to.
 GREEN_CLAIM=""
-for f in README.md docs/CONTRACTS.md docs/ADOPTION.md; do
-  grep -q '33 passed, 0 failed, 8 advisory, 1 skipped' "$f" || GREEN_CLAIM="$GREEN_CLAIM $f"
+for f in README.md docs/CONTRACTS.md docs/ADOPTION.md skills/goblin-bootstrap/SKILL.md; do
+  norm_text "$f" | grep -q '33 passed, 0 failed, 8 advisory, 1 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
-check "README, CONTRACTS and ADOPTION state the measured class-A green path" \
+check "README, CONTRACTS, ADOPTION and the shipped bootstrap skill state the measured green path" \
   "$([ -z "$GREEN_CLAIM" ] && echo 0 || echo 1)"
 
 # ---- F2-3: the unsigned record is admitted -----------------------------------

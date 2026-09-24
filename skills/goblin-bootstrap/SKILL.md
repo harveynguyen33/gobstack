@@ -10,9 +10,10 @@ Use when adopting goblin-stack in a repo, or starting one.
 1. **Classify the project A-E.** The class selects which parts are required, optional or off;
    it is not a stringency level.
 2. **`goblin-install --target <dir> --class <x>`**
-3. **`goblin-verify`** — a fresh install is not automatically green. The class's required
-   parts that only a round can produce (a first review, a real gate) are reported as FAIL, and
-   that list is the repo's first-step list, not a defect.
+3. **`goblin-verify`** — a fresh class-A install verifies green: `33 passed, 0 failed, 8
+   advisory, 1 skipped`, exit 0 (only `HS-02` skips, with no pinned pre-change commit yet).
+   The class's required parts that only a round can produce (a first review, a real gate) pass
+   *vacuously*, and that list is the repo's first-step list, not a defect.
 4. **Fix `.gitignore` BEFORE any `git init`.** A credentials file already in the tree is
    committed by the first `git add -A` and is then in history forever.
 5. **First HANDOFF, first SPEC, first check script** — in that order, each independently
