@@ -31,13 +31,17 @@ git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A \
   --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install exits 0" "$?"
-check "the installer's .goblin/bin holds exactly the two shipped scripts" \
-  "$([ "$(ls .goblin/bin | sort | tr '\n' ' ')" = "goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
+check "the installer's .goblin/bin holds exactly the three shipped scripts" \
+  "$([ "$(ls .goblin/bin | sort | tr '\n' ' ')" = "goblin-audit goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
 check "  so bin/goblin-model is checkout-only, as docs/ROLES.md says" \
   "$([ ! -e .goblin/bin/goblin-model ] && echo 0 || echo 1)"
 git add -A && git commit -q -m "chore: install goblin-stack"
 
 DIRS_BEFORE=$(find . -path ./.git -prune -o -type d -print | wc -l | tr -d ' ')
+
+# A decision record the project has EDITED is the project's, not the harness's: the uninstall
+# must keep it and name it. An untouched template is removed with the rest (both are asserted).
+printf 'lodash\thigh\t*\t2026-01-01\ta decision somebody took, not a template\n' >> .goblin/audit-waiver.tsv
 
 # ---- the uninstall -----------------------------------------------------------
 OUT=$(bash "$SRC/bin/goblin-install" --target "$WORK/target" --uninstall 2>&1); RC=$?
@@ -46,7 +50,10 @@ check "uninstall exits 0" "$([ "$RC" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$OUT" | grep -qE '^removed [1-9][0-9]* file\(s\) and [1-9][0-9]* empty director'
 check "  the summary counts the files and the emptied directories it removed" "$?"
 
-check ".goblin/ is gone" "$([ ! -d .goblin ] && echo 0 || echo 1)"
+check ".goblin/ holds nothing but the decision record the project edited" \
+  "$([ "$(find .goblin -type f | sort | tr '\n' ' ')" = ".goblin/audit-waiver.tsv " ] && echo 0 || echo 1)"
+printf '%s' "$OUT" | grep -q 'kept .goblin/audit-waiver.tsv (you edited it'
+check "  and the summary names it rather than deleting it in silence" "$?"
 check ".hermes/ is gone (every installed skill dir was emptied and removed)" \
   "$([ ! -d .hermes ] && echo 0 || echo 1)"
 EMPTY=$(find . -path ./.git -prune -o -type d -empty -print)

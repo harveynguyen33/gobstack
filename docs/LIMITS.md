@@ -70,7 +70,7 @@ deliberate trade or an unfilled gap.
     drift check — `IN-02`, `SK-02`, and `HS-01`'s hash of the harness dir — reads its expected
     hash out of that one file, and that file is the one file no check protects. Measured: append a
     byte to `.goblin/bin/goblin-verify`, rewrite its recorded hash in `installed.json`, commit, and
-    the run is **fully GREEN** (`36 passed, 0 failed`, exit 0). One edit defeats three rows at
+    the run is **fully GREEN** (`41 passed, 0 failed`, exit 0). One edit defeats three rows at
     once, and it is the cheapest way to fake a green run. Doing better needs an anchor the target
     cannot edit — a signature, or a hash held outside the repo — and goblin-stack has no such
     trust root: the source checkout is not guaranteed to exist at verify time, and any value
@@ -88,6 +88,19 @@ deliberate trade or an unfilled gap.
     copies of one symptom give one key and a different symptom gives another, but whether a real
     report set normalises well enough is unknown. Its failure mode is a duplicate card, never a
     lost report.
+22. **No audit has ever run against a real registry here.** Everything `SC-07` does was measured
+    against a canned npm-audit report (`tests/t-audit.sh`), so the parse is proven, the *policy*
+    is not: whether the recorded waiver set matches the real advisory set is unknown until the
+    first real `goblin-audit`. Its skip-with-a-reason behaviour on a repo with no record is what
+    keeps that honest rather than silent.
+23. **The audit record is read by field name, not by a JSON parser.** `goblin-audit` recognises
+    npm's `vulnerabilities` / `via` shape (`source`, `name`, `url`, `range`) with awk and REFUSES
+    (exit 5) anything it cannot parse, rather than writing an empty record that `SC-07` would read
+    as clean. A different audit tool is therefore a refusal, not a silent pass.
+24. **The freshness rows need a GNU `date -d`.** `SC-07` parses the record's date that way; on a
+    host without it the row FAILS with the reason rather than assuming the record is fresh.
+25. **`SC-04` reads one statement, not one program.** A cookie write spread over three lines (or
+    assembled through a helper) is not seen, and the row says so in its own cell.
 
 ## What the harness refuses to do
 

@@ -191,6 +191,47 @@ fi
 export GOBLIN_ROOT="$ROOT"
 export GOBLIN_CONFIG="$CONFIG"
 
+# ---- the security surface (SC-01..SC-09) and the perf baseline (PF-01) -----------------------
+# Every one of these is DECLARED in .goblin/goblin.yaml. A stack-specific rule guessed from the
+# files on disk is how a matrix starts lying; a declared key that is absent is a skip with a
+# reason, never a silent pass.
+SEC_GITIGNORE_FAMILY=$(g_yaml_block_scalar "$CONFIG" security gitignore_family)
+SEC_BUILD_OUTPUT=$(g_yaml_block_scalar "$CONFIG" security build_output)
+SEC_AUDIT_CMD=$(g_yaml_block_scalar "$CONFIG" security audit_cmd)
+SEC_AUDIT_MAX_AGE=$(g_yaml_block_scalar "$CONFIG" security audit_max_age_days)
+SEC_WAIVER_MAX_AGE=$(g_yaml_block_scalar "$CONFIG" security waiver_max_age_days)
+SEC_WRITE_ROUTES=$(g_yaml_block_scalar "$CONFIG" security write_routes)
+[ -n "$SEC_AUDIT_MAX_AGE" ] || SEC_AUDIT_MAX_AGE=90
+[ -n "$SEC_WAIVER_MAX_AGE" ] || SEC_WAIVER_MAX_AGE=180
+PERF_METRIC=$(g_yaml_block_scalar "$CONFIG" perf metric)
+PERF_CMD=$(g_yaml_block_scalar "$CONFIG" perf cmd)
+PERF_BASELINE_COMMIT=$(g_unquote "$(g_yaml_block_scalar "$CONFIG" perf baseline_commit)")
+PERF_BASELINE_VALUE=$(g_yaml_block_scalar "$CONFIG" perf baseline_value)
+PERF_MEASURED=$(g_unquote "$(g_yaml_block_scalar "$CONFIG" perf measured)")
+PERF_HOST_GATE=$(g_yaml_block_scalar "$CONFIG" perf host_gate)
+export SEC_GITIGNORE_FAMILY SEC_BUILD_OUTPUT SEC_AUDIT_CMD SEC_AUDIT_MAX_AGE SEC_WAIVER_MAX_AGE
+export SEC_WRITE_ROUTES PERF_METRIC PERF_CMD PERF_BASELINE_VALUE PERF_HOST_GATE
+
+# Whole days between an ISO date and today, or empty when the date does not parse on this host
+# (`date -d` is GNU; the row FAILS rather than assuming, because an unreadable date is not a
+# fresh record).
+age_days() {
+  local then_s now_s
+  then_s=$(date -u -d "$1" +%s 2>/dev/null) || return 1
+  now_s=$(date -u +%s)
+  printf '%s' "$(( (now_s - then_s) / 86400 ))"
+}
+
+# The source files a secret-shaped search should look at. The vendored harness (.goblin,
+# .hermes), the build output and dependencies are excluded: SC-03 must not match the row text
+# that describes it.
+sc_sources() {
+  ( cd "$ROOT" && grep -rniE "$1" \
+      --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' \
+      --include='*.mjs' --include='*.cjs' --include='*.vue' --include='*.svelte' . 2>/dev/null \
+      | grep -vE '(^|/)(\.next|node_modules|\.goblin|\.hermes|dist|build|out|coverage)/' || true )
+}
+
 only_selected() {
   [ -z "$ONLY" ] && return 0
   case ",$ONLY," in *",$1,"*) return 0 ;; esac
@@ -658,6 +699,236 @@ check_au_03() {
   fi
   [ "$dirty" -le "$MAX_DIRTY" ] || { printf 'the reporter left the tree dirty\n'; bad=1; }
   [ "$bad" -eq 0 ]
+}
+
+check_sc_02() {
+  # Clause 1 is a file rule; clause 2 is BEHAVIOURAL - it asks git's own matcher, so an ignore
+  # rule that looks right but does not match still fails. `git check-ignore -q` accepts exactly
+  # one pathname, so the body loops.
+  local miss="" p
+  if [ ! -f "$ROOT/.gitignore" ]; then
+    if [ -f "$ROOT/package.json" ]; then
+      printf 'no .gitignore in a repo with a package.json\n'; return 1
+    fi
+    printf 'no .gitignore and no package.json - there is no dependency surface here to protect\n'
+    return 3
+  fi
+  grep -qE '^[[:space:]]*\.env(\*|/)?[[:space:]]*$' "$ROOT/.gitignore" \
+    || miss="no bare .env rule"
+  if [ -d "$ROOT/.git" ]; then
+    for p in .env .env.local .env.production; do
+      ( cd "$ROOT" && git check-ignore -q "$p" ) || miss="$miss not-ignored:$p"
+    done
+  else
+    miss="$miss no-git-repository"
+  fi
+  if [ -n "$miss" ]; then printf 'the secret family is not ignored:%s\n' "$miss"; return 1; fi
+  printf 'the whole secret family is ignored (.env, .env.local, .env.production proved by git)\n'
+  return 0
+}
+
+check_sc_03() {
+  # Clause 1: a client-visible NAME that is secret-shaped. Clause 2: a known secret PREFIX in
+  # real build output. The second clause is reported, never silently skipped: a repo with no
+  # build output is told so on the line.
+  local hits vs_keys vs_files out n=0 bad=0
+  hits=$(printf '%s' "$(sc_sources 'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD|PASSWD|PRIVATE)')" | head -n 5)
+  if [ -n "$hits" ]; then
+    printf 'client-visible secret-shaped name(s):\n%s\n' "$hits"; bad=1
+  fi
+  out=""
+  for d in $SEC_BUILD_OUTPUT; do
+    [ -d "$ROOT/$d" ] || continue
+    out="$out $(find "$ROOT/$d" -type f 2>/dev/null | head -n 200)"
+  done
+  for f in $out; do
+    n=$((n + 1))
+    grep -qE '(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|eyJ[A-Za-z0-9_-]{20,}\.)' "$f" 2>/dev/null \
+      && { printf 'a secret-shaped literal is in build output: %s\n' "${f#"$ROOT"/}"; bad=1; }
+  done
+  if [ "$n" -eq 0 ]; then
+    printf '%d client-visible secret-shaped name(s); no build output to scan for clause 2\n' "${#hits}"
+  else
+    printf '%d client-visible secret-shaped name(s); %d build-output file(s) scanned for secret literals\n' "${#hits}" "$n"
+  fi
+  [ "$bad" -eq 0 ]
+}
+
+check_sc_04() {
+  # A JS-written cookie needs `secure` + `samesite` in the SAME statement; a server-side set
+  # needs `httpOnly` + `sameSite`. Same-statement only: a write spread over three lines is not
+  # seen, and the row says so rather than implying it read the statement.
+  local js srv bad=0 n=0 line
+  js=$(sc_sources 'document\.cookie[[:space:]]*=')
+  srv=$(sc_sources '(cookies\(\)\.set\(|res\.cookie\(|NextResponse\.cookie\()')
+  if [ -n "$js" ]; then
+    while IFS= read -r line; do
+      n=$((n + 1))
+      printf '%s' "$line" | grep -qiE 'secure' || { printf 'a JS cookie write has no secure flag: %s\n' "$(printf '%s' "$line" | cut -d: -f1-2)"; bad=1; }
+      printf '%s' "$line" | grep -qiE 'samesite' || { printf 'a JS cookie write has no samesite flag: %s\n' "$(printf '%s' "$line" | cut -d: -f1-2)"; bad=1; }
+    done <<EOF
+$js
+EOF
+  fi
+  if [ -n "$srv" ]; then
+    while IFS= read -r line; do
+      n=$((n + 1))
+      printf '%s' "$line" | grep -qiE 'httponly' || { printf 'a server cookie set has no httpOnly: %s\n' "$(printf '%s' "$line" | cut -d: -f1-2)"; bad=1; }
+      printf '%s' "$line" | grep -qiE 'samesite' || { printf 'a server cookie set has no sameSite: %s\n' "$(printf '%s' "$line" | cut -d: -f1-2)"; bad=1; }
+    done <<EOF
+$srv
+EOF
+  fi
+  printf '%d cookie write(s) checked; a JS-written cookie is readable by any script - reported, not failed\n' "$n"
+  [ "$bad" -eq 0 ]
+}
+
+check_sc_05() {
+  # Every write handler (POST|PUT|PATCH|DELETE) in the declared route dirs must CALL a validator,
+  # or be named in .goblin/boundary-waivers. Partial by design: it proves a validator is called,
+  # not that the schema is right.
+  local d f rel n=0 bad=0 w=0
+  for d in $SEC_WRITE_ROUTES; do
+    [ -d "$ROOT/$d" ] || continue
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      grep -qE 'export[[:space:]]+(async[[:space:]]+)?(function[[:space:]]+)?(const[[:space:]]+)?(POST|PUT|PATCH|DELETE)\b' "$f" || continue
+      n=$((n + 1))
+      rel="${f#"$ROOT"/}"
+      if grep -qE 'safeParse|zod|valibot|yup|ajv|superstruct|validate\(' "$f"; then continue; fi
+      if [ -f "$ROOT/.goblin/boundary-waivers" ] && grep -qE "^[[:space:]]*${rel}([[:space:]]|$)" "$ROOT/.goblin/boundary-waivers"; then
+        w=$((w + 1)); continue
+      fi
+      printf 'a write handler validates nothing and is not waived: %s\n' "$rel"; bad=1
+    done <<EOF
+$(find "$ROOT/$d" -type f \( -name 'route.ts' -o -name 'route.js' -o -name 'route.tsx' \) 2>/dev/null)
+EOF
+  done
+  printf '%d write handler(s), %d waived; %d dir(s) declared\n' "$n" "$w" "${#SEC_WRITE_ROUTES}"
+  [ "$bad" -eq 0 ]
+}
+
+check_sc_06() {
+  [ -f "$ROOT/package.json" ] || { printf 'no package.json - there is no dependency manifest to lock\n'; return 3; }
+  local f found=""
+  for f in package-lock.json pnpm-lock.yaml yarn.lock bun.lockb bun.lock; do
+    [ -f "$ROOT/$f" ] && found="$f"
+  done
+  [ -n "$found" ] || { printf 'package.json is present with no lockfile beside it\n'; return 1; }
+  if [ -d "$ROOT/.git" ]; then
+    ( cd "$ROOT" && git ls-files --error-unmatch "$found" >/dev/null 2>&1 ) \
+      || { printf '%s exists but is not tracked\n' "$found"; return 1; }
+    printf '%s is present and tracked\n' "$found"
+  else
+    printf '%s is present; the tracked clause is ordered after `git init`\n' "$found"
+  fi
+  return 0
+}
+
+check_sc_07() {
+  # Offline by construction: the record is written by .goblin/bin/goblin-audit, run ONCE,
+  # deliberately. A verify-time network call would break the offline dependency contract
+  # (docs/RISKS.md K4).
+  [ -n "$SEC_AUDIT_CMD" ] || { printf 'this class declares no audit command (security.audit_cmd is empty)\n'; return 3; }
+  local rec="$ROOT/.goblin/audit.tsv" wfile="$ROOT/.goblin/audit-waiver.tsv"
+  if [ ! -f "$rec" ]; then
+    printf 'no audit record yet. Run .goblin/bin/goblin-audit once, deliberately, then commit\n.goblin/audit.tsv: SC-07 reads the record and never the network\n'; return 3
+  fi
+  local d age lines=0 waivers=0 pkg sev id bad=0 wl wd
+  d=$(sed -n 's/^measured[[:space:]]*//p' "$rec" | head -n 1)
+  if [ -z "$d" ]; then printf 'the audit record carries no `measured` date\n'; return 1; fi
+  age=$(age_days "$d") || { printf 'the recorded date does not parse on this host: %s\n' "$d"; return 1; }
+  if [ "$age" -gt "$SEC_AUDIT_MAX_AGE" ]; then
+    printf 'the audit record is %s days old (max %s): run goblin-audit again\n' "$age" "$SEC_AUDIT_MAX_AGE"
+    bad=1
+  fi
+  while IFS=$'\t' read -r pkg sev id rest; do
+    [ -n "$pkg" ] || continue
+    case "$pkg" in \#*) continue ;; esac
+    case "$sev" in high|critical) : ;; *) continue ;; esac
+    lines=$((lines + 1))
+    wl=""
+    if [ -f "$wfile" ]; then
+      wl=$(awk -F'\t' -v p="$pkg" -v i="$id" '$1==p && ($3==i || $3=="*") { print $4; exit }' "$wfile")
+    fi
+    if [ -z "$wl" ]; then
+      printf 'unwaived %s advisory: %s %s\n' "$sev" "$pkg" "$id"; bad=1; continue
+    fi
+    waivers=$((waivers + 1))
+    wd=$(age_days "$wl") || { printf 'the waiver for %s carries an unparseable date: %s\n' "$pkg" "$wl"; bad=1; continue; }
+    [ "$wd" -le "$SEC_WAIVER_MAX_AGE" ] \
+      || { printf 'the waiver for %s is %s days old (max %s): re-decide it\n' "$pkg" "$wd" "$SEC_WAIVER_MAX_AGE"; bad=1; }
+  done < "$rec"
+  printf 'audit measured %s (%s days old): %s high|critical line(s), %s matched waiver(s), %s unwaived\n' \
+    "$d" "$age" "$lines" "$waivers" "$((lines - waivers))"
+  [ "$bad" -eq 0 ]
+}
+
+check_sc_08() {
+  # An install hook is arbitrary code that runs on every `npm ci`. Only npm's lockfile records
+  # it (`hasInstallScript`); pnpm/yarn do not, so the row SKIPs with that reason rather than
+  # passing vacuously.
+  local lock="$ROOT/package-lock.json"
+  if [ ! -f "$lock" ]; then
+    if [ -f "$ROOT/pnpm-lock.yaml" ] || [ -f "$ROOT/yarn.lock" ]; then
+      printf 'a pnpm/yarn lockfile carries no hasInstallScript field - nothing to enumerate\n'; return 3
+    fi
+    printf 'no package-lock.json - there is no install-hook surface to enumerate\n'; return 3
+  fi
+  local pkgs n=0 ok=0 bad=0 p
+  pkgs=$(awk '
+    /^[[:space:]]*"node_modules\/[^"]+": \{/ {
+      k = $0; sub(/^[[:space:]]*"/, "", k); sub(/":.*/, "", k); sub(/^node_modules\//, "", k)
+    }
+    /"hasInstallScript"[[:space:]]*:[[:space:]]*true/ { if (k != "") print k }
+  ' "$lock" | sort -u)
+  for p in $pkgs; do
+    n=$((n + 1))
+    if [ -f "$ROOT/.goblin/install-hooks.allowlist" ] \
+       && grep -qxF "$p" "$ROOT/.goblin/install-hooks.allowlist"; then
+      ok=$((ok + 1))
+    else
+      printf 'an install-time script is not on the allowlist: %s\n' "$p"; bad=1
+    fi
+  done
+  printf '%s install hook(s), %s allowlisted\n' "$n" "$ok"
+  [ "$bad" -eq 0 ]
+}
+
+check_pf_01() {
+  # The perf NUMBER lives in `ratchet:` (GT-04/GT-05 unchanged). This row is the other half: the
+  # baseline must name the commit it was measured on, so raising the ceiling cannot silently
+  # become never measuring again. An empty metric or an empty baseline means "not measured yet"
+  # - a skip with that reason, because a row that is RED on every fresh install teaches people
+  # to ignore it.
+  local rname bad=0
+  rname=$(g_yaml_block_scalar "$CONFIG" ratchet name)
+  [ -n "$PERF_METRIC" ] || {
+    printf 'this class declares no perf metric (perf.metric is empty). The ratchet still carries\n%s; declare metric/cmd here the day you pick one\n' "${rname:-nothing}"
+    return 3
+  }
+  [ -n "$PERF_BASELINE_COMMIT" ] || {
+    printf 'no perf baseline recorded yet: run `%s` on a pinned commit, then write\nperf.baseline_commit, perf.baseline_value, perf.measured and the matching ratchet ceiling\n' "$PERF_CMD"
+    return 3
+  }
+  [ "$PERF_METRIC" = "$rname" ] \
+    || { printf 'perf.metric (%s) and ratchet.name (%s) disagree - the budget and the measurement are two different numbers\n' "$PERF_METRIC" "$rname"; bad=1; }
+  case "$PERF_BASELINE_VALUE" in
+    ''|*[!0-9]*) printf 'perf.baseline_value is not a number: %s\n' "${PERF_BASELINE_VALUE:-<empty>}"; bad=1 ;;
+  esac
+  case "$PERF_MEASURED" in
+    ????-??-??) : ;;
+    *) printf 'perf.measured is not an ISO date: %s\n' "${PERF_MEASURED:-<empty>}"; bad=1 ;;
+  esac
+  ( cd "$ROOT" && git cat-file -e "${PERF_BASELINE_COMMIT}^{commit}" 2>/dev/null ) \
+    || { printf 'perf.baseline_commit does not resolve: %s\n' "$PERF_BASELINE_COMMIT"; bad=1; }
+  ( cd "$ROOT" && git merge-base --is-ancestor "$PERF_BASELINE_COMMIT" HEAD 2>/dev/null ) \
+    || { printf 'perf.baseline_commit is not an ancestor of HEAD: %s - the number describes a tree nobody has\n' "$PERF_BASELINE_COMMIT"; bad=1; }
+  [ "$bad" -eq 0 ] || return 1
+  printf '%s = %s measured %s on %s (ceiling %s), host gate: %s\n' \
+    "$PERF_METRIC" "$PERF_BASELINE_VALUE" "$PERF_MEASURED" "$PERF_BASELINE_COMMIT" \
+    "$(g_yaml_block_scalar "$CONFIG" ratchet ceiling)" "${PERF_HOST_GATE:-none}"
+  return 0
 }
 
 check_sk_02() {

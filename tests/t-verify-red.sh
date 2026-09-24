@@ -3,9 +3,10 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One `expect_red` per target-scope row: 49 controls over the 47 target rows (42 at v0.1 plus
-# the five added with AU-01..AU-04 and SK-04), the two F4 extras included. The `--only <id>`
-# form is used so a mutation in one row cannot be masked by another row failing first.
+# One `expect_red` per target-scope row: 60 controls over the 57 target rows (42 at v0.1 plus the
+# five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01), the
+# three F4/G4 extras included. The `--only <id>` form is used so a mutation in one row cannot be
+# masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
 # rows whose bodies F4 rewrote, so beyond the one `expect_red` each already had, four more controls
@@ -68,6 +69,12 @@ cp -a "$WORK/standard.md" "$BK/standard.md"
 cp -a .hermes/skills/goblin-drift-audit/SKILL.md "$BK/drift-audit-SKILL.md"
 cp -a .hermes/skills/goblin-bugreporter/SKILL.md "$BK/bugreporter-SKILL.md"
 cp -a .goblin/automations "$BK/automations"
+cp -a .goblin/audit-waiver.tsv "$BK/audit-waiver.tsv"
+cp -a .goblin/install-hooks.allowlist "$BK/install-hooks.allowlist"
+cp -a .goblin/boundary-waivers "$BK/boundary-waivers"
+# .gitignore is mutated by m_sc_02 and must come back byte-for-byte: the fixture-green check at
+# the end of this file is what caught its absence.
+cp -a .gitignore "$BK/gitignore"
 
 restore_all() {
   cp -a "$BK/HANDOFF.md" HANDOFF.md
@@ -80,11 +87,14 @@ restore_all() {
   cp -a "$BK/drift-audit-SKILL.md" .hermes/skills/goblin-drift-audit/SKILL.md
   cp -a "$BK/bugreporter-SKILL.md" .hermes/skills/goblin-bugreporter/SKILL.md
   cp -a "$BK/automations/." .goblin/automations/
+  cp -a "$BK/gitignore" .gitignore
   rm -f checks/green.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
-        .goblin/state.json .goblin/last-gate-line .goblin/.ds-report .goblin/ratchet-last
+        .goblin/state.json .goblin/last-gate-line .goblin/.ds-report .goblin/ratchet-last \
+        .envrc .goblin/audit.tsv package.json package-lock.json
   rm -f reviews/fixture-*.md
   rm -rf reports
   rm -rf .github
+  rm -rf dist src app
   git add -A >/dev/null 2>&1
   git commit -q -m "test: restore fixture" >/dev/null 2>&1 || true
 }
@@ -174,8 +184,11 @@ m_feely_ac()      { printf '\n- AC9: the panel feels right\n' >> ROUND-000-SPEC.
 m_no_gates()      { sed -i '/^gates:/,/^$/{/^$/d; d}' .goblin/goblin.yaml; }
 m_break_gate()    { sed -i 's|^    cmd: git rev-parse --verify --quiet HEAD|    cmd: false|' .goblin/goblin.yaml; }
 m_drop_gate_line(){ rm -f .goblin/last-gate-line; }
-m_no_ratchet()    { sed -i 's/^  name: todo_markers/  name:/' .goblin/goblin.yaml; }
-m_todo_marker()   { printf '// TODO: this is what the ratchet counts\n' > todo-marker.mjs; }
+# The class-A ratchet is the PERF metric (G4 D2): the TODO count moved into the `todo_ceiling`
+# gate. So m_no_ratchet strips the metric name and m_ratchet_rise grows the measured number.
+m_no_ratchet()    { sed -i 's/^  name: client_js_bytes/  name:/' .goblin/goblin.yaml; }
+m_ratchet_rise()  { mkdir -p dist/assets; printf 'console.log("a byte that was not there before")\n' > dist/assets/chunk.js; }
+m_todo_gate()     { sed -i 's/-le 160/-le 0/' .goblin/goblin.yaml; printf '// TODO: over the ceiling\n' > todo-marker.mjs; }
 
 m_no_harness_dir() { sed -i 's|^harness_dir: .*|harness_dir: nowhere|' .goblin/goblin.yaml; }
 m_green_harness() { printf 'console.log("PASS  nothing\\n"); process.exit(0);\n' > checks/green.mjs; git add -A >/dev/null 2>&1; git commit -q -m "test: a harness green on both trees" >/dev/null 2>&1; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" .goblin/goblin.yaml; }
@@ -200,6 +213,23 @@ m_drop_ds_report()  { rm -f .goblin/.ds-report; }
 
 m_doc_01()        { m_row_fails DOC-01; }
 m_doc_02()        { m_row_fails DOC-02; }
+
+# ---- the security and perf rows (G4): SC-01..SC-09, PF-01 -------------------------------------
+# Every mutation is the exact failure the row's why-cell names, and every one is a file a real
+# repo produces by accident: a dotenv-family file that got added, an ignore rule narrowed by
+# hand, a client-visible key name, a cookie written without flags, a write route with no
+# validator, a manifest with no lockfile, an audit record nobody re-took, an install hook nobody
+# decided on.
+m_sc_01()  { printf 'export TOKEN=x\n' > .envrc; git add -A >/dev/null 2>&1; git commit -q -m "test: a tracked dotenv-family file" >/dev/null 2>&1; }
+m_sc_02()  { sed -i '/^\.env$/d' .gitignore; }
+m_sc_03()  { mkdir -p src; printf 'export const k = process.env.NEXT_PUBLIC_API_SECRET_KEY;\n' > src/config.ts; }
+m_sc_04()  { mkdir -p src; printf 'document.cookie = "theme=dark";\n' > src/cookie.ts; }
+m_sc_05()  { mkdir -p app/api/contact; printf 'export async function POST(req) {\n  const b = await req.json();\n  await save(b);\n}\n' > app/api/contact/route.ts; }
+m_sc_06()  { printf '{"name":"fixture","version":"1.0.0"}\n' > package.json; }
+m_sc_07()  { printf '# .goblin/audit.tsv - written by goblin-audit 0.2.0 on 2020-01-01\n# command: npm audit --json\nmeasured 2020-01-01\n' > .goblin/audit.tsv; }
+m_sc_08()  { printf '{\n  "packages": {\n    "node_modules/esbuild": {\n      "version": "0.1.0",\n      "hasInstallScript": true\n    }\n  }\n}\n' > package-lock.json; }
+m_sc_09()  { m_row_fails SC-09; }
+m_pf_01()  { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e 's/^  baseline_commit: .*/  baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^  baseline_value: .*/  baseline_value: 1/' -e 's/^  measured: .*/  measured: 2026-01-01/' .goblin/goblin.yaml; }
 
 m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
@@ -271,7 +301,10 @@ expect_red "no gate declared"                      GT-01 1 m_no_gates
 expect_red "a gate that exits non-zero"            GT-02 1 m_break_gate
 expect_red "no measured gate line"                 GT-03 1 m_drop_gate_line
 expect_red "a ratchet with no name"                GT-04 1 m_no_ratchet
-expect_red "the ratchet above its ceiling"         GT-05 1 m_todo_marker
+expect_red "the ratchet above its ceiling"         GT-05 1 m_ratchet_rise
+# G4 D2 moved the TODO count out of the ratchet and into a gate. One control for the row that
+# still holds it, so the move is measured rather than asserted.
+expect_red "the TODO ceiling gate, moved from the ratchet" GT-02 1 m_todo_gate
 
 expect_red "a declared harness dir that is absent"  HS-01 1 m_no_harness_dir
 expect_red "a harness green on both trees"         HS-02 1 m_green_harness
@@ -309,6 +342,17 @@ expect_red "an automation producer with a network verb" AU-01 1 m_au_01
 expect_red "a dedup key outside the content-only form"  AU-02 1 m_au_02
 expect_red "a reporter leaving the tree dirty"          AU-03 1 m_au_03
 expect_red "an automation skill with no write surface"  AU-04 1 m_au_04
+
+expect_red "a tracked dotenv-family file"           SC-01 1 m_sc_01
+expect_red "an ignore rule narrowed to .env.* only" SC-02 1 m_sc_02
+expect_red "a client-visible secret-shaped name"    SC-03 1 m_sc_03
+expect_red "a JS cookie write with no flags"        SC-04 1 m_sc_04
+expect_red "a write route with no validator"        SC-05 1 m_sc_05
+expect_red "a manifest with no lockfile"           SC-06 1 m_sc_06
+expect_red "an audit record nobody re-took"        SC-07 1 m_sc_07
+expect_red "an install hook nobody decided on"     SC-08 1 m_sc_08
+expect_red "SC-09 (advisory row: wired, not biting)" SC-09 1 m_sc_09
+expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
 
 expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip

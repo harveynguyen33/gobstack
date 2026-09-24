@@ -16,6 +16,9 @@ Use for anything that should be reviewed before it lands.
 2. **Run the gate set at the candidate SHA and record the numbers.**
 3. **Write `reviews/<slug>-<head7>.md`** with `head:`, `base:`, `patch-id:`, `stakes:`,
    `checks-run:`, `lanes:`. The file is the artifact; a board card is only the routing record.
+   At S2+, add a `security:` line naming three things the checks cannot tell a reader: the audit
+   record's date, the number of matched waivers, and the perf number with its baseline commit.
+   It is prose on purpose — a review prompt, not a check (`SC-07`, `PF-01`).
 4. **Evaluate the panel rule for S3+.** One lane is not a panel. Lanes go through the kanban
    (see `goblin-mode`), each carrying the resolved provider/model.
 5. **Re-check the patch-id before landing.**

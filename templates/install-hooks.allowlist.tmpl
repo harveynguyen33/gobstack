@@ -1,0 +1,9 @@
+# .goblin/install-hooks.allowlist — dependencies whose install-time script is accepted (SC-08).
+#
+# One package name per line. SC-08 enumerates package-lock.json for "hasInstallScript": true and
+# requires every one of them to appear here. An install hook is arbitrary code that runs on every
+# `npm ci` (and on every CI job), so the list is short and each entry is a decision, not a default.
+#
+# example:
+# esbuild
+# sharp

@@ -15,4 +15,18 @@ ratchet_ceiling: measure
 replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs
 runtime_data: .goblin/state.json
+sec_gitignore_family: yes
+sec_build_output: Builds Library
+sec_audit_cmd: ""
+sec_audit_max_age_days: 90
+sec_waiver_max_age_days: 180
+sec_write_routes: ""
+# The game's perf number is frame time on the target device - a HOST gate, declared and named,
+# never a hermetic ratchet (G4 C3.4). The engine's Editor run is already a host gate.
+perf_metric: ""
+perf_cmd: ""
+perf_baseline_commit: ""
+perf_baseline_value: 0
+perf_measured: ""
+perf_host_gate: "Editor run - frame time on the target device"
 notes: the Editor suite is a host gate, not a hermetic one - declare it as such and do not expect it to run in CI.

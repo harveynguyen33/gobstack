@@ -31,6 +31,29 @@ max_dirty: {{MAX_DIRTY}}
 # Unenforceable rules are counted; this is the cap that stops the matrix decaying into prose.
 advisory_ceiling: {{ADVISORY_CEILING}}
 
+# Whether this class requires a client-visible surface to be secret-free (SC-01..SC-09 read the
+# `security:` block below). Declared, never inferred: a stack-specific rule guessed from the
+# files on disk is how a matrix starts lying.
+security:
+  gitignore_family: {{SEC_GITIGNORE_FAMILY}}
+  build_output: {{SEC_BUILD_OUTPUT}}
+  audit_cmd: {{SEC_AUDIT_CMD}}
+  audit_max_age_days: {{SEC_AUDIT_MAX_AGE}}
+  waiver_max_age_days: {{SEC_WAIVER_MAX_AGE}}
+  write_routes: {{SEC_WRITE_ROUTES}}
+
+# The performance budget (PF-01). The NUMBER lives in `ratchet:` above — this block only names
+# the commit it was measured on, so "I raised the ceiling" cannot silently become "I never
+# measured again". An empty baseline_commit means "not measured yet" and PF-01 skips with that
+# reason; a baseline_commit that does not resolve to an ancestor of HEAD is a RED.
+perf:
+  metric: {{PERF_METRIC}}
+  cmd: {{PERF_CMD}}
+  baseline_commit: {{PERF_BASELINE_COMMIT}}
+  baseline_value: {{PERF_BASELINE_VALUE}}
+  measured: {{PERF_MEASURED}}
+  host_gate: {{PERF_HOST_GATE}}
+
 # Where the asserting harnesses live.
 harness_dir: {{HARNESS_DIR}}
 
@@ -42,6 +65,7 @@ scaffold_checks: {{SCAFFOLD_CHECKS}}
 # real commands for this project; each must exit 0.
 gates:
 {{GATES}}
+{{GATE2}}
 
 # A count that must not rise, with its ceiling. The ceiling was measured at install time.
 ratchet:

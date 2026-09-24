@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# goblin-audit — run the DECLARED dependency audit ONCE, deliberately, and write the record that
+# SC-07 reads.
+#
+#   goblin-audit [--target <dir>] [--print] [--help]
+#
+# This is the ONE command in the toolchain that touches the network, and it is not a check: SC-07
+# never runs it, never calls out, and reads only the record it leaves behind. That split is the
+# whole design (docs/RISKS.md K4: a network call at verify time breaks the offline dependency
+# contract). Run it when you mean to, then commit `.goblin/audit.tsv`.
+#
+# What it writes: `.goblin/audit.tsv`, with a `measured <date>` line and one TAB-separated line
+# per high|critical advisory:
+#
+#   package	severity	id	url
+#
+# Exit codes:
+#   0  the record was written (whether or not it is clean)
+#   2  usage, or no .goblin/goblin.yaml to read `security.audit_cmd` from
+#   3  the class declares no audit command (security.audit_cmd is empty) - nothing to run
+#   4  the declared command could not run
+#   5  the output could not be parsed as an audit report - REFUSING to write an empty record,
+#      because an empty record reads to SC-07 as "clean" and that would be a fabricated pass
+set -uo pipefail
+
+GOBLIN_AUDIT_VERSION="0.2.0"
+
+usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+TARGET="$(pwd)"
+PRINT=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --target) TARGET="${2:-}"; shift 2 ;;
+    --print)  PRINT=1; shift ;;
+    --help|-h) usage; exit 0 ;;
+    *) printf 'goblin-audit: unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+[ -n "$TARGET" ] || { printf 'goblin-audit: --target needs a directory\n' >&2; exit 2; }
+cd "$TARGET" || { printf 'goblin-audit: no such directory: %s\n' "$TARGET" >&2; exit 2; }
+
+CONFIG=".goblin/goblin.yaml"
+[ -f "$CONFIG" ] || { printf 'goblin-audit: %s has no %s - run goblin-install first\n' "$TARGET" "$CONFIG" >&2; exit 2; }
+
+# Self-contained on purpose: the audit runner must work even if goblin-lib.sh was edited or is
+# missing, because it is the one tool a human runs by hand.
+g_yaml_block_scalar() { # <file> <block> <key>
+  awk -v b="$2" -v k="$3" '
+    $0 ~ ("^" b ":[[:space:]]*$") { inb = 1; next }
+    inb && /^[^ ]/ { inb = 0 }
+    inb && $0 ~ ("^  " k ":") {
+      v = $0; sub("^  " k ":[[:space:]]*", "", v); print v; exit
+    }
+  ' "$1"
+}
+
+AUDIT_CMD=$(g_yaml_block_scalar "$CONFIG" security audit_cmd)
+if [ -z "$AUDIT_CMD" ]; then
+  printf 'goblin-audit: this class declares no audit command (security.audit_cmd is empty in\n'
+  printf '  %s). Nothing to run, and no record to write.\n' "$CONFIG"
+  exit 3
+fi
+
+TODAY=$(date -u +%F)
+RAW=$(mktemp) || exit 2
+trap 'rm -f "$RAW"' EXIT
+
+printf 'goblin-audit: running the declared audit ONCE (this is the deliberate network step):\n  %s\n' "$AUDIT_CMD"
+# shellcheck disable=SC2086
+bash -c "$AUDIT_CMD" > "$RAW" 2>&1
+RC=$?
+if [ "$RC" -ne 0 ] && [ ! -s "$RAW" ]; then
+  printf 'goblin-audit: the declared command exited %s and printed nothing\n' "$RC" >&2
+  exit 4
+fi
+
+# npm audit exits non-zero when it FINDS advisories, which is the normal case we are recording.
+# So the exit code is not the signal here - the parse is.
+if ! grep -qE '"(vulnerabilities|advisories)"|auditReportVersion' "$RAW"; then
+  printf 'goblin-audit: the output is not an audit report (no "vulnerabilities", "advisories" or\n' >&2
+  printf '  "auditReportVersion" key). REFUSING to write a record: an empty record reads to SC-07\n' >&2
+  printf '  as "clean", which would be a fabricated pass. First 20 lines:\n' >&2
+  head -n 20 "$RAW" >&2
+  exit 5
+fi
+
+RECORD=".goblin/audit.tsv"
+LINES=$(awk '
+  # npm v2/v3 JSON. Two shapes matter:
+  #   "vulnerabilities": { "<pkg>": { "name": ..., "severity": "high", "via": [ ... ] } }
+  #   "via": [ { "source": 1, "name": "<pkg>", "id": 1091, "url": "https://..." , ... "range": "..." } ]
+  # The vulnerability object names its severity BEFORE the via block that carries the advisory id
+  # and url, so the entries are buffered and printed at END rather than on the severity line.
+  # Field order (source, name, dependency, title, url, severity, cwe, cvss, range) is what makes
+  # "range" a safe end-of-advisory marker; anything the parse cannot pair is left empty on the
+  # line, visibly, instead of guessed.
+  {
+    line = $0
+    if (match(line, /"source"[[:space:]]*:[[:space:]]*[0-9]+/)) {
+      inadv = 1; aname = ""; aurl = ""
+      s = substr(line, RSTART, RLENGTH); sub(/.*:[[:space:]]*/, "", s); aid = s
+    }
+    if (inadv) {
+      if (match(line, /"name"[[:space:]]*:[[:space:]]*"[^"]+"/)) {
+        s = substr(line, RSTART, RLENGTH); sub(/.*"[[:space:]]*:[[:space:]]*"/, "", s); sub(/"$/, "", s); aname = s
+      }
+      if (match(line, /"id"[[:space:]]*:[[:space:]]*[0-9]+/)) {
+        s = substr(line, RSTART, RLENGTH); sub(/.*:[[:space:]]*/, "", s); aid = s
+      }
+      if (match(line, /"url"[[:space:]]*:[[:space:]]*"[^"]+"/)) {
+        s = substr(line, RSTART, RLENGTH); sub(/.*"[[:space:]]*:[[:space:]]*"/, "", s); sub(/"$/, "", s); aurl = s
+      }
+      if (match(line, /"range"[[:space:]]*:/)) {
+        if (aname != "" && !(aname in adid)) { adid[aname] = aid; aurl2[aname] = aurl }
+        inadv = 0
+      }
+    }
+    if (match(line, /"name"[[:space:]]*:[[:space:]]*"[^"]+"/)) {
+      s = substr(line, RSTART, RLENGTH); sub(/.*"[[:space:]]*:[[:space:]]*"/, "", s); sub(/"$/, "", s); vname = s
+    }
+    if (match(line, /"severity"[[:space:]]*:[[:space:]]*"(high|critical)"/)) {
+      s = substr(line, RSTART, RLENGTH); sub(/.*:[[:space:]]*"/, "", s); sub(/"$/, "", s)
+      if (vname != "") vsev[vname] = s
+    }
+  }
+  END {
+    for (p in vsev) printf "%s\t%s\t%s\t%s\n", p, vsev[p], (p in adid ? adid[p] : ""), (p in aurl2 ? aurl2[p] : "")
+  }
+' "$RAW" | sort)
+
+{
+  printf '# .goblin/audit.tsv - written by goblin-audit %s on %s\n' "$GOBLIN_AUDIT_VERSION" "$TODAY"
+  printf '# command: %s\n' "$AUDIT_CMD"
+  printf '# one line per high|critical advisory: package<TAB>severity<TAB>id<TAB>url\n'
+  printf '# SC-07 reads this file and never the network. Each line must be matched in\n'
+  printf '# .goblin/audit-waiver.tsv (package, severity, id, date, reason) or it is a RED.\n'
+  printf 'measured %s\n' "$TODAY"
+  if [ -n "$LINES" ]; then printf '%s\n' "$LINES"; else printf '# no high|critical advisories\n'; fi
+} > "$RECORD"
+
+N=$(printf '%s\n' "$LINES" | grep -c '[^[:space:]]' || true)
+printf 'goblin-audit: wrote %s - %s high|critical advisory line(s), measured %s\n' "$RECORD" "$N" "$TODAY"
+if [ "$PRINT" -eq 1 ]; then printf '\n'; cat "$RECORD"; fi
+exit 0

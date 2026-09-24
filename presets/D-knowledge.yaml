@@ -16,4 +16,20 @@ ratchet_ceiling: 0
 replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs
 runtime_data: .goblin/state.json
+# A knowledge repo has no client surface and no dependency manifest, so SC-03's build-output
+# clause, SC-05..SC-08 skip with a reason. The SECRET FAMILY is not one of those: a note file is
+# one `git add` away from a pasted token, so SC-02 is required here too and the installer writes
+# the family into `.gitignore` for every class.
+sec_gitignore_family: yes
+sec_build_output: ""
+sec_audit_cmd: ""
+sec_audit_max_age_days: 90
+sec_waiver_max_age_days: 180
+sec_write_routes: ""
+perf_metric: ""
+perf_cmd: ""
+perf_baseline_commit: ""
+perf_baseline_value: 0
+perf_measured: ""
+perf_host_gate: ""
 notes: mark every unsourced claim [unverified]; the freshness/lint gate over notes is optional.

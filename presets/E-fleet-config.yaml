@@ -19,4 +19,18 @@ ratchet_ceiling: measure
 replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs
 runtime_data: .goblin/state.json
+# A fleet config has no client surface; the secret family still matters (a profile file is one
+# `git add` away from a live token), so SC-01/SC-02 are the rows that bite here.
+sec_gitignore_family: yes
+sec_build_output: ""
+sec_audit_cmd: ""
+sec_audit_max_age_days: 90
+sec_waiver_max_age_days: 180
+sec_write_routes: ""
+perf_metric: ""
+perf_cmd: ""
+perf_baseline_commit: ""
+perf_baseline_value: 0
+perf_measured: ""
+perf_host_gate: ""
 notes: the order is dry-run, then one profile, then verify, then apply-all.

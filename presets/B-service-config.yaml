@@ -15,4 +15,20 @@ ratchet_ceiling: measure
 replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs
 runtime_data: .goblin/state.json
+# A service has real inputs and real dependencies, so the security rows bite here.
+sec_gitignore_family: yes
+sec_build_output: dist
+sec_audit_cmd: npm audit --json
+sec_audit_max_age_days: 90
+sec_waiver_max_age_days: 180
+sec_write_routes: src app
+# No perf metric is declared for this class by default (G4 D1): build bytes are measurable, but
+# latency - the number a service is judged on - is a HOST gate (`curl -w '%{time_total}'`), and a
+# host gate cannot be a hermetic ratchet. Declare metric+cmd here the day you pick a build metric.
+perf_metric: ""
+perf_cmd: ""
+perf_baseline_commit: ""
+perf_baseline_value: 0
+perf_measured: ""
+perf_host_gate: ""
 notes: declare the schema-shape snapshot as the gate; content is optional, schema is required.

@@ -10,10 +10,33 @@ harness_dir: checks
 scaffold_checks: yes
 gate_name: commit
 gate_cmd: git rev-parse --verify --quiet HEAD
-ratchet_name: todo_markers
-ratchet_cmd: grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' --include='*.py' --include='*.go' --include='*.rs' . 2>/dev/null | wc -l
+# The TODO count is a GATE here, not the ratchet (G4 D2): the ratchet carries the performance
+# budget, which is the number a shipped-software round is supposed to move. 160 is deliberately
+# generous - a floor against decay, not the project's real budget. Replace it with yours.
+gate2_name: todo_ceiling
+gate2_cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' . 2>/dev/null | wc -l)" -le 160
+# The perf lane's number lives in the ratchet, measured: ratchet.name names the metric,
+# ratchet.cmd is the ONE command that produces it, ratchet.ceiling is the measured baseline.
+# `find ... -exec cat {} + | wc -c` is used rather than `du`, because du reports block sizes and
+# is not deterministic across filesystems (G4 C1).
+ratchet_name: client_js_bytes
+ratchet_cmd: find .next/static dist/assets dist -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
 ratchet_ceiling: measure
 replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs
 runtime_data: .goblin/state.json
+# SC-02 requires the whole secret family to be ignored; SC-03 clause 2 scans `sec_build_output`
+# for secret-shaped literals; SC-07 runs `sec_audit_cmd` once, deliberately, via goblin-audit.
+sec_gitignore_family: yes
+sec_build_output: .next/static dist/assets dist
+sec_audit_cmd: npm audit --json
+sec_audit_max_age_days: 90
+sec_waiver_max_age_days: 180
+sec_write_routes: app src/app
+perf_metric: client_js_bytes
+perf_cmd: find .next/static dist/assets dist -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c
+perf_baseline_commit: ""
+perf_baseline_value: 0
+perf_measured: ""
+perf_host_gate: ""
 notes: class A also requires a SPEC before every change, and the REPLAY on every new assertion.

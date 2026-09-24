@@ -1,0 +1,10 @@
+# .goblin/audit-waiver.tsv — one line per accepted dependency advisory (SC-07).
+#
+# package	severity	id	date	reason
+#
+# The date is the day the decision was taken, and SC-07 refuses a waiver older than
+# security.waiver_max_age_days: a waiver with no expiry is a permanent blind spot. A
+# high|critical line in .goblin/audit.tsv with no matching row here is a RED.
+#
+# example:
+# next	high	GHSA-xxxx-yyyy-zzzz	2026-09-24	no fixed release yet; the vulnerable path is the dev server only

@@ -118,6 +118,28 @@ if [ "$UNINSTALL" -eq 1 ]; then
     [ "$DRY_RUN" -eq 1 ] || rm -f "$TARGET/$f"
     g_info "removed $f (runtime state)"
   done
+  # The three decision records (audit waivers, boundary waivers, the install-hook allowlist) are
+  # put_once files. An UNEDITED one is still goblin-stack's template and goes; an EDITED one is
+  # the project's decision and stays, named in the summary. Deleting a decision silently would be
+  # data loss; leaving an untouched template behind would be residue (both were measured).
+  KEPT=""
+  while IFS=$'\t' read -r p h; do
+    [ -n "$p" ] || continue
+    case "$p" in
+      .goblin/audit-waiver.tsv|.goblin/boundary-waivers|.goblin/install-hooks.allowlist) ;;
+      *) continue ;;
+    esac
+    [ -e "$TARGET/$p" ] || continue
+    if [ "$(g_sha256_file "$TARGET/$p")" = "$h" ]; then
+      [ "$DRY_RUN" -eq 1 ] || rm -f "$TARGET/$p"
+      g_info "removed $p (unedited template)"
+      n=$((n + 1))
+      case "$p" in */*) PARENTS="$PARENTS${p%/*}"$'\n' ;; esac
+    else
+      KEPT="$KEPT $p"
+      g_info "kept $p (you edited it: a decision record is the project's, not the harness's)"
+    fi
+  done < <(g_json_object "$INSTALLED" owned)
   # installed.json goes BEFORE the directory pass. While it was still on disk, .goblin/ was
   # never empty when it was tested, so the directory survived unnamed (D17 / F2-7).
   if [ "$DRY_RUN" -eq 0 ]; then
@@ -145,7 +167,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
       printf '%s' "$PARENTS"
       printf '.goblin\n.goblin/bin\n.goblin/manifest\n.hermes\n.hermes/skills\n'
     } | awk 'NF' | awk -F/ '{print NF " " $0}' | sort -rn | cut -d' ' -f2- | awk '!seen[$0]++')
-  g_info "removed $n file(s) and $nd empty director(y|ies). Left in place: HANDOFF.md, AGENTS.md, ROUND-000-SPEC.md, reviews/, the .gitignore block."
+  g_info "removed $n file(s) and $nd empty director(y|ies). Left in place: HANDOFF.md, AGENTS.md, ROUND-000-SPEC.md, reviews/, the .gitignore block${KEPT:+, and the decision record(s) you edited:$KEPT}."
   exit 0
 fi
 
@@ -218,6 +240,22 @@ REPLAY_ENV=$(preset replay_env)
 REPLAY_CMD=$(preset replay_cmd)
 RUNTIME_DATA=$(preset runtime_data)
 ADV_CEILING=$(preset advisory_ceiling); [ -n "$ADV_CEILING" ] || ADV_CEILING=10
+# The optional second gate (class A: the TODO ceiling). Empty for every other class.
+GATE2_NAME=$(preset gate2_name)
+GATE2_CMD=$(preset gate2_cmd)
+# The security surface (SC-01..SC-09) and the perf baseline (PF-01).
+SEC_GITIGNORE_FAMILY=$(preset sec_gitignore_family); [ -n "$SEC_GITIGNORE_FAMILY" ] || SEC_GITIGNORE_FAMILY=no
+SEC_BUILD_OUTPUT=$(preset sec_build_output)
+SEC_AUDIT_CMD=$(preset sec_audit_cmd)
+SEC_AUDIT_MAX_AGE=$(preset sec_audit_max_age_days); [ -n "$SEC_AUDIT_MAX_AGE" ] || SEC_AUDIT_MAX_AGE=90
+SEC_WAIVER_MAX_AGE=$(preset sec_waiver_max_age_days); [ -n "$SEC_WAIVER_MAX_AGE" ] || SEC_WAIVER_MAX_AGE=180
+SEC_WRITE_ROUTES=$(preset sec_write_routes)
+PERF_METRIC=$(preset perf_metric)
+PERF_CMD=$(preset perf_cmd)
+PERF_BASELINE_COMMIT=$(preset perf_baseline_commit)
+PERF_BASELINE_VALUE=$(preset perf_baseline_value); [ -n "$PERF_BASELINE_VALUE" ] || PERF_BASELINE_VALUE=0
+PERF_MEASURED=$(preset perf_measured)
+PERF_HOST_GATE=$(preset perf_host_gate)
 
 need() { g_class_need "$CLASSES_TSV" "$CLASS" "$1"; }
 
@@ -389,6 +427,12 @@ render_config() {
   local gates runtime
   gates="  - name: $GATE_NAME
     cmd: $GATE_CMD"
+  # A class may declare a second gate (A: the TODO ceiling that used to be the ratchet, G4 D2).
+  if [ -n "$GATE2_NAME" ] && [ -n "$GATE2_CMD" ]; then
+    gates="$gates
+  - name: $GATE2_NAME
+    cmd: $GATE2_CMD"
+  fi
   runtime="  - $RUNTIME_DATA"
   render "$SRC/templates/goblin.yaml.tmpl" \
     CLASS "$CLASS" \
@@ -400,6 +444,18 @@ render_config() {
     ARCHIVE "$ARCHIVE" \
     MAX_DIRTY "0" \
     ADVISORY_CEILING "$ADV_CEILING" \
+    SEC_GITIGNORE_FAMILY "$SEC_GITIGNORE_FAMILY" \
+    SEC_BUILD_OUTPUT "$SEC_BUILD_OUTPUT" \
+    SEC_AUDIT_CMD "$SEC_AUDIT_CMD" \
+    SEC_AUDIT_MAX_AGE "$SEC_AUDIT_MAX_AGE" \
+    SEC_WAIVER_MAX_AGE "$SEC_WAIVER_MAX_AGE" \
+    SEC_WRITE_ROUTES "$SEC_WRITE_ROUTES" \
+    PERF_METRIC "$PERF_METRIC" \
+    PERF_CMD "$PERF_CMD" \
+    PERF_BASELINE_COMMIT "$PERF_BASELINE_COMMIT" \
+    PERF_BASELINE_VALUE "$PERF_BASELINE_VALUE" \
+    PERF_MEASURED "$PERF_MEASURED" \
+    PERF_HOST_GATE "$PERF_HOST_GATE" \
     HARNESS_DIR "$HARNESS_DIR" \
     SCAFFOLD_CHECKS "$SCAFFOLD" \
     GATES "$gates" \
@@ -415,12 +471,20 @@ render_config() {
 render_config
 put ".goblin/bin/goblin-verify" "$SRC/bin/goblin-verify"
 put ".goblin/bin/goblin-lib.sh" "$SRC/bin/goblin-lib.sh"
+# The audit record is produced by a DELIBERATE, separate command - SC-07 reads the record and
+# never the network (RISKS.md K4: no network at verify time).
+put ".goblin/bin/goblin-audit" "$SRC/bin/goblin-audit"
 put ".goblin/roles.yaml" "$SRC/roles.yaml"
 put ".goblin/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
 put ".goblin/manifest/playbooks.tsv" "$SRC/manifest/playbooks.tsv"
 put ".goblin/manifest/classes.tsv" "$SRC/manifest/classes.tsv"
 put ".goblin/manifest/glossary.tsv" "$SRC/manifest/glossary.tsv"
 put_once ".goblin/goblin.yaml" "$TMP/goblin.yaml"
+# The security lane's two decision records and the audit allowlist are created once, then YOURS:
+# they are answers to questions only the project can answer (G4 B3).
+[ -f "$SRC/templates/audit-waiver.tsv.tmpl" ] && put_once ".goblin/audit-waiver.tsv" "$SRC/templates/audit-waiver.tsv.tmpl"
+[ -f "$SRC/templates/boundary-waivers.tmpl" ] && put_once ".goblin/boundary-waivers" "$SRC/templates/boundary-waivers.tmpl"
+[ -f "$SRC/templates/install-hooks.allowlist.tmpl" ] && put_once ".goblin/install-hooks.allowlist" "$SRC/templates/install-hooks.allowlist.tmpl"
 
 if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
   for d in "$SRC"/skills/*/; do
@@ -477,6 +541,13 @@ else
     printf '\n%s\n' "$GI_MARK"
     printf '# goblin-stack runtime state (gates write these; they are not fixture)\n'
     printf '.goblin/last-gate-line\n.goblin/.ds-report\n.goblin/ratchet-last\n'
+    if [ "$SEC_GITIGNORE_FAMILY" = "yes" ]; then
+      # SC-02: the whole secret family, not one member of it. The row is behavioural - it asks
+      # git's own matcher (`git check-ignore`) rather than reading this file - so a rule that
+      # looks right but does not match still fails.
+      printf '# the secret family (SC-02): each is one `git add` away from a live credential\n'
+      printf '.env\n.env.*\n*.pem\n*.key\n'
+    fi
     if [ -n "$RUNTIME_DATA" ]; then
       printf '# declared runtime_data (DS-01 hashes them around every gate run)\n'
       printf '%s\n' "$RUNTIME_DATA"
