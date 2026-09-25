@@ -10,6 +10,11 @@
 #
 # Exit codes: 0 the report passed intake | 1 REFUSED (the gap is named) | 2 could not run.
 #
+# The report is UNTRUSTED INPUT, so nothing reads it into a shell: the card is created by
+# exec'ing an argv array (`run_card`), and the form printed for an operator (`card_cmd`) quotes
+# every value that came out of the report. There is no `eval` on any path. A `symptom:` carrying
+# a backtick, `$(...)` or a quote is text, in the card title and on the printed line alike.
+#
 # An under-specified report is filed, not dropped and not guessed: the refusal command carries
 # NO --assignee, so the dispatcher buckets the card `skipped_unassigned` and it is structurally
 # un-spawnable, while remaining visible on the board to a human.
@@ -69,11 +74,39 @@ done
 WANT_KEY="bug:${REPO}:$(sha12 "$(normalise "$SYMPTOM")")"
 
 TITLE="bug: ${SYMPTOM}"
+
+# shq <word> — the word quoted for a shell, so the printed form can be pasted without executing
+# anything the report says. Single quotes make backticks and `$( )` text; an embedded single
+# quote is written as the four-character `'\''` (close, escaped quote, reopen).
+shq() { local s="$1"; s=${s//\'/\'\\\'\'}; printf "'%s'" "$s"; }
+
+# card_cmd <title-suffix> <idempotency-key> <max-runtime> <max-retries> [assignee-args...]
+# The card command as it is PRINTED for an operator. Every value that came out of the report is
+# shell-quoted; flags and numbers are printed literally, so the line stays greppable. The printed
+# form is what skills/goblin-bugreporter/SKILL.md step 1 tells the operator to run, so it must be
+# paste-safe: the report is the untrusted input this gate exists to validate (G8-1).
+card_cmd() {
+  local title="$TITLE$1" key="$2" rt="$3" rr="$4"; shift 4
+  local a
+  printf 'hermes kanban create %s' "$(shq "$title")"
+  for a in "$@"; do printf ' %s' "$a"; done
+  printf ' --idempotency-key %s --body-file %s --max-runtime %s --max-retries %s\n' \
+    "$(shq "$key")" "$(shq "$REPORT")" "$rt" "$rr"
+}
+
+# run_card <title-suffix> <idempotency-key> <max-runtime> <max-retries> [assignee-args...]
+# The same card as an ARGV ARRAY: no `eval`, no command string, so the title reaches the board as
+# ONE argument whatever it contains. Never build a shell command out of file content (G8-1).
+run_card() {
+  local title="$TITLE$1" key="$2" rt="$3" rr="$4"; shift 4
+  hermes kanban create "$title" "$@" --idempotency-key "$key" --body-file "$REPORT" \
+    --max-runtime "$rt" --max-retries "$rr"
+}
+
 if [ -n "$MISSING" ]; then
   printf 'bugreporter-intake: REFUSED - %s carries no value for:%s\n' "$REPORT" "$MISSING"
   printf '# the card is created WITHOUT --assignee, so no agent can be spawned on it\n'
-  printf 'hermes kanban create "%s (incomplete intake)" --idempotency-key %s --body-file %s --max-runtime 600 --max-retries 0\n' \
-    "$TITLE" "${KEY:-incomplete:$SLUG}" "$REPORT"
+  card_cmd " (incomplete intake)" "${KEY:-incomplete:$SLUG}" 600 0
   exit 1
 fi
 
@@ -81,8 +114,7 @@ if [ -n "$KEY" ] && [ "$KEY" != "$WANT_KEY" ]; then
   printf 'bugreporter-intake: REFUSED - the recorded dedup_key is not the content key\n'
   printf '  recorded   %s\n  recomputed %s\n' "$KEY" "$WANT_KEY"
   printf '  a key derived from a date, a run id or a counter dedups nothing\n'
-  printf 'hermes kanban create "%s (bad key)" --idempotency-key %s --body-file %s --max-runtime 600 --max-retries 0\n' \
-    "$TITLE" "$WANT_KEY" "$REPORT"
+  card_cmd " (bad key)" "$WANT_KEY" 600 0
   exit 1
 fi
 
@@ -91,24 +123,23 @@ fi
 if [ -d "$REPO" ]; then
   if ! ( cd "$REPO" && git rev-parse --verify --quiet "$REVISION^{commit}" >/dev/null 2>&1 ); then
     printf 'bugreporter-intake: REFUSED - revision "%s" does not resolve in %s\n' "$REVISION" "$REPO"
-    printf 'hermes kanban create "%s (unresolvable revision)" --idempotency-key %s --body-file %s --max-runtime 600 --max-retries 0\n' \
-      "$TITLE" "$WANT_KEY" "$REPORT"
+    card_cmd " (unresolvable revision)" "$WANT_KEY" 600 0
     exit 1
   fi
 else
   printf '# note: %s is not a local directory - the revision gate is unexercised here\n' "$REPO" >&2
 fi
 
-CMD="hermes kanban create \"$TITLE\" --assignee researcher --skill goblin-bugreporter --idempotency-key $WANT_KEY --body-file $REPORT --max-runtime 1800 --max-retries 1"
 if [ "$CARDS" -eq 0 ]; then
-  printf '%s\n' "$CMD"
+  card_cmd "" "$WANT_KEY" 1800 1 --assignee researcher --skill goblin-bugreporter
   exit 0
 fi
 if ! command -v hermes >/dev/null 2>&1; then
   printf 'bugreporter-intake: hermes is not on PATH - the command is printed, no card was created\n' >&2
-  printf '%s\n' "$CMD"
+  card_cmd "" "$WANT_KEY" 1800 1 --assignee researcher --skill goblin-bugreporter
   exit 0
 fi
-eval "$CMD" >/dev/null 2>&1 || { printf 'bugreporter-intake: the card was NOT created\n' >&2; exit 1; }
+run_card "" "$WANT_KEY" 1800 1 --assignee researcher --skill goblin-bugreporter >/dev/null 2>&1 \
+  || { printf 'bugreporter-intake: the card was NOT created\n' >&2; exit 1; }
 printf 'bugreporter-intake: card created with key %s\n' "$WANT_KEY"
 exit 0

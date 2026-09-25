@@ -141,6 +141,58 @@ sed -n 's/^dedup_key: bug:\.://p' "$WORK/reports/good/report.yaml" > "$WORK/keyB
 diff -q "$WORK/keyA" "$WORK/keyB" >/dev/null 2>&1
 check "the dedup key is a function of the normalised symptom only" "$?"
 
+# ---- 7. G8-1: the intake must never execute what the report says -----------------------------
+# The report file is the untrusted input this gate exists to validate ("a report is a FILE WITH
+# A SCHEMA, not prose"). The accept path used to `eval` a command string built from the report's
+# own `symptom:`. Measured at 43f7f69: a symptom carrying a backtick ran `id -un` and its output
+# landed in the card title, and one carrying `$(printf pwned > <marker>)` WROTE THE MARKER. The
+# printed form (no --cards) was that same string, printed unescaped, and pasting it ran the
+# injection too - and that printed line is exactly what skills/goblin-bugreporter/SKILL.md step 1
+# tells the operator to run. The control mutates nothing: it fixes the INPUT. Falsifiable
+# statements, per the two reachable forms:
+#   (a) the injected command does not run (the marker file is still empty),
+#   (b) the stub `hermes` received the title as ONE argv element, byte-for-byte as the report
+#       wrote it - so the fix is an argv exec, not escaping that happens to look right,
+#   (c) the printed form, pasted into a shell, does not run it either.
+# What this cannot see: whether a later edit reintroduces a shell re-parse on a code path this
+# symptom does not reach, and whether a report is TRUE - it proves the gate hands the board one
+# literal argument, nothing about the argument's content.
+SHIMDIR="$WORK/shim"; mkdir -p "$SHIMDIR" "$WORK/reports/inj"
+SHIM_ARGV_LOG="$WORK/shim-argv.log"; export SHIM_ARGV_LOG; : > "$SHIM_ARGV_LOG"
+cat > "$SHIMDIR/hermes" <<'SHIM'
+#!/usr/bin/env bash
+# A stub `hermes`: records the argv it was handed, one argument per line, and does nothing else.
+# One argument per line is what makes "the title arrived as ONE element" a measurement.
+for a in "$@"; do printf '%s\n' "$a"; done >> "$SHIM_ARGV_LOG"
+exit 0
+SHIM
+chmod +x "$SHIMDIR/hermes"
+
+MARKER="$WORK/marker.txt"; : > "$MARKER"
+SYMPTOM_TMPL='the `id -un` label is wrong; $(printf pwned > __MARKER__) and a "quote" here'
+SYMPTOM="${SYMPTOM_TMPL/__MARKER__/$MARKER}"
+printf 'repo: alpha\nsymptom: %s\nexpected: a CSV downloads\nobserved: nothing happens\nrevision: HEAD\nrepro_steps:\n  - open the page\n' \
+  "$SYMPTOM" > "$WORK/reports/inj/report.yaml"
+WANT_TITLE="bug: $SYMPTOM"
+
+cd "$WORK/projects/installed"
+PATH="$SHIMDIR:$PATH" bash "$SRC/automations/bugreporter-intake.sh" inj --reports "$WORK/reports" --cards >/dev/null 2>&1
+check "G8-1: a symptom carrying a backtick, \$(...) and a quote still passes intake (the gate is about the report's SHAPE, not its intent)" "$?"
+check "G8-1: nothing the report says executed (the marker is still empty: $(wc -c < "$MARKER" | tr -d ' ') byte(s))" \
+  "$([ ! -s "$MARKER" ] && echo 0 || echo 1)"
+grep -qxF "$WANT_TITLE" "$SHIM_ARGV_LOG"
+check "G8-1: the stub received the title as ONE argument, byte-for-byte as the report wrote it" "$?"
+grep -qxF -- '--assignee' "$SHIM_ARGV_LOG" && grep -qxF 'researcher' "$SHIM_ARGV_LOG"
+check "G8-1:  and the accept path still hands the reporter role to the board" "$?"
+
+: > "$SHIM_ARGV_LOG"; : > "$MARKER"
+OUT=$(bash "$SRC/automations/bugreporter-intake.sh" inj --reports "$WORK/reports" 2>/dev/null) || true
+( PATH="$SHIMDIR:$PATH" bash -c "$OUT" ) >/dev/null 2>&1
+check "G8-1: pasting the PRINTED command does not execute it either (the marker is still empty)" \
+  "$([ ! -s "$MARKER" ] && echo 0 || echo 1)"
+grep -qxF "$WANT_TITLE" "$SHIM_ARGV_LOG"
+check "G8-1:  and the pasted line hands the same title over as ONE argument" "$?"
+
 rm -rf "$WORK"
 if [ "$fail" -eq 0 ]; then note "t-automation-silent: PASS"; else note "t-automation-silent: FAIL"; fi
 exit "$fail"
