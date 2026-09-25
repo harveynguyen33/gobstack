@@ -3,13 +3,17 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One `expect_red` per target-scope row: 93 `expect_red` call sites and 14 `expect_green`, covering
-# the 70 target rows that carry an executable rule. The three it does not cover AS RULES - `DOC-01`,
-# `DOC-02` (advisory) and `JG-03` (advisory, G2) - carry no executable check at all
-# (docs/LIMITS.md and docs/RISKS.md name them and say why); their control mutates the row's check
-# column and proves the row is WIRED, not that the rule bites. Measured: 70 distinct ids, 0 phantom
-# ids (every id used here is a row in the matrix) and 0 target row with
-# an executable rule left without a control. The 70 were built up as 42 at v0.1 plus the
+# One control per target-scope row: 93 `expect_red` call sites and 14 `expect_green` - 107 calls over
+# all 73 of the matrix's 73 target rows (the other five rows are source-scope and carry controls of
+# their own). Measured at this revision: 73 distinct ids, 0 phantom ids (every id used here is a row
+# in the matrix) and 0 target row left without a control. Three of the 73 - `DOC-01`, `DOC-02`
+# (advisory) and `JG-03` (advisory, G2) - carry no executable check at all (docs/LIMITS.md and
+# docs/RISKS.md name them and say why), so their one control replaces the row's check column with a
+# command that fails and proves the row is WIRED, not that a rule bites. This paragraph was counted
+# from the file rather than carried: it said "63 of the matrix's 65 target rows. The two it does not
+# cover are `DOC-01` and `DOC-02`" until G2, and "70 ... the three as rules" for one commit
+# - both were one count behind, because a row whose control exists was still described as uncovered.
+# The ids were built up as 42 at v0.1 plus the
 # five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01, plus the
 # five added with BN-00..BN-03 and BN-05, plus the three F4/G4 extras, the two V1 extras (G8-2,
 # G8-5), the second BN-00 control, the five W1 extras (three G8-3 gate-cmd forms, the V3-2
