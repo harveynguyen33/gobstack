@@ -12,6 +12,12 @@
 # A ban the config's `bans:` list does not name is SKIPPED with that reason; a ban whose
 # globs match no file is SKIPPED with that reason. A missing or empty ban table is exit 2.
 #
+# A narrow, explicit exception (Dune rule 5) reaches the probe through its environment, so it can
+# change the VERDICT and not only the printed detail: GOBLIN_BANS_ID (the ban) and
+# GOBLIN_BANS_EXEMPT (its `bans_exempt:` path prefixes) let the probe drop exempted hits before it
+# chooses its exit code, and `// BAN-OK(<id>): <reason>` clears one offending line. See
+# bans/README.md, "Narrow exceptions".
+#
 # Exit codes:
 #   0  every selected ban passed or skipped
 #   1  at least one selected ban FAILED
@@ -22,7 +28,7 @@
 
 set -uo pipefail
 
-GOBLIN_BANS_VERSION="0.3.0"
+GOBLIN_BANS_VERSION="0.4.0"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=goblin-lib.sh
 . "$SELF_DIR/goblin-lib.sh"
@@ -90,6 +96,13 @@ enabled() {
 }
 
 # bans_exempt: a list of "- <ID> <path>" items (Dune rule 5: narrow, explicit, reviewed).
+# W5-1: the exemption must reach the PROBE. Filtering the probe's stdout after it has already
+# chosen its exit code cannot change the verdict, and the exit code is the signal (V3-2) - so the
+# old stdout filter made every exemption DECORATIVE: a real violation inside an exempted path was
+# a permanent FAIL with no remedy (measured rc 0 at 72490f0 -> rc 1 at 7fec08f). The engine now
+# exports GOBLIN_BANS_ID and GOBLIN_BANS_EXEMPT and each shipped probe filters the FILE LIST
+# before it judges (bans/README.md, "Narrow exceptions"). A probe that ignores the variables
+# keeps the old behaviour, which fails CLOSED, never open.
 exempt_paths() { # exempt_paths <id> -> path prefixes, one per line
   [ -f "$CONFIG" ] || return 0
   g_yaml_list "$CONFIG" bans_exempt | awk -v id="$1" '$1==id {print $2}'
@@ -123,12 +136,11 @@ while IFS=$'\t' read -r id ban globs detect replacement escape reviewer source; 
     continue
   fi
 
-  out=$( cd "$ROOT" && bash -c "$detect" 2>&1 ); rc=$?
-  # Drop lines a narrow, explicit exception names (bans_exempt), then judge.
+  # The exemption is pushed into the probe (see exempt_paths above): the probe filters the file
+  # list and exits 0 when nothing outside the exempted paths is hit. The exit code stays the only
+  # signal - stdout, when any, still names the offending lines the probe did NOT exempt.
   ex=$(exempt_paths "$id")
-  if [ -n "$ex" ] && [ -n "$out" ]; then
-    for p in $ex; do out=$(printf '%s\n' "$out" | grep -v -- "$p" || true); done
-  fi
+  out=$( cd "$ROOT" && GOBLIN_BANS_ID="$id" GOBLIN_BANS_EXEMPT="$ex" bash -c "$detect" 2>&1 ); rc=$?
   case "$rc" in
     0)
       if [ -n "$out" ]; then

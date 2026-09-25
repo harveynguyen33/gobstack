@@ -8,8 +8,9 @@
 # "exit=<n> ts=<ISO8601>": the run-once rule is how you know the command is runnable and
 # currently red, which is what makes a later green mean anything.
 # Then pin it: sha256sum .goblin/loop/predicate | cut -d' ' -f1 > .goblin/loop/predicate.sha256
-# Never edit the predicate mid-loop — archive it under .goblin/loop/closed-<date>/ and open a
-# new loop instead (LP-02).
+# Never edit the predicate mid-loop — archive it under .goblin/loop/closed-<date>/ together with
+# the pin it was closed under, then open a new loop whose predicate.sha256 names the archived
+# digest on a `previous: <digest>` line (LP-02: a silent relaxation FAILs; the chain is the record).
 #
 # Replace the line below with the real condition. Example shape only:
 node tools/check-cycles.mjs

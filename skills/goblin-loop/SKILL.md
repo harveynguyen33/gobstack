@@ -32,7 +32,12 @@ loop, and a ceiling that disagreed with the engine would be a number someone mad
 The predicate's digest is recorded at loop start (`LP-02`). Changing it mid-loop is **not an
 edit** - it is closing this loop and opening another:
 
-    .goblin/loop/closed-<date>/   # where a relaxed predicate must go, committed
+    .goblin/loop/closed-<date>/   # the relaxed predicate AND its pin go here, committed
+    # then re-record predicate.sha256 with a `previous: <archived digest>` line beside the new one
+
+The chain is what the row checks: a silent relaxation fails, a recorded re-scope costs one line.
+Whether the new predicate is *weaker* is not decidable from a digest and is recorded in
+`docs/LIMITS.md` #39 rather than claimed.
 
 The pin never updates itself, for the same reason `practice_sha256:` never re-pins itself: a
 self-updating pin is the silent edit it exists to catch. The remedy is printed when the row fails

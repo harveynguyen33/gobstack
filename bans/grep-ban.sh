@@ -11,6 +11,19 @@
 # It reads TEXT, with no AST and no comments blanked: a `: any` inside a string or a
 # comment is reported. That limit is stated, not hidden - the AST-grade form needs a
 # parser the no-npm contract (docs/CONTRACTS.md) does not allow (docs/LIMITS.md #27).
+#
+# NARROW, EXPLICIT EXCEPTIONS (Dune rule 5). The engine exports two variables, and the hits are
+# filtered BEFORE the exit code is chosen - a filter applied to stdout after the fact cannot
+# change a verdict and is therefore decorative (W5-1: `bans_exempt:` produced a permanent RED):
+#
+#   GOBLIN_BANS_ID       the ban being probed (BN-01 ...)
+#   GOBLIN_BANS_EXEMPT   newline-separated path prefixes this ban exempts
+#
+# A hit is dropped when its FILE is under an exempt prefix, or when the offending LINE carries
+# the inline escape `// BAN-OK(<id>): <reason>`. Both are segment-aligned and both require the
+# documented form: `src` exempts `src/a.ts` and `src/legacy/b.ts`, never `src2/c.ts`, and a
+# `BAN-OK(<id>)` with no `: <reason>` after it is NOT an escape (it is a wish). When nothing is
+# left the probe exits 0: there is no violation outside the declared exception.
 
 set -uo pipefail
 pats=()
@@ -38,8 +51,34 @@ out=$(grep -rnE "${args[@]}" \
         --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' --include='*.mjs' \
         -- "${paths[@]}" 2>&1)
 rc=$?
+
+# The exemption filter. It runs on hits only, so the fail-closed arms below are untouched.
+ban_exempt_filter() {
+  GOBLIN_BANS_EXEMPT="${GOBLIN_BANS_EXEMPT:-}" GOBLIN_BANS_ID="${GOBLIN_BANS_ID:-}" awk '
+    BEGIN {
+      n = 0
+      if (ENVIRON["GOBLIN_BANS_EXEMPT"] != "") n = split(ENVIRON["GOBLIN_BANS_EXEMPT"], ex, "\n")
+      id = ENVIRON["GOBLIN_BANS_ID"]
+      pat = ""
+      if (id != "") pat = "BAN-OK\\(" id "\\)[[:space:]]*:[[:space:]]*[^[:space:]]"
+    }
+    {
+      f = $0; sub(/:.*/, "", f)
+      for (i = 1; i <= n; i++) {
+        p = ex[i]
+        if (p == "") continue
+        if (f == p || index(f, p "/") == 1) next
+      }
+      if (pat != "" && $0 ~ pat) next
+      print
+    }'
+}
+
 case "$rc" in
   1) exit 0 ;;                              # no match: clean
-  0) printf '%s\n' "$out"; exit 1 ;;        # matches: the ban is violated
+  0) out=$(printf '%s\n' "$out" | ban_exempt_filter) ;;   # matches: drop the declared exceptions
   *) printf '%s\n' "$out" >&2; exit 2 ;;    # grep could not run: fail closed
 esac
+[ -n "$(printf '%s' "$out" | tr -d '[:space:]')" ] || exit 0
+printf '%s\n' "$out"
+exit 1

@@ -33,5 +33,25 @@ done <<EOF
 $layers
 EOF
 
+# A narrow, explicit exception (Dune rule 5) reaches this probe through the same environment the
+# engine gives grep-ban.sh: GOBLIN_BANS_EXEMPT is a newline-separated list of path prefixes, and a
+# hit whose FILE is under one of them does not count. Filtering here, before the exit code, is what
+# makes the exception able to change a verdict (W5-1). BN-05's documented escape is `layers:` or a
+# move, not the inline marker, so no BAN-OK is honoured here. A probe that ignores the variable
+# keeps the old, fail-closed behaviour.
+if [ -n "$bad" ] && [ -n "${GOBLIN_BANS_EXEMPT:-}" ]; then
+  bad=$(GOBLIN_BANS_EXEMPT="$GOBLIN_BANS_EXEMPT" printf '%s' "$bad" | awk '
+    BEGIN { n = split(ENVIRON["GOBLIN_BANS_EXEMPT"], ex, "\n") }
+    {
+      f = $0; sub(/:.*/, "", f)
+      for (i = 1; i <= n; i++) {
+        p = ex[i]
+        if (p == "") continue
+        if (f == p || index(f, p "/") == 1) next
+      }
+      print
+    }')
+fi
+
 if [ -n "$bad" ]; then printf '%s' "$bad"; exit 1; fi
 exit 0

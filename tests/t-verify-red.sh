@@ -3,7 +3,7 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 105 `expect_red` call sites and 19 `expect_green` - 124 calls over
+# One control per target-scope row: 112 `expect_red` call sites and 22 `expect_green` - 134 calls over
 # all 78 of the matrix's 78 target rows (the other five rows are source-scope and carry controls of
 # their own). Measured at this revision: 78 distinct ids, 0 phantom ids (every id used here is a row
 # in the matrix) and 0 target row left without a control. Five of the 78 - `DOC-01`, `DOC-02`
@@ -26,12 +26,19 @@
 # class (five re-declared PG-05 shapes with the GREEN half that proves the new strictness is not
 # "any file that mentions if:", six controls for the new PG-06 row - one per clause plus the two
 # halves that prove it is not always-red and not always-green, five electron bans with the SKIP
-# control, and the second class-B part control). Nineteen of the
-# controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, two that seed a feature
+# control, and the second class-B part control), and the ten added with X1/W5 - five for the ban
+# lane's two DOCUMENTED escapes in both directions (`bans_exempt:` with a real violation inside
+# the exempt path, the same violation outside it, the inline `BAN-OK(<id>): <reason>` marker, a
+# marker with no reason, and a marker naming another ban), one stub feature map whose token occurs
+# only in the harness, and three for the loop's close-and-reopen (silent, recorded, stub archive).
+# The judge-lane family comparison is two text assertions rather than `expect_*` calls, because
+# `MD-02` is advisory and exits 0 either way; its control reads the line it prints. Twenty-two of
+# the controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, two that seed a feature
 # map and require it to PASS, seven that seed a loop record or a judge lane and require
-# `JG-01`, `JG-02` and `LP-01`..`LP-05` to PASS, and five that pin a new row's non-failing half -
+# `JG-01`, `JG-02` and `LP-01`..`LP-05` to PASS, five that pin a new row's non-failing half -
 # a commented-out `if:`, the installed workflow, a verbatim gate run, the no-workflow SKIP and an
-# unlisted ban). The `--only <id>` form is used
+# unlisted ban - and three that prove the two escapes and the recorded re-scope are not
+# always-red). The `--only <id>` form is used
 # so a mutation in one row cannot be masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
@@ -377,6 +384,24 @@ m_bn_07()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-07]/' .gobli
 m_bn_08()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-08]/' .goblin/goblin.yaml; mkdir -p src; printf 'export const prefs = { webSecurity: false };\n' > src/webs.ts; }
 m_bn_09()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-09]/' .goblin/goblin.yaml; mkdir -p src; printf 'const v = ipcRenderer.sendSync("chan", 1);\n' > src/ipc.ts; }
 
+# ---- W5-1/W5-2: the two documented escapes, in BOTH directions ---------------------------------
+# `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` were documented in three places and
+# exercised by NOTHING (`grep -rn bans_exempt tests/` = 0 hits at 7fec08f), which is why W5's
+# regression - a documented escape that produced a permanent RED - shipped unnoticed. These five
+# controls are that missing pair, and every one of them is RED on the pre-fix tree (measured:
+# the exempt-path green is rc 1 there, and the two BAN-OK reds are PASSes there because the
+# marker does nothing).
+m_bn_01_exempt()      { m_bn_01; awk '{ if ($0 ~ /^bans_exempt:/) { print; print "  - BN-01 src"; next } print }' .goblin/goblin.yaml > .goblin/goblin.yaml.n && mv .goblin/goblin.yaml.n .goblin/goblin.yaml; }
+# The other direction: the exception names a DIFFERENT path, so the same violation still counts.
+# Without this half, an engine that exempted everything would pass the control above.
+m_bn_01_exempt_else() { m_bn_01; awk '{ if ($0 ~ /^bans_exempt:/) { print; print "  - BN-01 app"; next } print }' .goblin/goblin.yaml > .goblin/goblin.yaml.n && mv .goblin/goblin.yaml.n .goblin/goblin.yaml; }
+m_bn_01_banok()       { mkdir -p src; printf 'export const a: any = 1; // BAN-OK(BN-01): the value is narrowed at the boundary\n' > src/bn01.ts; }
+# The documented form carries a reason. A bare marker is not an escape, and the line stays RED.
+m_bn_01_banok_noreason() { mkdir -p src; printf 'export const a: any = 1; // BAN-OK(BN-01)\n' > src/bn01.ts; }
+# The marker names the ban it clears. A BAN-OK for another ban must not clear this one - which is
+# what stops a sloppy `BAN-OK\(` matcher from becoming a blanket escape.
+m_bn_01_banok_other() { mkdir -p src; printf 'export const a: any = 1; // BAN-OK(BN-02): another ban\n' > src/bn01.ts; }
+
 m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
 m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 7/' .goblin/goblin.yaml; }
@@ -558,6 +583,15 @@ expect_red   "a renderer with contextIsolation: false"          BN-07 1 m_bn_07
 expect_red   "a renderer with webSecurity: false"               BN-08 1 m_bn_08
 expect_red   "a synchronous IPC call in a hot path"             BN-09 1 m_bn_09
 
+# ---- W5-1/W5-2: both documented escapes, both directions --------------------------------------
+# The exempt path must PASS with a real violation inside it, and the SAME violation must still
+# FAIL when the exception names another path. That pair is the control whose absence let W5-1 ship.
+expect_green "W5-1: a bans_exempt path holding a real violation PASSES"      BN-01 m_bn_01_exempt
+expect_red   "W5-1: the same violation outside the exempt path still FAILs"  BN-01 1 m_bn_01_exempt_else
+expect_green "W5-2: inline BAN-OK(<id>): <reason> clears the offending line" BN-01 m_bn_01_banok
+expect_red   "W5-2: a BAN-OK with no reason is not an escape"                BN-01 1 m_bn_01_banok_noreason
+expect_red   "W5-2: a BAN-OK naming another ban does not clear this one"     BN-01 1 m_bn_01_banok_other
+
 # ---- G1: the feature map (FM-01, FM-02) and the generated skill's doctor (VA-01) --------------
 # P6 authors the map (skills/goblin-feature-map); FM-01 is the entry contract + index hygiene,
 # FM-02 the source tripwire, VA-01 the declared doctor. All three are NEW rows, so there is no
@@ -623,6 +657,11 @@ m_fm_01_h2()        { plant_map; sed -i 's/^## Gotchas$/### Gotchas/' "$MAPDIR/p
 m_fm_01_slug()      { plant_map; sed -i 's/^feature: panel$/feature: sidebar/' "$MAPDIR/panel.md"; }
 m_fm_02_token()     { plant_map; printf 'route-renamed\n' > "$FM_SRC"; }
 m_fm_02_stale()     { plant_map; sed -i 's/^verified: .*/verified: 2020-01-01/' "$MAPDIR/panel.md"; }
+# W5-4: the STUB map. `entry_paths` naming a token that occurs only inside the harness (this one
+# occurs in .goblin/bin/goblin-verify and nowhere else in the fixture) passed both FM rows before
+# the fix, because `source_root: .` walked the install: the map merely echoed the template. The
+# token has to be one the harness demonstrably holds - the control below is measured, not assumed.
+m_fm_02_stub()      { plant_map; sed -i 's|^  - panel-root$|  - g_yaml_block_scalar|' "$MAPDIR/panel.md"; }
 m_va_01_fail()      { sed -i 's|^verify_doctor: .*|verify_doctor: false|' .goblin/goblin.yaml; }
 
 # The empty config is the fresh-install state: each row SKIPs (the builtin returns 3, which the
@@ -645,6 +684,9 @@ expect_red   "an entry H2 demoted to H3"           FM-01 1 m_fm_01_h2
 expect_red   "a feature: that is not the filename stem" FM-01 1 m_fm_01_slug
 expect_green "a seeded feature map resolves under source_root" FM-02 m_fm_plant
 expect_red   "a declared entry path renamed in source"  FM-02 1 m_fm_02_token
+# W5-4: the stub map. RED before the fix too - `source_root: .` resolved the token against the
+# install, so the map passed while naming nothing in source.
+expect_red   "W5-4: a stub map whose token occurs only in the harness" FM-02 1 m_fm_02_stub
 expect_red   "an entry path changed after the map was verified" FM-02 1 m_fm_02_stale
 expect_red   "a verify_doctor that exits non-zero" VA-01 1 m_va_01_fail
 # ---- G2: the judge role and the loop contract (JG-01..JG-03, LP-01..LP-05) --------------------
@@ -691,6 +733,29 @@ m_lp_01_two()    { plant_loop; printf 'test -f README.md\n' >> "$LOOP/predicate"
 m_lp_01_late()   { plant_loop; printf 'exit=1 ts=2026-09-25T00:30:00Z\n' > "$LOOP/first-run"; }
 m_lp_01_norun()  { plant_loop; rm -f "$LOOP/first-run"; }
 m_lp_02_repin()  { plant_loop; printf '# relaxed by hand\n' >> "$LOOP/predicate"; }
+# W5-7: the close-and-reopen path. A loop archives its bar under closed-<date>/, writes a weaker
+# one and re-pins - and before the fix LP-02 and LP-05 both PASSED with nothing in the record.
+# Three controls: the silent version must FAIL, the RECORDED version must pass (the half that
+# proves the clause is not always-red), and a stub archive must FAIL.
+m_lp_02_reopen_silent() {
+  plant_loop
+  mkdir -p "$LOOP/closed-2026-09-24"
+  cp "$LOOP/predicate" "$LOOP/closed-2026-09-24/predicate"
+  cp "$LOOP/predicate.sha256" "$LOOP/closed-2026-09-24/predicate.sha256"
+  printf '# the relaxed bar: any file will do\n' >> "$LOOP/predicate"
+  sha256sum "$LOOP/predicate" | awk '{print $1}' > "$LOOP/predicate.sha256"
+}
+m_lp_02_reopen_recorded() {
+  m_lp_02_reopen_silent
+  printf 'previous: %s\n' "$(sha256sum "$LOOP/closed-2026-09-24/predicate" | awk '{print $1}')" >> "$LOOP/predicate.sha256"
+}
+m_lp_02_reopen_noarc() {
+  plant_loop
+  mkdir -p "$LOOP/closed-2026-09-24"
+  cp "$LOOP/predicate" "$LOOP/closed-2026-09-24/predicate"
+  printf '# the relaxed bar\n' >> "$LOOP/predicate"
+  sha256sum "$LOOP/predicate" | awk '{print $1}' > "$LOOP/predicate.sha256"
+}
 m_lp_03_over()   { plant_loop; printf '21\n' > "$LOOP/budget"; }
 m_lp_03_rows()   { plant_loop; printf '1\n' > "$LOOP/budget"; }
 # The same pointer three times with no green: rows 2, 3 and 4 of the record. What the row measures
@@ -718,6 +783,26 @@ expect_red   "a verdict resting on a command that ran (cmd:)" JG-01 1 m_jg_01_cm
 expect_red   "a sha of the right shape that names no commit"  JG-01 1 m_jg_01_ghost
 expect_green "a judge lane beside the code lane, disjoint"    JG-02 m_jg_02_ok
 expect_red   "the judge lane IS the author lane"              JG-02 1 m_jg_02_shared
+# ---- W5-6: the judge lane's model FAMILY ------------------------------------------------------
+# JG-02 proves the declared profile NAMES are disjoint; a `judge:` profile mapped to the author's
+# own model passed it, so the judge was distinct by name only. MD-02 now compares the judge lane's
+# resolved model with the code lane's - and it stays ADVISORY either way (`ADV`, exit 0), because
+# goblin-stack cannot choose the fleet's models. So the control reads the LINE, not the exit code:
+# the same-family case must be named as such, and the different-family case must be too.
+plant_judge()      { plant_judge_lane; }
+plant_judge_same() { plant_judge_lane; awk '{ if ($0 ~ /^  judge:$/) { print; getline; print "    model: model-code"; next } print }' "$WORK/models.yaml" > "$WORK/models.yaml.n" && mv "$WORK/models.yaml.n" "$WORK/models.yaml"; }
+plant_judge_same
+out=$(bash .goblin/bin/goblin-verify --only MD-02 2>&1); rc=$?
+printf '%s' "$out" | grep -q 'the SAME family as the code lane'; hit=$?
+check "W5-6: a judge mapped to the author's own model is reported as the same family" \
+  "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
+restore_all
+plant_judge
+out=$(bash .goblin/bin/goblin-verify --only MD-02 2>&1); rc=$?
+printf '%s' "$out" | grep -q 'judge lane model-judge, code lane model-code - different family'; hit=$?
+check "W5-6: a judge on another model is reported as a different family" \
+  "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
+restore_all
 expect_red   "JG-03 (advisory row: wired, not biting)"        JG-03 1 m_jg_03_wired
 expect_green "a seeded loop record passes LP-01 (one command, run first)" LP-01 m_loop_plant
 expect_red   "a predicate of two commands"                       LP-01 1 m_lp_01_two
@@ -725,6 +810,10 @@ expect_red   "a first run recorded AFTER the first log row"      LP-01 1 m_lp_01
 expect_red   "no recorded first run at all"                      LP-01 1 m_lp_01_norun
 expect_green "a seeded loop record passes LP-02 (the pin still matches)" LP-02 m_loop_plant
 expect_red   "the predicate relaxed after the pin was taken"     LP-02 1 m_lp_02_repin
+# W5-7: the close-and-reopen, recorded vs silent, plus a stub archive.
+expect_red   "W5-7: a close-and-reopen that records nothing"     LP-02 1 m_lp_02_reopen_silent
+expect_green "W5-7: the same re-scope with the archived digest named" LP-02 m_lp_02_reopen_recorded
+expect_red   "W5-7: a closed loop whose archive holds no pin"    LP-02 1 m_lp_02_reopen_noarc
 expect_green "a seeded loop record passes LP-03 (budget 12, 2 rows)" LP-03 m_loop_plant
 expect_red   "a budget above loop_max_turns_ceiling"             LP-03 1 m_lp_03_over
 expect_red   "more verdict rows than the declared budget"        LP-03 1 m_lp_03_rows

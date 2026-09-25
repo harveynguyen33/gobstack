@@ -59,12 +59,13 @@ One unattended run, one committed record. `templates/loop/` ships a copy-ready `
 loop record — every `LP-` row skips until a loop has actually run here.
 
     .goblin/loop/predicate          one command; exits 0 == the loop is finished
-    .goblin/loop/predicate.sha256   its digest, recorded at loop start (the pin)
+    .goblin/loop/predicate.sha256   its digest, recorded at loop start (the pin); after a close,
+                                    the chain follows on `previous: <digest>` lines
     .goblin/loop/first-run          exit=<n> ts=<ISO8601>, run BEFORE iteration 1
     .goblin/loop/budget             the turn budget this run declares
     .goblin/loop/decisions.tsv      ts · phase · decision · why · evidence · result
     .goblin/loop/stuck.md           the write-up when the run ended without predicate:green
-    .goblin/loop/closed-<date>/     a relaxed predicate, archived
+    .goblin/loop/closed-<date>/     a relaxed predicate AND the pin it was closed under, archived
 
 An iteration row's `evidence` is a **pointer that resolves**: `sha:<hex>` (a commit in
 `git rev-list --all`), `file:<path>` (a path under the root), `sha256:<hex>` (the digest of a file
@@ -79,9 +80,13 @@ output is not in the record, and a verdict resting on it is the self-report `JG-
    green mean anything (`LP-01`).
 2. **Never relax.** The predicate's digest is recorded at loop start (`LP-02`). Changing it
    mid-loop is not an edit; it is closing this loop and opening another, with the old predicate
-   archived under `.goblin/loop/closed-<date>/` and committed. The precedent is already in the
-   repo: `practice_sha256:` + `IN-02` and the deliberate `--re-pin`, which never re-pins
-   automatically "because a self-updating pin would be the silent edit it exists to catch"
+   **and the pin it was closed under** archived under `.goblin/loop/closed-<date>/` and committed,
+   and the new `predicate.sha256` naming the archived digest on a `previous: <digest>` line. That
+   chain is what `LP-02` checks: not that the new bar is as strong — no digest can say that
+   (`docs/LIMITS.md` #39) — but that the supersession is **recorded**, so a silent relaxation is a
+   FAIL rather than an indistinguishable re-scope. The precedent is already in the repo:
+   `practice_sha256:` + `IN-02` and the deliberate `--re-pin`, which never re-pins automatically
+   "because a self-updating pin would be the silent edit it exists to catch"
    (`docs/CONTRACTS.md`).
 3. **The escape hatch is a write-up, not a silence.** A run whose last row's `result` is not
    `predicate:green` carries `.goblin/loop/stuck.md` — at least three non-blank lines naming the
@@ -129,7 +134,7 @@ Approved shape: write `.goblin/loop/stuck.md`, commit it, `kanban_block` naming 
 | **a judge grading its own profile** | the judge's profile set must be **disjoint** from the author's (`JG-02`, FAIL) | **Partly.** Disjoint *profiles* is fully checkable; disjoint *families* needs the mapping file and is a report (`MD-02`), and *which lane ran* is unobservable from a repo (`MD-03`) |
 | **a judge given prose instead of evidence** | `done` may only cite a **typed handle** the repo can resolve (`JG-01`) | **Yes**, on the record — it still cannot see whether the handle *supports* the verdict |
 | **a loop making no progress** | three consecutive identical pointers with a non-terminal result → FAIL (`LP-04`) | **Yes** on the record; a changed pointer is a proxy, not progress |
-| **a loop weakening its check** | the predicate is pinned by digest at loop start (`LP-02`); relaxing it is a committed archive-and-restart | **Yes** for a file predicate; a card predicate is protected by the board itself |
+| **a loop weakening its check** | the predicate is pinned by digest at loop start (`LP-02`); relaxing it is a committed archive-and-restart, and the new pin must name the archived digest on a `previous:` line, so a SILENT relaxation is a FAIL | **Partly**: the chain is checked; whether the new predicate is weaker is not (docs/LIMITS.md #39). A card predicate is protected by the board itself |
 | **a loop that thrashes** | budget ceiling + `LP-04` + the mandatory write-up (`LP-03`, `LP-04`, `LP-05`) | **Yes** |
 
 **The JG-03 policy, stated so it is not mistaken for a check.** `JG-03` is a **counted** row, never

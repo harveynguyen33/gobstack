@@ -24,6 +24,39 @@ A `detect` command runs from the repo root and exits
 A ban the config does not name is SKIPPED with that reason; a ban whose `globs` match no file
 is SKIPPED with that reason. An empty or missing table is **exit 2**.
 
+## Narrow exceptions (Dune rule 5)
+
+Two escape hatches ship, and both are filtered **before the exit code is chosen** — a filter
+applied to a probe's stdout afterwards cannot change a verdict, so it would be decorative, and
+every violation inside an exempted path would be a permanent RED with no remedy (that was
+**W5-1**, measured `rc 0` at `72490f0` → `rc 1` at `7fec08f`).
+
+```
+bans_exempt:                 # in .goblin/goblin.yaml — a path prefix, or a whole path
+  - BN-03 src/legacy         # <ban id> <path prefix>: that ban, that path, nothing else
+```
+
+```
+export const a: any = 1;    // BAN-OK(BN-01): the value is narrowed at the boundary
+```
+
+An inline escape clears **one line** for **that ban**; a non-empty reason after the colon is
+required, so `BAN-OK(BN-01)` on its own is not an escape. Path exemption is segment-aligned:
+`src` exempts `src/a.ts` and `src/legacy/b.ts`, never `src2/c.ts`.
+
+The engine passes both to the probe through its environment rather than editing stdout:
+
+| variable | meaning |
+|---|---|
+| `GOBLIN_BANS_ID` | the ban being probed — what an inline `BAN-OK(<id>)` must name |
+| `GOBLIN_BANS_EXEMPT` | newline-separated path prefixes this ban exempts |
+
+`bans/grep-ban.sh` and `bans/layer-check.sh` honour both (the layer probe honours the path list
+only — its documented escape is `layers:` or a move, not an inline marker). A project's **own**
+probe that ignores the variables keeps the old behaviour: a violation inside an exempted path
+stays RED. That is deliberate — the failure is **closed**, never open — and it is recorded in
+`docs/LIMITS.md`.
+
 ## No npm, no AST
 
 The engine uses `bash`/`grep`/`awk` only — the dependency contract in `docs/CONTRACTS.md`. So

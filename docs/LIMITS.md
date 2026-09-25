@@ -287,6 +287,42 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     claim is not. Three further Electron failure modes are **recorded, not mechanised**, and
     `docs/CI.md` §4 says why: the dependency-graph boundary check, `ipcMain` sender validation,
     and fuses at package time.
+36. **A ban's exemption reaches the probe through its environment, so a custom probe can ignore it.**
+    `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` are filtered *before* the exit code is
+    chosen, because a filter applied to a probe's stdout afterwards cannot change a verdict — that
+    was W5-1, and the old code made every exemption a permanent RED. The engine therefore exports
+    `GOBLIN_BANS_ID` and `GOBLIN_BANS_EXEMPT` and the two shipped probes honour them. A project's
+    **own** `detect` command that ignores the variables keeps the old behaviour: a violation inside
+    an exempted path stays RED. That direction is **closed**, never open, and it is the trade this
+    choice makes. The engine's own stdout is no longer filtered at all, so a probe that ignores the
+    contract prints the exempted lines it reported — loud, and still a FAIL.
+37. **`FM-02` refuses the harness, not every non-source file.** The search skips `.git/`,
+    `.goblin/`, `.hermes/`, the declared `harness_dir` and the map's own directory, so a stub map
+    whose token occurs only in the install no longer resolves (W5-4: `entry_paths: [export]` used to
+    "resolve" to `./.goblin/bin/goblin-verify`). It does **not** exclude the target's own `docs/`,
+    `tests/` or build output: a token that occurs only there still reads as resolved, and excluding
+    them would be a guess about a layout goblin-stack does not know. Nor is there a frequency bound
+    — a common token ("export", "main") is satisfied by the first of hundreds of files.
+38. **The judge lane's model family is reported, never enforced — and on this box it is the same
+    family.** `JG-02` proves the declared profile *names* are disjoint; W5-6 measured that a `judge`
+    profile mapped to the author's own model passed it. `MD-02` now resolves the judge lane and
+    compares its model with the code lane's, so the state is loud — but it stays `advisory`
+    (`return 2`, never a FAIL): goblin-stack cannot choose the fleet's models, and a repo-local file
+    cannot observe *which* model a lane actually ran. Measured on this box at X1: Harvey's
+    `fleet-model.yaml` resolves **every** profile — `default`, `architect`, `reviewer`, `coder`,
+    `chef`, `homelab`, `pkm`, `news-digest`, `researcher` — to one model under an active promotion,
+    so the judge *is* the author's family here and `MD-02` says so on the ADV line. The comparison
+    is exact model equality, not a version-stripped "family": two spellings of the same family that
+    differ only in a suffix would read as different.
+39. **`LP-02` cannot tell a weaker predicate from a re-scope. The close-and-reopen is recorded, not
+    prevented.** A loop could archive its bar under `closed-<date>/`, write a weaker one, re-pin,
+    and pass `LP-02` and `LP-05` with nothing in the record (W5-7, measured). The row now requires
+    every archive to hold its predicate **and** the pin it was closed under, and the live
+    `predicate.sha256` to name the archived digest on a `previous:` line — so a **silent** relaxation
+    is caught and a legitimate re-scope costs one line. Whether the new predicate is weaker, and who
+    edited it, is not decidable from a digest, and a predicate that calls a script elsewhere is
+    pinned only at its call site. The residual is the same one `LP-01` carries one file over: the
+    record is evidence, not proof that the loop stopped for the right reason.
 
 ## Verdicts recorded, not built (the note-8 questions)
 
