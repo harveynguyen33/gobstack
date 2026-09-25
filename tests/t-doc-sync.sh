@@ -23,6 +23,11 @@
 #         discoverable only in the post-mortem (V3-1).
 #   V3-8  the verifier's "cannot see" footer must name the ban lane's own blind spots (the
 #         unsigned ban table, the text-probe gap, a ban that is invisible until verify runs).
+#   AB3   the advisory arithmetic is a number THIS matrix owns (`advisory_ceiling`), and it is
+#         quoted as prose in five places. Three are dated history (the CHANGELOG entries,
+#         docs/ENFORCEMENT.md's chronology, t-verify-red.sh's pre-change note) and keep their own
+#         tense; the two LIVE claim sites stated 9 of 10 as what the run prints, one with no
+#         dating at all. The live copies are read here, and only they.
 #
 # Run by tests/run-tests.sh.
 set -uo pipefail
@@ -191,6 +196,28 @@ check "templates/AGENTS.md.tmpl names the ban engine, so a ban is seen in contex
 # every run, not only in docs/LIMITS.md.
 awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /ban/) found = 1 } END { exit !found }' bin/goblin-verify
 check "the verifier's 'cannot see' footer names the ban lane's blind spots (V3-8)" "$?"
+
+# ---- AB3: the LIVE copies of the advisory arithmetic must match the run -----------------------
+# `advisory_ceiling` is 10 and `SK-03` prints `advisory 10 of ceiling 10 (0 free slots: the next
+# advisory row FAILs)`. docs/GUARDRAILS.md's third design constraint and docs/LIMITS.md #26 both
+# presented 9 of 10 as what the run reports - LIMITS in the present tense ("reports that arithmetic
+# on every run"), GUARDRAILS with no way to date it. Both are read here; the dated history
+# (CHANGELOG entries, docs/ENFORCEMENT.md's chronology, t-verify-red.sh's pre-change note) is not,
+# and keeps its own tense.
+ADV_POINT=$(awk '/advisory_ceiling/ { c = 6 } c > 0 { print; c-- }' docs/GUARDRAILS.md)
+printf '%s' "$ADV_POINT" | grep -q '10 of 10'
+check "docs/GUARDRAILS.md's advisory point states the measured count (10 of 10) (AB3)" "$?"
+printf '%s' "$ADV_POINT" | grep -qE '\*\*Corrected [0-9]{4}-[0-9]{2}-[0-9]{2}'
+check "  and dates the correction, the way docs/LIMITS.md's own W2/W3 notes do (AB3)" "$?"
+# Normalised, because the sentence wraps: a literal grep for 'reports that arithmetic on every run'
+# is green on BOTH trees while the file holds '...on every\nrun' (measured at 58a6fe6).
+LIMITS_FLAT=$(sed 's/[*_`]/ /g' docs/LIMITS.md | tr '\n' ' ' | tr -s '[:space:]' ' ')
+if printf '%s' "$LIMITS_FLAT" | grep -q 'reports that arithmetic on every run'; then
+  note "FAIL docs/LIMITS.md #26 still says the stale arithmetic is what the run reports (AB3)"
+  fail=1
+else
+  note "ok   docs/LIMITS.md #26 no longer claims the stale arithmetic is what the run reports (AB3)"
+fi
 
 if [ "$fail" -eq 0 ]; then note "t-doc-sync: PASS"; else note "t-doc-sync: FAIL"; fi
 exit "$fail"

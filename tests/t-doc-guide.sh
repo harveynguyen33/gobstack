@@ -21,9 +21,16 @@
 #       `created 49` line, the day-one line (`42 passed, 1 failed, 11 advisory, 24 skipped`) and the
 #       green-path line (`43 passed, 0 failed, 11 advisory, 24 skipped`). A number no run prints is
 #       the defect this half exists to catch.
+#   AB3 §8's rule sentence names HOW MANY files `IN-02` covers, and §11 states a review score. The
+#       sentence said "hashes every file the installer wrote" - measured false (the installer writes
+#       50, the row's `files` map is 40), so the reader's counterexample file drifted nothing. The
+#       count the guide quotes is asserted against the map a real install writes, the universal is
+#       asserted gone, and the 9/10 is asserted to name the revision it was measured at. A control
+#       that RUNS a guide's commands does not read its sentences - this half reads two of them.
 #
 # RED on d5424be / GREEN at the tip: the REPLAY block does not exist there at all, the `created 49`
-# gloss is the false one, and §1 carries the unscoped claim.
+# gloss is the false one, and §1 carries the unscoped claim. RED at 58a6fe6: the AB3 assertions
+# below (the guide quotes no files-map length there, and the 9/10 carries no revision).
 set -uo pipefail
 
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -131,6 +138,38 @@ else
   note "FAIL the gloss on 'created $CREATED' does not say which file the installer omits from the count"
   fail=1
 fi
+
+# ---- AB3: the guide's own file-count claim must equal the map a real install writes -------------
+# §8's rule tells the reader which row to break, and until AB3 it said `IN-02` "hashes every file the
+# installer wrote" - measured false: the installer writes 50 files into an empty repo and the row's
+# `files` map is 40, so the ten it does not hash (including `.goblin/goblin.yaml`, the file §5 step 3
+# has the reader edit) drift nothing and the exercise "confirms" a check that never moved. The count
+# the sentence quotes is compared with the map THIS install wrote, and the universal is compared with
+# absence. Both are RED at 58a6fe6, where the sentence carries no count at all.
+#
+# The absence half normalises the file first (markdown emphasis/code ticks to spaces, newlines to
+# spaces, whitespace collapsed). A literal grep is green on BOTH trees: measured at 58a6fe6, the
+# pre-change file holds "hashes every file the\ninstaller wrote" - the claim wraps, so the string the
+# reader sees is not the string the file holds. That is the same defeat-the-control-by-emphasis trap
+# t-doc-sync's F2-9 matcher documents.
+NORMTXT=$(sed 's/[*_`]/ /g' "$GUIDE" | tr '\n' ' ' | tr -s '[:space:]' ' ')
+FILESMAP=$(awk '/^  "files": \{/{f=1;next} f&&/^  \},$/{f=0} f&&/^    "/{n++} END{print n+0}' .goblin/installed.json)
+QUOTED=$(sed -n 's/.*hashes the [^0-9]*\([0-9][0-9]*\) files.*/\1/p' "$GUIDE" | head -1)
+check "the guide quotes the files-map length a real install writes ($QUOTED quoted vs $FILESMAP measured)" \
+  "$([ -n "$QUOTED" ] && [ "$QUOTED" = "$FILESMAP" ] && echo 0 || echo 1)"
+if printf '%s' "$NORMTXT" | grep -q 'hashes every file the installer wrote'; then
+  note "FAIL the guide still says \`IN-02\` hashes EVERY file the installer wrote (AB3)"
+  fail=1
+else
+  note "ok   the false universal ('IN-02 hashes every file the installer wrote') is gone (AB3)"
+fi
+
+# ---- AB3: the stated score must name the revision it describes ---------------------------------
+# §11 presented a previous revision's **9/10** as "the current status" in a file stamped with the
+# current version, so the next pass makes it false in silence. A score is a claim about a revision,
+# and the sentence has to carry which one. RED at 58a6fe6 (no revision anywhere near the number).
+awk '/9\/10/ { c = 2 } c > 0 { print; c-- }' "$GUIDE" | grep -qE '0\.4\.[0-9]'
+check "the guide's 9/10 score names the revision it was measured at (AB3)" "$?"
 
 # ---- D5: the network claim is scoped -----------------------------------------------------------
 ! grep -q 'It adds no network calls' "$GUIDE"
