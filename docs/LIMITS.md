@@ -51,9 +51,24 @@ deliberate trade or an unfilled gap.
     line can no longer lose its `measured <date>` in silence (G8-2 measured the old row passing
     exactly that); but nothing re-measures the number, and a gate-bearing line that names no
     declared gate and carries no gate-shaped keyword is still unseen.
-13. **`PG-04` and `PG-05` are documentation plus a textual heuristic.** A protected branch whose
-    only admin is the person pushing protects nothing, and a required check that self-skips
-    reports success. Neither is observable from inside a repo.
+13. **`PG-04` is documentation, and `PG-05` is a text reading — re-declared at W4 rather than
+    called a gate.** `PG-04` stays `advisory` because the forge is unobservable from inside a
+    repo: a protected branch whose only admin is the person pushing protects nothing, so a
+    required check armed under the sole admin's own identity binds nobody — the second half of
+    that sentence is measured (Harvey is the sole admin of every repo he owns), and changing it
+    is a forge/account change, not a repository change. `PG-05` **used to be a heuristic**: it
+    counted "every step is guarded", so a single **job-level** `if:`, a job with no step, and the
+    measured real shape (one *unguarded* step deciding whether the guarded gate step runs) all
+    passed it while GitHub reported Success. It now refuses a conditional job, a conditional
+    step, a job that declares no step and a workflow with no `jobs:` — see `docs/CI.md` §1 for
+    why a skipped job is a green light. It is still a **text reading**: no YAML parser
+    (`docs/CONTRACTS.md` allows none), so a flow-style `jobs: {…}` mapping is refused rather than
+    parsed, a `#` inside a quoted string is read as a comment, and a conditional step that is
+    genuinely safe is indistinguishable from the trap. It cannot see branch protection, the
+    required-check list, or whether the job ever ran — `PG-04` is the row that says so. `PG-06`
+    is the other half and has its own limit: it proves the declared gate is **invoked** in a file
+    under `.github/workflows/`, never that the forge marks that job required, never that it is
+    the job the forge waits on, and never that the workflow can fail.
 14. **`CM-02` cannot be enforced.** A backtick lost to command substitution leaves no trace a
     later check can read.
 
@@ -96,7 +111,7 @@ deliberate trade or an unfilled gap.
     drift check — `IN-02`, `SK-02`, and `HS-01`'s hash of the harness dir — reads its expected
     hash out of that one file, and that file is the one file no check protects. Measured: append a
     byte to `.goblin/bin/goblin-verify`, rewrite its recorded hash in `installed.json`, commit, and
-    the run is **fully GREEN** (`42 passed, 0 failed`, exit 0). One edit defeats three rows at
+    the run is **fully GREEN** (`43 passed, 0 failed`, exit 0). One edit defeats three rows at
     once, and it is the cheapest way to fake a green run. Doing better needs an anchor the target
     cannot edit — a signature, or a hash held outside the repo — and goblin-stack has no such
     trust root: the source checkout is not guaranteed to exist at verify time, and any value
@@ -211,7 +226,9 @@ untestable remainder is counted and capped — and it prints, on every single ru
 see: the five upstream blind spots, plus the ban lane's own (the unsigned ban table #28, the
 text-probe gap #27, and a ban that is invisible until verify runs, `V3-1`), plus the judge/loop
 lane's (#32: a handle that exists is not a handle that supports the verdict; #33: a changed
-pointer is a proxy for progress, not progress).
+pointer is a proxy for progress, not progress), plus the CI lane's (#34: a file is not a gate —
+the required-check list, the bypass switch and the push identity are forge state; #35: the
+Electron perf number is a host gate, and the ratchet deliberately carries a different metric).
 
 27. **The ban probes are text probes, not ASTs.** `BN-01`, `BN-02`, `BN-03` and `BN-05` are
     `grep` over source under `bash`/`grep`/`awk` only — the dependency contract in
@@ -240,3 +257,72 @@ pointer is a proxy for progress, not progress).
     new number together, and record it as an operator action), which is the deliberate re-anchor
     the row's own why-cell names. It is a bound on the budget's shape, not a claim that the
     budget is the right one — and it still never re-measures.
+34. **The CI lane reads files, and a file is not a gate.** The shipped workflow
+    (`templates/ci/goblin-gate.yml.tmpl` → `.github/workflows/goblin-gate.yml`) has no `if:` at any
+    level, but nothing in a repository can make GitHub **require** it: the required-check list,
+    the bypass switch and the push identity are forge state (four settings, `docs/CI.md` §1).
+    `PG-06` proves the whole declared gate set is invoked in a file under `.github/workflows/` and
+    cannot prove that file is the one the forge waits on; `PG-05`'s reader has no parser, so a
+    flow-style `jobs: {…}` mapping is refused, and a `#` inside a quoted string truncates the line
+    it is on. Two further measured gaps: the template's job is `ubuntu-latest` with no cache, so a
+    repo whose gate needs a display, a licence, a GPU or a signed-in session cannot use it at all
+    (that is a **host** gate — the class-C rule, restated for class F), and a private repo's
+    Actions minutes are billed to the account (2,000/month free). Measured ground truth at W4:
+    **one** first-party workflow exists in the whole estate and it self-skips; five of the six
+    repos with a remote have none.
+35. **The Electron perf number is a host gate, and the ratchet carries a different metric.**
+    `presets/F-electron.yaml` declares `main_thread_busy_pct` as `perf_host_gate:` and uses
+    `app_bundle_bytes` for `ratchet:` — a **deliberate deviation** from G6 §B.3, which put the FPS
+    number in the ratchet. The instrument that produces it (CDP `Performance.getMetrics`, or
+    `app.getAppMetrics()[i].cpu.percentCPUUsage` inside a real Electron) needs Playwright or
+    Electron plus a GUI, and a shipped rule may use nothing but bash/git/awk/sed/grep/python3
+    (`docs/CONTRACTS.md`) — so `ratchet.cmd` pointing at the probe would make a fresh install
+    **born RED**, which is the one thing the install path must not produce. The probe belongs to
+    the project; a project whose CI needs npm runs it in **its own** workflow. What the number
+    means has a limit of its own, and it is measured: this box is an LXC with no display and no
+    system Chromium, so the G6 sweep came from a *bundled headless* Chromium with no compositor
+    and no vsync. Relative comparisons on one machine are meaningful (which is why
+    `main_thread_busy_pct` works at all, and why frame time does not — p50 stayed flat at 16.70 ms
+    while the main thread went from 1.8 % to 54.5 % busy, `docs/CI.md` §3.3); an absolute FPS
+    claim is not. Three further Electron failure modes are **recorded, not mechanised**, and
+    `docs/CI.md` §4 says why: the dependency-graph boundary check, `ipcMain` sender validation,
+    and fuses at package time.
+
+## Verdicts recorded, not built (the note-8 questions)
+
+Two library questions were investigated to a verdict and **deliberately built nothing here**, so a
+later session does not re-derive them. The measurements and sources are in
+`goblin-stack-research/G6.md` Part C; this is the durable half.
+
+**Pretext (`chenglou/pretext`) — USE, narrowly, and not as a runtime dependency.** Verified from
+the source of truth: a pure JS/TS library for multiline text measurement and layout, MIT, that
+*"side-steps the need for DOM measurements (e.g. `getBoundingClientRect`, `offsetHeight`), which
+trigger layout reflow"*, using the browser's own font engine as ground truth. Author confirmed
+(Cheng Lou, `_npmUser: chenglou`); the README credits Sebastian Markbage's earlier `text-layout`,
+whose repository now says *"This project is archived. The ideas here evolved into Pretext"*.
+Two verified corrections to the shipped skill: the skill pins `@chenglou/pretext@0.0.6` while npm's
+latest is **`0.0.9`**, and *"15KB zero-dependency"* describes the **runtime**, not the install
+(published tarball `unpackedSize: 887142` across 69 files, `sideEffects: false`, subpaths `.` and
+`./rich-inline`). The concrete use is a **dev-time / harness-time label-fit check** for
+`diagram-studio` and `goblin-ui` — "does this string fit this box at this font", without a layout
+read, as a `checks/*.mjs` assertion with a REPLAY — in exactly the repos that today hand-roll that
+arithmetic (26 `getBoundingClientRect()` calls, no `measureText` call, no label-overflow probe).
+**Do not** put it in the runtime bundle: the app is offline by design, and the skill's own stack
+table imports it through a CDN, which contradicts that. The second use is one blog demo, not
+infrastructure.
+
+**mise (`jdx/mise`) — NOT NOW, with a named trigger that flips it.** Verified: mise-en-place, MIT,
+macOS/Linux/Windows, one CLI that declares tool versions, environment variables and commands in
+`mise.toml` and uses them in the shell, the editor and CI; the polyglot successor to
+asdf/nvm/pyenv, and `.tool-versions` already works; installed with `curl https://mise.run | sh`.
+The premise for adopting it did not survive measurement: the projects do **not** run differing Node
+versions, and nothing declares a version at all — 0 `.nvmrc`/`.node-version`/`.tool-versions` files
+under `~/projects`, `engines.node` in exactly **one** first-party manifest, and a single Node on
+the box (v22.23.1, reached through `~/.local/bin`, which a shell profile puts first). The one real
+divergence is a *package-manager* split, which mise cannot resolve. Adopting it now would add a
+second version source beside the Node Hermes bundles. **Adopt when either becomes true:** two
+projects need different Node majors, or the first Electron app lands (Electron ships its own
+Node/Chromium, so the host Node stops mattering for the shell and starts mattering for the build
+tooling). **The cheap thing to do meanwhile:** declare the version that already exists — one
+`engines.node` line where it is missing, and a `measured <date>` gate line in the HANDOFF naming
+the Node the gates ran under.

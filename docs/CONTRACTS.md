@@ -9,7 +9,7 @@ same way the fleet's own tool reads it. Everything else is line-oriented shell.
     goblin-install --target <dir> [options]
 
     --target <dir>        required; the repo root to install into
-    --class A|B|C|D|E     required unless --uninstall or --re-pin
+    --class A|B|C|D|E|F  required unless --uninstall or --re-pin
     --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)
     --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md)
     --parts <list>        comma list to install; default = every part the class requires
@@ -111,7 +111,7 @@ Output is one line per executed row, in manifest order:
     FAIL  GT-02  gate commit: false -> exit 1
     ADV   MD-02  code lane and review lane both resolve to the same family
     SKIP  HS-02  no pinned pre-change commit yet - REPLAY not provable
-          42 passed, 0 failed, 11 advisory, 20 skipped
+          43 passed, 0 failed, 11 advisory, 24 skipped
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -123,25 +123,29 @@ that every rule in the manifest with a command still passes, and that the untest
 is counted and capped.
 
 **What it cannot see** (printed at the end of every run): whether a check in the harness dir
-tests the right path rather than merely passing; whether the target repo has CI; whether a human
+tests the right path rather than merely passing; whether the forge is bound by the workflow
+`CL-01` found; whether a human
 read the diff; whether the model mapping names a family that actually differs; and whether
 `.goblin/installed.json` — the record every drift check trusts — was itself rewritten, since it
-is not signed (`docs/LIMITS.md` #18).
+is not signed (`docs/LIMITS.md` #18). The CI lane adds its own, and `docs/CI.md` is where the four
+settings that make a workflow a **gate** are written down.
 
 ### A fresh install verifies green
 
-Measured on a fresh class-A install, committed with no hand edit: **`42 passed, 0 failed,
-11 advisory, 20 skipped`, exit 0.** Twenty rows skip with a reason: `HS-02` — no pre-change commit
+Measured on a fresh class-A install, committed with no hand edit: **`43 passed, 0 failed,
+11 advisory, 24 skipped`, exit 0.** Twenty-four rows skip with a reason: `HS-02` — no pre-change commit
 is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `AU-02` and `AU-03`, which
 have no report to audit in a repo where no reporter has run — `SC-06`, `SC-07` and `SC-08`, which
 have no dependency manifest, no lockfile and no audit record to read yet — `PF-01`, which has
-no measured perf baseline — `BN-01`/`BN-02`/`BN-03`/`BN-05`, which have no `src/` tree for a
-ban to read — `FM-01`/`FM-02`/`VA-01`, which have no feature map and no declared
+no measured perf baseline — `BN-01`/`BN-02`/`BN-03`/`BN-05` plus the four electron bans
+`BN-06`..`BN-09`, which have no `src/` tree for a ban to read — `FM-01`/`FM-02`/`VA-01`, which have no feature map and no declared
 `verify_doctor:` yet (`feature_map:` and `verify_doctor:` ship empty on purpose: a fresh install
 must not be born RED — G1, `docs/LIMITS.md` #30) — and `JG-01` with `LP-01`..`LP-05`, which have
 no `.goblin/loop/` record because no loop has run in this repo: the six judge/loop rows are
-**absent-state** rows, and a fresh install must not be born RED either. Every one is a *not yet*,
-not a pass.
+**absent-state** rows, and a fresh install must not be born RED either. The four new rows that do
+**not** skip are the CI lane's: `PG-05` and `PG-06` read the workflow this class installs, and
+`BN-06`..`BN-09` would PASS-or-SKIP the same way on any tree without a renderer. Every skip above
+is a *not yet*, not a pass.
 
 Two of the eleven advisories arrive with the same lane. `JG-02` reports that the judge lane
 resolves to **no profile** on this fleet — measured `bash bin/goblin-model judge` →
@@ -161,7 +165,7 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a class's `-` (off) real.
 - **The opt-out numbers are pinned (V3-3).** A fresh class-A install with `--skills no` verifies
-  `38 passed, 0 failed, 11 advisory, 24 skipped`, exit 0, and `tests/t-install-off-switch.sh`
+  `39 passed, 0 failed, 11 advisory, 28 skipped`, exit 0, and `tests/t-install-off-switch.sh`
   asserts that line: a silent drift in the opt-out path is caught rather than left as a number
   nobody wrote down (the `--skills no` count moved from `37/0/9/11` at v0.2 to here when the ban
   rows landed, and no file recorded the shift; **the skipped count moved 15 → 18 on 2026-09-25

@@ -63,7 +63,7 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 ## P8 - `goblin-bootstrap`
 
 - **When:** adopting goblin-stack in a repo, or starting one
-- **Steps:** 1 classify the project (A-E)<br>- 2 goblin-install --class <x><br>- 3 goblin-verify GREEN<br>- 4 fix .gitignore BEFORE any git init<br>- 5 first HANDOFF, first SPEC, first check script
+- **Steps:** 1 classify the project (A-F)<br>- 2 goblin-install --class <x><br>- 3 goblin-verify GREEN<br>- 4 fix .gitignore BEFORE any git init<br>- 5 first HANDOFF, first SPEC, first check script
 - **Verification:** goblin-verify exits 0 and the created-file list matches installed.json; a repo with no gate declares one and records its first measured numbers
 - **Profiles:** architect
 - **Role:** judgment
@@ -87,7 +87,7 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 ## P11 - `goblin-sweep`
 
 - **When:** the same change or question across projects
-- **Steps:** 1 enumerate targets with a shell glob, not a memory<br>- 2 classify each (A-E); an archive project is skipped, not processed<br>- 3 one card per project, parents=[sweep]<br>- 4 collect one line per project: what changed / what was refused / what is unfindable
+- **Steps:** 1 enumerate targets with a shell glob, not a memory<br>- 2 classify each (A-F); an archive project is skipped, not processed<br>- 3 one card per project, parents=[sweep]<br>- 4 collect one line per project: what changed / what was refused / what is unfindable
 - **Verification:** the per-project line carries the command it ran; the sweep report states its own coverage (n of m projects, and names the skipped ones)
 - **Profiles:** default
 - **Role:** synthesis

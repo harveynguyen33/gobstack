@@ -73,12 +73,20 @@ depend on it report advisory, never a failure — that is what makes the repo po
 | A "goblin-stack rules" document | The #1 anti-pattern: a rules doc with no enforcement is a measured net cost. |
 | Copying the referenced standard into this repo | It is the strongest artifact on the box and must not be weakened; a second copy is exactly the duplication that already rots. |
 | Replacing the referenced standard | Would discard the pinned-commit REPLAY rule, the stale-sentence rule, the data-safety rule and adopt-don't-replace — four things no imported source has. |
-| Per-project bespoke harnesses | The *gate vocabulary* differs by class, not the harness. Five class presets plus a real off switch. |
+| Per-project bespoke harnesses | The *gate vocabulary* differs by class, not the harness. Six class presets plus a real off switch. |
 | Fan-out by default, auto-merge, or an unattended hillclimb | The axis is read-versus-write, parallel lanes cost about N times the tokens, and no reviewed source ships unconditional auto-merge. |
 | A plugin or marketplace package | There is no marketplace here. The portable unit is a `SKILL.md` plus a bash installer. |
+| Shipping no workflow at all (the pre-W4 position) | Measured: `PG-05` cannot bite without a workflow to read, and CI and `goblin-verify` were free to report different truths about one SHA. Reversed at W4 as an **architecture change**, which is why the part is in `manifest/classes.tsv` and the installer step is explicit rather than a loose template file. |
 
 ## What it deliberately does not do
 
 See `docs/LIMITS.md` and the non-goals in `docs/RISKS.md`. The short version: it does not choose
 models, does not write the vault, does not replace any project's existing gate, writes nothing
 outside its target, and does not pretend the prose rules are enforced.
+
+**One amendment, at W4.** It used to say *"there is no CI workflow"*. It now writes **at most one**
+workflow, into its own target, only for a class that requires or permits the `ci-gate` part
+(`.github/workflows/goblin-gate.yml`), never overwriting a file it did not write. What it cannot do
+is make that file a **gate**: the required-check list, the bypass switch and the push identity are
+forge state, so `docs/CI.md` §1 writes them down and `PG-04` stays advisory. The workflow runs the
+repo's own declared gate set through `goblin-verify`, so it adds no second source of truth.

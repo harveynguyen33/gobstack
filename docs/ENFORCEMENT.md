@@ -10,7 +10,7 @@ single source of truth).
 this repo via `tests/run-tests.sh`). `enforced_by` is one of four values, and the enum is
 closed: `script`, `lint`, `gate`, `advisory`.
 
-Measured shape of this table: **78 rows** - 73 target, 5 source; advisory 10, gate 23, lint 22, script 19, test 4.
+Measured shape of this table: **83 rows** - 78 target, 5 source; advisory 10, gate 24, lint 26, script 19, test 4.
 
 ## The rows
 
@@ -46,7 +46,8 @@ Measured shape of this table: **78 rows** - 73 target, 5 source; advisory 10, ga
 | `PG-02` | target | script | The gate is chosen by the change, not the repo, and the tier's evidence exists. | `goblin-verify --only PG-02` (builtin) | — |
 | `PG-03` | target | gate | A new head voids the verdict. | `goblin-verify --only PG-03` (builtin) | — |
 | `PG-04` | target | advisory | Never bypass what the forge enforces. | `advisory` | Needs the forge: GitHub's restrictions do not apply to admins, and a sole-admin repo has nobody the gate binds. Not observable from the repo. |
-| `PG-05` | target | lint | No required check that self-skips. | `goblin-verify --only PG-05` (builtin) | Heuristic: 'all steps guarded' is textual. |
+| `PG-05` | target | lint | No required check that self-skips. | `goblin-verify --only PG-05` | Text, not a YAML parser. Three clauses per job: the job declares at least one `run:`/`uses:` step (else the check runs nothing); the JOB carries no `if:` (else the whole required check self-skips); and no STEP carries an `if:` (else that step - possibly the gate step - self-skips). The old body flagged only 'every step guarded', which PASSED the real shape: in the estate's one existing workflow a deliberately UNGUARDED credential step decides whether the guarded compile step runs, so `guarded < steps` and the row reported PASS on the workflow it exists to catch (G8 section 3, re-measured V3-4). Deliberately strict, and the strictness is the point: GitHub reports a SKIPPED job as Success even when it is a required check (docs S1/S2), so a conditional step is a step that can green-light a commit whose gate never ran. False positives it cannot avoid: a `#` inside a quoted string is read as a comment, a flow-style (`jobs: {...}`) mapping is refused rather than parsed, and a conditional step that is genuinely safe is indistinguishable from the trap - the remedy is to move the condition into the declared command, or into a second job that is not the required check. It cannot see branch-protection state, the required-check list, or whether the workflow ever ran (`PG-04`), and a repo with no workflow passes with the count printed on the line. |
+| `PG-06` | target | gate | The gate CI runs is the gate the project declares. | `goblin-verify --only PG-06` | The declared set comes from `g_yaml_gates`, the reader `GT-01` uses, so a gate cannot vanish from the comparison in silence (G8-3). A workflow passes when the whole declared set is RUN: the verifier with no `--only` (a full run executes every declared gate through `GT-02`), or each declared gate command verbatim. It reads TEXT with comments blanked first, and only `run:` payloads and block-scalar bodies count - a command sitting in a `name:`, `env:` or `with:` value is dropped, which is what stops a comment or a label from satisfying the row. What it cannot see: that the forge marks that job a REQUIRED check, that the job is the one the forge waits on, or that the workflow can fail at all (`PG-05`). A repo with no workflow reports SKIP with that reason instead of a vacuous pass. |
 | `DS-01` | target | script | Runtime data is not test fixture: a gate run must not write it. | `goblin-verify --only DS-01` (builtin) | — |
 | `DS-02` | target | gate | Snapshot before, verify after. | `goblin-verify --only DS-02` (builtin) | — |
 | `DOC-01` | target | advisory | A significant change updates the docs that teach it. | `advisory` | 'Significant' is a judgement; a diff-size heuristic fails on the cases that matter. |
@@ -78,6 +79,10 @@ Measured shape of this table: **78 rows** - 73 target, 5 source; advisory 10, ga
 | `BN-02` | target | lint | No `@ts-ignore` / `@ts-expect-error` suppressions. | `goblin-verify --only BN-02` (builtin) | Text probe: it sees the directive wherever it appears, including inside a string, and cannot tell a suppression hiding a real error from one on a line that would compile anyway. SKIPs when the ban is not in `bans:` or its globs match no file. |
 | `BN-03` | target | lint | No direct network call from a component. | `goblin-verify --only BN-03` (builtin) | Text probe over the declared component globs: it stops the call and cannot tell whether a data layer was written or the call merely moved into a helper. SKIPs when the ban is not in `bans:` or its globs match no file. |
 | `BN-05` | target | lint | No import across a declared layer boundary. | `goblin-verify --only BN-05` (builtin) | Reads the `layers:` list; an empty list SKIPs with a reason, never a vacuous pass. It matches an import path naming the target directory's last segment - module aliases and dynamic imports are not seen. SKIPs when no file matches its globs. |
+| `BN-06` | target | lint | No renderer with Node access (`nodeIntegration: true`). | `goblin-verify --only BN-06` | Text probe over the ban table's globs, the same mechanism as BN-01..BN-05: it sees `nodeIntegration: true` wherever it appears, including inside a string, and cannot see a webPreferences object built at run time or spread in from another module. The STRONGER form is a runtime measurement - the renderer prints `process.contextIsolated` and `process.sandboxed` and the check requires true/true - and that needs a real Electron process, which the dependency contract (docs/CONTRACTS.md) does not allow a shipped rule to launch: it is the project's host gate (docs/LIMITS.md #34). SKIPs when the ban is not in `bans:` or its globs match no file. |
+| `BN-07` | target | lint | No renderer with context isolation or the process sandbox turned off. | `goblin-verify --only BN-07` | One probe for two properties because Electron's own documentation makes them one: disabling `contextIsolation` "also disables process sandboxing", so a repo that has turned either off has lost both. Text probe, with the same false-positive set as BN-06. SKIPs when the ban is not in `bans:` or its globs match no file. |
+| `BN-08` | target | lint | No dangerous webPreferences. | `goblin-verify --only BN-08` | Four one-line patterns from Electron's own security checklist (`webSecurity: false`, `allowRunningInsecureContent: true`, `enableBlinkFeatures`, `<webview allowpopups>`). Text probe: `enableBlinkFeatures` is banned by name rather than by value, so the string is reported even in a comment. SKIPs when the ban is not in `bans:` or its globs match no file. |
+| `BN-09` | target | lint | No synchronous IPC and no `@electron/remote`. | `goblin-verify --only BN-09` | The banned-list shape the wave's note 9 asks for, applied to Electron: `sendSync(` and `@electron/remote` block the renderer's own thread, which is the freeze the class exists to prevent. Text probe - it sees the call site, not the call graph, so a wrapper around `sendSync` in a file the globs do not match is missed. SKIPs when the ban is not in `bans:` or its globs match no file. |
 | `FM-01` | target | lint | Every feature file is indexed from the map README, declares its slug and at least one entry path, and carries the four-H2 entry contract. | `goblin-verify --only FM-01` (builtin) | SKIPs (exit 3) when feature_map: is empty - a fresh install has no map and must not be born RED (the D8 shape). When a map IS declared: the README must exist, every features/*.md must be linked from it in the (./<slug>.md) form and every relative .md link must resolve, each feature file's `feature:` must equal its filename stem, it must declare >=1 `entry_paths:`, and its H2s must be exactly Sub-features / How to get to it (user POV) / Driving it with <harness> / Gotchas, in that order. Partial: the README's own H2s are prose this row does not read, and 'the map lists every user-facing feature' is not mechanically checkable - that is docs/LIMITS.md #30, not a row. |
 | `FM-02` | target | lint | Every entry point a feature declares still resolves in source, and no entry path changed after the map was verified. | `goblin-verify --only FM-02` (builtin) | SKIPs (exit 3) when feature_map: is empty. A tripwire, not a proof. The token is searched under source_root with occurrences under the map's own directory excluded - without that exclusion the map's own entry-path list satisfies the search and the row could never go RED. Freshness is `git log -1 --format=%cs` on the resolved file against the feature's `verified:` date, and git sees a FILE change, not a behaviour change: the row can be RED-when-stale and never GREEN-means-fresh. A token that also occurs in a vendored copy or a build artifact is read as resolved, and a `verified:` date is itself a claim the row cannot test (docs/LIMITS.md #30). |
 | `VA-01` | target | gate | The generated verification skill's doctor command runs and exits 0. | `goblin-verify --only VA-01` (builtin) | SKIPs (exit 3) when verify_doctor: is empty (the replay.commit: "" shape). Runs the DECLARED command exactly as GT-02 runs a declared gate, and never a string read out of file content (the v0.2 blocker). Closes P6's stated-but-unenforced clause 'a generated skill that was never executed is a draft': the doctor is the smallest executable proof that the skill's own instructions still run - and it proves only that, never that the doctor tests the right path. |
@@ -141,21 +146,30 @@ OR its `enforced_by` cell does.
 the installer records every `-` part in `disabled:`, so its rows report `SKIP (opt-out)`
 instead of silently passing, and `CL-01` fails if a forbidden part's artifact exists.
 
-| part | A | B | C | D | E |
-|---|---|---|---|---|---|
-| handoff | R | R | R | R | R |
-| spec | R | R | R | - | R |
-| gate | R | R | R | O | R |
-| replay | R | - | R | - | O |
-| ratchet | R | O | O | - | O |
-| pr-gate | O | - | O | - | O |
-| review-panel | O | - | R | - | O |
-| playbooks | R | R | R | R | R |
-| tokens | O | - | - | - | - |
+| part | A | B | C | D | E | F |
+|---|---|---|---|---|---|---|
+| handoff | R | R | R | R | R | R |
+| spec | R | R | R | - | R | R |
+| gate | R | R | R | O | R | R |
+| replay | R | - | R | - | O | R |
+| ratchet | R | O | O | - | O | R |
+| pr-gate | O | - | O | - | O | O |
+| review-panel | O | - | R | - | O | O |
+| playbooks | R | R | R | R | R | R |
+| tokens | O | - | - | - | - | O |
+| ci-gate | R | - | O | - | O | R |
+
+Class **F** is the desktop shell: it needs a part no other class has — a **host gate**, a number
+measured on a machine with a display — and forbids nothing the others allow except a renderer that
+reaches Node directly, which its ban list catches. `ci-gate` is the one part added at W4: when it
+is required or optional the installer renders `templates/ci/goblin-gate.yml.tmpl` into
+`.github/workflows/goblin-gate.yml`, and when it is `-` the artifact must be **absent** (which is
+why `CL-01` keys off that exact path, not the `.github/` directory — a repo is still allowed CI of
+its own). `docs/CI.md` is the contract for what that file does and does not make true.
 
 ## The ban list (G5)
 
-`BN-00`..`BN-05` are not ordinary rows: they read `.goblin/manifest/bans.tsv`, a table whose
+`BN-00`..`BN-09` are not ordinary rows: they read `.goblin/manifest/bans.tsv`, a table whose
 every row carries a real command. A ban with no mechanism is a wish, so `manifest/bans.tsv`
 holds `id`, the ban, the globs, the `detect` command, the replacement code, the escape hatch,
 the reviewer and the source — and `BN-00` fails the whole list if any ban has no enforcement

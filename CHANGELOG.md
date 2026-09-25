@@ -71,21 +71,50 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   and `docs/INTEGRATION.md`'s claim that the auxiliary judge "is the predicate re-check" is
   corrected in place with the measured calls. `docs/LIMITS.md` #32 and #33 and `docs/RISKS.md` K17
   record what the lane cannot see.
-- `manifest/enforcement.tsv` is **78 rules** (73 target, 5 source); the advisory count is **10 of
-  ceiling 10 — full**, so the next advisory row must raise the ceiling in the same change;
-  `tests/t-verify-red.sh` carries **93** controls and **14** `expect_green` over the 70 target rows
-  that carry an executable rule. (Superseded 2026-09-25: this line read 70 rules / 65 target /
-  9 advisory / 80 controls / 7 green before G2's eight rows landed.)
-- A fresh class-A install verifies **`42 passed, 0 failed, 11 advisory, 20 skipped`**, exit 0
-  (twenty rows skip with a reason: `HS-02`, `AU-02`, `AU-03`, `SC-06`, `SC-07`, `SC-08`, `PF-01`,
-  `BN-01`/`BN-02`/`BN-03`/`BN-05` on a repo with no `src/`, `FM-01`/`FM-02`/`VA-01` with no map
-  and no doctor declared, and `JG-01` + `LP-01`..`LP-05` with no `.goblin/loop/` record). A fresh
-  class-B install (`bans: []`) verifies `37 passed, 0 failed, 10 advisory, 26 skipped`; class-C
-  verifies `42 passed, 0 failed, 11 advisory, 20 skipped`; class-E (`bans: [BN-02]`) verifies
-  `41 passed, 0 failed, 11 advisory, 21 skipped`; class-A with `--skills no` verifies
-  `38 passed, 0 failed, 11 advisory, 24 skipped`. All measured on fresh installs, committed with no
+- **The CI lane and the desktop-shell class (G6, W4).** `PG-05` is **re-declared**, not patched: it
+  counted "every step is guarded", which passed the shape G8 measured — a single **job-level**
+  `if:`, a job with no step, and one *unguarded* step deciding whether the guarded gate step runs —
+  all of which reach the end of the job without running the gate while the required check reports
+  Success. It now FAILs all four. **`PG-06` is new**: the gate CI runs must be the gate the project
+  declares, read from the same `g_yaml_gates` reader `GT-01` uses so a gate cannot vanish from the
+  comparison in silence; a workflow satisfies it by running the verifier with no `--only`, or by
+  running every declared gate command verbatim, with comments blanked first. A `ci-gate` **part**
+  joins `manifest/classes.tsv` (`R` for A/F, `O` for C/E, `-` for B/D) and the installer renders
+  `templates/ci/goblin-gate.yml.tmpl` into `.github/workflows/goblin-gate.yml` — one job, no `if:`
+  anywhere, one step that runs the repo's own gate set. `CL-01`'s artifact for the part is that
+  exact path, never the `.github/` directory, so a repo that forbids `ci-gate` may still carry CI of
+  its own. `bin/goblin-install --uninstall` now walks **every** ancestor directory, because that
+  workflow empties two levels. **Class F (desktop shell)** is the new preset: five electron bans
+  (`BN-06` `nodeIntegration: true`, `BN-07` context isolation/sandbox off, `BN-08` the dangerous
+  `webPreferences`, `BN-09` synchronous IPC / `@electron/remote`) and the FPS number as a **host
+  gate** — the instrument needs Playwright or Electron plus a display, which no shipped rule may
+  depend on, so the ratchet carries the hermetic `app_bundle_bytes` instead. **A stated deviation
+  from G6 §B.3**, recorded in `docs/LIMITS.md` #35; a `ratchet.cmd` that cannot run would make a
+  fresh install born RED. `docs/CI.md` is the new contract: what makes a workflow a gate (required
+  check, no admin bypass, a push identity that is not the sole admin, never conditional), why frame
+  time is the wrong metric (measured p50 flat at 16.70 ms while the main thread went 1.8 % → 54.5 %
+  busy), and what is deliberately not mechanised. `docs/LIMITS.md` #13 and #34, `docs/RISKS.md` K7
+  and the new K18, `docs/DESIGN.md`'s "no CI workflow" invariant (amended as an architecture change)
+  and the verifier's "cannot see" footer all carry it.
+- `manifest/enforcement.tsv` is **83 rules** (78 target, 5 source); the advisory count is **10 of
+  ceiling 10 — full**, unchanged (both new rows are real commands, so no slot was spent);
+  `tests/t-verify-red.sh` carries **105** controls and **19** `expect_green` — **124** over all 78
+  target rows, 0 uncovered and 0 phantom. (Superseded 2026-09-25: this line read 78 rules / 73
+  target / 93 controls / 14 green before W4's five rows landed.)
+- A fresh class-A install verifies **`43 passed, 0 failed, 11 advisory, 24 skipped`**, exit 0
+  (twenty-four rows skip with a reason: `HS-02`, `AU-02`, `AU-03`, `SC-06`, `SC-07`, `SC-08`,
+  `PF-01`, `BN-01`/`BN-02`/`BN-03`/`BN-05` plus `BN-06`..`BN-09` on a repo with no `src/`,
+  `FM-01`/`FM-02`/`VA-01` with no map
+  and no doctor declared, and `JG-01` + `LP-01`..`LP-05` with no `.goblin/loop/` record); `PG-05`
+  and `PG-06` do **not** skip, because this class installs the workflow they read. A fresh
+  class-B install (`bans: []`) verifies `37 passed, 0 failed, 10 advisory, 31 skipped`; class-C
+  verifies `43 passed, 0 failed, 11 advisory, 24 skipped`; class-E (`bans: [BN-02]`) verifies
+  `42 passed, 0 failed, 11 advisory, 25 skipped`; the new **class-F** verifies
+  `43 passed, 0 failed, 11 advisory, 24 skipped`; class-A with `--skills no` verifies
+  `39 passed, 0 failed, 11 advisory, 28 skipped`. All measured on fresh installs, committed with no
   hand edit. (Superseded 2026-09-25: these lines read 42/0/9/14, 37/0/8/20, 42/0/9/14, 41/0/9/15
-  and 38/0/9/18 before G2's eight rows landed.)
+  and 38/0/9/18 before G2's eight rows landed, and 42/0/11/20, 37/0/10/26, 42/0/11/20, 41/0/11/21
+  and 38/0/11/24 before W4's five.)
 
 ## 0.2.0
 

@@ -28,8 +28,9 @@ vendored plugin paths do not exist in Hermes). Not a replacement for a project s
 | `docs/CONTRACTS.md` | the installer/verifier interface, exit codes, idempotency, uninstall |
 | `docs/INTEGRATION.md` | the board, cron, the skills precedence order, the referenced standard |
 | `docs/RISKS.md` | the risk register, the advisory rows named, the non-goals |
+| `docs/CI.md` | the CI lane: what makes a workflow a gate, the four settings a repository cannot set, and the desktop-shell class |
 | `docs/LOOP.md` | the judge role and the loop contract: what Hermes's `goal_mode` actually does, the record, and what neither can see |
-| `docs/ADOPTION.md` | the five classes, the preset matrix, the adoption order |
+| `docs/ADOPTION.md` | the six classes, the preset matrix, the adoption order |
 | `docs/LIMITS.md` | where this is weaker than its sources, and what is unproven |
 
 `manifest/enforcement.tsv` is the source of truth for rules; `manifest/classes.tsv` for what a
@@ -38,7 +39,7 @@ vocabulary.
 
 ## Install
 
-    bash bin/goblin-install --target <dir> --class A|B|C|D|E [options]
+    bash bin/goblin-install --target <dir> --class A|B|C|D|E|F [options]
 
 It writes only paths it records, hash-compares before writing, and prints `no-op` on a second
 run with the same arguments. It never overwrites `HANDOFF.md`, `AGENTS.md`, a `*-SPEC.md`,
@@ -51,17 +52,20 @@ failure: reconcile the file rather than forcing over it — `docs/ADOPTION.md`.
 After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other
-    .goblin/bin/goblin-verify                 # a fresh class-A install: 42 passed, 0 failed
+    .goblin/bin/goblin-verify                 # a fresh class-A install: 43 passed, 0 failed
     hermes skills trust <target>              # one-time, so the project-tier skills load
     .goblin/bin/goblin-audit                  # once, deliberately: the ONLY network step (SC-07)
 
-**A fresh class-A install verifies green: `42 passed, 0 failed, 11 advisory, 20 skipped`, exit 0.**
-Twenty rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
+**A fresh class-A install verifies green: `43 passed, 0 failed, 11 advisory, 24 skipped`, exit 0.**
+Twenty-four rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
 `AU-02` and `AU-03` have no report to audit; `SC-06`, `SC-07` and `SC-08` have no dependency
 manifest, no lockfile and no audit record to read; `PF-01` has no measured perf baseline;
-`BN-01`/`BN-02`/`BN-03`/`BN-05` have no `src/` for a ban to read; `FM-01`/`FM-02`/`VA-01`
+`BN-01`/`BN-02`/`BN-03`/`BN-05` plus the four electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` have no
+`src/` for a ban to read; `FM-01`/`FM-02`/`VA-01`
 have no feature map and no declared `verify_doctor:` yet; and `JG-01` with `LP-01`..`LP-05`
-have no loop record, because no loop has run in this repo yet). Two of the eleven advisories
+have no loop record, because no loop has run in this repo yet). The four rows that do **not** skip
+are the CI lane's: this class installs `.github/workflows/goblin-gate.yml`, so `PG-05` and `PG-06`
+read it and pass. Two of the eleven advisories
 are new with the judge lane: `JG-02` reports that the judge lane resolves to no profile on this
 fleet (it prints the one-line remedy and never fails a repo for a fleet's routing), and `JG-03`
 is the counted row the advisory ceiling had left for it. The parts
@@ -81,7 +85,7 @@ Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-05) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (60 over 57 target rows), each required to go RED and then
+one control per target-scope row (124 over 78 target rows), each required to go RED and then
 restored, plus `t-audit.sh` for the SC-07 producer. **A verifier that only ever prints GREEN is a
 failure**, so that file is the one that matters most.
 

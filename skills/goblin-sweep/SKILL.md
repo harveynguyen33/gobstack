@@ -7,7 +7,7 @@ description: P11: the same change or question across projects - one card each, o
 
 1. **Enumerate targets with a shell glob, not a memory.** A list typed from memory is a list
    that is already wrong.
-2. **Classify each target A-E.** An `archive` project is **skipped, not processed** — say so.
+2. **Classify each target A-F.** An `archive` project is **skipped, not processed** — say so.
 3. **One card per project, parented to the sweep card.**
 4. **Collect one line per project**: what changed / what was refused / what is unfindable.
 

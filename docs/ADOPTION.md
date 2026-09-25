@@ -1,6 +1,6 @@
 # Adoption — classes, presets, and the order
 
-## The five classes
+## The six classes
 
 A class is **not** a stringency level. It selects which parts are required, optional or off, and
 it supplies the default gate and ratchet shape. The gate vocabulary differs by class; the
@@ -13,6 +13,7 @@ harness does not.
 | **C. Game** | a suite green in the Editor **and** a human feel verdict — the verdict is a first-class deliverable |
 | **D. Knowledge / research** | a question is answered with sources and the answer is findable |
 | **E. Agent-fleet config** | a config change is applied, verified against the **artifact**, and versioned |
+| **F. Desktop shell** | the renderer is isolated from Node, the main process is not busy, and the packaged bundle ships no dev dependency |
 
 Two placements worth arguing about:
 
@@ -28,17 +29,25 @@ Two placements worth arguing about:
 `R` = required · `O` = optional (installed, reported) · `—` = off. The same data is in
 `manifest/classes.tsv`, and `CL-01` checks it against the repo.
 
-| Part | A | B | C | D | E |
-|---|---|---|---|---|---|
-| HANDOFF | R | R | R | R | R |
-| SPEC before change | R | R | R | — | R |
-| Verification gate | R | R | R | O | R |
-| Pinned-commit REPLAY | R | — | R | — | O |
-| Ratchet | R | O | O | — | O |
-| PR gate | O | — | O | — | O |
-| Review panel | O | — | R | — | O |
-| Playbooks (the skills) | R | R | R | R | R |
-| Design tokens | O | — | — | — | — |
+| Part | A | B | C | D | E | F |
+|---|---|---|---|---|---|---|
+| HANDOFF | R | R | R | R | R | R |
+| SPEC before change | R | R | R | — | R | R |
+| Verification gate | R | R | R | O | R | R |
+| Pinned-commit REPLAY | R | — | R | — | O | R |
+| Ratchet | R | O | O | — | O | R |
+| PR gate | O | — | O | — | O | O |
+| Review panel | O | — | R | — | O | O |
+| Playbooks (the skills) | R | R | R | R | R | R |
+| Design tokens | O | — | — | — | — | O |
+| CI lane | R | — | O | — | O | R |
+
+**F is the desktop shell**, added at W4: it declares the Electron failure surface as bans
+(`BN-06`..`BN-09`) and declares its FPS number as a **host gate** rather than a ratchet, because
+the probe that measures it needs Playwright or Electron plus a display — neither of which a
+shipped rule may depend on. Its ratchet carries `app_bundle_bytes` instead. `docs/CI.md` §3 argues
+that in full, including why frame time is the wrong number (measured flat at 16.70 ms while the
+main thread went from 1.8 % to 54.5 % busy).
 
 **`—` is a real, enforced option.** The installer records every off part in `disabled:`, so its
 rows report `SKIP (opt-out)`; `CL-01` fails if a forbidden part's artifact exists. A repo with
@@ -93,10 +102,10 @@ Each step is independently useful and the later ones build on the earlier:
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .goblin/bin/goblin-verify         # fresh class A: 42 passed, 0 failed, 11 advisory, 20 skipped
+    .goblin/bin/goblin-verify         # fresh class A: 43 passed, 0 failed, 11 advisory, 24 skipped
     hermes skills trust <target>      # one-time, so the project-tier skills load
 
-A fresh class-A install is **green** — `42 passed, 0 failed, 11 advisory, 20 skipped`, exit 0 — and
+A fresh class-A install is **green** — `43 passed, 0 failed, 11 advisory, 24 skipped`, exit 0 — and
 that is measured, not assumed (`docs/CONTRACTS.md`). Twenty rows skip with a reason: `HS-02` (no
 pinned pre-change commit yet), `AU-02`/`AU-03` (no report has been filed, so there is nothing to
 dedup and no reporter run to audit), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile,
@@ -145,7 +154,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .goblin/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the class's full green path (`42 passed, 0 failed, 11 advisory, 20 skipped`, exit 0 for
+   Success is the class's full green path (`43 passed, 0 failed, 11 advisory, 24 skipped`, exit 0 for
    class A) with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three
