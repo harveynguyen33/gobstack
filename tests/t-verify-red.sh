@@ -3,10 +3,12 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One `expect_red` per target-scope row: 68 controls over the 62 target rows (42 at v0.1 plus the
+# One `expect_red` per target-scope row: 73 controls over the 62 target rows (42 at v0.1 plus the
 # five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01, plus the
 # five added with BN-00..BN-03 and BN-05, plus the three F4/G4 extras, the two V1 extras (G8-2,
-# G8-5) and the second BN-00 control). The `--only <id>` form is used
+# G8-5), the second BN-00 control, and the five W1 extras: three G8-3 gate-cmd forms, the V3-2
+# exit-code ban control, and the G8-6b ceiling/baseline control (whose matching `expect_green` is
+# the sixth). The `--only <id>` form is used
 # so a mutation in one row cannot be masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
@@ -64,6 +66,12 @@ git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 
 bash .goblin/bin/goblin-verify >/dev/null 2>&1
 check "the fixture starts GREEN (nothing below is measured against a broken baseline)" "$?"
+
+# V3-1: the ban lane has to reach the WRITER, not only the post-mortem. AGENTS.md is the file a
+# session reads first in an adopted repo, so the engine and the `bans:` switch are named there.
+# RED on the pre-change tree (0 mentions), which is what the assertion is for.
+grep -q 'goblin-bans' AGENTS.md
+check "the installed AGENTS.md names the ban engine (V3-1)" "$?"
 
 BK="$WORK/backup"
 mkdir -p "$BK"
@@ -205,6 +213,12 @@ m_untracked_spec() { printf '# a round nobody committed\n\n- AC1: `x` prints `y`
 m_feely_ac()      { printf '\n- AC9: the panel feels right\n' >> ROUND-000-SPEC.md; }
 
 m_no_gates()      { sed -i '/^gates:/,/^$/{/^$/d; d}' .goblin/goblin.yaml; }
+# G8-3: a DECLARED gate that loses its `cmd:` used to survive as a silent drop from GT-01's
+# count (`1 declared gate(s)` for a config that declares two). Three forms, all of them a
+# one-line edit: the cmd line deleted, re-indented out of the gate block, and blanked.
+m_gate_no_cmd()   { sed -i '/^    cmd: test /d' .goblin/goblin.yaml; }
+m_gate_indent_cmd(){ sed -i 's/^    cmd: test /  cmd: test /' .goblin/goblin.yaml; }
+m_gate_blank_cmd(){ sed -i 's/^    cmd: test .*/    cmd:/' .goblin/goblin.yaml; }
 m_break_gate()    { sed -i 's|^    cmd: git rev-parse --verify --quiet HEAD|    cmd: false|' .goblin/goblin.yaml; }
 m_drop_gate_line(){ rm -f .goblin/last-gate-line; }
 # The class-A ratchet is the PERF metric (G4 D2): the TODO count moved into the `todo_ceiling`
@@ -258,6 +272,12 @@ m_sc_07()  { printf '# .goblin/audit.tsv - written by goblin-audit 0.2.0 on 2020
 m_sc_08()  { printf '{\n  "packages": {\n    "node_modules/esbuild": {\n      "version": "0.1.0",\n      "hasInstallScript": true\n    }\n  }\n}\n' > package-lock.json; }
 m_sc_09()  { m_row_fails SC-09; }
 m_pf_01()  { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e 's/^  baseline_commit: .*/  baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^  baseline_value: .*/  baseline_value: 1/' -e 's/^  measured: .*/  measured: 2026-01-01/' .goblin/goblin.yaml; }
+# G8-6b: the budget and the measurement have to be the SAME number. Two controls - the honest
+# record passes, and a one-line `ceiling:` raise that leaves the baseline alone FAILs. Before the
+# fix both were GREEN: the passing line printed `baseline_value 0 ... (ceiling 100000)` and
+# nothing cross-checked it.
+m_pf_ceiling_match() { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e "s/^  baseline_commit: .*/  baseline_commit: $PRE_CHANGE/" -e 's/^  baseline_value: .*/  baseline_value: 0/' -e 's/^  measured: .*/  measured: 2026-01-01/' .goblin/goblin.yaml; }
+m_pf_ceiling_raise() { m_pf_ceiling_match; sed -i 's/^  ceiling: .*/  ceiling: 100000/' .goblin/goblin.yaml; }
 
 # ---- the ban list (G5): BN-00..BN-03, BN-05 ------------------------------------------------
 # Every mutation is the exact move a ban forbids. The bans are TEXT probes (no npm, no AST), so
@@ -265,6 +285,10 @@ m_pf_01()  { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e 's/^  bas
 m_bn_00_orphan()   { sed -i '/^BN-05\t/d' .goblin/manifest/bans.tsv; }
 m_bn_00_norepl()   { awk -F'\t' -v OFS='\t' '{ if ($1=="BN-01") $5=""; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; }
 m_bn_01()          { mkdir -p src; printf 'export const a: any = 1;\n' > src/bn01.ts; }
+# V3-2: the engine judged by stdout emptiness, so a detect that reports a violation through its
+# EXIT CODE alone was read as clean - fail-open, in the lane whose whole job is failing closed.
+# The ban really is violated on disk (`: any`), and the detect says so only with exit 1.
+m_bn_exit1_detect() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "exit 1"; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; mkdir -p src; printf 'export const a: any = 1;\n' > src/bn01.ts; }
 m_bn_02()          { mkdir -p src; printf '// @ts-expect-error\nexport const b = 1;\n' > src/bn02.ts; }
 m_bn_03()          { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-03, BN-05]/' .goblin/goblin.yaml; mkdir -p src/components; printf 'export const P = () => { fetch("/api/x"); return null; };\n' > src/components/panel.tsx; }
 m_bn_05()          { printf '\nlayers:\n  - src/renderer src/main\n' >> .goblin/goblin.yaml; mkdir -p src/renderer src/main; printf "import { db } from '../main/db';\nexport const r = db;\n" > src/renderer/p.ts; }
@@ -349,6 +373,11 @@ expect_red "an untracked SPEC"                     SP-02 1 m_untracked_spec
 expect_red "an AC that is a feeling, not a check"  SP-03 1 m_feely_ac
 
 expect_red "no gate declared"                      GT-01 1 m_no_gates
+# G8-3: the third condition of G8's own 9/10 sentence - "G8-3's parser made to fail loudly".
+# Each of the three forms is RED at 72490f0, where GT-01 reported the surviving gate(s).
+expect_red "G8-3: a declared gate whose cmd line was deleted"    GT-01 1 m_gate_no_cmd
+expect_red "G8-3: a declared gate whose cmd line was re-indented" GT-01 1 m_gate_indent_cmd
+expect_red "G8-3: a declared gate whose cmd value was blanked"   GT-01 1 m_gate_blank_cmd
 expect_red "a gate that exits non-zero"            GT-02 1 m_break_gate
 expect_red "no measured gate line"                 GT-03 1 m_drop_gate_line
 expect_red "a ratchet with no name"                GT-04 1 m_no_ratchet
@@ -405,11 +434,14 @@ expect_red "an audit record nobody re-took"        SC-07 1 m_sc_07
 expect_red "an install hook nobody decided on"     SC-08 1 m_sc_08
 expect_red "SC-09 (advisory row: wired, not biting)" SC-09 1 m_sc_09
 expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
+expect_green "G8-6b: the ceiling matches the recorded baseline"        PF-01 m_pf_ceiling_match
+expect_red   "G8-6b: the ceiling raised by hand, the baseline untouched" PF-01 1 m_pf_ceiling_raise
 
 # ---- G5: the ban list is a gate, not a wish - one control per row -----------------------------
 expect_red   "the ban table loses a row the matrix still names" BN-00 1 m_bn_00_orphan
 expect_red   "a ban that names no replacement"                  BN-00 1 m_bn_00_norepl
 expect_red   "an any type in application TypeScript"               BN-01 1 m_bn_01
+expect_red   "V3-2: a ban violated by exit code alone (no stdout)"  BN-01 1 m_bn_exit1_detect
 expect_red   "a ts-expect-error suppression"                 BN-02 1 m_bn_02
 expect_red   "a fetch() called from a component"                BN-03 1 m_bn_03
 expect_red   "an import across a declared layer boundary"       BN-05 1 m_bn_05

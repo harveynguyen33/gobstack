@@ -75,6 +75,11 @@ printf '%s' "$NS_OUT" | grep -q 'SKIP  AU-01  .*opt-out: playbooks'
 check "  and the automation rows are opt-out, not absent" "$?"
 printf '%s' "$NS_OUT" | grep -q 'SKIP  SK-02'
 check "  and SK-02 is opt-out rather than FAIL (the pre-fix defect)" "$?"
+# V3-3: the opt-out path had a number no file recorded (the count moved from `37/0/9/11` at v0.2
+# to `38/0/9/15` with the ban rows and nothing noticed). Pin the line so the next silent shift is
+# caught here. The number is measured, not copied: see the note line the run prints above.
+printf '%s' "$NS_OUT" | grep -q '38 passed, 0 failed, 9 advisory, 15 skipped'
+check "  and the --skills no numbers are pinned (V3-3: 38/0/9/15)" "$?"
 
 if [ "$fail" -eq 0 ]; then note "t-install-off-switch: PASS"; else note "t-install-off-switch: FAIL"; fi
 exit "$fail"
