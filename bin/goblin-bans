@@ -7,7 +7,7 @@
 # The table is .goblin/manifest/bans.tsv (installed) or manifest/bans.tsv (a checkout).
 # Each row's `detect` column is a real command, run from the repo root, that
 #   0  the tree is clean
-#   1  the ban is violated (its output names the offending lines)
+#   1  the ban is violated - the exit code alone decides; stdout, when any, names the lines
 #   2  the check could not run (FAIL CLOSED - a missing tool is never a silent pass)
 # A ban the config's `bans:` list does not name is SKIPPED with that reason; a ban whose
 # globs match no file is SKIPPED with that reason. A missing or empty ban table is exit 2.
@@ -139,12 +139,16 @@ while IFS=$'\t' read -r id ban globs detect replacement escape reviewer source; 
         PASS=$((PASS + 1)); g_pass "$id" "$ban"
       fi ;;
     1)
+      # Exit 1 IS the documented signal that the ban is violated (this file's header and
+      # bans/README.md). Judging by whether stdout happened to be empty made the engine
+      # FAIL-OPEN: a detect that reports a violation through its exit code alone was read as
+      # clean. The exit code decides; stdout only adds detail (V3-2).
+      FAIL=$((FAIL + 1))
+      g_fail "$id" "$ban -> $replacement"
       if [ -n "$out" ]; then
-        FAIL=$((FAIL + 1))
-        g_fail "$id" "$ban -> $replacement"
         printf '%s\n' "$out" | sed 's/^/        /'
       else
-        PASS=$((PASS + 1)); g_pass "$id" "$ban"
+        printf '        (reported violated by exit 1 with no detail on stdout)\n'
       fi ;;
     3)
       SKIP=$((SKIP + 1))

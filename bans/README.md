@@ -17,7 +17,7 @@ A `detect` command runs from the repo root and exits
 | exit | meaning |
 |---|---|
 | 0 | the tree is clean |
-| 1 | the ban is violated (its output names the offending lines) |
+| 1 | the ban is violated — the exit code alone is the signal; stdout, when any, names the offending lines |
 | 2 | the check could not run — **fail closed**, never a silent pass |
 | 3 | nothing to check (e.g. no `layers:` declared) — SKIP with that reason |
 
