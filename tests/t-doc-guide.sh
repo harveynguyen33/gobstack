@@ -27,10 +27,20 @@
 #       count the guide quotes is asserted against the map a real install writes, the universal is
 #       asserted gone, and the 9/10 is asserted to name the revision it was measured at. A control
 #       that RUNS a guide's commands does not read its sentences - this half reads two of them.
+#   AB4 §11's identity stamp: the guide's own `Version:` line stated a revision the tree had moved
+#       past - measured at 67a0872 the stamp says `0.4.3` while `VERSION` and all five `bin/`
+#       constants say `0.4.4` - and nothing in `tests/` read it, which is how it survived the wave
+#       that version-stamped the score eleven lines below it. The stamp is read out of the FILE, not
+#       out of a line number: the header is prose, so a re-wrap moves the number off the label's
+#       line. The matcher joins the first `Version:` line with the line after it and strips markdown
+#       emphasis, so it tolerates a re-wrapped or `**bold**` stamp; it does NOT tolerate the label
+#       and the number separated by more than one line, or a missing label.
 #
 # RED on d5424be / GREEN at the tip: the REPLAY block does not exist there at all, the `created 49`
 # gloss is the false one, and §1 carries the unscoped claim. RED at 58a6fe6: the AB3 assertions
-# below (the guide quotes no files-map length there, and the 9/10 carries no revision).
+# below (the guide quotes no files-map length there, and the 9/10 carries no revision). RED at
+# 67a0872: the guide's own `Version:` stamp still says `0.4.3` while `VERSION` is `0.4.4` - the AB4
+# assertion below.
 set -uo pipefail
 
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -170,6 +180,25 @@ fi
 # and the sentence has to carry which one. RED at 58a6fe6 (no revision anywhere near the number).
 awk '/9\/10/ { c = 2 } c > 0 { print; c-- }' "$GUIDE" | grep -qE '0\.4\.[0-9]'
 check "the guide's 9/10 score names the revision it was measured at (AB3)" "$?"
+
+# ---- AB4: the guide's own identity stamp must equal VERSION --------------------------------------
+# The `Version:` stamp at the top of the front door is a claim about the file's own identity, and
+# until AB4 nothing read it: measured at 67a0872 the line says `0.4.3` while `VERSION` and all five
+# `bin/` constants say `0.4.4` - it is the only stale stamp in the tree, and the same wave that
+# version-stamped the score eleven lines below it left the header behind.
+#
+# The stamp is read out of the FILE, not out of a line number. This is prose: a re-wrap moves the
+# number off the label's line, which is the same trap the AB3 count control fell into above (a
+# matcher that assumes one line is green on a reflowed file it should catch). So the matcher joins
+# the first `Version:` line with the line after it and strips markdown emphasis before it looks for
+# `x.y.z`. It TOLERATES a re-wrapped header and emphasis (`Version: **0.4.4**`); it does NOT
+# tolerate a missing label, or a label whose number sits more than one line below it.
+STAMP=$(awk '/Version:/{f=1} f{printf "%s ", $0; n++} n>=2{exit}' "$GUIDE" \
+        | sed 's/[*_`]/ /g' \
+        | sed -n 's/.*Version:[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+VERSION_FILE=$(cat "$SRC/VERSION")
+check "the guide's own Version: stamp equals VERSION ($STAMP stamped vs $VERSION_FILE in VERSION) (AB4)" \
+  "$([ -n "$STAMP" ] && [ "$STAMP" = "$VERSION_FILE" ] && echo 0 || echo 1)"
 
 # ---- D5: the network claim is scoped -----------------------------------------------------------
 ! grep -q 'It adds no network calls' "$GUIDE"
