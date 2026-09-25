@@ -45,7 +45,11 @@ deliberate trade or an unfilled gap.
     construction, so `HS-02` correctly reports it as a check that proves nothing until it is
     replaced with real probes.
 12. **`HP-03` proves a date exists, not that a number is fresh.** A HANDOFF can carry yesterday's
-    number with today's date and pass.
+    number with today's date and pass. Since V1 the row is anchored on the gate names
+    `.goblin/goblin.yaml` DECLARES and skips the template's own example sentence, so a real gate
+    line can no longer lose its `measured <date>` in silence (G8-2 measured the old row passing
+    exactly that); but nothing re-measures the number, and a gate-bearing line that names no
+    declared gate and carries no gate-shaped keyword is still unseen.
 13. **`PG-04` and `PG-05` are documentation plus a textual heuristic.** A protected branch whose
     only admin is the person pushing protects nothing, and a required check that self-skips
     reports success. Neither is observable from inside a repo.

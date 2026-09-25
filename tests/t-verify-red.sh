@@ -3,10 +3,10 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One `expect_red` per target-scope row: 60 controls over the 57 target rows (42 at v0.1 plus the
+# One `expect_red` per target-scope row: 61 controls over the 57 target rows (42 at v0.1 plus the
 # five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01), the
-# three F4/G4 extras included. The `--only <id>` form is used so a mutation in one row cannot be
-# masked by another row failing first.
+# three F4/G4 extras and the G8-2 extra added in V1 included. The `--only <id>` form is used so a
+# mutation in one row cannot be masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
 # rows whose bodies F4 rewrote, so beyond the one `expect_red` each already had, four more controls
@@ -14,6 +14,13 @@
 # rejected) and two are `expect_red` (a violation the pre-change rows let through). All four are
 # RED on the pre-change rows - measured by running this file against e196b3e with its old HP-02 and
 # HP-03 bodies restored, the F4 way of proving a control is not green on both trees.
+#
+# V1 (G8-2) rewrote HP-03 a second time: the row's matcher was satisfied by the TEMPLATE's own
+# example sentence, so the real gate line could lose its `measured <date>` and the row stayed
+# GREEN. The F4 `expect_red ... m_no_gate_line` control was re-pointed with it (it now removes the
+# real gate line and leaves the example), and one control per direction was added: m_no_date_real
+# (`expect_red`) and m_no_date_example (`expect_green`). Neither is green on both trees - measured
+# in V1.md against 43f7f69 with this same file.
 #
 # WHAT THE 8 ADVISORY-ROW CONTROLS DO AND DO NOT PROVE. Eight target rows are labelled
 # `advisory` by design (HP-04, HS-03, CM-02, MD-02, MD-03, PG-04, DOC-01, DOC-02): their rules
@@ -145,7 +152,19 @@ m_in_04()         { sed -i 's|^  "refused": {|  "refused": {\n    "checks/gone.m
 
 m_drop_handoff()  { rm -f HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: drop handoff" >/dev/null 2>&1; }
 m_drop_heading()  { sed -i 's/^## Gates$/#### Gates/' HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: demote the Gates heading" >/dev/null 2>&1; }
+# The row's WIRING control: it strips every date in the file, so it is RED on the pre-change row
+# and on the new one alike. Kept for that reason - it proves the id is honoured and the row can
+# still go red - and it proves nothing about which line the row reads (see the two G8-2 controls).
 m_no_date()       { sed -i -E 's/measured [0-9]{4}-[0-9]{2}-[0-9]{2}/measured/g' HANDOFF.md; }
+# G8-2, direction 1: the date goes from every line EXCEPT the template's example, i.e. from the
+# REAL gate line the row is supposed to check. Measured at 43f7f69 this left the row GREEN: the
+# old matcher's keyword list (tsc|build|hex|safelist|n/n) did not contain the shipped gate name
+# `commit`, so the only gate-shaped line it could see was the example prose.
+m_no_date_real()  { sed -i -E '/Example of the required form/!s/measured [0-9]{4}-[0-9]{2}-[0-9]{2}/-/g' HANDOFF.md; }
+# G8-2, direction 2: the date goes from the EXAMPLE only. Measured at 43f7f69 this made the row
+# FAIL - the fault was the other way round, and that is the proof the row tested the template
+# rather than the artifact. Prose is not a gate number, so it now PASSES.
+m_no_date_example() { sed -i -E '/Example of the required form/s/measured [0-9]{4}-[0-9]{2}-[0-9]{2}/-/g' HANDOFF.md; }
 
 # ---- F4's four controls: HP-02 slot-based, HP-03 scoped to the Gates section ------------------
 # Each is RED on the pre-change rows (the shipped `for h in 'State' 'Gates' ...` grep and the
@@ -170,7 +189,8 @@ m_hist_lines()    { awk '
 m_no_gate_line()  { awk '
   /^## Gates$/ {print; inG = 1; next}
   inG && /^#{1,3}[[:space:]]/ {inG = 0}
-  inG && /(tsc|build|hex|safelist|[0-9]+\/[0-9]+)[^=]*=/ {next}
+  inG && /Example of the required form/ {print; next}
+  inG && /^[[:space:]]*[-*][[:space:]]/ {next}
   {print}
 ' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md; }
 m_row_fails()     { awk -F'\t' -v OFS='\t' -v x="$1" 'NR==1{print;next} {if ($1==x) $6="false"; print}' .goblin/manifest/enforcement.tsv > .goblin/manifest/enforcement.tsv.new; mv .goblin/manifest/enforcement.tsv.new .goblin/manifest/enforcement.tsv; }
@@ -281,6 +301,13 @@ expect_red "a pre-existing file the install recorded has vanished" IN-04 1 m_in_
 expect_red "a missing HANDOFF"                     HP-01 1 m_drop_handoff
 expect_red "a required HANDOFF heading demoted"     HP-02 1 m_drop_heading
 expect_red "a gate number with no measured date"   HP-03 1 m_no_date
+# V1/G8-2: the row used to be satisfied by the template's own example sentence, so the REAL gate
+# line could lose its `measured <date>` and the row stayed GREEN. Two controls pin the two
+# directions, and neither is green on both trees: the first is RED at 43f7f69 as a control (the
+# old row returned PASS where the control wants exit 1), the second is RED there too (the old row
+# returned FAIL where the control wants exit 0). Both transcripts are in V1.md.
+expect_red   "G8-2: the REAL gate line loses its date while the example keeps its" HP-03 1 m_no_date_real
+expect_green "G8-2: the template's example line loses its date (prose is not a gate number)" HP-03 m_no_date_example
 expect_red "HP-04 (advisory row: wired, not biting)" HP-04 1 m_hp_04
 expect_red "a HANDOFF naming no commit in the repo" HP-05 1 m_no_head
 
