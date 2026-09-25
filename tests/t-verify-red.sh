@@ -3,7 +3,7 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 112 `expect_red` call sites and 22 `expect_green` - 134 calls over
+# One control per target-scope row: 116 `expect_red` call sites and 23 `expect_green` - 139 calls over
 # all 78 of the matrix's 78 target rows (the other five rows are source-scope and carry controls of
 # their own). Measured at this revision: 78 distinct ids, 0 phantom ids (every id used here is a row
 # in the matrix) and 0 target row left without a control. Five of the 78 - `DOC-01`, `DOC-02`
@@ -30,14 +30,27 @@
 # lane's two DOCUMENTED escapes in both directions (`bans_exempt:` with a real violation inside
 # the exempt path, the same violation outside it, the inline `BAN-OK(<id>): <reason>` marker, a
 # marker with no reason, and a marker naming another ban), one stub feature map whose token occurs
-# only in the harness, and three for the loop's close-and-reopen (silent, recorded, stub archive).
+# only in the harness, and three for the loop's close-and-reopen (silent, recorded, stub archive),
+# and the six added with Z1 - `HS-02`'s declared-command pair (the GREEN half runs a harness set
+# that is RED on the pre-change tree, the RED half declares `cmd: false`, a command that
+# interpolates no `{name}`), one for `IN-03`'s newly-enforced enum, one for `FM-02`'s tracked-file
+# clause, one for `SC-03`'s hit count, one text assertion over the summary's advisory arithmetic
+# (Z1-7 - a `check`, not an `expect_*` call, for the judge-lane reason below) and one pinning the
+# drift guard that catches a defanged ban probe. Measured against a054289 with the pre-fix
+# `bin/goblin-verify` and `manifest/enforcement.tsv` restored and these tests kept: five of the six
+# are RED there - they are the pre-fix run's ONLY five FAILs - which is what makes them controls;
+# the sixth (`W5-12`) is a PIN, holding on both trees, because it asserts the limitation Z1 chose to
+# record rather than fix, and the GREEN half of the `HS-02` pair is the same kind of half (it proves
+# the row is not always-red, not that a fix bites). No other control in this file changes verdict
+# between the two trees.
 # The judge-lane family comparison is two text assertions rather than `expect_*` calls, because
-# `MD-02` is advisory and exits 0 either way; its control reads the line it prints. Twenty-two of
+# `MD-02` is advisory and exits 0 either way; its control reads the line it prints. Twenty-three of
 # the controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, two that seed a feature
 # map and require it to PASS, seven that seed a loop record or a judge lane and require
 # `JG-01`, `JG-02` and `LP-01`..`LP-05` to PASS, five that pin a new row's non-failing half -
 # a commented-out `if:`, the installed workflow, a verbatim gate run, the no-workflow SKIP and an
-# unlisted ban - and three that prove the two escapes and the recorded re-scope are not
+# unlisted ban - and four that prove the two escapes, the recorded re-scope and the replay row's
+# declared command are not
 # always-red). The `--only <id>` form is used
 # so a mutation in one row cannot be masked by another row failing first.
 #
@@ -69,7 +82,12 @@
 # WHAT THE PRE-FIX RED LOOKS LIKE. For each row whose check this pass changed, the control is
 # RED on the pre-fix tree as well as after (D4/PT-01, D5/SP-03, D6/CL-02, D7/HS-01,
 # D10/CL-01, D12/DS-01, D13/SK-03). The pre-fix transcripts are in
-# goblin-stack-research/F1.md, section 2.
+# goblin-stack-research/F1.md, section 2. Z1's five biting controls were measured the same way -
+# this file run from a copy that keeps these tests and restores `bin/goblin-verify` and
+# `manifest/enforcement.tsv` from a054289: `Z1-4` (HS-02 exit 0, wanted 1), `Z1-5` (IN-03 exit 0,
+# wanted 1), `Z1-6` (FM-02 exit 0, wanted 1), `W5-11` (the run still prints the character count) and
+# `Z1-7` (the summary prints no arithmetic line) all go RED there, and they are the ONLY five
+# controls in the file that change verdict between the two trees.
 set -uo pipefail
 
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -134,6 +152,11 @@ cp -a .github "$BK/github"
 # .gitignore is mutated by m_sc_02 and must come back byte-for-byte: the fixture-green check at
 # the end of this file is what caught its absence.
 cp -a .gitignore "$BK/gitignore"
+# Z1-4: the harness set. The replay controls below REPLACE checks/*.mjs with a harness that is
+# RED on both trees - they have to, because the shipped scaffold (`assert.mjs`) asserts something
+# true by construction and so is GREEN on the pre-change tree, which would make HS-02 FAIL for a
+# reason unrelated to the declared command. The scaffold comes back byte-for-byte.
+cp -a checks/assert.mjs "$BK/assert.mjs"
 
 restore_all() {
   cp -a "$BK/HANDOFF.md" HANDOFF.md
@@ -150,9 +173,10 @@ restore_all() {
   cp -a "$BK/bugreporter-SKILL.md" .hermes/skills/goblin-bugreporter/SKILL.md
   cp -a "$BK/automations/." .goblin/automations/
   cp -a "$BK/gitignore" .gitignore
-  rm -f checks/green.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
+  rm -f checks/green.mjs checks/red.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
         .goblin/state.json .goblin/last-gate-line .goblin/.ds-report .goblin/ratchet-last \
         .envrc .goblin/audit.tsv package.json package-lock.json
+  cp -a "$BK/assert.mjs" checks/assert.mjs
   rm -f reviews/fixture-*.md
   # G2: the planted loop record. A leftover .goblin/loop/ would leave JG-01/LP-* green by
   # accident AND count as an untracked file for CM-03 in the final full run.
@@ -208,6 +232,9 @@ m_in_01()         { sed -i '/"version"/d' .goblin/installed.json; }
 m_edit_practice() { printf '# an edited byte\n' >> "$WORK/standard.md"; }
 m_blank_row()     { sed -i -E 's/^(HP-05\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t)[^\t]*/\1/' .goblin/manifest/enforcement.tsv; }
 m_in_04()         { sed -i 's|^  "refused": {|  "refused": {\n    "checks/gone.mjs": "deadbeef",|' .goblin/installed.json; }
+# Z1-5: a typo in the `enforced_by` cell. docs/ENFORCEMENT.md calls the enum closed; before the
+# fix NOTHING read the column, so this changed no verdict anywhere in the run.
+m_bad_enum()      { awk -F'\t' -v OFS='\t' '{ if ($1=="BN-01") $4="bogus"; print }' .goblin/manifest/enforcement.tsv > .goblin/manifest/enforcement.tsv.n && mv .goblin/manifest/enforcement.tsv.n .goblin/manifest/enforcement.tsv; }
 
 m_drop_handoff()  { rm -f HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: drop handoff" >/dev/null 2>&1; }
 m_drop_heading()  { sed -i 's/^## Gates$/#### Gates/' HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: demote the Gates heading" >/dev/null 2>&1; }
@@ -278,6 +305,17 @@ m_todo_gate()     { sed -i 's/-le 160/-le 0/' .goblin/goblin.yaml; printf '// TO
 m_no_harness_dir() { sed -i 's|^harness_dir: .*|harness_dir: nowhere|' .goblin/goblin.yaml; }
 m_green_harness() { printf 'console.log("PASS  nothing\\n"); process.exit(0);\n' > checks/green.mjs; git add -A >/dev/null 2>&1; git commit -q -m "test: a harness green on both trees" >/dev/null 2>&1; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" .goblin/goblin.yaml; }
 m_hs_03()         { m_row_fails HS-03; }
+# Z1-4: `replay.cmd` was read only to assert it was non-empty, and the row ran `node <file>`
+# itself - so the declared command and its `{name}` placeholder were decorative and `false`
+# changed no verdict. The harness set has to be RED on the pre-change tree for the difference to
+# be visible at all: the shipped scaffold `assert.mjs` asserts something TRUE by construction and
+# is therefore GREEN on the pre-change tree, which would make HS-02 fail for an unrelated reason.
+#   m_replay_all_red   the GREEN half: a harness RED on both trees, run by the declared command
+#                      (`node checks/{name}.mjs`) -> PASS, so the row is not always-red;
+#   m_replay_cmd_false the RED half: the same tree with `replay.cmd: false`, a command that
+#                      interpolates no `{name}` and so replayed nothing.
+m_replay_all_red()   { rm -f checks/*.mjs; printf 'process.exit(1)\n' > checks/red.mjs; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" .goblin/goblin.yaml; }
+m_replay_cmd_false() { m_replay_all_red; sed -i 's|^  cmd: node checks/{name}.mjs|  cmd: false|' .goblin/goblin.yaml; }
 
 m_bad_author()    { git -c user.email=someone@else.test commit -q --allow-empty -m "test: ambient author"; }
 m_cm_02()         { m_row_fails CM-02; }
@@ -366,6 +404,12 @@ m_bn_01()          { mkdir -p src; printf 'export const a: any = 1;\n' > src/bn0
 # EXIT CODE alone was read as clean - fail-open, in the lane whose whole job is failing closed.
 # The ban really is violated on disk (`: any`), and the detect says so only with exit 1.
 m_bn_exit1_detect() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "exit 1"; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; mkdir -p src; printf 'export const a: any = 1;\n' > src/bn01.ts; }
+# W5-12: a DEFANGED probe - `BN-01`'s detect set to `true`, so it always reports clean. Both ban
+# rows then PASS vacuously (measured), because neither can read a table whose rows were weakened.
+# The decision (Z1) is to RECORD that rather than fix it: the guard that holds is IN-02's drift
+# check over `.goblin/manifest/bans.tsv` (docs/LIMITS.md #28), and this control is that guard -
+# the defanging is caught, one row over, by the only row that can see it.
+m_bn_defang()      { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "true"; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; }
 m_bn_02()          { mkdir -p src; printf '// @ts-expect-error\nexport const b = 1;\n' > src/bn02.ts; }
 m_bn_03()          { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-03, BN-05]/' .goblin/goblin.yaml; mkdir -p src/components; printf 'export const P = () => { fetch("/api/x"); return null; };\n' > src/components/panel.tsx; }
 m_bn_05()          { printf '\nlayers:\n  - src/renderer src/main\n' >> .goblin/goblin.yaml; mkdir -p src/renderer src/main; printf "import { db } from '../main/db';\nexport const r = db;\n" > src/renderer/p.ts; }
@@ -454,6 +498,9 @@ m_b_workflow() { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    steps:\
 expect_red "a manifest with no version"            IN-01 1 m_in_01
 expect_red "one edited byte of the standard"       IN-02 1 m_edit_practice
 expect_red "a manifest row with no check"          IN-03 3 m_blank_row
+# Z1-5: the third clause. A typo in `enforced_by` used to change NO verdict in the whole run -
+# the enum was documented as closed in docs/ENFORCEMENT.md and read by nothing.
+expect_red "Z1-5: an enforced_by outside the closed enum" IN-03 1 m_bad_enum
 expect_red "a pre-existing file the install recorded has vanished" IN-04 1 m_in_04
 
 expect_red "a missing HANDOFF"                     HP-01 1 m_drop_handoff
@@ -498,6 +545,13 @@ expect_red "the TODO ceiling gate, moved from the ratchet" GT-02 1 m_todo_gate
 
 expect_red "a declared harness dir that is absent"  HS-01 1 m_no_harness_dir
 expect_red "a harness green on both trees"         HS-02 1 m_green_harness
+# Z1-4: the declared command has to be what RUNS the harness. Two halves - the GREEN one proves
+# the row is not always-red when the command is the shipped one, the RED one is `replay.cmd:
+# false`. `false` interpolates no `{name}`, so it cannot be running the harness it names and
+# nothing was replayed; the row FAILs instead of reporting "every harness was RED" from a command
+# that never ran one.
+expect_green "a harness set RED on the pre-change tree, run as the declared command" HS-02 m_replay_all_red
+expect_red   "Z1-4: a replay.cmd that interpolates no {name}"                       HS-02 1 m_replay_cmd_false
 expect_red "HS-03 (advisory row: wired, not biting)" HS-03 1 m_hs_03
 
 expect_red "an ambient commit author"              CM-01 1 m_bad_author
@@ -552,6 +606,14 @@ expect_red "an automation skill with no write surface"  AU-04 1 m_au_04
 expect_red "a tracked dotenv-family file"           SC-01 1 m_sc_01
 expect_red "an ignore rule narrowed to .env.* only" SC-02 1 m_sc_02
 expect_red "a client-visible secret-shaped name"    SC-03 1 m_sc_03
+# W5-11: the informative line printed a CHARACTER count as a hit count (`${#hits}` on a multiline
+# string), so ONE matching line was reported as "the length of that line client-visible
+# secret-shaped name(s)". The half-done fix left these two lines behind.
+m_sc_03
+out=$(bash .goblin/bin/goblin-verify --only SC-03 2>&1)
+printf '%s' "$out" | grep -q '1 client-visible secret-shaped name(s)'
+check "W5-11: SC-03 reports ONE hit, not the character count of the matching line" "$?"
+restore_all
 expect_red "a JS cookie write with no flags"        SC-04 1 m_sc_04
 expect_red "a write route with no validator"        SC-05 1 m_sc_05
 expect_red "a manifest with no lockfile"           SC-06 1 m_sc_06
@@ -567,6 +629,33 @@ expect_red   "the ban table loses a row the matrix still names" BN-00 1 m_bn_00_
 expect_red   "a ban that names no replacement"                  BN-00 1 m_bn_00_norepl
 expect_red   "an any type in application TypeScript"               BN-01 1 m_bn_01
 expect_red   "V3-2: a ban violated by exit code alone (no stdout)"  BN-01 1 m_bn_exit1_detect
+# W5-12: a defanged probe is INVISIBLE to the ban lane - with `BN-01`'s detect set to `true`, BN-00
+# and BN-01 both PASS (measured). Z1's decision is to keep that as RECORDED, because the row that
+# can see it is the drift guard over the table itself: this control pins the guard that actually
+# holds. BN-00's own why-cell and docs/LIMITS.md #28 name the limitation.
+expect_red   "W5-12: a defanged ban probe is caught by the drift guard, one row over" IN-02 1 m_bn_defang
+# ---- Y1 §7 items 4 and 5: the ban ENGINE's own contract, closed here --------------------------
+# Z1's census (docs/LIMITS.md #41) records the documented mechanisms with no control. Two are
+# closeable from this fixture and are closed: the engine's `exit 2` (a table it cannot read must
+# FAIL CLOSED, never report a clean lane) and `--list`. Neither had any control before -
+# `grep -c goblin-bans tests/` was 0 invocations, only `ls`/`grep` over the file. PR-03's second
+# branch applies rather than the pre-change tree: the mechanism WORKED before (that is why the
+# census calls it "verified working, control missing"), so the RED direction is a deliberately
+# broken copy of the engine - its table made unreadable (the missing-table path) and its `--list`
+# output emptied - which is what turns each of these three assertions red.
+BANS=.goblin/bin/goblin-bans
+out=$($BANS --list 2>&1); rc=$?
+printf '%s' "$out" | grep -q '^BN-01' && [ "$rc" -eq 0 ]
+check "Y1-§7 item 5: --list prints the table (BN-01 named)" "$?"
+mv .goblin/manifest/bans.tsv "$WORK/bans.tsv.parked"
+out=$($BANS 2>&1); rc=$?
+printf '%s' "$out" | grep -qi 'no ban table' && [ "$rc" -eq 2 ]
+check "Y1-§7 item 4a: a missing ban table is exit 2, not a silent pass" "$?"
+printf 'id\tscope\tban\tdetect\n' > .goblin/manifest/bans.tsv
+out=$($BANS 2>&1); rc=$?
+printf '%s' "$out" | grep -qi 'holds no bans' && [ "$rc" -eq 2 ]
+check "Y1-§7 item 4b: an empty ban table is exit 2, not a silent pass" "$?"
+mv "$WORK/bans.tsv.parked" .goblin/manifest/bans.tsv
 expect_red   "a ts-expect-error suppression"                 BN-02 1 m_bn_02
 expect_red   "a fetch() called from a component"                BN-03 1 m_bn_03
 expect_red "an import across a declared layer boundary"       BN-05 1 m_bn_05
@@ -662,6 +751,13 @@ m_fm_02_stale()     { plant_map; sed -i 's/^verified: .*/verified: 2020-01-01/' 
 # the fix, because `source_root: .` walked the install: the map merely echoed the template. The
 # token has to be one the harness demonstrably holds - the control below is measured, not assumed.
 m_fm_02_stub()      { plant_map; sed -i 's|^  - panel-root$|  - g_yaml_block_scalar|' "$MAPDIR/panel.md"; }
+# Z1-6: the resolved file is UNTRACKED. `git log -1 --format=%cs` prints nothing for a file git
+# cannot date, and the freshness clause used to skip on that empty string - so a map could claim
+# `verified: 2020-01-01` and PASS. The token is moved to a file created AFTER plant_map's commit,
+# so it is the only source occurrence (the map's own directory is excluded from the search).
+m_fm_02_untracked() { plant_map; printf 'untracked-panel-root\n' > src/panel/late.ts; \
+                      sed -i 's|^  - panel-root$|  - untracked-panel-root|' "$MAPDIR/panel.md"; \
+                      sed -i 's|^verified: .*|verified: 2020-01-01|' "$MAPDIR/panel.md"; }
 m_va_01_fail()      { sed -i 's|^verify_doctor: .*|verify_doctor: false|' .goblin/goblin.yaml; }
 
 # The empty config is the fresh-install state: each row SKIPs (the builtin returns 3, which the
@@ -688,6 +784,10 @@ expect_red   "a declared entry path renamed in source"  FM-02 1 m_fm_02_token
 # install, so the map passed while naming nothing in source.
 expect_red   "W5-4: a stub map whose token occurs only in the harness" FM-02 1 m_fm_02_stub
 expect_red   "an entry path changed after the map was verified" FM-02 1 m_fm_02_stale
+# Z1-6: an entry path that resolves only to a file git does not track. The freshness clause used
+# to SKIP when `git log -1 --format=%cs` printed nothing, so `verified: 2020-01-01` passed over
+# source that was never committed. "Resolves" must not imply "is tracked".
+expect_red   "Z1-6: an entry path only an untracked file holds" FM-02 1 m_fm_02_untracked
 expect_red   "a verify_doctor that exits non-zero" VA-01 1 m_va_01_fail
 # ---- G2: the judge role and the loop contract (JG-01..JG-03, LP-01..LP-05) --------------------
 # All eight rows are NEW, so there is no pre-change tree to be RED on: PR-03's other branch is "a
@@ -866,6 +966,18 @@ check "--only <target id mixed with a source id> still runs the target row" "$([
 FINAL=$(bash .goblin/bin/goblin-verify 2>&1); FINAL_RC=$?
 [ "$FINAL_RC" -eq 0 ] || printf '%s\n' "$FINAL" | grep -E '^(FAIL|SKIP|ADV)' | sed 's/^/        /'
 check "the fixture is GREEN again after every mutation was restored" "$FINAL_RC"
+
+# ---- Z1-7: the summary's advisory arithmetic, over the same full run -------------------------
+# The line `advisory N of ceiling C` counts the rows the MATRIX labels advisory (SK-03), while the
+# `ADV` lines on screen include a non-advisory row whose lane cannot be resolved here (JG-02). The
+# two numbers therefore differ by design, and the summary used to print only the first - so a
+# reader comparing it with the ADV lines saw a mismatch that only the row's why-cell explained.
+# This is a text assertion rather than an `expect_*` call for the same reason the judge-lane
+# comparison is: the row exits 0 either way and the claim is about the LINE it prints.
+ADV_LABELLED=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' .goblin/manifest/enforcement.tsv)
+ADV_PRINTED=$(printf '%s\n' "$FINAL" | grep -cE '^ADV')
+printf '%s\n' "$FINAL" | grep -q "of those $ADV_PRINTED advisory: the matrix labels $ADV_LABELLED row(s) advisory"
+check "Z1-7: the summary prints the advisory arithmetic ($ADV_PRINTED ADV lines vs $ADV_LABELLED labelled)" "$?"
 
 if [ "$fail" -eq 0 ]; then note "t-verify-red: PASS"; else note "t-verify-red: FAIL"; fi
 exit "$fail"

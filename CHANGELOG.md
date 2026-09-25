@@ -3,6 +3,35 @@
 One line per released version. `goblin-install --upgrade` prints the delta between the
 version recorded in a target's `.goblin/installed.json` and the source `VERSION`.
 
+## 0.4.1
+
+- **Y1's remaining defects, landed (Z1).** Eight MINOR/STYLE findings from an independent verification
+  of 0.4.0, plus the carried W5 items that survived X1. The load-bearing one is `{{GATE2}}`, which
+  leaked an unsubstituted token into **all six classes'** installed `.goblin/goblin.yaml` for two
+  waves while `grep -rl '{{GATE2}}' tests docs manifest bin` was **0 files**: nothing rendered it and
+  nothing saw it. It is deleted, and it now has the control that would have caught it —
+  `tests/t-render-tokens.sh` renders all six classes and scans every installed file for a `{{…}}`
+  token (RED on the pre-fix template: 6 leaks, 1 per class).
+- **`replay.cmd` now runs.** `presets/*.yaml` declared `replay_cmd: node checks/{name}.mjs` and `HS-02`
+  read it only to assert it was non-empty, then ran `node <file>` itself — so the declared command and
+  its `{name}` placeholder were decorative and `replay.cmd: false` changed no verdict. The row
+  executes the declared command with `{name}` substituted; measured, `false` now FAILs and the PASS
+  line names the command it ran.
+- **Also fixed:** `IN-03` now enforces the `enforced_by` enum it documented as closed (a `bogus` cell
+  changed nothing before); `FM-02` refuses an entry path that resolves only to a file git does not
+  track (the freshness clause used to skip silently); `SC-03` prints a hit count instead of the
+  character count of the matching line (W5-11, a half-done fix); the summary prints the advisory
+  arithmetic, so `advisory 10 of ceiling 10` beside 11 `ADV` lines is explained on screen (Z1-7);
+  `--practice <path>` that does not resolve is now reported instead of silently dropped (W5-3);
+  `CHANGELOG.md`'s own ban-lane claim is corrected to its measurement (two of five RED pre-fix, three
+  pinning behaviour that was never broken, which is what X1 §5 reports); `docs/ENFORCEMENT.md` cites
+  the right `LIMITS` entry; `tests/run-tests.sh`'s header counts five source rows, not four.
+- **`docs/LIMITS.md` #41** records Y1 §7's census: sixteen documented mechanisms with no control of
+  their own — two closed from the ban engine's contract (that engine's `exit 2` paths and `--list`),
+  two fixed (the token, `replay.cmd`), fourteen recorded with the reason. W5-10's exemption
+  (`docs/` is never installed) is stated there too. No advisory row was added: **10 of 10**, unchanged.
+- **`VERSION` is `0.4.1`** — `VERSION`, the five `bin/` version constants and this entry agree.
+
 ## 0.4.0
 
 - **W5's regression is closed: the ban lane's two documented escapes now work (X1).** `bans_exempt:`
@@ -13,7 +42,9 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   exports `GOBLIN_BANS_ID` and `GOBLIN_BANS_EXEMPT` and the shipped probes filter the **file list
   before judging**; the manifest's `escape` column is now true — `// BAN-OK(<id>): <reason>` on the
   offending line clears that line, and a non-empty reason is required. Five controls, both
-  directions, all RED on the pre-fix tree; the residual (a project's own `detect` that ignores the
+  directions — **two of the five RED on the pre-fix tree; the other three pin behaviour that was
+  never broken** (Y1 measured the ban-lane half at 2, which is what X1 §5 itself reports);
+  the residual (a project's own `detect` that ignores the
   variables keeps the old, closed failure) is `docs/LIMITS.md` #36.
 - **W5's four half-instrumentations: closed where closable, recorded where not (X1).** `FM-02` no
   longer resolves a token that occurs only in the harness — `.goblin/`, `.hermes/`, the declared

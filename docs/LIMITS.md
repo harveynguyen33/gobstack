@@ -246,7 +246,14 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     pass vacuously — `BN-00` fails closed on an *empty* table, but it cannot see a table whose
     rows were weakened, because `.goblin/manifest/bans.tsv` is hashed by `IN-02` and
     `.goblin/installed.json` is not signed (`docs/LIMITS.md` #18). The ban list is not
-    tamper-proof; it is as strong as the record every drift check trusts.
+    tamper-proof; it is as strong as the record every drift check trusts. **Measured (W5-12):** with
+    `BN-01`'s `detect` cell set to `true`, `BN-00` and `BN-01` both PASS and the only row that
+    changes verdict is `IN-02`'s drift check — the `W5-12` control in `tests/t-verify-red.sh` pins
+    exactly that, and nothing else can. Z1's verdict is to **record this, not fix it**: the `detect`
+    cell is executable content, and a row able to judge whether another row's command *means*
+    something would be an `eval` over the matrix, which the same card rules out. The gap is now
+    stated, measured and controlled one row over, which is the most this table can do without
+    becoming an interpreter.
 29. **The perf ceiling must EQUAL the recorded baseline, so a budget with headroom is not
     expressible.** `PF-01` FAILs when `ratchet.ceiling` and `perf.baseline_value` disagree
     (G8-6b), which is what stops a one-line ceiling raise from passing while printing the
@@ -333,6 +340,44 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     Harvey's repo on first contact is the overreach `docs/CONTRACTS.md` rules out. Carried from W5
     §5's `G8-9` rather than fixed here — it is a **sequencing** limit, not a hole in a row: one commit
     clears all six, and `tests/t-verify-green.sh` seeds one before it installs.
+41. **Sixteen documented mechanisms carry no control of their own, and one exemption is by design.**
+    Y1 §7 listed eighteen; Z1 **fixed** the two load-bearing ones (17, the unrendered token — Z1-3;
+    18, `replay.cmd` — Z1-4) and **closed** two more (4, the ban engine's `exit 2` paths; 5,
+    `--list` — three assertions in `tests/t-verify-red.sh`, RED against a deliberately broken copy
+    of `bin/goblin-bans`, which is PR-03's second branch: those mechanisms *worked*, they were just
+    unguarded). The other fourteen are **recorded here rather than mechanised**. Each was measured
+    WORKING by Y1, so an assertion would pin behaviour that already holds, and this box does not
+    have fourteen controls' worth of budget; the cost of the gap is exactly the shape of both
+    regressions in this repo's history — a mechanism documented, and nothing asserting it.
+      - items 1, 2, 6 — `bans_exempt:` on the layer probe, the engine→probe
+        `GOBLIN_BANS_ID`/`GOBLIN_BANS_EXEMPT` contract, and its segment alignment: exercised
+        *indirectly* by X1's five ban-lane controls (an exemption reaches a violation; `src/ok` does
+        not swallow `src/okay`). A direct control is the first thing a later wave should add.
+      - item 3 — a project's own probe that ignores those variables fails closed: the mechanism is
+        this file's #36, where the FAIL is measured.
+      - item 7 — `BAN-OK` must sit on the offending line: the marker's *effect* is controlled, the
+        on-this-line clause is not (a marker on another line does not clear the violation).
+      - items 8, 9 — `SC-05`'s `.goblin/boundary-waivers` and `SC-08`'s
+        `.goblin/install-hooks.allowlist`: both files are copied and both FAIL directions are
+        controlled; neither *honoured* direction is.
+      - item 10 — `SC-03` clause 2, `sec_build_output`: a literal in `dist/assets` FAILs; only the
+        clause-1 path is controlled.
+      - items 11, 12, 15 — `scaffold_checks:`'s SKIP branch, `perf_host_gate` (#35) and
+        `templates/loop/*.tmpl`: declared no-ops (SKIP, a host gate, and templates `docs/LOOP.md`
+        says nothing installs). A control here would assert that nothing happens.
+      - item 13 — `docs/CI.md`'s flow-style `jobs: {…}` refusal: fails closed already, so a control
+        would pin the strict direction of a check that cannot pass vacantly.
+      - item 14 — `bin/goblin-model`: works (`code` → the resolved lane, unknown role → exit 2);
+        only its *absence* from an install is asserted.
+      - item 16 — `docs/LOOP.md` §6's "one known-red control verdict per wave, recorded in this
+        file": a prose obligation, not a command. It is honoured in the write-ups (or not) and no
+        check can read a wave.
+    **W5-10 is answered here too.** The tenant strings `PT-01` forbids do not reach `docs/`, because
+    `docs/` is never installed: the row's directory list is `skills manifest bin templates presets
+    .goblin .hermes`, so a string under `docs/` is source-tree prose that no operator's repo ever
+    receives. That is the whole reason, it is deliberate, and the row is not weakened by it — Y1
+    agreed, and Z1 leaves it. This is the sentence Z1 added so the reason is visible in the shipped
+    artifact rather than only in the wave's own notes.
 
 ## Verdicts recorded, not built (the note-8 questions)
 
