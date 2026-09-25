@@ -18,8 +18,13 @@ vendored plugin paths do not exist in Hermes). Not a replacement for a project s
 
 ## Read this on GitHub
 
+**New here? Read `docs/GUIDE.md` first.** It is the step-by-step getting-started guide — install,
+the first green run, your first change. This README is the reference you come back to; the table
+below is the reference material the guide points into, so the two do not compete for the first read.
+
 | file | what it decides |
 |---|---|
+| `docs/GUIDE.md` | **read this first**: the first week, in order — install, the first verify, the REPLAY habit |
 | `docs/DESIGN.md` | the thesis, the three load-bearing decisions, and every rejected alternative |
 | `docs/FLOWS.md` | the 14 playbooks, with the 11 cuts and a reason for each |
 | `docs/GUARDRAILS.md` | the security and perf rows (`SC-01`..`SC-09`, `PF-01`), the rung ladder, and what they cannot see |
@@ -52,11 +57,14 @@ failure: reconcile the file rather than forcing over it — `docs/ADOPTION.md`.
 After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other
-    .goblin/bin/goblin-verify                 # a fresh class-A install: 43 passed, 0 failed
+    .goblin/bin/goblin-verify                 # 42 passed, 1 failed - see the placeholder note below
     hermes skills trust <target>              # one-time, so the project-tier skills load
     .goblin/bin/goblin-audit                  # once, deliberately: the ONLY network step (SC-07)
 
-**A fresh class-A install verifies green: `43 passed, 0 failed, 11 advisory, 24 skipped`, exit 0.**
+**A class-A install verifies green — `43 passed, 0 failed, 11 advisory, 24 skipped`, exit 0 — once
+`HANDOFF.md` names a commit that exists. Before that edit the scaffold's `0000000` placeholder is
+the one expected red: `42 passed, 1 failed`, `HP-05`. Both numbers measured 2026-09-25; the run and
+the fix are step 2 of `docs/GUIDE.md`.**
 Twenty-four rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
 `AU-02` and `AU-03` have no report to audit; `SC-06`, `SC-07` and `SC-08` have no dependency
 manifest, no lockfile and no audit record to read; `PF-01` has no measured perf baseline;
@@ -85,7 +93,7 @@ Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-05) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (124 over 78 target rows), each required to go RED and then
+one control per target-scope row (149 over 78 target rows), each required to go RED and then
 restored, plus `t-audit.sh` for the SC-07 producer. **A verifier that only ever prints GREEN is a
 failure**, so that file is the one that matters most.
 
