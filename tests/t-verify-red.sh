@@ -524,8 +524,9 @@ m_fm_02_token()     { plant_map; printf 'route-renamed\n' > "$FM_SRC"; }
 m_fm_02_stale()     { plant_map; sed -i 's/^verified: .*/verified: 2020-01-01/' "$MAPDIR/panel.md"; }
 m_va_01_fail()      { sed -i 's|^verify_doctor: .*|verify_doctor: false|' .goblin/goblin.yaml; }
 
-# The empty config is the fresh-install state: each row SKIPs (exit 3 from the builtin, which the
-# runner reports as SKIP and does not count as a failure), and the reason names WHY.
+# The empty config is the fresh-install state: each row SKIPs (the builtin returns 3, which the
+# runner counts as a SKIP; the process still exits 0 - only FAIL or a broken manifest exits
+# non-zero), and the reason names WHY.
 for pair in "FM-01:no map is declared" "FM-02:no entry paths to resolve" "VA-01:no doctor is declared"; do
   rid=${pair%%:*}; want=${pair#*:}
   out=$(bash .goblin/bin/goblin-verify --only "$rid" 2>&1); rc=$?
