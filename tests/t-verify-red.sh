@@ -39,10 +39,11 @@
 # drift guard that catches a defanged ban probe, and the ten added with AA1/Z2 - two for Z2-2's
 # minified lockfile (the FAIL half that used to PASS vacuously, and the allowlisted half that
 # proves the fix is not "any minified lock FAILs"), one for Z2-3's metacharacter-bearing harness
-# name, six for Y1 §7 items 1/2/6 (item 1 in both directions, item 6's subtree/sibling pair plus
+# name, seven for Y1 §7 items 1/2/6 (item 1 in both directions, item 6's subtree/sibling pair plus
 # the trailing-slash case, item 2's env contract in both directions - the cluster Z1 named as the
-# one with a real engine underneath), and one assertion on the LINE the alignment control reports
-# (a `check`, not an `expect_*`, for the judge-lane reason below). Measured against a054289 with the pre-fix
+# one with a real engine underneath), plus one assertion on the LINE the alignment control reports
+# (a `check`, not an `expect_*`, for the judge-lane reason below): ten call sites, eleven
+# assertions. Measured against a054289 with the pre-fix
 # `bin/goblin-verify` and `manifest/enforcement.tsv` restored and these tests kept: five of the six
 # are RED there - they are the pre-fix run's ONLY five FAILs - which is what makes them controls;
 # the sixth (`W5-12`) is a PIN, holding on both trees, because it asserts the limitation Z1 chose to
