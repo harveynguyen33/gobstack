@@ -61,6 +61,15 @@ harness_dir: {{HARNESS_DIR}}
 # (HS-01) when this is yes; a class that ships no harness dir skips with a reason.
 scaffold_checks: {{SCAFFOLD_CHECKS}}
 
+# The feature map (P6's inventory, authored by skills/goblin-feature-map).
+# feature_map: the map's README, relative to this repo. EMPTY means "no map declared yet" and
+# makes FM-01/FM-02 SKIP with that reason - a fresh install has no map and must not be born RED.
+# source_root: entry paths in the map resolve against this.
+# verify_doctor: the command the map's own instructions say to run. EMPTY -> VA-01 SKIPs.
+feature_map: {{FEATURE_MAP}}
+source_root: {{SOURCE_ROOT}}
+verify_doctor: {{VERIFY_DOCTOR}}
+
 # The gate set. DECLARED, never inferred from the stack. Replace the default below with the
 # real commands for this project; each must exit 0.
 gates:

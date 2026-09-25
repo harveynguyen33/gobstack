@@ -463,6 +463,9 @@ render_config() {
     PERF_HOST_GATE "$PERF_HOST_GATE" \
     HARNESS_DIR "$HARNESS_DIR" \
     SCAFFOLD_CHECKS "$SCAFFOLD" \
+    FEATURE_MAP "" \
+    SOURCE_ROOT "." \
+    VERIFY_DOCTOR "" \
     GATES "$gates" \
     RATCHET_NAME "$RAT_NAME" \
     RATCHET_CMD "$RAT_CMD" \
