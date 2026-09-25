@@ -182,6 +182,18 @@ SOURCE_ROOT=$(g_unquote "$(g_yaml_scalar "$CONFIG" source_root)")
 VERIFY_DOCTOR=$(g_unquote "$(g_yaml_scalar "$CONFIG" verify_doctor)")
 export FEATURE_MAP SOURCE_ROOT VERIFY_DOCTOR
 
+# The loop ceiling (G2, LP-03). The most turns ONE loop record may declare in its budget; 20 is
+# the engine's own default for a kanban goal loop, so a ceiling that disagreed with the engine
+# would be a number someone made up. A config written before this key existed keeps the default
+# (the SCAFFOLD_CHECKS shape): an absent key is not a broken config.
+LOOP_MAX_TURNS_CEILING=$(g_yaml_scalar "$CONFIG" loop_max_turns_ceiling)
+[ -n "$LOOP_MAX_TURNS_CEILING" ] || LOOP_MAX_TURNS_CEILING=20
+# The loop record (G2): a COMMITTED artifact of one unattended run. Nothing in this section
+# re-runs the predicate and nothing writes: the record IS the evidence, and what that costs is
+# stated in docs/LOOP.md and docs/LIMITS.md.
+LOOP_DIR="$ROOT/.goblin/loop"
+export LOOP_MAX_TURNS_CEILING LOOP_DIR
+
 if [ -d "$ROOT/$HARNESS_DIR_RAW" ]; then
   export GOBLIN_HARNESS_DIR="$ROOT/$HARNESS_DIR_RAW"
   export GOBLIN_HARNESS_REL="$HARNESS_DIR_RAW"
@@ -1370,6 +1382,288 @@ check_va_01() {
   return 0
 }
 
+# ---- the judge and the loop (G2): JG-01..JG-03, LP-01..LP-05 --------------------------------
+# A loop record is the committed artifact of ONE unattended run:
+#
+#   .goblin/loop/predicate        one shell command - the loop's own exit condition
+#   .goblin/loop/predicate.sha256 its digest, recorded at loop start (the pin)
+#   .goblin/loop/first-run        "exit=<n> ts=<ISO8601>" - run BEFORE iteration 1
+#   .goblin/loop/budget           the turn budget the loop declared
+#   .goblin/loop/decisions.tsv    one row per iteration: ts phase decision why evidence result
+#   .goblin/loop/stuck.md         the write-up when the loop ended without its predicate green
+#   .goblin/loop/closed-<date>/   a relaxed predicate, archived
+#
+# Nothing here re-runs the predicate and nothing here writes: the record is the evidence, and
+# what that costs is stated in docs/LOOP.md and docs/LIMITS.md.
+
+loop_present() { [ -d "$LOOP_DIR" ]; }
+
+# The one reason every LP row skips: no loop has run here, so there is nothing to audit.
+loop_no_record() { printf 'no loop has run in this repo\n'; return 3; }
+
+# The verdict rows, in order: "<rownum><TAB><decision><TAB><evidence><TAB><result>".
+loop_decision_rows() {
+  awk -F'\t' 'NR > 1 && NF >= 6 { print NR "\t" $3 "\t" $5 "\t" $6 }' "$LOOP_DIR/decisions.tsv" 2>/dev/null
+}
+
+# A row with fewer columns than the header is a malformed record, and a malformed record is a
+# FAIL: a row the reader silently skipped is a row nothing checked.
+loop_malformed_rows() {
+  awk -F'\t' 'NR > 1 && NF > 0 && NF < 6 { print NR }' "$LOOP_DIR/decisions.tsv" 2>/dev/null
+}
+
+# Does ONE evidence token resolve? The typed handles are sha:<hex> (a commit `git rev-list
+# --all` knows), file:<path> (a path under the root) and sha256:<hex> (the digest of a file
+# under .goblin/loop/); a bare token resolves when it names an existing path. A `cmd:` token
+# resolves NOTHING on purpose: the command ran, its output is not in the record, and a verdict
+# that rests on it is exactly the self-report JG-01 exists to refuse.
+loop_token_resolves() {
+  local t="$1" h p
+  case "$t" in
+    *..*) return 1 ;;
+  esac
+  case "$t" in
+    sha:*)
+      h=${t#sha:}
+      case "$h" in ''|*[!0-9a-fA-F]*) return 1 ;; esac
+      [ "${#h}" -ge 7 ] || return 1
+      # NOT `git rev-list --all | grep -qi` : grep -q exits on the first match, git dies of
+      # SIGPIPE (141), and with `set -o pipefail` the pipeline reports FAILURE for a commit that
+      # IS in the repo. Measured: a seeded record's own HEAD resolved as false, rc 141. grep -c
+      # reads to the end of the stream, so the count is what is compared.
+      case "$( cd "$ROOT" && git rev-list --all 2>/dev/null | grep -ci "^$h" )" in
+        ''|0) return 1 ;;
+      esac
+      return 0 ;;
+    sha256:*)
+      h=${t#sha256:}
+      case "$h" in ''|*[!0-9a-fA-F]*) return 1 ;; esac
+      [ "${#h}" -eq 64 ] || return 1
+      for p in "$LOOP_DIR"/* "$LOOP_DIR"/closed-*/*; do
+        [ -f "$p" ] || continue
+        [ "$(g_sha256_file "$p")" = "$h" ] && return 0
+      done
+      return 1 ;;
+    file:*)
+      p=${t#file:}
+      [ -n "$p" ] && [ -e "$ROOT/$p" ] && return 0
+      return 1 ;;
+    cmd:*|verdict:*|predicate:*|ts:*)
+      return 1 ;;
+    *)
+      [ -n "$t" ] && [ -e "$ROOT/$t" ] && return 0
+      return 1 ;;
+  esac
+}
+
+check_jg_01() {
+  local f="$LOOP_DIR/decisions.tsv" n=0 bad=0 rn dec ev res tok hit mal
+  [ -f "$f" ] || { printf 'no loop record in this repo - no judge verdict to check\n'; return 3; }
+  mal=$(loop_malformed_rows | head -n 3 | paste -sd' ' -)
+  if [ -n "$mal" ]; then
+    printf 'decisions.tsv row(s) %s carry fewer columns than the header - a row nothing reads is a row nothing checks\n' "$mal"
+    bad=1
+  fi
+  while IFS=$'\t' read -r rn dec ev res; do
+    [ -n "$rn" ] || continue
+    case "$dec" in verdict:*) ;; *) continue ;; esac
+    n=$((n + 1))
+    hit=0
+    for tok in $(printf '%s' "$ev" | tr ',' ' '); do
+      if loop_token_resolves "$tok"; then hit=1; break; fi
+    done
+    if [ "$hit" -eq 0 ]; then
+      printf 'row %s: %s cites no handle that resolves: "%s"\n' "$rn" "$dec" "${ev:-<empty>}"
+      printf '  a handle is sha:<hex> (a commit in this repo), file:<path>, sha256:<hex> (a file under .goblin/loop/), or an existing path\n'
+      bad=1
+    fi
+  done < <(loop_decision_rows)
+  [ "$bad" -eq 0 ] || return 1
+  printf '%d judge verdict row(s), each citing a handle the repo resolves\n' "$n"
+  return 0
+}
+
+# The profiles a role resolves to (one per lane), or nothing when the role has no lane.
+role_lane_profiles() {
+  resolve_role_models "$1" | awk -F'\t' 'NF >= 2 && $2 != "" { print $2 }' | sort -u
+}
+
+# Non-zero when ANY lane of the role has no provider/model. BOTH sentinels count as unresolved:
+# the installed path prints `?` (resolve_role_models, `${prov:-?}`) and the checkout path prints
+# `unknown` - a check that greps for one of them passes on the other.
+role_unresolved() {
+  local line p prov model
+  while IFS=$'\t' read -r line p prov model _; do
+    [ -n "$p" ] || continue
+    case "$prov" in '?'|unknown|'') return 0 ;; esac
+    case "$model" in '?'|unknown|'') return 0 ;; esac
+  done < <(resolve_role_models "$1")
+  return 1
+}
+
+check_jg_02() {
+  local judge_profiles code_profiles shared judge_unres code_unres
+  if [ ! -f "$MODELS_FILE" ]; then
+    printf 'no model mapping configured (%s absent) - advisory\n' "$MODELS_FILE"
+    printf 'remedy: add a `judge:` entry beside the code lane in the file declared as models_file: in %s\n' "$CONFIG"
+    return 2
+  fi
+  judge_profiles=$(role_lane_profiles judge)
+  code_profiles=$(role_lane_profiles code)
+  if [ -z "$judge_profiles" ] || [ -z "$code_profiles" ]; then
+    printf 'roles.yaml did not resolve both lanes (judge: %s, code: %s) - advisory\n' \
+      "${judge_profiles:-none}" "${code_profiles:-none}"
+    printf 'remedy: role-judge needs a profiles: list and a profile for it in the mapping file\n'
+    return 2
+  fi
+  role_unresolved judge; judge_unres=$?
+  role_unresolved code; code_unres=$?
+  if [ "$judge_unres" -eq 0 ] || [ "$code_unres" -eq 0 ]; then
+    printf 'unresolved lane - advisory (judge: %s, code: %s)\n' \
+      "$([ "$judge_unres" -eq 0 ] && printf 'no provider/model' || printf 'ok')" \
+      "$([ "$code_unres" -eq 0 ] && printf 'no provider/model' || printf 'ok')"
+    printf 'remedy: add the missing profile to the file declared as models_file: in %s - goblin-stack reads that file and never writes it\n' "$CONFIG"
+    return 2
+  fi
+  shared=$(printf '%s\n' "$judge_profiles" | grep -Fxf <(printf '%s\n' "$code_profiles") | head -n 1)
+  if [ -n "$shared" ]; then
+    printf 'the judge lane and the author (code) lane share the profile "%s" - the judge is the author\n' "$shared"
+    return 1
+  fi
+  printf 'judge lane [%s] and code lane [%s] are disjoint\n' \
+    "$(printf '%s' "$judge_profiles" | paste -sd, -)" "$(printf '%s' "$code_profiles" | paste -sd, -)"
+  return 0
+}
+
+check_lp_01() {
+  if ! loop_present; then loop_no_record; return 3; fi
+  local p="$LOOP_DIR/predicate" f="$LOOP_DIR/first-run" n fr fr_ts row1_ts a b
+  [ -f "$p" ] || { printf 'no .goblin/loop/predicate - the loop declared no exit condition\n'; return 1; }
+  n=$(grep -cvE '^[[:space:]]*(#|$)' "$p")
+  if [ "$n" -ne 1 ]; then
+    printf 'the predicate must be exactly ONE command; found %s non-blank non-comment line(s)\n' "$n"
+    return 1
+  fi
+  [ -f "$f" ] || { printf 'no .goblin/loop/first-run - the predicate was never run before iteration 1\n'; return 1; }
+  fr=$(head -n 1 "$f")
+  case "$fr" in
+    "exit="[0-9]*" ts="*) ;;
+    *) printf 'first-run must read "exit=<n> ts=<ISO8601>", got "%s"\n' "$fr"; return 1 ;;
+  esac
+  fr_ts=$(printf '%s' "$fr" | sed -n 's/.* ts=//p')
+  case "$fr_ts" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*) ;;
+    *) printf 'first-run ts is not an ISO8601 timestamp: "%s"\n' "$fr_ts"; return 1 ;;
+  esac
+  row1_ts=$(awk -F'\t' 'NR > 1 && NF >= 6 { print $1; exit }' "$LOOP_DIR/decisions.tsv" 2>/dev/null)
+  if [ -n "$row1_ts" ]; then
+    a=$fr_ts; b=$row1_ts
+    if [ "$a" \> "$b" ]; then
+      printf 'the recorded first run (%s) is AFTER the first log row (%s) - it did not run before iteration 1\n' "$fr_ts" "$row1_ts"
+      return 1
+    fi
+  fi
+  printf 'one predicate command; first run (%s) is at or before the first log row\n' "$fr"
+  return 0
+}
+
+check_lp_02() {
+  if ! loop_present; then loop_no_record; return 3; fi
+  local p="$LOOP_DIR/predicate" pin="$LOOP_DIR/predicate.sha256" want have
+  [ -f "$p" ] || { printf 'no .goblin/loop/predicate to pin\n'; return 1; }
+  [ -f "$pin" ] || { printf 'no .goblin/loop/predicate.sha256 - the predicate was never pinned at loop start\n'; return 1; }
+  want=$(head -n 1 "$pin" | tr -d '[:space:]')
+  have=$(g_sha256_file "$p")
+  if [ "$want" != "$have" ]; then
+    printf 'the predicate changed after the loop was pinned\n  pinned %s\n  now    %s\n' "$want" "$have"
+    printf 'remedy: close this loop - commit the green state, move the predicate under .goblin/loop/closed-<date>/, and open a new one with a re-recorded pin. Never automatic.\n'
+    return 1
+  fi
+  printf 'predicate pin ok (%s)\n' "$have"
+  return 0
+}
+
+check_lp_03() {
+  if ! loop_present; then loop_no_record; return 3; fi
+  local f="$LOOP_DIR/budget" b ceil n bad=0
+  [ -f "$f" ] || { printf 'no .goblin/loop/budget - the loop declared no turn budget\n'; return 1; }
+  b=$(head -n 1 "$f" | tr -d '[:space:]')
+  case "$b" in
+    ''|*[!0-9]*) printf 'budget must be a positive integer, got "%s"\n' "$b"; return 1 ;;
+  esac
+  [ "$b" -gt 0 ] || { printf 'budget must be a positive integer, got "%s"\n' "$b"; return 1; }
+  ceil=$LOOP_MAX_TURNS_CEILING
+  case "$ceil" in ''|*[!0-9]*) ceil=20 ;; esac
+  if [ "$b" -gt "$ceil" ]; then
+    printf 'budget %s exceeds loop_max_turns_ceiling %s in the config\n' "$b" "$ceil"
+    bad=1
+  fi
+  if [ ! -f "$LOOP_DIR/decisions.tsv" ]; then
+    printf 'no decisions.tsv - the loop declared a budget and kept no record\n'
+    return 1
+  fi
+  n=$(awk -F'\t' 'NR > 1 && NF >= 6 && $3 ~ /^verdict:/ { c++ } END { print c+0 }' "$LOOP_DIR/decisions.tsv")
+  if [ "$n" -gt "$b" ]; then
+    printf 'the record holds %s verdict row(s) against a declared budget of %s\n' "$n" "$b"
+    bad=1
+  fi
+  [ "$bad" -eq 0 ] || return 1
+  printf 'budget %s (ceiling %s), %s verdict row(s) recorded\n' "$b" "$ceil" "$n"
+  return 0
+}
+
+check_lp_04() {
+  if ! loop_present; then loop_no_record; return 3; fi
+  [ -f "$LOOP_DIR/decisions.tsv" ] || { printf 'no decisions.tsv to read\n'; return 1; }
+  local prev_ev="" streak=0 nums="" rn dec ev res
+  while IFS=$'\t' read -r rn dec ev res; do
+    [ -n "$rn" ] || continue
+    case "$dec" in verdict:*) ;; *) continue ;; esac
+    if [ -n "$ev" ] && [ "$ev" = "$prev_ev" ] && [ "$res" != "predicate:green" ]; then
+      streak=$((streak + 1))
+      nums="$nums $rn"
+    else
+      streak=1
+      nums=" $rn"
+    fi
+    prev_ev="$ev"
+    if [ "$streak" -ge 3 ]; then
+      printf 'no progress: rows%s share the evidence pointer "%s" and none reached predicate:green\n' "$nums" "$ev"
+      printf '  a loop making no progress stops and writes up why; it does not spend its budget thrashing\n'
+      return 1
+    fi
+  done < <(loop_decision_rows)
+  printf 'no three consecutive verdict rows share an evidence pointer without reaching predicate:green\n'
+  return 0
+}
+
+check_lp_05() {
+  if ! loop_present; then loop_no_record; return 3; fi
+  [ -f "$LOOP_DIR/decisions.tsv" ] || { printf 'no decisions.tsv to read\n'; return 1; }
+  local last rn res s n
+  last=$(awk -F'\t' 'NR > 1 && NF >= 6 && $3 ~ /^verdict:/ { rn = NR; res = $6 } END { if (rn) print rn "\t" res }' "$LOOP_DIR/decisions.tsv")
+  if [ -z "$last" ]; then
+    printf 'the record holds no verdict row - there is no closing state to audit\n'
+    return 3
+  fi
+  rn=${last%%$'\t'*}
+  res=${last#*$'\t'}
+  if [ "$res" = "predicate:green" ]; then
+    printf 'the last verdict row (row %s) reached predicate:green - no write-up required\n' "$rn"
+    return 0
+  fi
+  s="$LOOP_DIR/stuck.md"
+  [ -f "$s" ] || { printf 'the loop ended at "%s" (row %s) and left no .goblin/loop/stuck.md\n' "${res:-<empty>}" "$rn"; return 1; }
+  n=$(grep -c '[^[:space:]]' "$s")
+  if [ "$n" -lt 3 ]; then
+    printf 'stuck.md holds %s non-blank line(s); a write-up needs at least 3\n' "$n"
+    return 1
+  fi
+  grep -q 'predicate' "$s" || { printf 'stuck.md does not name the predicate it failed to satisfy\n'; return 1; }
+  printf 'the loop ended at "%s" (row %s) and stuck.md names the predicate in %s line(s)\n' "$res" "$rn" "$n"
+  return 0
+}
+
 # ================================================================ runner ======
 
 PASS=0; FAIL=0; ADV=0; SKIP=0; BAD=0
@@ -1469,7 +1763,10 @@ else
       `Record<string, any>` is missed and a `: any` inside a string is reported
       (docs/LIMITS.md #27); and no check here can reach a ban IN CONTEXT — the row proves
       the forbidden path fails mechanically, never that the ban reached the agent that
-      wrote the line.
+      wrote the line. The judge/loop lane adds its own: every JG-/LP- row reads a RECORD, so
+      it proves a handle, a pin, a budget and a pointer exist — never that the loop made
+      progress (a changed pointer is a proxy, docs/LIMITS.md #33), never which lane returned
+      a verdict, and never that the predicate was the right one or was really run.
 SEE
 fi
 
