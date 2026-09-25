@@ -93,15 +93,16 @@ Each step is independently useful and the later ones build on the earlier:
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .goblin/bin/goblin-verify         # fresh class A: 42 passed, 0 failed, 9 advisory, 11 skipped
+    .goblin/bin/goblin-verify         # fresh class A: 42 passed, 0 failed, 9 advisory, 14 skipped
     hermes skills trust <target>      # one-time, so the project-tier skills load
 
-A fresh class-A install is **green** — `42 passed, 0 failed, 9 advisory, 11 skipped`, exit 0 — and
-that is measured, not assumed (`docs/CONTRACTS.md`). Eleven rows skip with a reason: `HS-02` (no
+A fresh class-A install is **green** — `42 passed, 0 failed, 9 advisory, 14 skipped`, exit 0 — and
+that is measured, not assumed (`docs/CONTRACTS.md`). Fourteen rows skip with a reason: `HS-02` (no
 pinned pre-change commit yet), `AU-02`/`AU-03` (no report has been filed, so there is nothing to
 dedup and no reporter run to audit), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile,
-no audit record), `PF-01` (no measured perf baseline) and `BN-01`/`BN-02`/`BN-03`/`BN-05` (no
-`src/` for a ban to read). The class's required parts that only a round can produce pass *vacuously*
+no audit record), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-03`/`BN-05` (no
+`src/` for a ban to read) and `FM-01`/`FM-02`/`VA-01` (no feature map and no declared
+`verify_doctor:` yet). The class's required parts that only a round can produce pass *vacuously*
 (zero `reviews/*.md` to check; the declared gate is still the shipped floor), so the first-step
 list is a list of work, not a list of FAILs.
 
@@ -143,7 +144,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .goblin/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the class's full green path (`42 passed, 0 failed, 9 advisory, 11 skipped`, exit 0 for
+   Success is the class's full green path (`42 passed, 0 failed, 9 advisory, 14 skipped`, exit 0 for
    class A) with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three

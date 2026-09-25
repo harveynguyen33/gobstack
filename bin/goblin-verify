@@ -173,6 +173,15 @@ PRACTICE_SHA=$(g_unquote "$(g_yaml_scalar "$CONFIG" practice_sha256)")
 # skip behaviour rather than failing an adopted repo on an upgrade.
 [ -n "$SCAFFOLD_CHECKS" ] || SCAFFOLD_CHECKS=no
 
+# The feature map (G1). feature_map: EMPTY is the meaningful state, not a broken config: a
+# fresh install has no map and the two FM rows must SKIP with that reason (the replay.commit:
+# "" shape, docs/LIMITS.md #11). source_root: is what an entry path resolves against.
+FEATURE_MAP=$(g_yaml_scalar "$CONFIG" feature_map)
+SOURCE_ROOT=$(g_unquote "$(g_yaml_scalar "$CONFIG" source_root)")
+[ -n "$SOURCE_ROOT" ] || SOURCE_ROOT=.
+VERIFY_DOCTOR=$(g_unquote "$(g_yaml_scalar "$CONFIG" verify_doctor)")
+export FEATURE_MAP SOURCE_ROOT VERIFY_DOCTOR
+
 if [ -d "$ROOT/$HARNESS_DIR_RAW" ]; then
   export GOBLIN_HARNESS_DIR="$ROOT/$HARNESS_DIR_RAW"
   export GOBLIN_HARNESS_REL="$HARNESS_DIR_RAW"
@@ -1194,6 +1203,170 @@ check_cl_02() {
   else
     printf 'archive: false - the full class requirement applies\n'
   fi
+  return 0
+}
+
+# ---- the feature map (G1): FM-01, FM-02, VA-01 ----------------------------------------------
+# P6 authors the map (skills/goblin-feature-map); these rows keep it honest. All three SKIP
+# with a reason when their declared config value is empty, because a fresh install has neither
+# a map nor a doctor and must not be born RED (the D8 shape).
+
+fm_readme() {  # absolute path of the declared map README
+  case "$FEATURE_MAP" in
+    /*) printf '%s' "$FEATURE_MAP" ;;
+    *)  printf '%s' "$ROOT/$FEATURE_MAP" ;;
+  esac
+}
+fm_dir() { dirname "$(fm_readme)"; }
+
+# The map directory RELATIVE to $ROOT. The entry-path list lives inside the map, so a token
+# written there would otherwise be found by FM-02's own grep and read as "still resolves" even
+# after the route it names was renamed - the exclusion is what makes the row able to go RED.
+fm_dir_rel() {
+  local d; d=$(fm_dir)
+  case "$d" in
+    "$ROOT"/*) printf '%s' "${d#"$ROOT"/}" ;;
+    *) printf '%s' "$d" ;;
+  esac
+}
+
+# fm_frontmatter <file> - the body of the leading --- block.
+fm_frontmatter() {
+  awk 'BEGIN{fm=0} /^---[[:space:]]*$/ {fm++; if (fm==1) next; else exit} fm==1 {print}' "$1"
+}
+
+# fm_entry_paths <file> - one declared entry path per line.
+fm_entry_paths() {
+  fm_frontmatter "$1" | awk '
+    /^entry_paths:/      { inb = 1; next }
+    inb && /^  - /       { v = $0; sub(/^  - /, "", v); sub(/[[:space:]]+$/, "", v); print v; next }
+    inb && !/^[[:space:]]/ { inb = 0 }
+  '
+}
+
+# fm_h2_ok <file> - exactly the four contract H2s, in order. The third is a PREFIX match: the
+# map names the project's own harness ("Driving it with <harness>"), so a literal would make the
+# rule un-portable.
+fm_h2_ok() {
+  local n=0 ok=1 line
+  while IFS= read -r line; do
+    n=$((n + 1))
+    case "$n" in
+      1) [ "$line" = "Sub-features" ] || ok=0 ;;
+      2) [ "$line" = "How to get to it (user POV)" ] || ok=0 ;;
+      3) case "$line" in "Driving it with "*) ;; *) ok=0 ;; esac ;;
+      4) [ "$line" = "Gotchas" ] || ok=0 ;;
+      *) ok=0 ;;
+    esac
+  done < <(grep -n '^## ' "$1" | sed 's/^[0-9]*:## //; s/[[:space:]]*$//')
+  [ "$n" -eq 4 ] && [ "$ok" -eq 1 ]
+}
+
+# fm_feature_files - every feature file. The README is the index, not a feature.
+fm_feature_files() {
+  local f
+  for f in "$(fm_dir)"/*.md; do
+    [ -f "$f" ] || continue
+    case "$(basename "$f")" in README.md) continue ;; esac
+    printf '%s\n' "$f"
+  done
+}
+
+check_fm_01() {
+  [ -n "$FEATURE_MAP" ] || {
+    printf 'feature_map: is empty - no map is declared, so there is nothing to index\n'
+    return 3
+  }
+  local readme; readme=$(fm_readme)
+  if [ ! -f "$readme" ]; then
+    printf 'feature_map: %s does not exist - a declared map that is absent is a hole, not a skip\n' "$FEATURE_MAP"
+    return 1
+  fi
+  local dir f b link slug eps n=0 bad=0
+  dir=$(fm_dir)
+  # index hygiene: every feature file is linked, every relative link resolves
+  while IFS= read -r f; do
+    n=$((n + 1)); b=$(basename "$f")
+    grep -qF "](./$b)" "$readme" \
+      || { printf 'feature file %s is not linked from %s\n' "$b" "$FEATURE_MAP"; bad=1; }
+  done < <(fm_feature_files)
+  [ "$n" -gt 0 ] \
+    || { printf '%s indexes no feature file - an empty map is a hole, not a pass\n' "$FEATURE_MAP"; bad=1; }
+  while IFS= read -r link; do
+    [ -e "$dir/$link" ] || { printf '%s links %s, which does not resolve\n' "$FEATURE_MAP" "$link"; bad=1; }
+  done < <(sed -n 's/.*](\.\/\([^)]*\.md\)).*/\1/p' "$readme")
+  # the per-feature entry contract
+  while IFS= read -r f; do
+    b=$(basename "$f")
+    slug=$(fm_frontmatter "$f" | sed -n 's/^feature:[[:space:]]*//p' | head -n 1)
+    [ "$slug" = "${b%.md}" ] \
+      || { printf '%s: feature: is "%s" but the filename stem is "%s"\n' "$b" "${slug:-<absent>}" "${b%.md}"; bad=1; }
+    eps=$(fm_entry_paths "$f" | grep -c . || true)
+    [ "${eps:-0}" -ge 1 ] \
+      || { printf '%s: declares no entry_paths: - nothing for FM-02 to resolve\n' "$b"; bad=1; }
+    fm_h2_ok "$f" \
+      || { printf '%s: the H2s are not the contract four, in order (Sub-features / How to get to it (user POV) / Driving it with <harness> / Gotchas)\n' "$b"; bad=1; }
+  done < <(fm_feature_files)
+  [ "$bad" -eq 0 ] || return 1
+  printf '%s: %d feature file(s) indexed, each with the four-H2 contract and >=1 entry path\n' \
+    "$FEATURE_MAP" "$n"
+  return 0
+}
+
+check_fm_02() {
+  [ -n "$FEATURE_MAP" ] || {
+    printf 'feature_map: is empty - no map is declared, so there are no entry paths to resolve\n'
+    return 3
+  }
+  local readme; readme=$(fm_readme)
+  if [ ! -f "$readme" ]; then
+    printf 'feature_map: %s does not exist - a declared map that is absent is a hole, not a skip\n' "$FEATURE_MAP"
+    return 1
+  fi
+  local sr srpath reldir f b e v m t bad=0
+  sr="$SOURCE_ROOT"
+  case "$sr" in /*) srpath="$sr" ;; *) srpath="$ROOT/$sr" ;; esac
+  reldir=$(fm_dir_rel)
+  while IFS= read -r f; do
+    b=$(basename "$f")
+    v=$(fm_frontmatter "$f" | sed -n 's/^verified:[[:space:]]*//p' | head -n 1)
+    while IFS= read -r e; do
+      [ -n "$e" ] || continue
+      m=$( cd "$ROOT" && grep -rlF --exclude-dir=.git -- "$e" "$sr" 2>/dev/null \
+             | grep -v -e "^$reldir/" -e "^\./$reldir/" | head -n 1 )
+      if [ -z "$m" ]; then
+        printf '%s: entry path "%s" no longer occurs under %s\n' "$b" "$e" "$sr"
+        bad=1; continue
+      fi
+      [ -n "$v" ] || continue
+      t=$( cd "$ROOT" && git log -1 --format=%cs -- "$m" 2>/dev/null )
+      [ -n "$t" ] || continue
+      if [ "$t" \> "$v" ]; then
+        printf '%s: "%s" resolves to %s, last changed %s - after the map was verified %s\n' \
+          "$b" "$e" "$m" "$t" "$v"
+        bad=1
+      fi
+    done < <(fm_entry_paths "$f")
+  done < <(fm_feature_files)
+  [ "$bad" -eq 0 ] || return 1
+  printf 'every declared entry path still resolves under %s, and none changed after its verified: date\n' "$sr"
+  return 0
+}
+
+check_va_01() {
+  [ -n "$VERIFY_DOCTOR" ] || {
+    printf 'verify_doctor: is empty - no doctor is declared, so "the generated skill was executed once" is not provable here\n'
+    return 3
+  }
+  # The DECLARED command, run the same way GT-02 runs a declared gate. It is never a string read
+  # out of source (the v0.2 blocker): the config is the thing a human wrote on purpose.
+  local out rc
+  out=$( cd "$ROOT" && bash -c "$VERIFY_DOCTOR" 2>&1 ); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    printf 'verify_doctor: "%s" -> exit %d\n%s\n' "$VERIFY_DOCTOR" "$rc" "$(printf '%s' "$out" | head -n 3)"
+    return 1
+  fi
+  printf 'verify_doctor: "%s" -> exit 0\n' "$VERIFY_DOCTOR"
   return 0
 }
 

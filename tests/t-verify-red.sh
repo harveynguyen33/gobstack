@@ -3,12 +3,15 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One `expect_red` per target-scope row: 73 controls over the 62 target rows (42 at v0.1 plus the
+# One `expect_red` per target-scope row: 80 controls over the 65 target rows (42 at v0.1 plus the
 # five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01, plus the
 # five added with BN-00..BN-03 and BN-05, plus the three F4/G4 extras, the two V1 extras (G8-2,
-# G8-5), the second BN-00 control, and the five W1 extras: three G8-3 gate-cmd forms, the V3-2
-# exit-code ban control, and the G8-6b ceiling/baseline control (whose matching `expect_green` is
-# the sixth). The `--only <id>` form is used
+# G8-5), the second BN-00 control, the five W1 extras (three G8-3 gate-cmd forms, the V3-2
+# exit-code ban control, and the G8-6b ceiling/baseline control), and the seven added with G1's
+# FM-01/FM-02/VA-01 - four of FM-01's clauses, FM-02's two, and the failing doctor. Seven of the
+# controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, and two that seed a feature
+# map and require it to PASS, which is the half of a control that proves a new row is not
+# always-red). The `--only <id>` form is used
 # so a mutation in one row cannot be masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
@@ -25,8 +28,9 @@
 # (`expect_red`) and m_no_date_example (`expect_green`). Neither is green on both trees - measured
 # in V1.md against 43f7f69 with this same file.
 #
-# WHAT THE 8 ADVISORY-ROW CONTROLS DO AND DO NOT PROVE. Eight target rows are labelled
-# `advisory` by design (HP-04, HS-03, CM-02, MD-02, MD-03, PG-04, DOC-01, DOC-02): their rules
+# WHAT THE ADVISORY-ROW CONTROLS DO AND DO NOT PROVE. Nine target rows are labelled
+# `advisory` by design (HP-04, HS-03, CM-02, MD-02, MD-03, PG-04, DOC-01, DOC-02, SC-09 — the
+# ninth landed with G4's guard rails; this sentence said eight until 2026-09-25): their rules
 # are not mechanically checkable, so there is no violation of the *rule* to produce. Their
 # control mutates the row's check column to a command that fails, and asserts the run then
 # reports that row FAIL. That proves the row is wired into the runner and that its id is
@@ -112,7 +116,7 @@ restore_all() {
   rm -f reviews/fixture-*.md
   rm -rf reports
   rm -rf .github
-  rm -rf dist src app
+  rm -rf dist src app .hermes/skills/verify-fix
   git add -A >/dev/null 2>&1
   git commit -q -m "test: restore fixture" >/dev/null 2>&1 || true
 }
@@ -444,10 +448,99 @@ expect_red   "an any type in application TypeScript"               BN-01 1 m_bn_
 expect_red   "V3-2: a ban violated by exit code alone (no stdout)"  BN-01 1 m_bn_exit1_detect
 expect_red   "a ts-expect-error suppression"                 BN-02 1 m_bn_02
 expect_red   "a fetch() called from a component"                BN-03 1 m_bn_03
-expect_red   "an import across a declared layer boundary"       BN-05 1 m_bn_05
+expect_red "an import across a declared layer boundary"       BN-05 1 m_bn_05
 # BN-05 is a SKIP (not a FAIL) when no layers are declared - the HS-01 precedent: nothing to
 # read is reported as a reason, never as a pass.
 expect_green "no layers declared -> BN-05 skips with a reason"  BN-05 m_bn_05_nolayers
+
+# ---- G1: the feature map (FM-01, FM-02) and the generated skill's doctor (VA-01) --------------
+# P6 authors the map (skills/goblin-feature-map); FM-01 is the entry contract + index hygiene,
+# FM-02 the source tripwire, VA-01 the declared doctor. All three are NEW rows, so there is no
+# pre-change tree to be RED on: PR-03's other branch is "a deliberately broken copy of the module
+# under test", which is what these mutations are. The map is SEEDED first - a contract map that
+# passes both FM rows, which is the half of the control that proves the rows are not always-red -
+# and then one clause is broken at a time.
+#
+# The empty-config case is asserted first, because it is the state every fresh install is in: a
+# declared value that is empty must report SKIP with its own reason, never a vacuous PASS (the
+# shape PROJECT-PRACTICE section 3 calls out and PG-01..PG-03 still have).
+MAPDIR=".hermes/skills/verify-fix/features"
+FM_SRC="src/panel/index.ts"
+plant_map() {
+  mkdir -p "$MAPDIR" "$(dirname "$FM_SRC")"
+  printf 'panel-root\n' > "$FM_SRC"
+  cat > "$MAPDIR/README.md" <<'MAPEOF'
+# Features
+
+## Baseline preconditions
+- the app builds
+
+## Driving conventions
+- literal commands only
+
+## Proof and skip reporting
+- a skip names the feature id and the entry point
+
+## Features
+- [Panel](./panel.md) covers the side panel
+MAPEOF
+  cat > "$MAPDIR/panel.md" <<MAPEOF
+---
+feature: panel
+entry_paths:
+  - panel-root
+verified: $(date +%F)
+---
+# Panel
+The panel shows the total for the current selection.
+
+## Sub-features
+- the running total
+
+## How to get to it (user POV)
+- open the app and select a row
+
+## Driving it with node
+Preconditions: the app is built.
+Select a row. Run \`node -e 'process.stdout.write("1")'\`. The total updates.
+
+## Gotchas
+- a row with no children shows no total
+MAPEOF
+  sed -i "s|^feature_map: .*|feature_map: $MAPDIR/README.md|" .goblin/goblin.yaml
+  git add -A >/dev/null 2>&1; git commit -q -m "test: seed the feature map" >/dev/null 2>&1
+}
+# Every mutation below seeds the map first and then breaks exactly one clause.
+m_fm_plant()        { plant_map; }
+m_fm_01_unindex()   { plant_map; sed -i '/^- \[Panel\](\.\/panel\.md)/d' "$MAPDIR/README.md"; }
+m_fm_01_dangling()  { plant_map; printf -- '- [Gone](./gone.md) covers nothing\n' >> "$MAPDIR/README.md"; }
+m_fm_01_h2()        { plant_map; sed -i 's/^## Gotchas$/### Gotchas/' "$MAPDIR/panel.md"; }
+m_fm_01_slug()      { plant_map; sed -i 's/^feature: panel$/feature: sidebar/' "$MAPDIR/panel.md"; }
+m_fm_02_token()     { plant_map; printf 'route-renamed\n' > "$FM_SRC"; }
+m_fm_02_stale()     { plant_map; sed -i 's/^verified: .*/verified: 2020-01-01/' "$MAPDIR/panel.md"; }
+m_va_01_fail()      { sed -i 's|^verify_doctor: .*|verify_doctor: false|' .goblin/goblin.yaml; }
+
+# The empty config is the fresh-install state: each row SKIPs (exit 3 from the builtin, which the
+# runner reports as SKIP and does not count as a failure), and the reason names WHY.
+for pair in "FM-01:no map is declared" "FM-02:no entry paths to resolve" "VA-01:no doctor is declared"; do
+  rid=${pair%%:*}; want=${pair#*:}
+  out=$(bash .goblin/bin/goblin-verify --only "$rid" 2>&1); rc=$?
+  printf '%s' "$out" | grep -q "^SKIP  $rid.*$want"; hit=$?
+  check "$rid with an empty config SKIPs with its reason (not a vacuous pass)" \
+    "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
+done
+
+# The fixture is GREEN again after the last of these: every mutation is reverted by restore_all,
+# which also removes the seeded map (nothing below is measured against a planted tree).
+expect_green "a seeded feature map passes FM-01"  FM-01 m_fm_plant
+expect_red   "a feature file that is not indexed" FM-01 1 m_fm_01_unindex
+expect_red   "an index link that does not resolve" FM-01 1 m_fm_01_dangling
+expect_red   "an entry H2 demoted to H3"           FM-01 1 m_fm_01_h2
+expect_red   "a feature: that is not the filename stem" FM-01 1 m_fm_01_slug
+expect_green "a seeded feature map resolves under source_root" FM-02 m_fm_plant
+expect_red   "a declared entry path renamed in source"  FM-02 1 m_fm_02_token
+expect_red   "an entry path changed after the map was verified" FM-02 1 m_fm_02_stale
+expect_red   "a verify_doctor that exits non-zero" VA-01 1 m_va_01_fail
 
 expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip

@@ -111,7 +111,7 @@ Output is one line per executed row, in manifest order:
     FAIL  GT-02  gate commit: false -> exit 1
     ADV   MD-02  code lane and review lane both resolve to the same family
     SKIP  HS-02  no pinned pre-change commit yet - REPLAY not provable
-          42 passed, 0 failed, 9 advisory, 11 skipped
+          42 passed, 0 failed, 9 advisory, 14 skipped
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -131,12 +131,14 @@ is not signed (`docs/LIMITS.md` #18).
 ### A fresh install verifies green
 
 Measured on a fresh class-A install, committed with no hand edit: **`42 passed, 0 failed,
-9 advisory, 11 skipped`, exit 0.** Eleven rows skip with a reason: `HS-02` — no pre-change commit
+9 advisory, 14 skipped`, exit 0.** Fourteen rows skip with a reason: `HS-02` — no pre-change commit
 is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `AU-02` and `AU-03`, which
 have no report to audit in a repo where no reporter has run — `SC-06`, `SC-07` and `SC-08`, which
 have no dependency manifest, no lockfile and no audit record to read yet — `PF-01`, which has
-no measured perf baseline — and `BN-01`/`BN-02`/`BN-03`/`BN-05`, which have no `src/` tree for a
-ban to read. Every one is a *not yet*, not a pass.
+no measured perf baseline — `BN-01`/`BN-02`/`BN-03`/`BN-05`, which have no `src/` tree for a
+ban to read — and `FM-01`/`FM-02`/`VA-01`, which have no feature map and no declared
+`verify_doctor:` yet (`feature_map:` and `verify_doctor:` ship empty on purpose: a fresh install
+must not be born RED — G1, `docs/LIMITS.md` #30). Every one is a *not yet*, not a pass.
 
 The class's required parts that only a round can produce do **not** fail on a fresh install; they
 pass **vacuously**, and that is the honest reading: `PG-01`..`PG-03` iterate over `reviews/*.md`
@@ -150,10 +152,11 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a class's `-` (off) real.
 - **The opt-out numbers are pinned (V3-3).** A fresh class-A install with `--skills no` verifies
-  `38 passed, 0 failed, 9 advisory, 15 skipped`, exit 0, and `tests/t-install-off-switch.sh`
+  `38 passed, 0 failed, 9 advisory, 18 skipped`, exit 0, and `tests/t-install-off-switch.sh`
   asserts that line: a silent drift in the opt-out path is caught rather than left as a number
   nobody wrote down (the `--skills no` count moved from `37/0/9/11` at v0.2 to here when the ban
-  rows landed, and no file recorded the shift).
+  rows landed, and no file recorded the shift; **the skipped count moved 15 → 18 on 2026-09-25
+  (G1)** — the three new feature-map rows skip on the same path for the same reason, measured).
 - **Whole harness:** `--uninstall` deletes the `files` list plus `.goblin/goblin.yaml`, removes
   every directory that leaves empty (deepest first, after `installed.json` itself is gone — the
   order that used to leave `.goblin/` and the sixteen `.hermes/skills/*` directories behind),

@@ -10,7 +10,7 @@ single source of truth).
 this repo via `tests/run-tests.sh`). `enforced_by` is one of four values, and the enum is
 closed: `script`, `lint`, `gate`, `advisory`.
 
-Measured shape of this table: **67 rows** - 62 target, 5 source; advisory 9, gate 19, lint 20, script 15, test 4.
+Measured shape of this table: **70 rows** - 65 target, 5 source; advisory 9, gate 20, lint 22, script 15, test 4.
 
 ## The rows
 
@@ -78,6 +78,9 @@ Measured shape of this table: **67 rows** - 62 target, 5 source; advisory 9, gat
 | `BN-02` | target | lint | No `@ts-ignore` / `@ts-expect-error` suppressions. | `goblin-verify --only BN-02` (builtin) | Text probe: it sees the directive wherever it appears, including inside a string, and cannot tell a suppression hiding a real error from one on a line that would compile anyway. SKIPs when the ban is not in `bans:` or its globs match no file. |
 | `BN-03` | target | lint | No direct network call from a component. | `goblin-verify --only BN-03` (builtin) | Text probe over the declared component globs: it stops the call and cannot tell whether a data layer was written or the call merely moved into a helper. SKIPs when the ban is not in `bans:` or its globs match no file. |
 | `BN-05` | target | lint | No import across a declared layer boundary. | `goblin-verify --only BN-05` (builtin) | Reads the `layers:` list; an empty list SKIPs with a reason, never a vacuous pass. It matches an import path naming the target directory's last segment - module aliases and dynamic imports are not seen. SKIPs when no file matches its globs. |
+| `FM-01` | target | lint | Every feature file is indexed from the map README, declares its slug and at least one entry path, and carries the four-H2 entry contract. | `goblin-verify --only FM-01` (builtin) | SKIPs (exit 3) when feature_map: is empty - a fresh install has no map and must not be born RED (the D8 shape). When a map IS declared: the README must exist, every features/*.md must be linked from it in the (./<slug>.md) form and every relative .md link must resolve, each feature file's `feature:` must equal its filename stem, it must declare >=1 `entry_paths:`, and its H2s must be exactly Sub-features / How to get to it (user POV) / Driving it with <harness> / Gotchas, in that order. Partial: the README's own H2s are prose this row does not read, and 'the map lists every user-facing feature' is not mechanically checkable - that is docs/LIMITS.md #30, not a row. |
+| `FM-02` | target | lint | Every entry point a feature declares still resolves in source, and no entry path changed after the map was verified. | `goblin-verify --only FM-02` (builtin) | SKIPs (exit 3) when feature_map: is empty. A tripwire, not a proof. The token is searched under source_root with occurrences under the map's own directory excluded - without that exclusion the map's own entry-path list satisfies the search and the row could never go RED. Freshness is `git log -1 --format=%cs` on the resolved file against the feature's `verified:` date, and git sees a FILE change, not a behaviour change: the row can be RED-when-stale and never GREEN-means-fresh. A token that also occurs in a vendored copy or a build artifact is read as resolved, and a `verified:` date is itself a claim the row cannot test (docs/LIMITS.md #30). |
+| `VA-01` | target | gate | The generated verification skill's doctor command runs and exits 0. | `goblin-verify --only VA-01` (builtin) | SKIPs (exit 3) when verify_doctor: is empty (the replay.commit: "" shape). Runs the DECLARED command exactly as GT-02 runs a declared gate, and never a string read out of file content (the v0.2 blocker). Closes P6's stated-but-unenforced clause 'a generated skill that was never executed is a draft': the doctor is the smallest executable proof that the skill's own instructions still run - and it proves only that, never that the doctor tests the right path. |
 | `PR-01` | source | test | The installer never writes outside its target. | `tests/run-tests.sh` | — |
 | `PR-02` | source | test | A second install is a no-op, and an upgrade reports created/updated/unchanged. | `tests/run-tests.sh` | — |
 | `PR-03` | source | test | Every target-scope check goes RED under its own violation. | `tests/run-tests.sh` | — (the negative control the verifier re-runs) |
@@ -86,7 +89,7 @@ Measured shape of this table: **67 rows** - 62 target, 5 source; advisory 9, gat
 
 ## Advisory rows, named
 
-9 of the 67 rows are labelled `advisory`. 8 carry no executable check at all
+9 of the 70 rows are labelled `advisory`. 8 carry no executable check at all
 (they are prose the matrix refuses to pretend about); 1 are advisory-labelled but still
 report their state.
 
@@ -110,9 +113,12 @@ takes it must arrive with a real command. `SK-03` now prints the arithmetic on e
 FAILs`), and a ceiling that is not a number is a FAIL rather than a silent ADVISORY.
 
 Two planned rows each wanted that slot - **`FM-03`** (G1, the feature map) and **`JG-03`**
-(G2, the judge agent) - and **nothing at HEAD decides which of them gets it**. That decision
-is still open and is recorded in `docs/LIMITS.md` (V1). Whichever card lands second must bring
-a real command, or the suite goes RED; the other is the one that spends the slot.
+(G2, the judge agent) - and nothing at HEAD decided which of them got it. **Decided 2026-09-25
+(W2):** G1's `FM-03` does **not** take it. The feature map ships `FM-01` and `FM-02` as real
+commands, and the completeness claim `FM-03` would have carried is recorded in `docs/LIMITS.md`
+#30 instead of as a counted row, so the slot stays free for G2's `JG-03`. The decision is
+recorded in `docs/LIMITS.md` #26; measured after W2, `SK-03` still prints
+`advisory 9 of ceiling 10 (1 free slot)`.
 
 `SK-03`'s count is the count the run itself uses: a row is advisory if its `check` cell says so
 OR its `enforced_by` cell does.

@@ -54,11 +54,12 @@ After installing, in this order:
     hermes skills trust <target>              # one-time, so the project-tier skills load
     .goblin/bin/goblin-audit                  # once, deliberately: the ONLY network step (SC-07)
 
-**A fresh class-A install verifies green: `42 passed, 0 failed, 9 advisory, 11 skipped`, exit 0.**
-Only eleven rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
+**A fresh class-A install verifies green: `42 passed, 0 failed, 9 advisory, 14 skipped`, exit 0.**
+Only fourteen rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
 `AU-02` and `AU-03` have no report to audit; `SC-06`, `SC-07` and `SC-08` have no dependency
 manifest, no lockfile and no audit record to read; `PF-01` has no measured perf baseline; and
-`BN-01`/`BN-02`/`BN-03`/`BN-05` have no `src/` for a ban to read). The parts
+`BN-01`/`BN-02`/`BN-03`/`BN-05` have no `src/` for a ban to read; and `FM-01`/`FM-02`/`VA-01`
+have no feature map and no declared `verify_doctor:` yet). The parts
 that only a round can produce — a first review note, a gate that is not the shipped floor — pass
 *vacuously* rather than failing, and `P8` (`goblin-bootstrap`) still walks them as work to do.
 The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
