@@ -18,7 +18,9 @@
 # overwritten) is t-install-refusal.sh. The verifier's refusal to read an enclosing repo
 # (F2-1) is t-verify-nested.sh; `--uninstall`'s directory cleanup (F2-7) is t-uninstall.sh;
 # the documents that claim to render the matrix (F2-3, F2-4, F2-8, F2-9) are
-# t-doc-sync.sh; and the practice pin's explicit re-pin path (F4-followup) is
+# t-doc-sync.sh; the promises the documents make about this artifact - the command paths they hand
+# a reader and the self-counts they state about it, each enumerated from the docs themselves - are
+# t-doc-promises.sh; and the practice pin's explicit re-pin path (F4-followup) is
 # t-practice-repin.sh. Z1-3's "a rendered install carries no unsubstituted {{...}} token"
 # is t-render-tokens.sh.
 
@@ -88,8 +90,8 @@ fi
 
 # ---- the test scripts --------------------------------------------------------
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
-         t-verify-nested t-uninstall t-doc-sync t-practice-repin t-automation-silent t-audit \
-         t-render-tokens t-gt03-freshness t-doc-guide; do
+         t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
+         t-audit t-render-tokens t-gt03-freshness t-doc-guide; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi
