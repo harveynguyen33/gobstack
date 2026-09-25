@@ -19,7 +19,7 @@
 
 set -uo pipefail
 
-GOBLIN_VERIFY_VERSION="0.4.0"
+GOBLIN_VERIFY_VERSION="0.4.1"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=goblin-lib.sh
 . "$SELF_DIR/goblin-lib.sh"
@@ -524,12 +524,29 @@ check_hs_01() {
 }
 
 check_hs_02() {
-  local env cmd commit d tmp bad=0 f rc base
+  local env cmd commit d tmp bad=0 f rc base name pat
   env=$(g_yaml_block_scalar "$CONFIG" replay env)
   cmd=$(g_yaml_block_scalar "$CONFIG" replay cmd)
   commit=$(g_unquote "$(g_yaml_block_scalar "$CONFIG" replay commit)")
   [ -n "$env" ] || { printf 'replay.env not declared\n'; return 1; }
   [ -n "$cmd" ] || { printf 'replay.cmd not declared\n'; return 1; }
+  # Z1-4: the DECLARED command has to be what runs the harness. Until this fix it was read only
+  # to assert it was non-empty, and the loop below ran `node <file>` itself - so the command and
+  # its `{name}` placeholder were decorative (`grep -rn '{name}' tests/` was 0 hits, and setting
+  # `replay.cmd: false` changed no verdict). A documented mechanism that never executes is the
+  # same species as the regression this repo already shipped once.
+  #   * a command that does not interpolate {name} cannot be running the harness it names, so
+  #     nothing is replayed and "every harness was RED" would be a statement about a command
+  #     that never ran one (the defanged-probe shape, docs/LIMITS.md #28/W5-12);
+  #   * a command that cannot be executed at all (exit 126/127) FAILS rather than counting as a
+  #     RED harness - otherwise a typo'd interpreter would make every harness look proven.
+  pat='{name}'
+  case "$cmd" in
+    *"$pat"*) ;;
+    *) printf 'replay.cmd declares no %s: %s\n' "$pat" "$cmd"
+       printf 'the declared command cannot be running the harness it names, so nothing was replayed\n'
+       return 1 ;;
+  esac
   if [ -z "$commit" ] || ! git -C "$ROOT" rev-parse --verify --quiet "$commit^{commit}" >/dev/null; then
     printf 'no pinned pre-change commit yet (replay.commit empty or unknown) - REPLAY not provable\n'
     return 3
@@ -552,16 +569,23 @@ check_hs_02() {
   for f in "$tmp/wt/$GOBLIN_HARNESS_REL"/*.mjs; do
     [ -e "$f" ] || continue
     base=$(basename "$f")
-    ( cd "$tmp/wt" && env "$env"="$commit" node "$f" ) >/dev/null 2>&1
+    name=${base%.mjs}
+    ( cd "$tmp/wt" && env "$env"="$commit" bash -c "${cmd//$pat/$name}" ) >/dev/null 2>&1
     rc=$?
-    if [ "$rc" -eq 0 ]; then
-      printf '%s was GREEN on the pre-change tree %s - proves nothing\n' "$base" "${commit:0:7}"
-      bad=1
-    fi
+    case "$rc" in
+      0)
+        printf '%s was GREEN on the pre-change tree %s - proves nothing\n' "$base" "${commit:0:7}"
+        bad=1
+        ;;
+      126|127)
+        printf '%s: the declared replay.cmd could not be executed (exit %d): %s\n' "$base" "$rc" "$cmd"
+        bad=1
+        ;;
+    esac
   done
   git -C "$ROOT" worktree remove --force "$tmp/wt" >/dev/null 2>&1
   rm -rf "$tmp"
-  [ "$bad" -eq 0 ] && printf 'every harness was RED at %s\n' "${commit:0:7}"
+  [ "$bad" -eq 0 ] && printf 'every harness was RED at %s (run as: %s)\n' "${commit:0:7}" "$cmd"
   return $bad
 }
 
@@ -968,10 +992,17 @@ check_sc_03() {
   # Clause 1: a client-visible NAME that is secret-shaped. Clause 2: a known secret PREFIX in
   # real build output. The second clause is reported, never silently skipped: a repo with no
   # build output is told so on the line.
-  local hits vs_keys vs_files out n=0 bad=0
-  hits=$(printf '%s' "$(sc_sources 'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD|PASSWD|PRIVATE)')" | head -n 5)
+  local hits hits_all hits_n vs_keys vs_files out n=0 bad=0
+  hits_all=$(sc_sources 'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD|PASSWD|PRIVATE)')
+  # W5-11: this line printed a CHARACTER count as a hit count - `${#hits}` on a multiline
+  # string - so ONE matching line of 70 characters was reported as "70 client-visible
+  # secret-shaped name(s)". The number is the count of matching LINES (capped at five lines of
+  # evidence), which is what the word "name(s)" claims.
+  hits_n=0
+  [ -n "$hits_all" ] && hits_n=$(printf '%s\n' "$hits_all" | grep -c .)
+  hits=$(printf '%s' "$hits_all" | head -n 5)
   if [ -n "$hits" ]; then
-    printf 'client-visible secret-shaped name(s):\n%s\n' "$hits"; bad=1
+    printf 'client-visible secret-shaped name(s): %d\n%s\n' "$hits_n" "$hits"; bad=1
   fi
   out=""
   for d in $SEC_BUILD_OUTPUT; do
@@ -984,9 +1015,9 @@ check_sc_03() {
       && { printf 'a secret-shaped literal is in build output: %s\n' "${f#"$ROOT"/}"; bad=1; }
   done
   if [ "$n" -eq 0 ]; then
-    printf '%d client-visible secret-shaped name(s); no build output to scan for clause 2\n' "${#hits}"
+    printf '%d client-visible secret-shaped name(s); no build output to scan for clause 2\n' "$hits_n"
   else
-    printf '%d client-visible secret-shaped name(s); %d build-output file(s) scanned for secret literals\n' "${#hits}" "$n"
+    printf '%d client-visible secret-shaped name(s); %d build-output file(s) scanned for secret literals\n' "$hits_n" "$n"
   fi
   [ "$bad" -eq 0 ]
 }
@@ -1516,6 +1547,16 @@ check_fm_02() {
         bad=1; continue
       fi
       [ -n "$v" ] || continue
+      # Z1-6: "resolves" must not imply "is tracked". `git log -1 --format=%cs` prints nothing
+      # for a file git cannot date, and the comparison below used to SKIP on that empty string -
+      # so a map could claim `verified: 2020-01-01` and PASS while the source it names was never
+      # committed (measured: map seeded, source uncommitted -> PASS). The date is this row's
+      # whole claim, so an untracked resolved file is now a FAIL with the reason, not a skip.
+      if ! ( cd "$ROOT" && git ls-files --error-unmatch -- "$m" >/dev/null 2>&1 ); then
+        printf '%s: entry path "%s" resolves to %s, which git does not track - a verified: date cannot be checked against an uncommitted file\n' \
+          "$b" "$e" "$m"
+        bad=1; continue
+      fi
       t=$( cd "$ROOT" && git log -1 --format=%cs -- "$m" 2>/dev/null )
       [ -n "$t" ] || continue
       if [ "$t" \> "$v" ]; then
@@ -1948,6 +1989,16 @@ if [ "$JSON" -eq 1 ]; then
     "$(json_escape "$ROOT")" "$(json_escape "$CLASS")" "$PASS" "$FAIL" "$ADV" "$SKIP" "${JSON_ROWS%,}"
 else
   printf '      %d passed, %d failed, %d advisory, %d skipped\n' "$PASS" "$FAIL" "$ADV" "$SKIP"
+  # Z1-7: the advisory number above counts TWO different things - the rows the matrix LABELS
+  # advisory, and a row that is not advisory-labelled but whose lane cannot be resolved here
+  # (JG-02's unresolved judge lane returns 2 = ADV by design). SK-03 counts the first, the ADV
+  # lines on screen are both, so a reader comparing `advisory 10 of ceiling 10` with 11 ADV lines
+  # saw a mismatch that only the row's why-cell explained. Print the arithmetic.
+  adv_labelled=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "$MANIFEST")
+  if [ "$ADV" -ne "$adv_labelled" ]; then
+    printf '      of those %d advisory: the matrix labels %d row(s) advisory; the difference is the non-advisory row(s) reporting ADV by design (an unresolved lane) and any labelled row skipped by an opt-out\n' \
+      "$ADV" "$adv_labelled"
+  fi
   cat <<'SEE'
       cannot see: whether a check in the harness dir tests the right path rather than
       merely passing; whether the forge is bound by the workflow CL-01 found; whether a human

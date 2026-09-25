@@ -5,7 +5,7 @@
 #   --target <dir>        required; the repo root to install into
 #   --class A|B|C|D|E|F    required unless --uninstall or --re-pin; anything else needs an explicit class
 #   --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)
-#   --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md)
+#   --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md); a named path that is absent is reported, never silently dropped
 #   --parts <list>        comma list to install; default = every part the class requires
 #   --archive             mark the project archive: verify requires no HANDOFF and no gates
 #   --skills yes|no       install .hermes/skills (default yes; needs the one-time skills trust step)
@@ -22,7 +22,7 @@
 
 set -uo pipefail
 
-GOBLIN_INSTALL_VERSION="0.4.0"
+GOBLIN_INSTALL_VERSION="0.4.1"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC=$(cd "$SELF_DIR/.." && pwd)
 # shellcheck source=goblin-lib.sh
@@ -32,6 +32,12 @@ TARGET=""
 CLASS=""
 MODELS="${GOBLIN_MODELS:-$HOME/projects/fleet-model.yaml}"
 PRACTICE="${GOBLIN_PRACTICE:-$HOME/projects/PROJECT-PRACTICE.md}"
+# W5-3: `--practice <path>` naming a file that is not there used to be IGNORED IN SILENCE -
+# exit 0, `practice: ~`, `practice_sha256: ~`, and not one line about it in the install log.
+# The empty pin is a legitimate state (a repo may reference no standard, and the default path is
+# allowed to be absent), so this is a refusal to be silent, not a refusal to install: the value
+# stays empty and the log names the path that was not found.
+PRACTICE_ARG=""
 PARTS=""
 ARCHIVE="false"
 SKILLS="yes"
@@ -54,7 +60,7 @@ while [ $# -gt 0 ]; do
     --target)    TARGET="${2:-}"; shift 2 ;;
     --class)     CLASS="${2:-}"; shift 2 ;;
     --models)    MODELS="${2:-}"; shift 2 ;;
-    --practice)  PRACTICE="${2:-}"; shift 2 ;;
+    --practice)  PRACTICE="${2:-}"; PRACTICE_ARG="$PRACTICE"; shift 2 ;;
     --parts)     PARTS="${2:-}"; shift 2 ;;
     --archive)   ARCHIVE="true"; shift ;;
     --skills)    SKILLS="${2:-}"; shift 2 ;;
@@ -309,6 +315,13 @@ HEAD_SHORT=$( cd "$TARGET" && git rev-parse --short HEAD 2>/dev/null )
 if [ -f "$(g_expand_tilde "$PRACTICE")" ]; then
   PRACTICE_SHA=$(g_sha256_file "$(g_expand_tilde "$PRACTICE")")
 else
+  # W5-3: an explicitly named --practice that does not resolve is REPORTED, not swallowed. The
+  # pin stays empty (a repo with no referenced standard is legitimate), but a flag nobody honours
+  # has to say so - `practice: ~` with no line in the log is the "silent no-op" species.
+  if [ -n "$PRACTICE_ARG" ]; then
+    g_info "warning: --practice $PRACTICE_ARG does not exist - no standard is referenced"
+    g_info "         (practice: and practice_sha256: stay empty in .goblin/goblin.yaml)"
+  fi
   PRACTICE=""
   PRACTICE_SHA=""
 fi
