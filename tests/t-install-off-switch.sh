@@ -77,11 +77,13 @@ printf '%s' "$NS_OUT" | grep -q 'SKIP  SK-02'
 check "  and SK-02 is opt-out rather than FAIL (the pre-fix defect)" "$?"
 # V3-3: the opt-out path had a number no file recorded (the count moved from `37/0/9/11` at v0.2
 # to `38/0/9/15` with the ban rows and nothing noticed, and to `38/0/9/18` on 2026-09-25 when G1's
-# FM-01/FM-02/VA-01 joined - each of those three skips on this path for its own reason). Pin the
+# FM-01/FM-02/VA-01 joined - each of those three skips on this path for its own reason, and to
+# `38/0/11/24` on 2026-09-25 when W3's judge/loop rows joined: JG-02 reports ADV and JG-01 +
+# LP-01..LP-05 skip, all six because no loop has run). Pin the
 # line so the next silent shift is caught here. The number is measured, not copied: see the note
 # line the run prints above.
-printf '%s' "$NS_OUT" | grep -q '38 passed, 0 failed, 9 advisory, 18 skipped'
-check "  and the --skills no numbers are pinned (V3-3: 38/0/9/18)" "$?"
+printf '%s' "$NS_OUT" | grep -q '38 passed, 0 failed, 11 advisory, 24 skipped'
+check "  and the --skills no numbers are pinned (V3-3: 38/0/11/24)" "$?"
 
 if [ "$fail" -eq 0 ]; then note "t-install-off-switch: PASS"; else note "t-install-off-switch: FAIL"; fi
 exit "$fail"

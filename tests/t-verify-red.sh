@@ -3,19 +3,24 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One `expect_red` per target-scope row: 80 `expect_red` call sites and 7 `expect_green`, covering
-# 63 of the matrix's 65 target rows. The two it does not cover are `DOC-01` and `DOC-02`, which are
-# `advisory` and carry no executable check at all (docs/RISKS.md names them and says why); measured,
-# 63 distinct ids, 0 phantom ids (every id used here is a row in the matrix) and 0 target row with
-# an executable rule left without a control. The 63 were built up as 42 at v0.1 plus the
+# One `expect_red` per target-scope row: 93 `expect_red` call sites and 14 `expect_green`, covering
+# the 70 target rows that carry an executable rule. The three it does not cover AS RULES - `DOC-01`,
+# `DOC-02` (advisory) and `JG-03` (advisory, G2) - carry no executable check at all
+# (docs/LIMITS.md and docs/RISKS.md name them and say why); their control mutates the row's check
+# column and proves the row is WIRED, not that the rule bites. Measured: 70 distinct ids, 0 phantom
+# ids (every id used here is a row in the matrix) and 0 target row with
+# an executable rule left without a control. The 70 were built up as 42 at v0.1 plus the
 # five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01, plus the
 # five added with BN-00..BN-03 and BN-05, plus the three F4/G4 extras, the two V1 extras (G8-2,
 # G8-5), the second BN-00 control, the five W1 extras (three G8-3 gate-cmd forms, the V3-2
-# exit-code ban control, and the G8-6b ceiling/baseline control), and the seven added with G1's
-# FM-01/FM-02/VA-01 - four of FM-01's clauses, FM-02's two, and the failing doctor. Seven of the
-# controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, and two that seed a feature
-# map and require it to PASS, which is the half of a control that proves a new row is not
-# always-red). The `--only <id>` form is used
+# exit-code ban control, and the G8-6b ceiling/baseline control), the seven added with G1's
+# FM-01/FM-02/VA-01 - four of FM-01's clauses, FM-02's two, and the failing doctor - and the
+# fourteen added with G2's JG-01..JG-03 and LP-01..LP-05 (one expectation per clause the rows
+# mechanise, plus a seeded loop record that has to PASS, which is the half of a control that
+# proves a new row is not always-red). Fourteen of the
+# controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, two that seed a feature
+# map and require it to PASS, and seven that seed a loop record or a judge lane and require
+# `JG-01`, `JG-02` and `LP-01`..`LP-05` to PASS). The `--only <id>` form is used
 # so a mutation in one row cannot be masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
@@ -97,6 +102,11 @@ cp -a .goblin/audit-waiver.tsv "$BK/audit-waiver.tsv"
 cp -a .goblin/install-hooks.allowlist "$BK/install-hooks.allowlist"
 cp -a .goblin/boundary-waivers "$BK/boundary-waivers"
 cp -a .goblin/manifest/bans.tsv "$BK/bans.tsv"
+# G2 mutates roles.yaml (the judge lane's profile list) and the mapping file (a judge profile
+# beside the code lane). Both are restored: a leaked judge profile would turn MD-02's ADV into a
+# PASS for every control below it.
+cp -a .goblin/roles.yaml "$BK/roles.yaml"
+cp -a "$WORK/models.yaml" "$BK/models.yaml"
 # .gitignore is mutated by m_sc_02 and must come back byte-for-byte: the fixture-green check at
 # the end of this file is what caught its absence.
 cp -a .gitignore "$BK/gitignore"
@@ -107,6 +117,8 @@ restore_all() {
   cp -a "$BK/installed.json" .goblin/installed.json
   cp -a "$BK/enforcement.tsv" .goblin/manifest/enforcement.tsv
   cp -a "$BK/bans.tsv" .goblin/manifest/bans.tsv
+  cp -a "$BK/roles.yaml" .goblin/roles.yaml
+  cp -a "$BK/models.yaml" "$WORK/models.yaml"
   cp -a "$BK/SKILL.md" .hermes/skills/goblin-mode/SKILL.md
   cp -a "$BK/ROUND-000-SPEC.md" ROUND-000-SPEC.md
   cp -a "$BK/standard.md" "$WORK/standard.md"
@@ -118,6 +130,9 @@ restore_all() {
         .goblin/state.json .goblin/last-gate-line .goblin/.ds-report .goblin/ratchet-last \
         .envrc .goblin/audit.tsv package.json package-lock.json
   rm -f reviews/fixture-*.md
+  # G2: the planted loop record. A leftover .goblin/loop/ would leave JG-01/LP-* green by
+  # accident AND count as an untracked file for CM-03 in the final full run.
+  rm -rf .goblin/loop
   rm -rf reports
   rm -rf .github
   rm -rf dist src app .hermes/skills/verify-fix
@@ -546,6 +561,92 @@ expect_green "a seeded feature map resolves under source_root" FM-02 m_fm_plant
 expect_red   "a declared entry path renamed in source"  FM-02 1 m_fm_02_token
 expect_red   "an entry path changed after the map was verified" FM-02 1 m_fm_02_stale
 expect_red   "a verify_doctor that exits non-zero" VA-01 1 m_va_01_fail
+# ---- G2: the judge role and the loop contract (JG-01..JG-03, LP-01..LP-05) --------------------
+# All eight rows are NEW, so there is no pre-change tree to be RED on: PR-03's other branch is "a
+# deliberately broken copy of the module under test", which is what these mutations are. A LOOP
+# RECORD is seeded first - one that passes JG-01 and all five LP rows, which is the half of the
+# control that proves the rows are not always-red - and then one clause at a time is broken.
+#
+# The empty state is asserted first, because it is the state every fresh install is in: with no
+# .goblin/loop/ the six loop-dependent rows must report SKIP with their reason, never a vacuous
+# PASS (the PG-01..PG-03 shape). JG-02 is the exception by design: it reads roles.yaml and the
+# mapping file, so a lane that resolves to no provider/model is an ADV with its one-line remedy,
+# and that is asserted in t-verify-green.sh (ADV, exit 0).
+LOOP=".goblin/loop"
+plant_loop() {
+  mkdir -p "$LOOP"
+  printf '# the loop exit condition: exit 0 == the loop is finished\ntest -f .goblin/loop/done\n' > "$LOOP/predicate"
+  sha256sum "$LOOP/predicate" | awk '{print $1}' > "$LOOP/predicate.sha256"
+  printf 'exit=1 ts=2026-09-25T00:00:00Z\n' > "$LOOP/first-run"
+  printf '12\n' > "$LOOP/budget"
+  printf 'ts\tphase\tdecision\twhy\tevidence\tresult\n' > "$LOOP/decisions.tsv"
+  printf '2026-09-25T00:10:00Z\tcheck\tverdict:continue\tthe marker file is not there yet\tsha:%s\tpredicate:red\n' \
+    "$(git rev-parse HEAD)" >> "$LOOP/decisions.tsv"
+  printf '2026-09-25T00:20:00Z\tcheck\tverdict:done\tthe marker exists and the gate is green\tfile:README.md\tpredicate:green\n' \
+    >> "$LOOP/decisions.tsv"
+}
+# JG-02's own green: a `judge` lane beside the code lane in the mapping file. The fixture's
+# mapping file has no judge profile, which is the ADV state every install starts in.
+plant_judge_lane() {
+  printf '  judge:\n    model: model-judge\n    provider: prov-judge\n    effort: high\n' >> "$WORK/models.yaml"
+}
+m_loop_plant()   { plant_loop; }
+m_jg_02_ok()     { plant_judge_lane; }
+# The judge is the author: role-judge resolves to the code lane's own profile. A FAIL, not an ADV -
+# the declared lanes are visible to a repo, which is the whole point of the row.
+m_jg_02_shared() { plant_judge_lane; sed -i 's/^  profiles: \[judge\]$/  profiles: [coder]/' .goblin/roles.yaml; }
+# A verdict resting on a command that ran: `cmd:` resolves NOTHING by design, because the command's
+# output is not in the record and a verdict resting on it is the self-report the row refuses.
+m_jg_01_cmd()    { plant_loop; sed -i "s|sha:$(git rev-parse HEAD)|cmd:npm test|" "$LOOP/decisions.tsv"; }
+# A handle of the right SHAPE that names nothing: 40 hex, no such commit in `git rev-list --all`.
+m_jg_01_ghost()  { plant_loop; sed -i "s|sha:$(git rev-parse HEAD)|sha:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|" "$LOOP/decisions.tsv"; }
+m_jg_03_wired()  { m_row_fails JG-03; }
+m_lp_01_two()    { plant_loop; printf 'test -f README.md\n' >> "$LOOP/predicate"; }
+m_lp_01_late()   { plant_loop; printf 'exit=1 ts=2026-09-25T00:30:00Z\n' > "$LOOP/first-run"; }
+m_lp_01_norun()  { plant_loop; rm -f "$LOOP/first-run"; }
+m_lp_02_repin()  { plant_loop; printf '# relaxed by hand\n' >> "$LOOP/predicate"; }
+m_lp_03_over()   { plant_loop; printf '21\n' > "$LOOP/budget"; }
+m_lp_03_rows()   { plant_loop; printf '1\n' > "$LOOP/budget"; }
+# The same pointer three times with no green: rows 2, 3 and 4 of the record. What the row measures
+# is a CHANGED pointer, which is a proxy for progress - the why-cell says so.
+m_lp_04_thrash() {
+  plant_loop
+  printf '2026-09-25T00:30:00Z\tcheck\tverdict:continue\tthe same pointer again\tfile:README.md\tpredicate:red\n2026-09-25T00:40:00Z\tcheck\tverdict:continue\tand again\tfile:README.md\tpredicate:red\n' \
+    >> "$LOOP/decisions.tsv"
+}
+m_lp_05_nostuck() { plant_loop; sed -i 's|\tpredicate:green$|\tpredicate:stuck|' "$LOOP/decisions.tsv"; }
+m_lp_05_short()   { m_lp_05_nostuck; printf 'the marker never appeared\nthe predicate is still red\n' > "$LOOP/stuck.md"; }
+
+# The empty state: no loop has run here, so the six loop-dependent rows SKIP with their reason.
+for pair in "JG-01:no loop record" "LP-01:no loop has run" "LP-02:no loop has run" \
+            "LP-03:no loop has run" "LP-04:no loop has run" "LP-05:no loop has run"; do
+  rid=${pair%%:*}; want=${pair#*:}
+  out=$(bash .goblin/bin/goblin-verify --only "$rid" 2>&1); rc=$?
+  printf '%s' "$out" | grep -q "^SKIP  $rid.*$want"; hit=$?
+  check "$rid with no loop record SKIPs with its reason (not a vacuous pass)" \
+    "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
+done
+
+expect_green "a seeded loop record passes JG-01 (a sha: handle that resolves)" JG-01 m_loop_plant
+expect_red   "a verdict resting on a command that ran (cmd:)" JG-01 1 m_jg_01_cmd
+expect_red   "a sha of the right shape that names no commit"  JG-01 1 m_jg_01_ghost
+expect_green "a judge lane beside the code lane, disjoint"    JG-02 m_jg_02_ok
+expect_red   "the judge lane IS the author lane"              JG-02 1 m_jg_02_shared
+expect_red   "JG-03 (advisory row: wired, not biting)"        JG-03 1 m_jg_03_wired
+expect_green "a seeded loop record passes LP-01 (one command, run first)" LP-01 m_loop_plant
+expect_red   "a predicate of two commands"                       LP-01 1 m_lp_01_two
+expect_red   "a first run recorded AFTER the first log row"      LP-01 1 m_lp_01_late
+expect_red   "no recorded first run at all"                      LP-01 1 m_lp_01_norun
+expect_green "a seeded loop record passes LP-02 (the pin still matches)" LP-02 m_loop_plant
+expect_red   "the predicate relaxed after the pin was taken"     LP-02 1 m_lp_02_repin
+expect_green "a seeded loop record passes LP-03 (budget 12, 2 rows)" LP-03 m_loop_plant
+expect_red   "a budget above loop_max_turns_ceiling"             LP-03 1 m_lp_03_over
+expect_red   "more verdict rows than the declared budget"        LP-03 1 m_lp_03_rows
+expect_green "a seeded loop record passes LP-04 (the pointer moved)" LP-04 m_loop_plant
+expect_red   "three consecutive rows on one pointer, none green" LP-04 1 m_lp_04_thrash
+expect_green "a seeded loop record passes LP-05 (the last row is green)" LP-05 m_loop_plant
+expect_red   "a loop that ended not-green and left no write-up"  LP-05 1 m_lp_05_nostuck
+expect_red   "a write-up shorter than three lines"               LP-05 1 m_lp_05_short
 
 expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip
@@ -561,7 +662,7 @@ ADV_N=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n
 ADV_C=$(sed -n 's/^advisory_ceiling:[[:space:]]*//p' .goblin/goblin.yaml | head -n 1)
 : "${ADV_C:=10}"
 out=$(bash .goblin/bin/goblin-verify --only SK-03 2>&1)
-printf '%s' "$out" | grep -qE "advisory $ADV_N of ceiling $ADV_C \([0-9]+ free slots?\)"
+printf '%s' "$out" | grep -qE "advisory $ADV_N of ceiling $ADV_C \((0 free slots: the next advisory row FAILs|[0-9]+ free slots?)\)"
 check "SK-03 reports the advisory count AND the remaining budget ($ADV_N of $ADV_C)" "$?"
 sed -i "s/^advisory_ceiling: .*/advisory_ceiling: $ADV_N/" .goblin/goblin.yaml
 out=$(bash .goblin/bin/goblin-verify --only SK-03 2>&1)
