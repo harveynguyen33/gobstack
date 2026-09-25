@@ -139,6 +139,34 @@ g_yaml_gates() {
   ' "$1"
 }
 
+# g_yaml_gate_names <file> — one declared gate NAME per line, whether or not a `cmd:` follows it.
+# g_yaml_gates prints a name only when a `cmd:` LINE follows it, so a gate whose `cmd:` was
+# deleted, blanked or re-indented vanishes from it in silence. This reader keeps the name
+# visible, which is what lets GT-01 FAIL on the disappearance instead of reporting the
+# survivors (G8-3).
+g_yaml_gate_names() {
+  awk '
+    /^gates:[[:space:]]*$/ { inb = 1; next }
+    inb && /^[^ ]/ { inb = 0 }
+    inb && /^  - name:/ { n = $0; sub(/^  - name:[[:space:]]*/, "", n); print n }
+  ' "$1"
+}
+
+# g_yaml_gates_all <file> — one "name<TAB>cmd" line per DECLARED gate, including a gate whose
+# `cmd:` is missing or blank (the value is printed empty). g_yaml_gates emits only name+cmd
+# PAIRS, which is right for running a gate (GT-02) and wrong for counting declarations
+# (GT-01): a gate could lose its `cmd:` and the row still printed the survivors (G8-3).
+g_yaml_gates_all() {
+  awk '
+    function flush() { if (name != "") { print name "\t"; name = "" } }
+    /^gates:[[:space:]]*$/ { inb = 1; next }
+    inb && /^[^ ]/ { flush(); inb = 0 }
+    inb && /^  - name:/ { flush(); n = $0; sub(/^  - name:[[:space:]]*/, "", n); name = n; next }
+    inb && /^    cmd:/ { c = $0; sub(/^    cmd:[[:space:]]*/, "", c); print name "\t" c; name = "" }
+    END { if (inb) flush() }
+  ' "$1"
+}
+
 # g_yaml_disabled <file> — inline list of disabled parts, one per line.
 g_yaml_disabled() {
   local v
@@ -223,6 +251,19 @@ YAML
   [ "$got" = "hex" ] || { g_err "block scalar: expected hex, got '$got'"; rc=1; }
   got=$(g_yaml_gates "$tmp/g.yaml" | tr '\t' ':')
   [ "$got" = "typecheck:npx tsc --noEmit" ] || { g_err "gates: got '$got'"; rc=1; }
+  # The gates-all readers exist for the one case the pair reader hides: a gate whose `cmd:` LINE
+  # is missing (deleted or re-indented). g_yaml_gates drops it; g_yaml_gates_all keeps it with an
+  # empty cmd and g_yaml_gate_names still names it. Blank either awk and this exits non-zero -
+  # that is this self-test's own RED control for the G8-3 fix (the disappearance GT-01 must FAIL).
+  printf 'gates:\n  - name: typecheck\n    cmd: npx tsc --noEmit\n  - name: reindented\n  cmd: false\n' > "$tmp/g2.yaml"
+  got=$(g_yaml_gates "$tmp/g2.yaml" | wc -l | tr -d '[:space:]')
+  [ "$got" = "1" ] || { g_err "gates: a cmd-less gate should vanish from the pair reader, got $got line(s)"; rc=1; }
+  got=$(g_yaml_gates_all "$tmp/g2.yaml" | wc -l | tr -d '[:space:]')
+  [ "$got" = "2" ] || { g_err "gates-all: expected 2 declared gates, got $got"; rc=1; }
+  got=$(g_yaml_gates_all "$tmp/g2.yaml" | awk -F'\t' '$1 == "reindented" && $2 == ""' | wc -l | tr -d '[:space:]')
+  [ "$got" = "1" ] || { g_err "gates-all: the cmd-less gate was not reported with an empty cmd"; rc=1; }
+  got=$(g_yaml_gate_names "$tmp/g2.yaml" | tr '\n' ',')
+  [ "$got" = "typecheck,reindented," ] || { g_err "gate-names: got '$got'"; rc=1; }
   got=$(g_yaml_list "$tmp/g.yaml" runtime_data | tr '\n' ',')
   [ "$got" = ".goblin/state.json," ] || { g_err "list: got '$got'"; rc=1; }
   got=$(g_yaml_disabled "$tmp/g.yaml" | tr '\n' ',')

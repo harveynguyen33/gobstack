@@ -394,10 +394,23 @@ check_hp_05() {
 }
 
 check_gt_01() {
-  local n
-  n=$(g_yaml_gates "$CONFIG" | grep -c . || true)
+  # Every `- name:` under `gates:` is a DECLARED gate, and every declared gate must carry a
+  # `cmd:`. Counting only the name+cmd PAIRS (what this row did) let a gate lose its `cmd:` -
+  # deleted, blanked or re-indented - and the row still reported the survivors as
+  # `1 declared gate(s)`: the gate vanished in silence (G8-3). The name reader is the one that
+  # keeps it visible, so the missing `cmd:` is a FAIL here, not a pass.
+  local n=0 bad=0 name cmd
+  while IFS=$'\t' read -r name cmd; do
+    [ -n "$name" ] || continue
+    n=$((n + 1))
+    if [ -z "$cmd" ]; then
+      printf 'declared gate "%s" has no cmd - it is declared and never runs\n' "$name"
+      bad=1
+    fi
+  done < <(g_yaml_gates_all "$CONFIG")
   [ "$n" -ge 1 ] || { printf 'no gate declared in %s\n' "$CONFIG"; return 1; }
-  printf '%d declared gate(s)\n' "$n"
+  [ "$bad" -eq 0 ] || return 1
+  printf '%d declared gate(s), each with a cmd\n' "$n"
   return 0
 }
 
