@@ -10,8 +10,10 @@ Use when adopting goblin-stack in a repo, or starting one.
 1. **Classify the project A-F.** The class selects which parts are required, optional or off;
    it is not a stringency level. F is a desktop shell: it adds the electron bans and a host gate.
 2. **`goblin-install --target <dir> --class <x>`**
-3. **`goblin-verify`** — a fresh class-A install verifies green: `43 passed, 0 failed, 11
-   advisory, 24 skipped`, exit 0. Twenty-four rows skip with a reason, and the reason matters: `HS-02`
+3. **`goblin-verify`** — a class-A install verifies green: `43 passed, 0 failed, 11
+   advisory, 24 skipped`, exit 0, once `HANDOFF.md` names a commit that exists; before that edit the
+   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`42 passed, 1 failed`).
+   Twenty-four rows skip with a reason, and the reason matters: `HS-02`
    (no pinned pre-change commit yet, so the REPLAY is not provable), `AU-02`/`AU-03` (no report
    has been filed in this repo), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile, no
    audit record), `PF-01` (no perf baseline measured yet), `BN-01`/`BN-02`/`BN-03`/`BN-05` and the

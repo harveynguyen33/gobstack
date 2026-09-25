@@ -105,12 +105,15 @@ every created file is either a whole file or absent, and the record is written l
 
     goblin-verify [--only <id[,id...]>] [--json] [--list] [--source <goblin-stack path>]
 
-Output is one line per executed row, in manifest order:
+Output is one line per executed row, in manifest order, plus a summary line at the end:
 
     PASS  HP-01  (test -f HANDOFF.md)
     FAIL  GT-02  gate commit: false -> exit 1
     ADV   MD-02  code lane and review lane both resolve to the same family
     SKIP  HS-02  no pinned pre-change commit yet - REPLAY not provable
+
+Those four lines are one row of each marking. The summary line of a green class-A run is:
+
           43 passed, 0 failed, 11 advisory, 24 skipped
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
