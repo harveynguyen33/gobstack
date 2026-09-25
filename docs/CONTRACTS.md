@@ -149,6 +149,11 @@ verifier is reporting FAILs.
 - **Per part:** `--opt-out <part>` records the part in `disabled:`. `goblin-verify` then reports
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a class's `-` (off) real.
+- **The opt-out numbers are pinned (V3-3).** A fresh class-A install with `--skills no` verifies
+  `38 passed, 0 failed, 9 advisory, 15 skipped`, exit 0, and `tests/t-install-off-switch.sh`
+  asserts that line: a silent drift in the opt-out path is caught rather than left as a number
+  nobody wrote down (the `--skills no` count moved from `37/0/9/11` at v0.2 to here when the ban
+  rows landed, and no file recorded the shift).
 - **Whole harness:** `--uninstall` deletes the `files` list plus `.goblin/goblin.yaml`, removes
   every directory that leaves empty (deepest first, after `installed.json` itself is gone — the
   order that used to leave `.goblin/` and the sixteen `.hermes/skills/*` directories behind),
