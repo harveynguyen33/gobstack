@@ -3,7 +3,11 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One `expect_red` per target-scope row: 80 controls over the 65 target rows (42 at v0.1 plus the
+# One `expect_red` per target-scope row: 80 `expect_red` call sites and 7 `expect_green`, covering
+# 63 of the matrix's 65 target rows. The two it does not cover are `DOC-01` and `DOC-02`, which are
+# `advisory` and carry no executable check at all (docs/RISKS.md names them and says why); measured,
+# 63 distinct ids, 0 phantom ids (every id used here is a row in the matrix) and 0 target row with
+# an executable rule left without a control. The 63 were built up as 42 at v0.1 plus the
 # five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01, plus the
 # five added with BN-00..BN-03 and BN-05, plus the three F4/G4 extras, the two V1 extras (G8-2,
 # G8-5), the second BN-00 control, the five W1 extras (three G8-3 gate-cmd forms, the V3-2
