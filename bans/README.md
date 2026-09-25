@@ -45,7 +45,9 @@ required, so `BAN-OK(BN-01)` on its own is not an escape. Path exemption is segm
 compared as written: `src` exempts `src/a.ts` and `src/legacy/b.ts`, never `src2/c.ts`, and a
 prefix carrying a trailing slash (`src/legacy/`) strips nothing, so it matches no file and exempts
 nothing - write the prefix without one. Both shipped probes are controlled in
-`tests/t-verify-red.sh` (AA1), including that trailing-slash case.
+`tests/t-verify-red.sh` (AA1): the trailing-slash case is the LAYER probe's control (`BN-05`, AA1
+§7-6), and the same rule holds for the ban probe - measured on `BN-01`: `- BN-01 src` PASSes,
+`- BN-01 src/` FAILs, because it exempts nothing.
 
 The engine passes both to the probe through its environment rather than editing stdout:
 
