@@ -55,8 +55,8 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 ## P7 - `goblin-pr-gate`
 
 - **When:** anything that should be reviewed before it lands
-- **Steps:** 1 classify stakes S0-S4<br>- 2 run the gate set at the candidate SHA and record the numbers<br>- 3 write reviews/<slug>-<head7>.md with head/base/patch-id/stakes/checks-run<br>- 4 evaluate the panel rule for S3+<br>- 5 re-check the patch-id before landing
-- **Verification:** the patch-id of base..head still matches the recorded one; the review note names a SHA that exists in git rev-list; for S2+ a check ran on that SHA
+- **Steps:** 1 classify stakes S0-S4<br>- 2 run the gate set at the candidate SHA and record the numbers<br>- 3 write reviews/<slug>-<head7>.md with head/base/patch-id/stakes/checks-run<br>- 4 evaluate the panel rule for S3+<br>- 5 at S3+ the foreman is `role-judge`: N lane verdicts are opinions, and one judge turns them into a decision<br>- 6 re-check the patch-id before landing
+- **Verification:** the patch-id of base..head still matches the recorded one; the review note names a SHA that exists in git rev-list; for S2+ a check ran on that SHA; at S3+ the deciding lane is disjoint from the author's (`JG-02`)
 - **Profiles:** reviewer (+ architect for S3)
 - **Role:** review-panel
 
@@ -80,9 +80,9 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 
 - **When:** an unattended run over a predicate
 - **Steps:** 1 the exit condition is a checkable predicate written before iteration 1<br>- 2 it never gets relaxed<br>- 3 an escape hatch: a genuine dead end writes up why and stops<br>- 4 the morning audit reads the Attention section first
-- **Verification:** the predicate is a command in the card body and was run at least once; goal_max_turns is set; every landed change has a P7 verdict row
+- **Verification:** the predicate is a command, and its first run is recorded before iteration 1 (`LP-01`); the predicate is pinned and never relaxed (`LP-02`); `goal_max_turns` is set and at or under `loop_max_turns_ceiling` (`LP-03`); no three consecutive rows share an evidence pointer without reaching `predicate:green` (`LP-04`); a run that ends without its predicate green carries `.goblin/loop/stuck.md` naming it (`LP-05`); every landed change has a P7 verdict row; a verdict that says `done` cites a handle the repo resolves (`JG-01`) and comes from a lane disjoint from the author's (`JG-02`)
 - **Profiles:** default + coder
-- **Role:** code
+- **Role:** code + judge
 
 ## P11 - `goblin-sweep`
 

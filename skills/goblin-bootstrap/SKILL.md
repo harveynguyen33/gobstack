@@ -10,14 +10,15 @@ Use when adopting goblin-stack in a repo, or starting one.
 1. **Classify the project A-E.** The class selects which parts are required, optional or off;
    it is not a stringency level.
 2. **`goblin-install --target <dir> --class <x>`**
-3. **`goblin-verify`** — a fresh class-A install verifies green: `42 passed, 0 failed, 9
-   advisory, 14 skipped`, exit 0. Fourteen rows skip with a reason, and the reason matters: `HS-02`
+3. **`goblin-verify`** — a fresh class-A install verifies green: `42 passed, 0 failed, 11
+   advisory, 20 skipped`, exit 0. Twenty rows skip with a reason, and the reason matters: `HS-02`
    (no pinned pre-change commit yet, so the REPLAY is not provable), `AU-02`/`AU-03` (no report
    has been filed in this repo), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile, no
    audit record), `PF-01` (no perf baseline measured yet), `BN-01`/`BN-02`/`BN-03`/`BN-05`
-   (the ban table is installed but this fresh repo has no `src/` for a ban to read), and
-   `FM-01`/`FM-02`/`VA-01` (no feature map and no declared `verify_doctor:` yet). Each is a
-   *not yet*, not a pass.
+   (the ban table is installed but this fresh repo has no `src/` for a ban to read),
+   `FM-01`/`FM-02`/`VA-01` (no feature map and no declared `verify_doctor:` yet), and `JG-01` with
+   `LP-01`..`LP-05` (no `.goblin/loop/` record, because no loop has run in this repo yet). Each is
+   a *not yet*, not a pass.
    The class's required parts
    that only a round can produce (a first review, a real gate) pass *vacuously*, and that list
    is the repo's first-step list, not a defect.

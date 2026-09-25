@@ -10,7 +10,7 @@ single source of truth).
 this repo via `tests/run-tests.sh`). `enforced_by` is one of four values, and the enum is
 closed: `script`, `lint`, `gate`, `advisory`.
 
-Measured shape of this table: **70 rows** - 65 target, 5 source; advisory 9, gate 20, lint 22, script 15, test 4.
+Measured shape of this table: **78 rows** - 73 target, 5 source; advisory 10, gate 23, lint 22, script 19, test 4.
 
 ## The rows
 
@@ -81,6 +81,14 @@ Measured shape of this table: **70 rows** - 65 target, 5 source; advisory 9, gat
 | `FM-01` | target | lint | Every feature file is indexed from the map README, declares its slug and at least one entry path, and carries the four-H2 entry contract. | `goblin-verify --only FM-01` (builtin) | SKIPs (exit 3) when feature_map: is empty - a fresh install has no map and must not be born RED (the D8 shape). When a map IS declared: the README must exist, every features/*.md must be linked from it in the (./<slug>.md) form and every relative .md link must resolve, each feature file's `feature:` must equal its filename stem, it must declare >=1 `entry_paths:`, and its H2s must be exactly Sub-features / How to get to it (user POV) / Driving it with <harness> / Gotchas, in that order. Partial: the README's own H2s are prose this row does not read, and 'the map lists every user-facing feature' is not mechanically checkable - that is docs/LIMITS.md #30, not a row. |
 | `FM-02` | target | lint | Every entry point a feature declares still resolves in source, and no entry path changed after the map was verified. | `goblin-verify --only FM-02` (builtin) | SKIPs (exit 3) when feature_map: is empty. A tripwire, not a proof. The token is searched under source_root with occurrences under the map's own directory excluded - without that exclusion the map's own entry-path list satisfies the search and the row could never go RED. Freshness is `git log -1 --format=%cs` on the resolved file against the feature's `verified:` date, and git sees a FILE change, not a behaviour change: the row can be RED-when-stale and never GREEN-means-fresh. A token that also occurs in a vendored copy or a build artifact is read as resolved, and a `verified:` date is itself a claim the row cannot test (docs/LIMITS.md #30). |
 | `VA-01` | target | gate | The generated verification skill's doctor command runs and exits 0. | `goblin-verify --only VA-01` (builtin) | SKIPs (exit 3) when verify_doctor: is empty (the replay.commit: "" shape). Runs the DECLARED command exactly as GT-02 runs a declared gate, and never a string read out of file content (the v0.2 blocker). Closes P6's stated-but-unenforced clause 'a generated skill that was never executed is a draft': the doctor is the smallest executable proof that the skill's own instructions still run - and it proves only that, never that the doctor tests the right path. |
+| `JG-01` | target | script | A judge verdict is recorded as a row whose evidence resolves. | `goblin-verify --only JG-01` (builtin) | Builtin: it proves the named handle EXISTS - a commit `git rev-list --all` knows, a path under the root, or a `sha256:` matching a file under `.goblin/loop/` - never that the handle SUPPORTS the verdict beside it: a judge may cite a real commit that has nothing to do with the claim. It also cannot see whether the verdict was reached by the declared judge lane. A row with fewer columns than the header is a FAIL, not a silent skip. SKIPs (exit 3) when there is no loop record: nothing to check is reported as a reason, never as a pass. |
+| `JG-02` | target | gate | The judge lane is disjoint from the author lane. | `goblin-verify --only JG-02` (builtin) | Builtin: it proves the DECLARED lane sets are disjoint (profile names), not that a judge ran on one - no repo-local file observes which profile ran (the blindness `MD-03` records), and family equality is not this row's business (`MD-02` owns it). An unresolved lane is an ADV carrying the one-line remedy, never a FAIL: a box with no mapping file must not be failed for the fleet's routing. Both sentinels count as unresolved - `?` (the installed path) and `unknown` (the checkout path) - because a check that greps for one passes on the other. |
+| `JG-03` | target | advisory | A judge lane that has never returned a non-`done` verdict is escalated. | `advisory` | A lane that has returned two verdicts cannot be called always-yes, and a repo sees only its own rows; the history that would show a bad lane lives across cards and repos. The counter-measure is policy - one known-red control verdict per wave, recorded in docs/LOOP.md - and it is counted, not enforced. |
+| `LP-01` | target | script | The exit predicate is a command, and it ran before iteration 1. | `goblin-verify --only LP-01` (builtin) | Builtin: it proves the predicate is exactly ONE command and that a recorded first run exists whose timestamp is at or before the first log row - not that the command was actually run, and not that the `exit=` value was measured rather than typed (`HP-03`'s defect, one artifact over). It deliberately does NOT re-run the predicate: a stop condition is legitimately red before the loop finishes, so re-running it would fail a repo whose loop is working, and PROJECT-PRACTICE section 7 forbids a probe that writes. Timestamps compare on their `YYYY-MM-DDThh:mm:ss` prefix, so records written in different UTC offsets compare as text. |
+| `LP-02` | target | script | The predicate is pinned at loop start and is never relaxed. | `goblin-verify --only LP-02` (builtin) | Builtin: it proves the predicate file on disk still hashes to the recorded pin - never that the predicate is the RIGHT one, and never who edited it. The digest covers the predicate file alone: a loop that quietly relaxes a predicate living somewhere else is not seen. The remedy is printed with the failure and is never automatic, the `IN-02` `--re-pin` shape. |
+| `LP-03` | target | gate | The loop declares a budget, and the record never exceeds it. | `goblin-verify --only LP-03` (builtin) | Builtin: it proves the declared budget is a positive integer at or under the configured `loop_max_turns_ceiling`, and that the record holds no more verdict rows than the budget - not that the budget is affordable. Cost is not a field the record carries: a turn budget bounds turns, and the auxiliary judge call per turn is unpriced (`docs/LIMITS.md` #32). A worker cannot edit its own card body, so a CARD predicate is already protected; this row is the file-predicate half. |
+| `LP-04` | target | gate | A loop making no progress stops instead of thrashing. | `goblin-verify --only LP-04` (builtin) | Builtin: it measures a CHANGED EVIDENCE POINTER, which is a proxy for progress, not progress. Three consecutive verdict rows with an identical non-empty pointer and a non-`predicate:green` result is a FAIL that names the row numbers. A loop that edits a file each turn to keep the pointer moving is not caught, which is why LP-05 and the budget sit beside it. Nothing in the Hermes kanban goal loop detects a lack of progress at all - `run_kanban_goal_loop` carries no progress state. |
+| `LP-05` | target | script | A loop that ended without its predicate green carries a written-up reason. | `goblin-verify --only LP-05` (builtin) | Builtin: the three-non-blank-line threshold is arbitrary and stated as such - it proves a write-up EXISTS, the way `SP-03` proves a bullet LOOKS checkable. Nothing can make the write-up true, and the row cannot see whether it names the right dead end or whether the loop stopped too early. A loop whose last row IS `predicate:green` needs no write-up and the row passes without reading one. |
 | `PR-01` | source | test | The installer never writes outside its target. | `tests/run-tests.sh` | — |
 | `PR-02` | source | test | A second install is a no-op, and an upgrade reports created/updated/unchanged. | `tests/run-tests.sh` | — |
 | `PR-03` | source | test | Every target-scope check goes RED under its own violation. | `tests/run-tests.sh` | — (the negative control the verifier re-runs) |
@@ -89,9 +97,9 @@ Measured shape of this table: **70 rows** - 65 target, 5 source; advisory 9, gat
 
 ## Advisory rows, named
 
-9 of the 70 rows are labelled `advisory`. 8 carry no executable check at all
-(they are prose the matrix refuses to pretend about); 1 are advisory-labelled but still
-report their state.
+10 of the 78 rows are labelled `advisory`. 9 of them carry no executable check at all
+(they are prose the matrix refuses to pretend about); 1 is advisory-labelled but still
+reports its state.
 
 - **HP-04** (no check at all) - A stale sentence is corrected in place with a dated parenthetical, never deleted.
 - **HS-03** (no check at all) - Source probes read text with comments blanked first.
@@ -101,24 +109,27 @@ report their state.
 - **PG-04** (no check at all) - Never bypass what the forge enforces.
 - **DOC-01** (no check at all) - A significant change updates the docs that teach it.
 - **DOC-02** (no check at all) - System-level changes are recorded in the vault via the pkm profile.
+- **SC-09** (no check at all) - Auth is applied consistently across sibling routes. Added when the missing entry was measured: the count said 9 and this list held 8.
+- **JG-03** (no check at all) - A judge lane that has never returned a non-`done` verdict is escalated. The history that would show a bad lane lives across cards and repos, so the counter-measure is policy - one known-red control verdict per wave, recorded in `docs/LOOP.md` - not a command.
 
 `advisory_ceiling` (default 10) caps that count: **SK-03 fails the run when the advisory
 count exceeds it.** The number of unenforceable rules is itself a gate. Measured at `43f7f69`:
-`advisory 9 of ceiling 10`.
+`advisory 9 of ceiling 10`; measured after W3's judge/loop rows:
+`advisory 10 of ceiling 10`.
 
 **The budget, stated so the next rule author does not have to work it out (V1/G8-5).** The
-count is 9 of a ceiling of 10, so **exactly one advisory slot is free**, and the row that
-takes it must arrive with a real command. `SK-03` now prints the arithmetic on every run
-(`advisory 9 of ceiling 10 (1 free slot)`; at the cap, `0 free slots: the next advisory row
-FAILs`), and a ceiling that is not a number is a FAIL rather than a silent ADVISORY.
+count is 10 of a ceiling of 10, so **no advisory slot is free**: the next advisory row FAILs
+`SK-03` unless the ceiling is raised in the same change, with the reason written down. `SK-03`
+prints the arithmetic on every run (`advisory 10 of ceiling 10 (0 free slots: the next advisory
+row FAILs)`), and a ceiling that is not a number is a FAIL rather than a silent ADVISORY.
 
-Two planned rows each wanted that slot - **`FM-03`** (G1, the feature map) and **`JG-03`**
-(G2, the judge agent) - and nothing at HEAD decided which of them got it. **Decided 2026-09-25
-(W2):** G1's `FM-03` does **not** take it. The feature map ships `FM-01` and `FM-02` as real
-commands, and the completeness claim `FM-03` would have carried is recorded in `docs/LIMITS.md`
-#30 instead of as a counted row, so the slot stays free for G2's `JG-03`. The decision is
-recorded in `docs/LIMITS.md` #26; measured after W2, `SK-03` still prints
-`advisory 9 of ceiling 10 (1 free slot)`.
+Two planned rows each wanted the last slot - **`FM-03`** (G1, the feature map) and **`JG-03`**
+(G2, the judge agent). **Decided 2026-09-25 (W2):** G1's `FM-03` does **not** take it. The
+feature map ships `FM-01` and `FM-02` as real commands, and the completeness claim `FM-03` would
+have carried is recorded in `docs/LIMITS.md` #30 instead of as a counted row, so the slot stayed
+free for G2's `JG-03`. The decision is recorded in `docs/LIMITS.md` #26; W2 measured `advisory 9
+of ceiling 10 (1 free slot)`. **Spent 2026-09-25 (W3):** G2's `JG-03` took it, measured `advisory
+10 of ceiling 10 (0 free slots)`.
 
 `SK-03`'s count is the count the run itself uses: a row is advisory if its `check` cell says so
 OR its `enforced_by` cell does.
@@ -171,6 +182,6 @@ fails the run when it exceeds the ceiling.
 
 ## What the matrix cannot do
 
-A counted rule is still not an enforced one. The cap is a policy, not a proof, and seven of
+A counted rule is still not an enforced one. The cap is a policy, not a proof, and nine of
 these rows are prose. That is stated here rather than implied away.
 

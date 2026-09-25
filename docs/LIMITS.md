@@ -33,8 +33,9 @@ deliberate trade or an unfilled gap.
 8. **A new surface to maintain.** Per-repo vendored `.goblin/` plus `.hermes/skills/` means
    upgrade debt in every adopted repo, plus one more command pair to learn. The counter is that
    the alternative — profile copies — already failed.
-9. **Eight rows are labelled `advisory`, and seven of them are prose with no check at all:**
-   `HP-04`, `HS-03`, `CM-02`, `MD-03`, `PG-04`, `DOC-01`, `DOC-02`. One (`MD-02`) is
+9. **Ten rows are labelled `advisory`, and nine of them are prose with no check at all:**
+   `HP-04`, `HS-03`, `CM-02`, `MD-03`, `PG-04`, `DOC-01`, `DOC-02`, `SC-09` and `JG-03` (G2, the
+   judge lane that has never returned a non-`done` verdict). One (`MD-02`) is
    advisory-labelled but still reports its state as `ADV`. Each is counted and capped, but a
    counted rule is still not an enforced one, and **the cap is a policy, not a proof.**
 10. **It does not reduce the profile-skill surface.** It only stops that surface from growing
@@ -140,6 +141,11 @@ deliberate trade or an unfilled gap.
     lists every feature — is recorded as #30 instead of as a counted row; the slot is left free for
     G2's `JG-03`, whose judge is the mechanism `P12` actually needs. Measured after W2, `SK-03`
     still reads `advisory 9 of ceiling 10 (1 free slot)`.
+    **Spent 2026-09-25 (W3):** G2 landed and `JG-03` took it. The slot is now **full** — measured
+    `advisory 10 of ceiling 10 (0 free slots: the next advisory row FAILs)` — so the next author who
+    wants an advisory row must raise `advisory_ceiling` in the same change and write down why,
+    rather than discovering the cap from a red run. This is not a rule change; it is the arithmetic
+    the ceiling was always meant to force into the open.
 30. **The feature map is an inventory, and nothing checks that it is complete.** `FM-01` checks the
     index against the feature files that exist and the four-H2 entry contract; `FM-02` is a tripwire
     over `entry_paths:`. **Neither can see a feature nobody wrote down** — that needs semantic
@@ -162,6 +168,40 @@ deliberate trade or an unfilled gap.
     and `P12` has still never been run. The runner and the record checks (`EV-01`..`EV-04` in G1's
     design) are deferred to a follow-up card, deliberately and in the open, rather than half-built:
     a row that reads a record nobody writes would pass vacuously and look like enforcement.
+32. **The judge is a language model grading prose, and the record proves a handle exists — never
+    that the handle supports the verdict.** `JG-01` FAILs a `done` verdict whose evidence resolves
+    to nothing: `sha:<hex>` must be a commit in `git rev-list --all`, `file:<path>` a path under the
+    root, `sha256:<hex>` the digest of a file under `.goblin/loop/`. All three say *exists*. A judge
+    may cite a real commit that has nothing to do with the claim and pass, and a `cmd:<command>`
+    token resolves **nothing on purpose** — the command ran, its output is not in the record, and a
+    verdict resting on it is the self-report the row refuses. Two smaller blind spots are stated in
+    the row's own why-cell and repeated here: the row cannot see **which lane returned a verdict**
+    (no file in a repo observes the profile that ran — `MD-03`), and **an unresolved judge lane is
+    an `ADV`, not a failure**, because a repo cannot choose the fleet's routing (`docs/ROLES.md`,
+    "the measured caveat"): measured on this box, the judge lane resolves to no profile at all.
+    Finally, the `JG-03` counter-measure is **policy, not a check** — one known-red control verdict
+    per wave, recorded in `docs/LOOP.md`: a lane that has judged twice cannot be called always-yes,
+    and the history that would show a bad lane lives across cards and repos.
+33. **`LP-04` measures a changed evidence pointer, which is a proxy for progress — not progress.**
+    Three consecutive verdict rows with an identical non-empty pointer and a result that is not
+    `predicate:green` is a FAIL naming the row numbers, and that is the strongest thing a repo can
+    read without running the loop. A loop that edits a file each turn to keep the pointer moving is
+    not caught, and **nothing in Hermes detects a lack of progress either**: measured in
+    `hermes_cli/goals.py`, `run_kanban_goal_loop` carries no progress state at all — its whole
+    state is `last_response`, `turns_used` and `nudged_to_finalize`, so a loop that returns
+    `continue` for the same reason nineteen times spends nineteen turns and then blocks
+    (`hermes_cli/goals.py:1634-1636`, `:1691-1698`). So the budget is the backstop, and the budget
+    has its own blind spots: `LP-03` proves the declared budget is a positive integer at or under
+    `loop_max_turns_ceiling` and that the record holds no more verdict rows than the budget — it
+    cannot see whether the budget is **affordable**, and cost is not a field the record holds
+    (neither turns nor tokens nor the per-turn auxiliary judge call). Three further "not yets" are
+    structural rather than measurable: `LP-01` proves a recorded first run exists and that its
+    timestamp is at or before the first log row — **not that the command ran and not that the
+    `exit=` value was measured rather than typed** (`HP-03`'s defect, one artifact over); `LP-02`
+    proves the predicate file still hashes to its pin — **not that the predicate is the right one,
+    and not who edited it**; and a predicate that was **vacuously true from the start** (a `grep -c`
+    against a renamed directory) passes `LP-01` and `LP-02` and ends the loop green on nothing.
+    `LP-05` makes a write-up mandatory and therefore visible — nothing can make it true.
 
 ## What the harness refuses to do
 
@@ -169,7 +209,9 @@ It does not claim a green run means the work is right. `goblin-verify` asserts t
 files are the files on disk, that every rule with a command still passes, and that the
 untestable remainder is counted and capped — and it prints, on every single run, what it cannot
 see: the five upstream blind spots, plus the ban lane's own (the unsigned ban table #28, the
-text-probe gap #27, and a ban that is invisible until verify runs, `V3-1`).
+text-probe gap #27, and a ban that is invisible until verify runs, `V3-1`), plus the judge/loop
+lane's (#32: a handle that exists is not a handle that supports the verdict; #33: a changed
+pointer is a proxy for progress, not progress).
 
 27. **The ban probes are text probes, not ASTs.** `BN-01`, `BN-02`, `BN-03` and `BN-05` are
     `grep` over source under `bash`/`grep`/`awk` only — the dependency contract in

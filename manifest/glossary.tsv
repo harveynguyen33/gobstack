@@ -2,7 +2,7 @@ term	definition	source
 playbook	A named, ordered procedure with a measurable verification step. goblin-stack ships 12.	R6 sec.3
 skill	A Hermes SKILL.md directory. goblin-stack installs its skills into the target repo at .hermes/skills/ (project tier), never into a profile.	R6 sec.0.1 / sec.7.3
 profile	A worker identity in the Hermes fleet (architect, coder, reviewer, ...). Owns memory and skills.	R4
-role	What the work needs: code | judgment | review-panel | synthesis | investigate. A role maps to a profile; it never names a model.	R6 sec.4.1
+role	What the work needs: code | judgment | review-panel | synthesis | investigate | judge. A role maps to a profile; it never names a model.	R6 sec.4.1
 class	A project category A-E that selects which parts are required, optional or off. See manifest/classes.tsv.	R7 sec.4
 part	One installable unit a class requires or forbids: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, playbooks, tokens.	R7 sec.5
 gate	A declared command that must exit 0. Declared per project, never inferred from the stack.	PP sec.4
@@ -19,3 +19,7 @@ archive	A class-D flag: verify requires no HANDOFF and no gates, and the summary
 sweep	P11: the same change or question across many projects, enumerated by glob, one card each.	R6 sec.3
 overnight	P10: an unattended run over a checkable predicate written before iteration 1.	R6 sec.3
 review-panel	N independent verdict lanes, each its own card with its own resolved model. Only at stakes S3+.	R6 sec.4.3
+judge	A role that decides whether a PROCESS met its own predicate, from a command's output and a pointer it can resolve - never from a report. One lane per verdict; never the author's lane.	docs/LOOP.md
+predicate	One shell command that exits 0 when the loop is finished. Written before iteration 1 and run once before it, so its first state is known to be red. A duration is not a predicate.	docs/LOOP.md + pstack guide/07
+loop	One unattended run over a predicate, recorded in the committed .goblin/loop/ (predicate, pin, first-run, budget, one decisions.tsv row per iteration).	docs/LOOP.md
+never-relax	The predicate's digest is recorded at loop start and never updates itself; relaxing it is closing this loop and opening another, with the old predicate archived under .goblin/loop/closed-<date>/.	docs/LOOP.md

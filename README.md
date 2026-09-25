@@ -28,6 +28,7 @@ vendored plugin paths do not exist in Hermes). Not a replacement for a project s
 | `docs/CONTRACTS.md` | the installer/verifier interface, exit codes, idempotency, uninstall |
 | `docs/INTEGRATION.md` | the board, cron, the skills precedence order, the referenced standard |
 | `docs/RISKS.md` | the risk register, the advisory rows named, the non-goals |
+| `docs/LOOP.md` | the judge role and the loop contract: what Hermes's `goal_mode` actually does, the record, and what neither can see |
 | `docs/ADOPTION.md` | the five classes, the preset matrix, the adoption order |
 | `docs/LIMITS.md` | where this is weaker than its sources, and what is unproven |
 
@@ -54,12 +55,16 @@ After installing, in this order:
     hermes skills trust <target>              # one-time, so the project-tier skills load
     .goblin/bin/goblin-audit                  # once, deliberately: the ONLY network step (SC-07)
 
-**A fresh class-A install verifies green: `42 passed, 0 failed, 9 advisory, 14 skipped`, exit 0.**
-Only fourteen rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
+**A fresh class-A install verifies green: `42 passed, 0 failed, 11 advisory, 20 skipped`, exit 0.**
+Twenty rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
 `AU-02` and `AU-03` have no report to audit; `SC-06`, `SC-07` and `SC-08` have no dependency
-manifest, no lockfile and no audit record to read; `PF-01` has no measured perf baseline; and
-`BN-01`/`BN-02`/`BN-03`/`BN-05` have no `src/` for a ban to read; and `FM-01`/`FM-02`/`VA-01`
-have no feature map and no declared `verify_doctor:` yet). The parts
+manifest, no lockfile and no audit record to read; `PF-01` has no measured perf baseline;
+`BN-01`/`BN-02`/`BN-03`/`BN-05` have no `src/` for a ban to read; `FM-01`/`FM-02`/`VA-01`
+have no feature map and no declared `verify_doctor:` yet; and `JG-01` with `LP-01`..`LP-05`
+have no loop record, because no loop has run in this repo yet). Two of the eleven advisories
+are new with the judge lane: `JG-02` reports that the judge lane resolves to no profile on this
+fleet (it prints the one-line remedy and never fails a repo for a fleet's routing), and `JG-03`
+is the counted row the advisory ceiling had left for it. The parts
 that only a round can produce — a first review note, a gate that is not the shipped floor — pass
 *vacuously* rather than failing, and `P8` (`goblin-bootstrap`) still walks them as work to do.
 The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.

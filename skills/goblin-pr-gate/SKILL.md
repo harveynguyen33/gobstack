@@ -21,7 +21,10 @@ Use for anything that should be reviewed before it lands.
    It is prose on purpose — a review prompt, not a check (`SC-07`, `PF-01`).
 4. **Evaluate the panel rule for S3+.** One lane is not a panel. Lanes go through the kanban
    (see `goblin-mode`), each carrying the resolved provider/model.
-5. **Re-check the patch-id before landing.**
+5. **At S3+, the foreman is `role-judge`.** N lane verdicts are **opinions**; the foreman turns
+   them into one **decision**, and it is a lane disjoint from the author's — a panel that grades
+   its own author is the author. A vote count is not a decision.
+6. **Re-check the patch-id before landing.**
 
 ## Verification
 
@@ -29,8 +32,11 @@ Use for anything that should be reviewed before it lands.
   message does not restore it, and a green check from an older SHA is not a substitute.
 - The named `head:` exists in `git rev-list --all`.
 - For S2+, a check actually ran on that SHA.
+- At S3+, the deciding lane is disjoint from the author's (`JG-02`).
 
 ## What this cannot see
 
 A required check that self-skips (it reports Success), and a protected branch whose only
-admin is the person pushing (it protects nothing).
+admin is the person pushing (it protects nothing). Nor can it see *which* lane produced a
+verdict: the review note names the declared lanes, and no file in the repo observes the profile
+that actually ran (`MD-03`).

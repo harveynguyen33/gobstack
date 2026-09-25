@@ -18,9 +18,16 @@ code lane resolve to the same family.
 | `review-panel` | **a list** — N independent verdict lanes, each its own lane | `[reviewer, architect]` | P7 at stakes S3+ |
 | `synthesis` | merges many outputs into one artifact | `architect` | P11, P12 |
 | `investigate` | read-only exploration returning a distilled summary | `researcher` | P1 (read-only half) |
+| `judge` | decides whether a process met its own predicate, from a command's output and a pointer it can resolve, never from a report | `judge` (a **single** lane) | P10, P12, P7 at S3+, the terminal handoff gate |
 
 The list-valued panel is the sharpest configuration idea retained here: **one lane runs per list
 entry, so the list length sets the lane count.** Lane count is configuration, not code.
+
+A **panel is N opinions; a judge is one decision** — which is why `role-judge` is a role and not a
+sentence inside P7 or P12. The judge's contract (what it receives, what it must refuse, how its
+verdict is recorded) is `docs/LOOP.md`; the pair of rules that make it real are that a `done`
+verdict may only cite a handle the repo can resolve (`JG-01`) and that the judge's lane must be
+disjoint from the author's (`JG-02`).
 
 ## The model-mapping contract
 
@@ -71,9 +78,25 @@ observe which tool created a worker — so this rule is stated here and enforced
 ## The measured caveat
 
 Today's mapping puts every switchable profile on the **same** model, so `review-panel` resolves
-to the same family as `code`. `MD-02` therefore reports the state and is labelled advisory:
-goblin-stack cannot choose the fleet's models, and a harness must not fail a repo for a
-fleet-wide campaign. This is a reported number, not a silent assumption.
+to the same family as `code`, and **`judge` resolves to no lane at all**. `MD-02` therefore reports
+the state and is labelled advisory: goblin-stack cannot choose the fleet's models, and a harness
+must not fail a repo for a fleet-wide campaign. This is a reported number, not a silent assumption.
+
+The judge lane, measured on this box on 2026-09-25:
+
+    bash bin/goblin-model judge         -> judge unknown unknown unknown        (rc 0)
+    bash bin/goblin-model code          -> coder <provider> <model> <effort>
+    bash bin/goblin-model review-panel  -> reviewer <...> · architect <...>
+
+`~/projects/fleet-model.yaml` has no `judge:` entry, and `hermes profile list` reports no `judge`
+profile. So **`MD-02`'s rule is not satisfiable on this box today through the mapping file**: the
+judge and the author would run on one family. A different family exists only as a per-profile
+alias held in another profile's own config (a comment in the mapping file names it), and **the
+mapping file cannot express an alias** — it maps a profile to a provider/model pair. Making the
+constraint real is a **fleet-side** change (add the `judge` profile, add the entry, re-apply),
+never a goblin-stack one; `JG-02` therefore gates the *declared lanes* being disjoint and reports
+an unresolved judge lane as `ADV` with the one-line remedy rather than failing a repo for the
+fleet's routing.
 
 ## Budget
 

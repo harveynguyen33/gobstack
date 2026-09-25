@@ -20,12 +20,14 @@
 | K14 | **A waiver becomes a permanent blind spot** - a dated exception nobody re-decides, or an audit record nobody re-takes, so `SC-07` passes against facts that are no longer true | The record's date is checked against `security.audit_max_age_days` (90) and every waiver's date against `security.waiver_max_age_days` (180); the waiver count is printed on the gate line so the debt is loud even when the row passes; `goblin-audit` writes a refusal (exit 5) instead of an empty record, so "no advisories" can never mean "the parse found nothing". | Handled by design; the policy is unmeasured against a real registry (`docs/LIMITS.md` #22) |
 | K15 | **goblin-stack installs agent-authored skills, and the one controlled study of that practice puts it BELOW the no-skill baseline.** SkillsBench 1.1's self-generated condition (the agent authors its own Skills before solving) reports all three tested configurations below their no-Skills baseline (-8.1, -11.3, -11.5 points), while curated Skills rose +16.6 points across 18 configurations. A generated skill accepted after a skim is a different proposition from a written one. | `P6` hands every generated verification skill to `P12`, and `verified:` does not advance until an eval record exists; the record's shape, the eleven-token ban, the cheap-checks-first ladder and the pass condition (every seeded defect detected, the control at zero, every correction RED before GREEN) are specified in `skills/goblin-eval/SKILL.md`. The evidence is cited with its pin in `docs/LIMITS.md` #15. | **Stated requirement, not an enforced one**: the runner is not shipped and no row reads a lane (`docs/LIMITS.md` #31) |
 | K16 | **The feature map rots, or claims coverage it does not have** - a route renamed under a recipe that still "works", a feature file nobody indexed, a `verified:` date nobody drove | `FM-01` (every feature file indexed, the four-H2 entry contract, the slug matches the filename), `FM-02` (every declared entry path still resolves under `source_root:`, no entry path changed after its `verified:` date), `VA-01` (the declared `verify_doctor:` exits 0); the upkeep pass and the rot table live in `skills/goblin-feature-map/SKILL.md`. | Handled by design for everything the map LISTED; completeness is not checkable (`docs/LIMITS.md` #30) |
+| K17 | **An unattended loop grades itself** - the judge is a language model handed the worker's own prose, the lane that judges can be the lane that wrote, and Hermes has **no progress detector**: `run_kanban_goal_loop` carries no progress state, so a loop returning `continue` for the same reason nineteen times spends nineteen turns and then blocks | `JG-01` (a `done` verdict may only cite a handle the repo can resolve - a commit in `git rev-list --all`, a path under the root, a `sha256:` of a file under `.goblin/loop/`), `JG-02` (the declared judge lane must be **disjoint** from the author's - a FAIL, not a report), `JG-03` (counted: a lane with no non-`done` verdict is escalated), and `LP-01`..`LP-05` (one predicate command, run and recorded before iteration 1, pinned by digest, budgeted under a ceiling, no three identical pointers without a green, and a write-up when it ends red). The contract is `docs/LOOP.md`. | **Partial, and stated**: disjoint *profiles* is gated; disjoint *families* needs the mapping file (`MD-02`, ADV) and *which lane ran* is unobservable from a repo (`MD-03`); the judge lane resolves to no profile on this box, so `JG-02` reports ADV with its one-line remedy rather than failing a repo for the fleet's routing. The judge's own failure modes (prose-not-evidence, a lane that always says yes, no progress detector, cost) are `docs/LIMITS.md` #32 and #33 |
 
 ## The advisory rows, named
 
-Nine rows are labelled `advisory` (this sentence said eight until 2026-09-25: the ninth, `SC-09`,
-landed with G4's guard rails), and the count is capped by `SK-03` (default ceiling 10).
-Eight carry **no executable check at all**:
+Ten rows are labelled `advisory` (this sentence said nine until 2026-09-25: the tenth, `JG-03`,
+landed with G2's judge lane), and the count is capped by `SK-03` (default ceiling 10 — the cap is
+now **full**, `advisory 10 of ceiling 10`).
+Nine carry **no executable check at all**:
 
 - **HP-04** — a stale sentence is corrected in place with a dated parenthetical, never deleted.
 - **HS-03** — source probes read text with comments blanked first.
@@ -35,6 +37,9 @@ Eight carry **no executable check at all**:
 - **DOC-01** — a significant change updates the docs that teach it.
 - **DOC-02** — system-level changes are recorded in the vault via the `pkm` profile.
 - **SC-09** — auth is applied consistently across sibling routes.
+- **JG-03** — a judge lane that has never returned a non-`done` verdict is escalated. The history
+  that would show a bad lane lives across cards and repos, so the counter-measure is policy (one
+  known-red control verdict per wave, `docs/LOOP.md`), not a command.
 
 One is advisory-labelled but still **reports its state** as `ADV`:
 
