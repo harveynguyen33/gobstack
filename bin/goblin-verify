@@ -524,7 +524,7 @@ check_hs_01() {
 }
 
 check_hs_02() {
-  local env cmd commit d tmp bad=0 f rc base name pat
+  local env cmd commit d tmp bad=0 f rc base name qname pat
   env=$(g_yaml_block_scalar "$CONFIG" replay env)
   cmd=$(g_yaml_block_scalar "$CONFIG" replay cmd)
   commit=$(g_unquote "$(g_yaml_block_scalar "$CONFIG" replay commit)")
@@ -570,7 +570,15 @@ check_hs_02() {
     [ -e "$f" ] || continue
     base=$(basename "$f")
     name=${base%.mjs}
-    ( cd "$tmp/wt" && env "$env"="$commit" bash -c "${cmd//$pat/$name}" ) >/dev/null 2>&1
+    # Z2-3: the name is SHELL-QUOTED before it is substituted, because it now reaches a shell.
+    # This row runs the DECLARED command rather than `node "$f"` (Z1-4), so a file in the harness
+    # dir - a name the row does not control - is part of the command text `bash -c` parses.
+    # Unquoted, a name carrying `;`, `#`, a space or a glob was read as shell syntax: measured, a
+    # file named `z2;true;#.mjs` produced TWO commands and the trailing `true` decided the exit
+    # code. The outcome stayed fail-closed (a GREEN "harness" makes the row FAIL), but it is the
+    # same surface class as the G8-1 injection, so it is quoted rather than only documented.
+    qname=$(printf '%q' "$name")
+    ( cd "$tmp/wt" && env "$env"="$commit" bash -c "${cmd//$pat/$qname}" ) >/dev/null 2>&1
     rc=$?
     case "$rc" in
       0)
@@ -1144,11 +1152,26 @@ check_sc_08() {
     printf 'no package-lock.json - there is no install-hook surface to enumerate\n'; return 3
   fi
   local pkgs n=0 ok=0 bad=0 p
+  # Z2-2: this reader is line-anchored, so a MINIFIED (one-line) lockfile - valid JSON, and what a
+  # tool that writes without pretty-printing leaves behind - matched NOTHING and the row printed
+  # `0 install hook(s), 0 allowlisted` as a PASS, exit 0. That is a vacuous PASS: the exact defect
+  # family (D6/PR-03) this harness exists to prevent, and the one shape the pnpm/yarn branch above
+  # already reports honestly. The text is normalised into the pretty shape first - break after
+  # every `{`, `}` and `,` - which is a TEXT transform, not a JSON parse: no npm, no jq, no parser
+  # (docs/CONTRACTS.md). The anchor accepts `": {` (what npm writes) and `":{` (minified), and the
+  # per-line state machine still attributes `hasInstallScript` to the key line it followed.
   pkgs=$(awk '
-    /^[[:space:]]*"node_modules\/[^"]+": \{/ {
-      k = $0; sub(/^[[:space:]]*"/, "", k); sub(/":.*/, "", k); sub(/^node_modules\//, "", k)
+    {
+      gsub(/\{/, "{\n"); gsub(/\}/, "}\n"); gsub(/,/, ",\n")
+      n = split($0, L, "\n")
+      for (i = 1; i <= n; i++) {
+        s = L[i]
+        if (s ~ /^[[:space:]]*"node_modules\/[^"]+":[[:space:]]*\{/) {
+          k = s; sub(/^[[:space:]]*"/, "", k); sub(/":[[:space:]]*\{.*/, "", k); sub(/^node_modules\//, "", k)
+        }
+        if (s ~ /"hasInstallScript"[[:space:]]*:[[:space:]]*true/ && k != "") print k
+      }
     }
-    /"hasInstallScript"[[:space:]]*:[[:space:]]*true/ { if (k != "") print k }
   ' "$lock" | sort -u)
   for p in $pkgs; do
     n=$((n + 1))
