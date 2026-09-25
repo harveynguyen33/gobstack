@@ -47,8 +47,8 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 ## P6 - `goblin-verify-author`
 
 - **When:** a project has no live lane, or its gates drift
-- **Steps:** 1 read the repo, not the user, for entry points<br>- 2 write the gate/check set into the harness dir with the house harness shape<br>- 3 execute it once end to end<br>- 4 add the REPLAY block
-- **Verification:** a generated skill that was never executed is a draft, not a deliverable; the harness prints PASS/FAIL and exits non-zero on failure; the REPLAY shows RED pre-change
+- **Steps:** 1 read the repo, not the user, for entry points<br>- 2 write the gate/check set into the harness dir with the house harness shape<br>- 3 execute it once end to end<br>- 4 add the REPLAY block<br>- 5 seed the feature map and declare `feature_map:`/`source_root:` (`goblin-feature-map`)<br>- 6 hand the generated skill to P12: `verified:` does not advance until the eval record exists
+- **Verification:** a generated skill that was never executed is a draft, not a deliverable; the harness prints PASS/FAIL and exits non-zero on failure; the REPLAY shows RED pre-change; the map's index and four-H2 entry contract hold (`FM-01`), every declared entry path still resolves (`FM-02`), and the declared `verify_doctor:` exits 0 (`VA-01`)
 - **Profiles:** architect
 - **Role:** judgment
 
@@ -95,8 +95,8 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 ## P12 - `goblin-eval`
 
 - **When:** a skill or prompt changed, and you want to know if it did anything
-- **Steps:** 1 candidate and control run in sanitized directories<br>- 2 no eval/test/judge/rubric token anywhere the candidate sees<br>- 3 grade the chain from the transcript (which files it actually opened), never self-report<br>- 4 the judge runs on a different model family
-- **Verification:** the judge's verdict is reproducible from the transcripts; candidates never learn other candidates exist
+- **Steps:** 1 candidate and control run in sanitized directories<br>- 2 no eval/test/judge/rubric token anywhere the candidate sees<br>- 3 grade the chain from the transcript (which files it actually opened), never self-report<br>- 4 the judge runs on a different model family<br>- 5 write the record to `evals/<slug>/` (prompt, rubric, manifest.tsv, transcripts/, verdict.md)<br>- 6 a change must improve the evaluated cases or add new evaluations; a generated verification skill passes only on a measured sensitivity
+- **Verification:** the judge's verdict is reproducible from the transcripts; candidates never learn other candidates exist; the record exists and every lane names a transcript file that exists; a generated verification skill is verified only by a record, with its sensitivity printed beside the control's number
 - **Profiles:** researcher
 - **Role:** synthesis
 

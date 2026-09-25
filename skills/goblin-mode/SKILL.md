@@ -18,6 +18,7 @@ into exactly one playbook, and it refuses to invent machinery that does not exis
 | a behaviour-preserving reshape | P4 | `goblin-refactor` |
 | a defect where a regression test is cheap | P5 | `goblin-tdd-repro` |
 | a project has no live lane, or its gates drift | P6 | `goblin-verify-author` |
+| a feature map is missing, or its entry points have drifted | P6 | `goblin-verify-author` + `goblin-feature-map` |
 | anything that should be reviewed before it lands | P7 | `goblin-pr-gate` |
 | adopting goblin-stack in a repo, or starting one | P8 | `goblin-bootstrap` |
 | ending a session, or picking up another's | P9 | `goblin-handoff` |
