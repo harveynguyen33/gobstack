@@ -78,5 +78,24 @@ printf '%s' "$OUT3" | grep -q '^no-op:'
 check "a second install is a no-op" "$?"
 check "and it exits 0" "$([ "$RC3" -eq 0 ] && echo 0 || echo 1)"
 
+# ---- W5-3: an explicitly named --practice that does not resolve is REPORTED ------------------
+# A flag the operator wrote and the tool ignored in silence is the same species as a mechanism
+# documented with nothing asserting it: exit 0, `practice: ~`, and no line about it in the log at
+# all (`grep -c practice` over the install output was 0 for the flag). The DEFAULT case - no
+# --practice on the command line - stays silent, because there is no flag to answer for; that is
+# why the control has to NAME the path. --force is used so the install is not the same-version
+# no-op above and actually reaches the practice pin.
+OUT4=$(bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --models "$WORK/models.yaml" \
+        --practice "$WORK/absent-standard.md" --force 2>&1); RC4=$?
+printf '%s' "$OUT4" | grep -q -e '--practice .*absent-standard.md does not exist'
+check "W5-3: an explicit --practice that does not resolve is reported" "$?"
+printf '%s' "$OUT4" | grep -q -e 'practice: and practice_sha256: stay empty'
+check "  and the report says what the operator is left with" "$?"
+OUT5=$(bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --models "$WORK/models.yaml" \
+        --force 2>&1); RC5=$?
+printf '%s' "$OUT5" | grep -q -e 'does not exist' && SILENT=1 || SILENT=0
+check "  no --practice on the command line stays silent, and still exits 0" \
+  "$([ "$SILENT" -eq 0 ] && [ "$RC5" -eq 0 ] && echo 0 || echo 1)"
+
 if [ "$fail" -eq 0 ]; then note "t-install-refusal: PASS"; else note "t-install-refusal: FAIL"; fi
 exit "$fail"
