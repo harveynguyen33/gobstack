@@ -340,26 +340,35 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     Harvey's repo on first contact is the overreach `docs/CONTRACTS.md` rules out. Carried from W5
     §5's `G8-9` rather than fixed here — it is a **sequencing** limit, not a hole in a row: one commit
     clears all six, and `tests/t-verify-green.sh` seeds one before it installs.
-41. **Sixteen documented mechanisms carry no control of their own, and one exemption is by design.**
-    Y1 §7 listed eighteen; Z1 **fixed** the two load-bearing ones (17, the unrendered token — Z1-3;
-    18, `replay.cmd` — Z1-4) and **closed** two more (4, the ban engine's `exit 2` paths; 5,
-    `--list` — three assertions in `tests/t-verify-red.sh`, RED against a deliberately broken copy
-    of `bin/goblin-bans`, which is PR-03's second branch: those mechanisms *worked*, they were just
-    unguarded). The other fourteen are **recorded here rather than mechanised**. Each was measured
-    WORKING by Y1, so an assertion would pin behaviour that already holds, and this box does not
-    have fourteen controls' worth of budget; the cost of the gap is exactly the shape of both
-    regressions in this repo's history — a mechanism documented, and nothing asserting it.
+41. **Eleven of Y1 §7's eighteen documented mechanisms still carry no control of their own, and one
+    exemption is by design.** The census, stated separably so a reader can check the arithmetic:
+    **18 listed · 2 fixed · 2 closed · 3 controlled · 11 recorded.** Y1 §7 listed eighteen
+    mechanisms; Z1 **fixed** the two load-bearing ones (17, the unrendered token — Z1-3; 18,
+    `replay.cmd` — Z1-4, which now have controls and therefore sit *outside* the "carry no control"
+    set) and **closed** two more (4, the ban engine's `exit 2` paths; 5, `--list` — three assertions
+    in `tests/t-verify-red.sh`, RED against a deliberately broken copy of `bin/goblin-bans`, which
+    is PR-03's second branch: those mechanisms *worked*, they were just unguarded); AA1
+    **controlled** three (1, 2 and 6 — the ban-engine cluster, below). The remaining **eleven** are
+    **recorded here rather than mechanised**. Each was measured WORKING, so an assertion would pin
+    behaviour that already holds, and this box does not have eleven controls' worth of budget; the
+    cost of the gap is exactly the shape of both regressions in this repo's history — a mechanism
+    documented, and nothing asserting it.
       - items 1, 2, 6 — `bans_exempt:` on the layer probe, the engine→probe
-        `GOBLIN_BANS_ID`/`GOBLIN_BANS_EXEMPT` contract, and its segment alignment: exercised
-        *indirectly* by X1's five ban-lane controls (an exemption reaches a violation; `src/ok` does
-        not swallow `src/okay`). A direct control is the first thing a later wave should add.
+        `GOBLIN_BANS_ID`/`GOBLIN_BANS_EXEMPT` contract, and its segment alignment: **CONTROLLED at
+        0.4.2 (AA1)** — seven controls in `tests/t-verify-red.sh`, in both directions each (the
+        layer probe's exempt path PASSes and the same crossing import outside it FAILs; a prefix
+        covers its own subtree but does not swallow `src/okay`; a prefix written with a trailing
+        slash exempts nothing; and a project's own probe that exits 0 only when both environment
+        variables arrive). This was the cluster Z1 named as the one with a real engine underneath,
+        and `grep -c GOBLIN_BANS_EXEMPT tests/` was **0** before it.
       - item 3 — a project's own probe that ignores those variables fails closed: the mechanism is
         this file's #36, where the FAIL is measured.
       - item 7 — `BAN-OK` must sit on the offending line: the marker's *effect* is controlled, the
         on-this-line clause is not (a marker on another line does not clear the violation).
       - items 8, 9 — `SC-05`'s `.goblin/boundary-waivers` and `SC-08`'s
         `.goblin/install-hooks.allowlist`: both files are copied and both FAIL directions are
-        controlled; neither *honoured* direction is.
+        controlled; neither *honoured* direction is. (`SC-08`'s reader is the row the minified
+        lockfile defeated — Z2-2; that was a shape, not this item, and it is fixed and controlled.)
       - item 10 — `SC-03` clause 2, `sec_build_output`: a literal in `dist/assets` FAILs; only the
         clause-1 path is controlled.
       - items 11, 12, 15 — `scaffold_checks:`'s SKIP branch, `perf_host_gate` (#35) and

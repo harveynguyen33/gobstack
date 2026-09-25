@@ -16,7 +16,7 @@
 #     - name: typecheck        four-space-indented second member of a list entry
 #       cmd: npx tsc --noEmit
 
-GOBLIN_LIB_VERSION="0.4.1"
+GOBLIN_LIB_VERSION="0.4.2"
 
 # ---------------------------------------------------------------- output -----
 g_pass() { printf 'PASS  %-6s %s\n' "$1" "$2"; }

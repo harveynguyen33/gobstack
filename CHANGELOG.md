@@ -3,6 +3,36 @@
 One line per released version. `goblin-install --upgrade` prints the delta between the
 version recorded in a target's `.goblin/installed.json` and the source `VERSION`.
 
+## 0.4.2
+
+- **`SC-08` no longer passes vacuously on a minified lockfile (Z2-2).** `check_sc_08` read
+  `package-lock.json` with a line-anchored awk, so a **minified** (one-line) lockfile matched
+  nothing and the row printed `0 install hook(s), 0 allowlisted` — **exit 0, a PASS** where the
+  pnpm/yarn branch's SKIP is the honest shape. Measured on one tree: the same unlisted hook is
+  `FAIL` rc 1 pretty-printed and was `PASS` rc 0 on one line. The text is normalised into the
+  pretty shape before the reader sees it (a text transform — no npm, no jq, no parser) and the
+  anchor accepts `": {` and `":{`; two controls hold it, and the FAIL half is RED against the
+  0.4.1 verifier.
+- **`HS-02` shell-quotes the harness file name it substitutes (Z2-3).** Z1-4 made the row run the
+  DECLARED command instead of `node "$f"`, which put a file name from the harness dir into the
+  command text `bash -c` parses — the same surface class as the G8-1 injection. Measured with a
+  file named `z2;true;#.mjs`: unquoted, two commands ran and the trailing `true` decided the exit
+  code (rc 1, "was GREEN on the pre-change tree"); quoted with `printf %q`, `node` receives one
+  argument. The control carries that name.
+- **Y1 §7's items 1, 2 and 6 have their direct controls, so the census moves (AA1).** The layer
+  probe's `bans_exempt:` path, the engine→probe `GOBLIN_BANS_ID`/`GOBLIN_BANS_EXEMPT` contract,
+  and the prefix's segment alignment (including the trailing-slash case) each have one now;
+  `grep -c GOBLIN_BANS_EXEMPT tests/` was **0** before, and the five W5-1/W5-2 controls all drive
+  `grep-ban.sh`, never `layer-check.sh`. The census is therefore **18 listed · 2 fixed · 2 closed ·
+  3 controlled · 11 recorded**: three mechanisms left `LIMITS.md` #41's recorded set, which is the
+  only direction that frees headroom, and no advisory row was spent — **10 of 10**.
+- **`tests/t-verify-red.sh`'s census is re-counted, not carried: 121 `expect_red` + 28
+  `expect_green` = 149 calls**, 78 distinct ids, 0 phantom, 0 uncovered. Its W5-1/W5-2 comment no
+  longer says that all five of those controls are RED on the pre-fix tree — two of the five are
+  (Z2-4). Measured on 7fec08f: the two `expect_green` halves fail there (the escape did nothing),
+  the three `expect_red` halves report ok; all five name a row that is RED there.
+- **`VERSION` is `0.4.2`** — `VERSION`, the five `bin/` version constants and this entry agree.
+
 ## 0.4.1
 
 - **Y1's remaining defects, landed (Z1).** Eight MINOR/STYLE findings from an independent verification
@@ -26,10 +56,16 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   `CHANGELOG.md`'s own ban-lane claim is corrected to its measurement (two of five RED pre-fix, three
   pinning behaviour that was never broken, which is what X1 §5 reports); `docs/ENFORCEMENT.md` cites
   the right `LIMITS` entry; `tests/run-tests.sh`'s header counts five source rows, not four.
-- **`docs/LIMITS.md` #41** records Y1 §7's census: sixteen documented mechanisms with no control of
-  their own — two closed from the ban engine's contract (that engine's `exit 2` paths and `--list`),
-  two fixed (the token, `replay.cmd`), fourteen recorded with the reason. W5-10's exemption
-  (`docs/` is never installed) is stated there too. No advisory row was added: **10 of 10**, unchanged.
+- **`docs/LIMITS.md` #41** records Y1 §7's census, and the arithmetic is stated separably so a
+  reader can check it: Y1 listed **18** documented mechanisms with no control of their own; this
+  wave **fixed** two (the unrendered token, `replay.cmd` — items 17 and 18, which by definition
+  now HAVE controls and so sit **outside** the "carry no control" set), **closed** two more (the
+  ban engine's `exit 2` paths and `--list` — items 4 and 5, three assertions in
+  `tests/t-verify-red.sh`), and **recorded the remaining 14** with their reason. **18 listed ·
+  2 fixed · 2 closed · 14 recorded.** (This sentence said *sixteen* and counted the two fixed
+  mechanisms inside the no-control set, so `2 + 2 + 14` could not be reconciled from it —
+  Z2-1; the corrected counts are the ones that add up.) W5-10's exemption (`docs/` is never
+  installed) is stated there too. No advisory row was added: **10 of 10**, unchanged.
 - **`VERSION` is `0.4.1`** — `VERSION`, the five `bin/` version constants and this entry agree.
 
 ## 0.4.0

@@ -41,8 +41,11 @@ export const a: any = 1;    // BAN-OK(BN-01): the value is narrowed at the bound
 ```
 
 An inline escape clears **one line** for **that ban**; a non-empty reason after the colon is
-required, so `BAN-OK(BN-01)` on its own is not an escape. Path exemption is segment-aligned:
-`src` exempts `src/a.ts` and `src/legacy/b.ts`, never `src2/c.ts`.
+required, so `BAN-OK(BN-01)` on its own is not an escape. Path exemption is segment-aligned and
+compared as written: `src` exempts `src/a.ts` and `src/legacy/b.ts`, never `src2/c.ts`, and a
+prefix carrying a trailing slash (`src/legacy/`) strips nothing, so it matches no file and exempts
+nothing - write the prefix without one. Both shipped probes are controlled in
+`tests/t-verify-red.sh` (AA1), including that trailing-slash case.
 
 The engine passes both to the probe through its environment rather than editing stdout:
 
