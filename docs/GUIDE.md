@@ -444,7 +444,7 @@ cost of that edit, on a real 2450-line handoff, was **15 lines added, none remov
     .goblin/bin/goblin-verify [--only <id[,id...]>] [--json] [--list]
     .goblin/bin/goblin-audit        # the only network step
     .goblin/bin/goblin-bans         # run the ban list
-    .goblin/bin/goblin-model <role> # resolve a role to a profile (no model name in any rule)
+    bin/goblin-model <role>        # checkout-only; resolve a role to a profile (docs/ROLES.md)
 
 ### The 14 playbooks
 
@@ -514,7 +514,7 @@ run `goblin-verify` once a day for a week. The habit, not the tool, is what prod
 1. Point `practice:` at your existing house standard and pin it.
 2. Write one `AC:` item that a script could check, and make it pass.
 3. Add a ban for the one pattern you are tired of seeing in agent-written code
-   (`manifest/bans.tsv` — a ban without a mechanism is a wish, so give it one).
+   (`.goblin/manifest/bans.tsv` — a ban without a mechanism is a wish, so give it one).
 4. When you have a bug that a test could catch, walk P5 (`goblin-tdd-repro`) end to end once.
 
 **If you are sharing this with a team:** the parts that matter are `HANDOFF.md`, the `gates:` you

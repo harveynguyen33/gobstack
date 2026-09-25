@@ -124,7 +124,7 @@ stretching P9 would lose the reproduce-first gate. The producer half is
 `automations/drift-audit.sh` (no agent at all) and `automations/bugreporter-intake.sh`; the
 three-part model is in `automations/README.md`.
 
-## The cuts - pstack ships 23, this ships 12 (plus the two automations below)
+## The cuts - pstack ships 23, this ships 14 (the two automations included)
 
 Each cut has a reason, and a cut is recorded rather than deleted silently.
 

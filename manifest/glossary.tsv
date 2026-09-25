@@ -1,5 +1,5 @@
 term	definition	source
-playbook	A named, ordered procedure with a measurable verification step. goblin-stack ships 12.	R6 sec.3
+playbook	A named, ordered procedure with a measurable verification step. goblin-stack ships 14.	R6 sec.3
 skill	A Hermes SKILL.md directory. goblin-stack installs its skills into the target repo at .hermes/skills/ (project tier), never into a profile.	R6 sec.0.1 / sec.7.3
 profile	A worker identity in the Hermes fleet (architect, coder, reviewer, ...). Owns memory and skills.	R4
 role	What the work needs: code | judgment | review-panel | synthesis | investigate | judge. A role maps to a profile; it never names a model.	R6 sec.4.1
