@@ -190,7 +190,7 @@ deliberate trade or an unfilled gap.
     `hermes_cli/goals.py`, `run_kanban_goal_loop` carries no progress state at all — its whole
     state is `last_response`, `turns_used` and `nudged_to_finalize`, so a loop that returns
     `continue` for the same reason nineteen times spends nineteen turns and then blocks
-    (`hermes_cli/goals.py:1634-1636`, `:1691-1698`). So the budget is the backstop, and the budget
+    (`hermes_cli/goals.py:1636-1638`, `:1689-1696`). So the budget is the backstop, and the budget
     has its own blind spots: `LP-03` proves the declared budget is a positive integer at or under
     `loop_max_turns_ceiling` and that the record holds no more verdict rows than the budget — it
     cannot see whether the budget is **affordable**, and cost is not a field the record holds

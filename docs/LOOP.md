@@ -26,19 +26,19 @@ Every claim below was read in this box's Hermes tree (`/home/harvey/.hermes/herm
 
 | mechanism | measured behaviour | where it was read |
 |---|---|---|
-| the judge call | an **auxiliary LLM call**, `temperature=0`, max_tokens 4096, timeout 30 s, routed by `auxiliary.goal_judge.*` | `hermes_cli/goals.py:31-38`, `:854-863`, `:870-935` |
-| **what the judge sees** | the goal (truncated to 2000 chars) and **the agent's own most recent response** (truncated to 4000) | `hermes_cli/goals.py:38`, `:901-905` |
-| the verdict enum | `done \| blocked \| continue \| wait`, plus `skipped` for an empty goal; the legacy `{"done": bool}` shape is still accepted | `hermes_cli/goals.py:775-798`, `:886-889` |
-| quality gates | deterministic shell commands that must pass before the judge may say `done`; a failed gate **short-circuits judging** and its bounded output (3000 chars) becomes the continuation prompt. 300 s timeout, 3 retries | `hermes_cli/goals.py:50-57`, `:1278-1324` |
-| fail-open | an unparseable or unreachable judge → `continue`; auto-pause after 3 consecutive parse failures or 5 consecutive transport failures | `hermes_cli/goals.py:42-45`, `:929-930` |
-| budget | `DEFAULT_MAX_TURNS = 20`; the kanban loop **starts `turns_used` at 1** and checks the budget **before** spending another turn; exhaustion blocks with outcome `blocked_budget` | `hermes_cli/goals.py:31`, `:1635`, `:1691-1698` |
+| the judge call | an **auxiliary LLM call**, `temperature=0`, max_tokens 4096, timeout 30 s, routed by `auxiliary.goal_judge.*`. The function also accepts `contract=`, `subgoals=` and `background_processes=` | `hermes_cli/goals.py:31-38`, `:858-863`, `:870-935` |
+| **what the judge sees** | the goal (truncated to 2000 chars) and **the agent's own most recent response** (truncated to 4000) | `hermes_cli/goals.py:39`, `:904-905` |
+| the verdict enum | `done \| blocked \| continue \| wait`, plus `skipped` for an empty goal; the legacy `{"done": bool}` shape is still accepted | `hermes_cli/goals.py:773-800`, `:888` |
+| quality gates | deterministic shell commands that must pass before the judge may say `done`; a failed gate **short-circuits judging** and its bounded output (3000 chars) becomes the continuation prompt. 300 s timeout, 3 retries | `hermes_cli/goals.py:50-54`, `:60`, `:1279-1324` |
+| fail-open | an unparseable or unreachable judge → `continue`. The constants for an auto-pause exist (3 consecutive parse failures, 5 consecutive transport failures) but belong to the interactive goal loop: **the kanban loop binds `_parse_failed` and `_transport_failed` and discards both** | `hermes_cli/goals.py:45`, `:48` (constants), `:923-930` (fall-through), `:1662` (discarded) |
+| budget | `DEFAULT_MAX_TURNS = 20`; the kanban loop **starts `turns_used` at 1** and checks the budget **before** spending another turn; exhaustion blocks with outcome `blocked_budget` | `hermes_cli/goals.py:31`, `:1632-1634` (the default and the clamp), `:1637` (`turns_used = 1`), `:1689-1696` (the check and the block) |
 | terminators | the worker's own terminal calls stop the loop (`kanban_complete`, `kanban_block`, review hand-off) | `hermes_cli/goals.py:1586-1592` |
-| `wait` in a kanban loop | **downgraded to `continue`** — a worker finishes with kanban tools, not by parking | `hermes_cli/goals.py:1664-1665` |
-| **what the kanban loop passes the judge** | `judge_goal(goal_text, last_response)` — **no contract, no subgoals, no gates** | `hermes_cli/goals.py:1660` |
-| a judged-done worker that never finalises | one finalize nudge, then a **block**, never a completion | `hermes_cli/goals.py:1676-1684` |
+| `wait` in a kanban loop | **downgraded to `continue`** — a worker finishes with kanban tools, not by parking | `hermes_cli/goals.py:1666-1667` |
+| **what the kanban loop passes the judge** | `judge_goal(goal_text, last_response)` — **two positional arguments only: no contract, no subgoals, no gates** (the function can take all three; this call site passes none) | `hermes_cli/goals.py:1662` |
+| a judged-done worker that never finalises | one finalize nudge, then a **block**, never a completion | `hermes_cli/goals.py:1676-1685` |
 | the terminal handoff gate | `kanban_complete` and `kanban_request_review` are judged on the **supplied summary text**; a broken judge **allows** the handoff; the gate is skipped entirely when no auxiliary client resolves | `tools/kanban_tools.py:414-424`, `:447-477`, `:654-680`, `:783-808` |
-| **progress detection** | **none.** The loop's whole state is `last_response`, `turns_used`, `nudged_to_finalize` | `hermes_cli/goals.py:1634-1636` |
-| predicate pinning | **none** — `goal_text` is read once from the card, and a worker cannot edit its own card body anyway | `hermes_cli/goals.py:1595`, `tools/kanban_tools.py:211-244` |
+| **progress detection** | **none.** The loop's whole state is `last_response`, `turns_used`, `nudged_to_finalize` | `hermes_cli/goals.py:1636-1638` |
+| predicate pinning | **none** — `goal_text` is read once from the card, and a worker cannot edit its own card: `grep -rn kanban_edit tools/` finds **one** hit, the gate's own message text, and no tool definition | `hermes_cli/goals.py:1595-1601`, `tools/kanban_tools.py:432` |
 
 **The three sentences that matter.**
 
@@ -46,7 +46,7 @@ Every claim below was read in this box's Hermes tree (`/home/harvey/.hermes/herm
    whether it is enough. The prompt demands concrete evidence; the judge cannot go and get it. So
    *"a judge given prose instead of evidence"* is the default on every turn, not an edge case.
 2. **The one mechanical path exists and is not connected.** Quality gates would make this a real
-   loop, and the kanban path passes neither gates nor contract (`hermes_cli/goals.py:1660`).
+   loop, and the kanban path passes neither gates nor contract (`hermes_cli/goals.py:1662`).
 3. **No progress detector, no predicate pin — the budget is the only backstop.**
 
 `[inferred]` the goal-judge verdicts on this box are any *good*: this card ran no `goal_mode`
@@ -99,7 +99,7 @@ output is not in the record, and a verdict resting on it is the self-report `JG-
 ## 5. The guard rails — what stops a night being burned
 
 **What stops a loop making no progress?** *Nothing in Hermes*: `run_kanban_goal_loop` has no
-notion of progress (`hermes_cli/goals.py:1634-1636`), so a loop returning `continue` with the same
+notion of progress (`hermes_cli/goals.py:1636-1638`), so a loop returning `continue` with the same
 reason nineteen times spends nineteen turns and then blocks. The mechanism here is `LP-04`: three
 consecutive verdict rows with an **unchanged evidence pointer** and a result that is not
 `predicate:green` is a FAIL naming the row numbers. **What it measures is a changed pointer, not
@@ -108,15 +108,16 @@ why `LP-05` and the budget sit behind it.
 
 **What stops a loop "succeeding" by weakening its own check?** *Partly, and partly by accident.*
 A **card** predicate is already protected: a worker cannot mutate its own card
-(`tools/kanban_tools.py:211-244`) and no `kanban_edit` tool ships. A predicate in a **file** has no
+(`tools/kanban_tools.py:211-229`) and no `kanban_edit` **tool** ships - the CLI verb
+`hermes kanban edit` exists, and a headless worker cannot call it. A predicate in a **file** has no
 such protection, so `LP-02`'s pin is the mechanism. The wider hazard is unaddressed and stated:
-the judge is a language model grading prose (`hermes_cli/goals.py:905`), and *"the agent optimises
+the judge is a language model grading prose (`hermes_cli/goals.py:904-905`), and *"the agent optimises
 exactly the gate signal, including by faking it"* is measured rather than hypothetical. **The
 counter-measure is not a better prompt.** It is that a `done` verdict may only cite a handle the
 repo can resolve and re-check tomorrow (`JG-01`).
 
 **What does a genuinely stuck loop do?** Today: it burns the budget and **blocks for review**,
-carrying only the last judge reason, which came from a self-report (`hermes_cli/goals.py:1693`).
+carrying only the last judge reason, which came from a self-report (`hermes_cli/goals.py:1692-1695`).
 Approved shape: write `.goblin/loop/stuck.md`, commit it, `kanban_block` naming the predicate.
 `LP-05` makes the write-up mandatory and therefore visible; **nothing can make it true.**
 

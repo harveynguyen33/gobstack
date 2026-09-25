@@ -6,15 +6,16 @@ The board is the fleet's fan-out carrier and the only one with a model knob.
 
 - `goblin-overnight` (P10) maps to `goal_mode: true` plus a turn budget. **Corrected 2026-09-25
   (W3), measured in `hermes_cli/goals.py`:** the truth was weaker than this line claimed. The
-  auxiliary judge is called as `judge_goal(goal_text, last_response)` (`:1660`) — **no contract, no
-  subgoals, no quality gates**, so it is not "the predicate re-check"; what it sees is the card's
+  auxiliary judge is called as `judge_goal(goal_text, last_response)` (`:1662`) — two positional
+  arguments and nothing else: **no contract, no subgoals, no quality gates** (the function takes all
+  three; this call site passes none), so it is not "the predicate re-check"; what it sees is the card's
   goal text (truncated to 2000 chars) and the worker's own most recent response (truncated to
-  4000) (`:38`, `:901-905`). The judge is an auxiliary model call at `temperature=0` (`:854-863`)
+  4000) (`:39`, `:904-905`). The judge is an auxiliary model call at `temperature=0` (`:858-863`)
   and the loop's whole state is `last_response`, `turns_used` and `nudged_to_finalize` — **there is
-  no progress detector at all** (`:1634-1636`). `wait` is downgraded to `continue` in a kanban loop
-  (`:1664-1665`), a judged-done worker that never finalises is nudged once and then **blocked**
-  (`:1676-1684`), and the budget (`DEFAULT_MAX_TURNS = 20`) is checked before each further turn
-  (`:1691-1698`). What goblin-stack adds on top is `docs/LOOP.md` and the eight rows
+  no progress detector at all** (`:1636-1638`). `wait` is downgraded to `continue` in a kanban loop
+  (`:1666-1667`), a judged-done worker that never finalises is nudged once and then **blocked**
+  (`:1676-1685`), and the budget (`DEFAULT_MAX_TURNS = 20`) is checked before each further turn
+  (`:1689-1696`). What goblin-stack adds on top is `docs/LOOP.md` and the eight rows
   `JG-01`..`JG-03`, `LP-01`..`LP-05`; the terminal handoff gate is judged on the supplied summary
   text and **allows the handoff when the judge breaks** (`tools/kanban_tools.py:414-424`,
   `:447-477`).
