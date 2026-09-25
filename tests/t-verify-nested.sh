@@ -82,7 +82,7 @@ git add -A && git commit -q -m "docs: the handoff names the head"
 OUT2=$(bash .goblin/bin/goblin-verify 2>&1); RC2=$?
 printf '%s\n' "$OUT2" | sed 's/^/      /'
 check "a nested target with its own .git verifies (exit 0)" "$([ "$RC2" -eq 0 ] && echo 0 || echo 1)"
-printf '%s' "$OUT2" | grep -qE '^ *41 passed, 0 failed, 9 advisory, 7 skipped'
+printf '%s' "$OUT2" | grep -qE '^ *42 passed, 0 failed, 9 advisory, 11 skipped'
 check "  and it is the class-A green path (33/0/8/1)" "$?"
 
 if [ "$fail" -eq 0 ]; then note "t-verify-nested: PASS"; else note "t-verify-nested: FAIL"; fi

@@ -30,3 +30,5 @@ perf_baseline_value: 0
 perf_measured: ""
 perf_host_gate: "Editor run - frame time on the target device"
 notes: the Editor suite is a host gate, not a hermetic one - declare it as such and do not expect it to run in CI.
+# The ban list this class turns on (G5). An unlisted ban SKIPs with a reason.
+bans: BN-01, BN-02, BN-05

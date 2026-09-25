@@ -3,9 +3,10 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One `expect_red` per target-scope row: 62 controls over the 57 target rows (42 at v0.1 plus the
-# five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01), the
-# three F4/G4 extras and the two V1 extras (G8-2, G8-5) included. The `--only <id>` form is used
+# One `expect_red` per target-scope row: 68 controls over the 62 target rows (42 at v0.1 plus the
+# five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01, plus the
+# five added with BN-00..BN-03 and BN-05, plus the three F4/G4 extras, the two V1 extras (G8-2,
+# G8-5) and the second BN-00 control). The `--only <id>` form is used
 # so a mutation in one row cannot be masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
@@ -79,6 +80,7 @@ cp -a .goblin/automations "$BK/automations"
 cp -a .goblin/audit-waiver.tsv "$BK/audit-waiver.tsv"
 cp -a .goblin/install-hooks.allowlist "$BK/install-hooks.allowlist"
 cp -a .goblin/boundary-waivers "$BK/boundary-waivers"
+cp -a .goblin/manifest/bans.tsv "$BK/bans.tsv"
 # .gitignore is mutated by m_sc_02 and must come back byte-for-byte: the fixture-green check at
 # the end of this file is what caught its absence.
 cp -a .gitignore "$BK/gitignore"
@@ -88,6 +90,7 @@ restore_all() {
   cp -a "$BK/goblin.yaml" .goblin/goblin.yaml
   cp -a "$BK/installed.json" .goblin/installed.json
   cp -a "$BK/enforcement.tsv" .goblin/manifest/enforcement.tsv
+  cp -a "$BK/bans.tsv" .goblin/manifest/bans.tsv
   cp -a "$BK/SKILL.md" .hermes/skills/goblin-mode/SKILL.md
   cp -a "$BK/ROUND-000-SPEC.md" ROUND-000-SPEC.md
   cp -a "$BK/standard.md" "$WORK/standard.md"
@@ -256,6 +259,19 @@ m_sc_08()  { printf '{\n  "packages": {\n    "node_modules/esbuild": {\n      "v
 m_sc_09()  { m_row_fails SC-09; }
 m_pf_01()  { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e 's/^  baseline_commit: .*/  baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^  baseline_value: .*/  baseline_value: 1/' -e 's/^  measured: .*/  measured: 2026-01-01/' .goblin/goblin.yaml; }
 
+# ---- the ban list (G5): BN-00..BN-03, BN-05 ------------------------------------------------
+# Every mutation is the exact move a ban forbids. The bans are TEXT probes (no npm, no AST), so
+# the violation is a real line of source the probe reads - not a mocked tool.
+m_bn_00_orphan()   { sed -i '/^BN-05\t/d' .goblin/manifest/bans.tsv; }
+m_bn_00_norepl()   { awk -F'\t' -v OFS='\t' '{ if ($1=="BN-01") $5=""; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; }
+m_bn_01()          { mkdir -p src; printf 'export const a: any = 1;\n' > src/bn01.ts; }
+m_bn_02()          { mkdir -p src; printf '// @ts-expect-error\nexport const b = 1;\n' > src/bn02.ts; }
+m_bn_03()          { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-03, BN-05]/' .goblin/goblin.yaml; mkdir -p src/components; printf 'export const P = () => { fetch("/api/x"); return null; };\n' > src/components/panel.tsx; }
+m_bn_05()          { printf '\nlayers:\n  - src/renderer src/main\n' >> .goblin/goblin.yaml; mkdir -p src/renderer src/main; printf "import { db } from '../main/db';\nexport const r = db;\n" > src/renderer/p.ts; }
+# A tree BN-05 can read (so its globs match) but with no `layers:` declared: the row must SKIP
+# with that reason, never pass vacuously.
+m_bn_05_nolayers() { mkdir -p src/renderer; printf 'export const r = 1;\n' > src/renderer/p.ts; }
+
 m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
 m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 7/' .goblin/goblin.yaml; }
@@ -389,6 +405,17 @@ expect_red "an audit record nobody re-took"        SC-07 1 m_sc_07
 expect_red "an install hook nobody decided on"     SC-08 1 m_sc_08
 expect_red "SC-09 (advisory row: wired, not biting)" SC-09 1 m_sc_09
 expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
+
+# ---- G5: the ban list is a gate, not a wish - one control per row -----------------------------
+expect_red   "the ban table loses a row the matrix still names" BN-00 1 m_bn_00_orphan
+expect_red   "a ban that names no replacement"                  BN-00 1 m_bn_00_norepl
+expect_red   "an any type in application TypeScript"               BN-01 1 m_bn_01
+expect_red   "a ts-expect-error suppression"                 BN-02 1 m_bn_02
+expect_red   "a fetch() called from a component"                BN-03 1 m_bn_03
+expect_red   "an import across a declared layer boundary"       BN-05 1 m_bn_05
+# BN-05 is a SKIP (not a FAIL) when no layers are declared - the HS-01 precedent: nothing to
+# read is reported as a reason, never as a pass.
+expect_green "no layers declared -> BN-05 skips with a reason"  BN-05 m_bn_05_nolayers
 
 expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip

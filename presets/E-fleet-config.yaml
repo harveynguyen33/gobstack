@@ -34,3 +34,5 @@ perf_baseline_value: 0
 perf_measured: ""
 perf_host_gate: ""
 notes: the order is dry-run, then one profile, then verify, then apply-all.
+# The ban list this class turns on (G5). An unlisted ban SKIPs with a reason.
+bans: BN-02

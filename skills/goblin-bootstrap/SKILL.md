@@ -10,11 +10,13 @@ Use when adopting goblin-stack in a repo, or starting one.
 1. **Classify the project A-E.** The class selects which parts are required, optional or off;
    it is not a stringency level.
 2. **`goblin-install --target <dir> --class <x>`**
-3. **`goblin-verify`** — a fresh class-A install verifies green: `41 passed, 0 failed, 9
-   advisory, 7 skipped`, exit 0. Seven rows skip with a reason, and the reason matters: `HS-02`
+3. **`goblin-verify`** — a fresh class-A install verifies green: `42 passed, 0 failed, 9
+   advisory, 11 skipped`, exit 0. Eleven rows skip with a reason, and the reason matters: `HS-02`
    (no pinned pre-change commit yet, so the REPLAY is not provable), `AU-02`/`AU-03` (no report
    has been filed in this repo), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile, no
-   audit record) and `PF-01` (no perf baseline measured yet). Each is a *not yet*, not a pass.
+   audit record), `PF-01` (no perf baseline measured yet) and `BN-01`/`BN-02`/`BN-03`/`BN-05`
+   (the ban table is installed but this fresh repo has no `src/` for a ban to read). Each is a
+   *not yet*, not a pass.
    The class's required parts
    that only a round can produce (a first review, a real gate) pass *vacuously*, and that list
    is the repo's first-step list, not a defect.

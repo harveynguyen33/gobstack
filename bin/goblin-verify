@@ -19,7 +19,7 @@
 
 set -uo pipefail
 
-GOBLIN_VERIFY_VERSION="0.2.0"
+GOBLIN_VERIFY_VERSION="0.3.0"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=goblin-lib.sh
 . "$SELF_DIR/goblin-lib.sh"
@@ -956,6 +956,61 @@ check_sc_08() {
   printf '%s install hook(s), %s allowlisted\n' "$n" "$ok"
   [ "$bad" -eq 0 ]
 }
+
+check_bn_00() {
+  # The coherence row: the ban table and the matrix must agree in BOTH directions, every ban
+  # must name a replacement, and the table must not be empty. IN-03's shape applied to
+  # bans.tsv - a rule that lives only in a data file would otherwise be invisible to SK-03.
+  local bans ban_ids row_ids id n bad=0
+  bans="$ROOT/.goblin/manifest/bans.tsv"
+  [ -f "$bans" ] || bans="$SELF_DIR/../manifest/bans.tsv"
+  [ -f "$bans" ] || { printf 'no ban table found (manifest/bans.tsv)\n'; return 1; }
+  n=$(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$bans")
+  [ "$n" -gt 0 ] || { printf 'the ban table is empty - a ban list that enforces nothing\n'; return 1; }
+  awk -F'\t' 'NR>1 && $1!="" && $5=="" {print "ban " $1 " names no replacement"; bad=1} END{exit bad}' "$bans" \
+    || bad=1
+  ban_ids=$(awk -F'\t' 'NR>1 && $1!="" {print $1}' "$bans" | sort)
+  row_ids=$(awk -F'\t' 'NR>1 && $1 ~ /^BN-/ && $1 != "BN-00" {print $1}' "$MANIFEST" | sort)
+  while read -r id; do
+    [ -n "$id" ] || continue
+    printf '%s\n' "$ban_ids" | grep -qx "$id" || { printf 'enforcement row %s has no ban in the table\n' "$id"; bad=1; }
+  done <<EOF
+$row_ids
+EOF
+  while read -r id; do
+    [ -n "$id" ] || continue
+    printf '%s\n' "$row_ids" | grep -qx "$id" || { printf 'ban %s has no enforcement row\n' "$id"; bad=1; }
+  done <<EOF
+$ban_ids
+EOF
+  [ "$bad" -eq 0 ] || return 1
+  printf '%d ban(s), each with an enforcement row and a named replacement\n' "$n"
+  return 0
+}
+
+check_bn_run() {
+  # One ban, through the installed engine. rc: 0 pass | 1 fail | 3 skip | anything else fail
+  # closed (the engine's own exit 2 = the table is missing/empty, which is not a pass).
+  local id="$1" engine out rc detail
+  engine="$ROOT/.goblin/bin/goblin-bans"
+  [ -f "$engine" ] || { printf 'the ban engine is not installed: .goblin/bin/goblin-bans\n'; return 1; }
+  out=$( cd "$ROOT" && bash "$engine" --only "$id" 2>&1 ); rc=$?
+  detail=$(printf '%s\n' "$out" | grep -vE '^      [0-9]+ passed' \
+             | sed 's/^\(PASS\|FAIL\|SKIP\|ADV\)  \{1,\}[A-Z0-9-]*  *//' | sed '/^$/d' \
+             | head -n 3 | tr '\n' ' ')
+  printf '%s\n' "${detail:-no detail}"
+  case "$rc" in
+    0) return 0 ;;
+    1) return 1 ;;
+    3) return 3 ;;
+    *) return 1 ;;
+  esac
+}
+
+check_bn_01() { check_bn_run BN-01; }
+check_bn_02() { check_bn_run BN-02; }
+check_bn_03() { check_bn_run BN-03; }
+check_bn_05() { check_bn_run BN-05; }
 
 check_pf_01() {
   # The perf NUMBER lives in `ratchet:` (GT-04/GT-05 unchanged). This row is the other half: the

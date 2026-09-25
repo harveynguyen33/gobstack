@@ -10,7 +10,7 @@ single source of truth).
 this repo via `tests/run-tests.sh`). `enforced_by` is one of four values, and the enum is
 closed: `script`, `lint`, `gate`, `advisory`.
 
-Measured shape of this table: **62 rows** - 57 target, 5 source; advisory 9, gate 19, lint 16, script 14, test 4.
+Measured shape of this table: **67 rows** - 62 target, 5 source; advisory 9, gate 19, lint 20, script 15, test 4.
 
 ## The rows
 
@@ -73,6 +73,11 @@ Measured shape of this table: **62 rows** - 57 target, 5 source; advisory 9, gat
 | `AU-02` | target | script | A report's dedup key is a function of content only - no date, no run id. | `goblin-verify --only AU-02` (builtin) | Builtin: it recomputes the key from the report's own `repo` and `symptom` and requires the recorded `dedup_key` to equal it, then refuses a key carrying a date. Skipped with a reason when the repo holds no report - nothing to dedup. It cannot see whether two reports should have been one: a normalisation that merges two genuinely different symptoms is a duplicate card, not a lost report. |
 | `AU-03` | target | gate | A reporter run leaves the tree and the harness untouched. | `goblin-verify --only AU-03` (builtin) | Builtin: asserts a clean working tree, and - when HEAD is a reporter commit - that no path under the declared harness_dir appears in it. Skipped with a reason when the repo holds no reports/ - no reporter has run here. It cannot see a reporter that edited the tree and committed the edit as part of the report. |
 | `AU-04` | target | lint | An automation's skill declares its own write surface. | `n=0; for f in .hermes/skills/goblin-bugreporter/SKILL.md .hermes/skills/goblin-drift-audit/SKILL.md; do [ -e "$f" ] \|\| continue; n=$((n+1)); grep -q "^## Write surface" "$f" \|\| { echo "missing write surface: $f"; exit 1; }; done; [ "$n" -gt 0 ] \|\| { echo "no automation skill found"; exit 1; }; exit 0` | Partial: proves the heading exists, not that the surface it names is the right one. The heading is the contract a human reads before trusting an automation; the mechanical half is AU-03, which asserts the surface was respected. |
+| `BN-00` | target | script | Every ban has an enforcement row, every ban row names a replacement, and the ban table is not empty. | `goblin-verify --only BN-00` (builtin) | — (this row is the reason the ban list cannot decay into prose: IN-03's shape applied to bans.tsv, and it agrees in both directions) |
+| `BN-01` | target | lint | No `any` in application TypeScript. | `goblin-verify --only BN-01` (builtin) | Text probe, not an AST: a `: any` inside a string or a comment is reported, and `Record<string, any>` (no leading colon) is missed. The AST form needs a parser the no-npm contract (docs/CONTRACTS.md) forbids (docs/LIMITS.md #27). SKIPs when the ban is not in `bans:` or its globs match no file. |
+| `BN-02` | target | lint | No `@ts-ignore` / `@ts-expect-error` suppressions. | `goblin-verify --only BN-02` (builtin) | Text probe: it sees the directive wherever it appears, including inside a string, and cannot tell a suppression hiding a real error from one on a line that would compile anyway. SKIPs when the ban is not in `bans:` or its globs match no file. |
+| `BN-03` | target | lint | No direct network call from a component. | `goblin-verify --only BN-03` (builtin) | Text probe over the declared component globs: it stops the call and cannot tell whether a data layer was written or the call merely moved into a helper. SKIPs when the ban is not in `bans:` or its globs match no file. |
+| `BN-05` | target | lint | No import across a declared layer boundary. | `goblin-verify --only BN-05` (builtin) | Reads the `layers:` list; an empty list SKIPs with a reason, never a vacuous pass. It matches an import path naming the target directory's last segment - module aliases and dynamic imports are not seen. SKIPs when no file matches its globs. |
 | `PR-01` | source | test | The installer never writes outside its target. | `tests/run-tests.sh` | — |
 | `PR-02` | source | test | A second install is a no-op, and an upgrade reports created/updated/unchanged. | `tests/run-tests.sh` | — |
 | `PR-03` | source | test | Every target-scope check goes RED under its own violation. | `tests/run-tests.sh` | — (the negative control the verifier re-runs) |
@@ -81,7 +86,7 @@ Measured shape of this table: **62 rows** - 57 target, 5 source; advisory 9, gat
 
 ## Advisory rows, named
 
-9 of the 62 rows are labelled `advisory`. 8 carry no executable check at all
+9 of the 67 rows are labelled `advisory`. 8 carry no executable check at all
 (they are prose the matrix refuses to pretend about); 1 are advisory-labelled but still
 report their state.
 
@@ -130,6 +135,25 @@ instead of silently passing, and `CL-01` fails if a forbidden part's artifact ex
 | review-panel | O | - | R | - | O |
 | playbooks | R | R | R | R | R |
 | tokens | O | - | - | - | - |
+
+## The ban list (G5)
+
+`BN-00`..`BN-05` are not ordinary rows: they read `.goblin/manifest/bans.tsv`, a table whose
+every row carries a real command. A ban with no mechanism is a wish, so `manifest/bans.tsv`
+holds `id`, the ban, the globs, the `detect` command, the replacement code, the escape hatch,
+the reviewer and the source — and `BN-00` fails the whole list if any ban has no enforcement
+row, if any row names no replacement, or if the table is empty. `bin/goblin-bans` is the engine
+(`--only <id>` for one, `--list` for the table); each ban's `detect` exits 0 when the tree is
+clean, 1 when the ban is violated, 3 when it cannot be read (no file matches its globs, no
+`layers:` declared) and 2 when it could not run at all — a 2 FAILS, never passes.
+
+Which bans apply is the config's `bans:` list, not the class: an unlisted ban SKIPs with that
+reason (class A and C turn on `BN-01 BN-02 BN-05`; B and D turn on none; E turns on `BN-02`).
+`bans_exempt:` records narrow, reviewed exceptions and `layers:` is what `BN-05` reads. The
+probes are text probes — `grep`, no `npm`, no AST — so their false-positive sets are stated on
+each row and in `docs/LIMITS.md` #27, and G5's `BN-04` is deliberately unshipped for the same
+reason: it cannot be mechanised without a parser, and a ban that cannot go red is worse than an
+advisory.
 
 ## How a rule is added
 

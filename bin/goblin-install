@@ -22,7 +22,7 @@
 
 set -uo pipefail
 
-GOBLIN_INSTALL_VERSION="0.2.0"
+GOBLIN_INSTALL_VERSION="0.3.0"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC=$(cd "$SELF_DIR/.." && pwd)
 # shellcheck source=goblin-lib.sh
@@ -165,7 +165,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
     fi
   done < <({
       printf '%s' "$PARENTS"
-      printf '.goblin\n.goblin/bin\n.goblin/manifest\n.hermes\n.hermes/skills\n'
+      printf '.goblin\n.goblin/bin\n.goblin/manifest\n.goblin/bans\n.hermes\n.hermes/skills\n'
     } | awk 'NF' | awk -F/ '{print NF " " $0}' | sort -rn | cut -d' ' -f2- | awk '!seen[$0]++')
   g_info "removed $n file(s) and $nd empty director(y|ies). Left in place: HANDOFF.md, AGENTS.md, ROUND-000-SPEC.md, reviews/, the .gitignore block${KEPT:+, and the decision record(s) you edited:$KEPT}."
   exit 0
@@ -256,6 +256,11 @@ PERF_BASELINE_COMMIT=$(preset perf_baseline_commit)
 PERF_BASELINE_VALUE=$(preset perf_baseline_value); [ -n "$PERF_BASELINE_VALUE" ] || PERF_BASELINE_VALUE=0
 PERF_MEASURED=$(preset perf_measured)
 PERF_HOST_GATE=$(preset perf_host_gate)
+# The ban list (G5): which bans this class turns on. An unlisted ban SKIPs with a reason.
+BANS=$(preset bans)
+# `layers:` is a block list the project declares; no preset ships one, so it renders empty and
+# BN-05 SKIPs with that reason until the project declares a from/to pair.
+LAYERS_BLOCK=""
 
 need() { g_class_need "$CLASSES_TSV" "$CLASS" "$1"; }
 
@@ -463,6 +468,9 @@ render_config() {
     RATCHET_CMD "$RAT_CMD" \
     RATCHET_CEILING "$RAT_CEIL" \
     RUNTIME_DATA "$runtime" \
+    BANS "$BANS" \
+    BANS_EXEMPT "" \
+    LAYERS "$LAYERS_BLOCK" \
     REPLAY_ENV "$REPLAY_ENV" \
     REPLAY_CMD "$REPLAY_CMD" \
     DISABLED "$DISABLED" > "$TMP/goblin.yaml"
@@ -479,6 +487,13 @@ put ".goblin/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
 put ".goblin/manifest/playbooks.tsv" "$SRC/manifest/playbooks.tsv"
 put ".goblin/manifest/classes.tsv" "$SRC/manifest/classes.tsv"
 put ".goblin/manifest/glossary.tsv" "$SRC/manifest/glossary.tsv"
+# The ban list (G5): the table, the engine, and the two probes. A ban with no mechanism is a
+# wish, so the table and the engine install together or not at all.
+put ".goblin/manifest/bans.tsv" "$SRC/manifest/bans.tsv"
+put ".goblin/bin/goblin-bans" "$SRC/bin/goblin-bans"
+put ".goblin/bans/README.md" "$SRC/bans/README.md"
+put ".goblin/bans/grep-ban.sh" "$SRC/bans/grep-ban.sh"
+put ".goblin/bans/layer-check.sh" "$SRC/bans/layer-check.sh"
 put_once ".goblin/goblin.yaml" "$TMP/goblin.yaml"
 # The security lane's two decision records and the audit allowlist are created once, then YOURS:
 # they are answers to questions only the project can answer (G4 B3).

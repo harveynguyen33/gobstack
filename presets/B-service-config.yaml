@@ -32,3 +32,5 @@ perf_baseline_value: 0
 perf_measured: ""
 perf_host_gate: ""
 notes: declare the schema-shape snapshot as the gate; content is optional, schema is required.
+# The ban list this class turns on (G5). An unlisted ban SKIPs with a reason.
+bans: ""

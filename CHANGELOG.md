@@ -30,6 +30,31 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   `PF-01`); a fresh class-E install verifies `40 passed, 0 failed, 9 advisory, 8 skipped`.
   Advisory is **9 of ceiling 10**.
 
+## 0.3.0
+
+- **The ban list (G5).** `manifest/bans.tsv`, `bin/goblin-bans` and `bans/` install as
+  `.goblin/manifest/bans.tsv`, `.goblin/bin/goblin-bans` and `.goblin/bans/` — Dune rule 2 made
+  a gate: **a ban without a mechanism is a wish.** Four bans ship with a real command each
+  (`BN-01` no `any`, `BN-02` no `@ts-ignore`/`@ts-expect-error`, `BN-03` no `fetch` from a
+  component, `BN-05` no import across a declared layer boundary), plus `BN-00` (the coherence
+  row: every ban has an enforcement row, every row names a replacement, the table is not empty).
+  The config gains `bans:` (which bans this project turns on — an unlisted ban SKIPs with a
+  reason), `bans_exempt:` (narrow, explicit exceptions) and `layers:` (what `BN-05` reads).
+  Class A and C turn on `BN-01 BN-02 BN-05`; E turns on `BN-02`.
+- The ban probes are **text probes** (`grep`, no npm, no AST — `docs/CONTRACTS.md`), so G5's
+  `BN-04` (the nine named unnecessary-effect patterns) is **not shipped**: it cannot be
+  mechanised without a parser, and a ban that cannot go red is worse than advisory. Recorded in
+  `docs/LIMITS.md` #27 rather than spent as the last advisory slot. Advisory stays **9 of 10**.
+- `manifest/enforcement.tsv` is **67 rules** (62 target, 5 source); `tests/t-verify-red.sh`
+  carries **68** controls over the 62 target rows.
+- A fresh class-A install verifies **`42 passed, 0 failed, 9 advisory, 11 skipped`**, exit 0
+  (eleven rows skip with a reason: `HS-02`, `AU-02`, `AU-03`, `SC-06`, `SC-07`, `SC-08`,
+  `PF-01`, and `BN-01`/`BN-02`/`BN-03`/`BN-05` on a repo with no `src/`). A fresh class-B install
+  (`bans: []`) verifies `37 passed, 0 failed, 8 advisory, 17 skipped` — the four BN rows SKIP with
+  "not enabled in `bans:`"; class-C verifies `42 passed, 0 failed, 9 advisory, 11 skipped`; class-E
+  (`bans: [BN-02]`) verifies `41 passed, 0 failed, 9 advisory, 12 skipped`. All measured on fresh
+  installs, committed with no hand edit.
+
 ## 0.1.0
 
 - First version. Ships `bin/goblin-install`, `bin/goblin-verify`, `bin/goblin-model`,

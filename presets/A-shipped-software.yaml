@@ -40,3 +40,5 @@ perf_baseline_value: 0
 perf_measured: ""
 perf_host_gate: ""
 notes: class A also requires a SPEC before every change, and the REPLAY on every new assertion.
+# The ban list this class turns on (G5). An unlisted ban SKIPs with a reason.
+bans: BN-01, BN-02, BN-05

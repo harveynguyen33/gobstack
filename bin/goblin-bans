@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# goblin-bans — run the ban table. Dune rule 2: forbidden must fail mechanically.
+#
+# Usage:
+#   goblin-bans [--only <id[,id...]>] [--list]
+#
+# The table is .goblin/manifest/bans.tsv (installed) or manifest/bans.tsv (a checkout).
+# Each row's `detect` column is a real command, run from the repo root, that
+#   0  the tree is clean
+#   1  the ban is violated (its output names the offending lines)
+#   2  the check could not run (FAIL CLOSED - a missing tool is never a silent pass)
+# A ban the config's `bans:` list does not name is SKIPPED with that reason; a ban whose
+# globs match no file is SKIPPED with that reason. A missing or empty ban table is exit 2.
+#
+# Exit codes:
+#   0  every selected ban passed or skipped
+#   1  at least one selected ban FAILED
+#   2  the ban table is missing, empty or unreadable (fail closed)
+#   3  every selected ban was SKIPPED (only when exactly one ban is selected)
+#
+# No npm, no jq, no yq, no network. bash/git/awk/sed/grep only.
+
+set -uo pipefail
+
+GOBLIN_BANS_VERSION="0.3.0"
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=goblin-lib.sh
+. "$SELF_DIR/goblin-lib.sh"
+
+ONLY=""
+LIST=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --only) ONLY="${2:-}"; shift 2 ;;
+    --list) LIST=1; shift ;;
+    -h|--help)
+      sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) g_err "unknown option: $1"; exit 2 ;;
+  esac
+done
+
+# ---- root resolution (the installed config is the target's own marker) --------
+find_installed_root() {
+  local d="$PWD"
+  while :; do
+    if [ -f "$d/.goblin/goblin.yaml" ]; then printf '%s\n' "$d"; return 0; fi
+    [ "$d" = "/" ] && return 1
+    d=$(dirname "$d")
+  done
+}
+ROOT=$(find_installed_root) || ROOT=""
+if [ -z "$ROOT" ]; then
+  ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+  [ -n "$ROOT" ] || ROOT="$PWD"
+fi
+
+CONFIG="$ROOT/.goblin/goblin.yaml"
+if [ -f "$ROOT/.goblin/manifest/bans.tsv" ]; then
+  BANS="$ROOT/.goblin/manifest/bans.tsv"
+else
+  BANS="$SELF_DIR/../manifest/bans.tsv"
+fi
+
+# Fail closed: no table, or a table with no data rows, is exit 2 - never a silent pass.
+if [ ! -f "$BANS" ]; then
+  g_err "no ban table at $BANS - the ban list cannot be empty and still enforce anything"
+  exit 2
+fi
+if [ "$(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$BANS")" -eq 0 ]; then
+  g_err "the ban table $BANS holds no bans - an empty list enforces nothing (fail closed)"
+  exit 2
+fi
+
+if [ "$LIST" -eq 1 ]; then
+  awk -F'\t' 'NR>1 && $1!="" {printf "%-7s %s\n", $1, $2}' "$BANS"
+  exit 0
+fi
+
+# ---- the config: which bans this project turns on, and its narrow exceptions --
+ENABLED=""
+if [ -f "$CONFIG" ]; then
+  ENABLED=$(g_yaml_scalar "$CONFIG" bans)
+  ENABLED=${ENABLED#[}; ENABLED=${ENABLED%]}
+  ENABLED=$(printf '%s' "$ENABLED" | tr ',' ' ' | tr -s ' ' ' ')
+fi
+enabled() {
+  [ -z "$ENABLED" ] && return 1
+  for e in $ENABLED; do [ "$e" = "$1" ] && return 0; done
+  return 1
+}
+
+# bans_exempt: a list of "- <ID> <path>" items (Dune rule 5: narrow, explicit, reviewed).
+exempt_paths() { # exempt_paths <id> -> path prefixes, one per line
+  [ -f "$CONFIG" ] || return 0
+  g_yaml_list "$CONFIG" bans_exempt | awk -v id="$1" '$1==id {print $2}'
+}
+
+only_selected() {
+  [ -z "$ONLY" ] && return 0
+  case ",$ONLY," in *",$1,"*) return 0 ;; esac
+  return 1
+}
+
+# ---- run ---------------------------------------------------------------------
+PASS=0; FAIL=0; SKIP=0; SEL=0
+while IFS=$'\t' read -r id ban globs detect replacement escape reviewer source; do
+  [ "$id" = "id" ] && continue
+  [ -n "$id" ] || continue
+  only_selected "$id" || continue
+  SEL=$((SEL + 1))
+
+  if ! enabled "$id"; then
+    SKIP=$((SKIP + 1)); g_skip "$id" "$ban (not enabled in bans: - add $id to .goblin/goblin.yaml to turn it on)"
+    continue
+  fi
+  # A ban whose globs match no file is a SKIP with a reason, not a pass and not a fail.
+  have_glob=0
+  for g in $globs; do
+    [ -e "$ROOT/$g" ] && have_glob=1
+  done
+  if [ "$have_glob" -eq 0 ]; then
+    SKIP=$((SKIP + 1)); g_skip "$id" "$ban (no matching files: $globs)"
+    continue
+  fi
+
+  out=$( cd "$ROOT" && bash -c "$detect" 2>&1 ); rc=$?
+  # Drop lines a narrow, explicit exception names (bans_exempt), then judge.
+  ex=$(exempt_paths "$id")
+  if [ -n "$ex" ] && [ -n "$out" ]; then
+    for p in $ex; do out=$(printf '%s\n' "$out" | grep -v -- "$p" || true); done
+  fi
+  case "$rc" in
+    0)
+      if [ -n "$out" ]; then
+        FAIL=$((FAIL + 1))
+        g_fail "$id" "$ban -> $replacement"
+        printf '%s\n' "$out" | sed 's/^/        /'
+      else
+        PASS=$((PASS + 1)); g_pass "$id" "$ban"
+      fi ;;
+    1)
+      if [ -n "$out" ]; then
+        FAIL=$((FAIL + 1))
+        g_fail "$id" "$ban -> $replacement"
+        printf '%s\n' "$out" | sed 's/^/        /'
+      else
+        PASS=$((PASS + 1)); g_pass "$id" "$ban"
+      fi ;;
+    3)
+      SKIP=$((SKIP + 1))
+      g_skip "$id" "$ban (${out:-skipped})" ;;
+    *)
+      FAIL=$((FAIL + 1))
+      g_fail "$id" "$ban (the check could not run - exit $rc, fail closed)"
+      printf '%s\n' "$out" | sed 's/^/        /' ;;
+  esac
+done < "$BANS"
+
+printf '      %d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIP"
+[ "$FAIL" -gt 0 ] && exit 1
+if [ "$SEL" -eq 1 ] && [ "$SKIP" -eq 1 ]; then exit 3; fi
+exit 0

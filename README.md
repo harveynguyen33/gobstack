@@ -50,14 +50,15 @@ failure: reconcile the file rather than forcing over it — `docs/ADOPTION.md`.
 After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other
-    .goblin/bin/goblin-verify                 # a fresh class-A install: 41 passed, 0 failed
+    .goblin/bin/goblin-verify                 # a fresh class-A install: 42 passed, 0 failed
     hermes skills trust <target>              # one-time, so the project-tier skills load
     .goblin/bin/goblin-audit                  # once, deliberately: the ONLY network step (SC-07)
 
-**A fresh class-A install verifies green: `41 passed, 0 failed, 9 advisory, 7 skipped`, exit 0.**
-Only seven rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
+**A fresh class-A install verifies green: `42 passed, 0 failed, 9 advisory, 11 skipped`, exit 0.**
+Only eleven rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
 `AU-02` and `AU-03` have no report to audit; `SC-06`, `SC-07` and `SC-08` have no dependency
-manifest, no lockfile and no audit record to read; `PF-01` has no measured perf baseline). The parts
+manifest, no lockfile and no audit record to read; `PF-01` has no measured perf baseline; and
+`BN-01`/`BN-02`/`BN-03`/`BN-05` have no `src/` for a ban to read). The parts
 that only a round can produce — a first review note, a gate that is not the shipped floor — pass
 *vacuously* rather than failing, and `P8` (`goblin-bootstrap`) still walks them as work to do.
 The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.

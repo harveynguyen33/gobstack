@@ -74,7 +74,7 @@ deliberate trade or an unfilled gap.
     drift check — `IN-02`, `SK-02`, and `HS-01`'s hash of the harness dir — reads its expected
     hash out of that one file, and that file is the one file no check protects. Measured: append a
     byte to `.goblin/bin/goblin-verify`, rewrite its recorded hash in `installed.json`, commit, and
-    the run is **fully GREEN** (`41 passed, 0 failed`, exit 0). One edit defeats three rows at
+    the run is **fully GREEN** (`42 passed, 0 failed`, exit 0). One edit defeats three rows at
     once, and it is the cheapest way to fake a green run. Doing better needs an anchor the target
     cannot edit — a signature, or a hash held outside the repo — and goblin-stack has no such
     trust root: the source checkout is not guaranteed to exist at verify time, and any value
@@ -121,3 +121,21 @@ It does not claim a green run means the work is right. `goblin-verify` asserts t
 files are the files on disk, that every rule with a command still passes, and that the
 untestable remainder is counted and capped — and it prints, on every single run, the five things
 it cannot see.
+
+27. **The ban probes are text probes, not ASTs.** `BN-01`, `BN-02`, `BN-03` and `BN-05` are
+    `grep` over source under `bash`/`grep`/`awk` only — the dependency contract in
+    `docs/CONTRACTS.md` allows no parser and no `npm`. So a `: any` inside a string or a comment
+    is reported, `Record<string, any>` (no leading colon) is missed, and BN-05 does not resolve
+    module aliases or dynamic imports. The AST-grade form of the same bans (BN-01..BN-04 in
+    `G5.md` §C.2) needs ESLint and `dependency-cruiser`; that is why **G5's `BN-04` (the nine
+    named unnecessary-effect patterns) is NOT shipped** — it cannot be mechanised without a
+    parser, and a ban that cannot go red is worse than advisory, so it is recorded here rather
+    than as a row that would cost the last advisory slot. A text probe with a stated
+    false-positive set is still a gate: each BN row is shown RED under its own violation and
+    GREEN when it is removed (`tests/t-verify-red.sh`).
+28. **The ban table's integrity rides on `IN-02`, and `IN-02` rides on an unsigned record.** A
+    project could empty `manifest/bans.tsv` (or edit a `detect` command) and the ban gate would
+    pass vacuously — `BN-00` fails closed on an *empty* table, but it cannot see a table whose
+    rows were weakened, because `.goblin/manifest/bans.tsv` is hashed by `IN-02` and
+    `.goblin/installed.json` is not signed (`docs/LIMITS.md` #18). The ban list is not
+    tamper-proof; it is as strong as the record every drift check trusts.

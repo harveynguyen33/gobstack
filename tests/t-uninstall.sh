@@ -31,8 +31,8 @@ git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A \
   --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install exits 0" "$?"
-check "the installer's .goblin/bin holds exactly the three shipped scripts" \
-  "$([ "$(ls .goblin/bin | sort | tr '\n' ' ')" = "goblin-audit goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
+check "the installer's .goblin/bin holds exactly the four shipped scripts" \
+  "$([ "$(ls .goblin/bin | sort | tr '\n' ' ')" = "goblin-audit goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
 check "  so bin/goblin-model is checkout-only, as docs/ROLES.md says" \
   "$([ ! -e .goblin/bin/goblin-model ] && echo 0 || echo 1)"
 git add -A && git commit -q -m "chore: install goblin-stack"

@@ -77,6 +77,18 @@ ratchet:
 runtime_data:
 {{RUNTIME_DATA}}
 
+# The ban list (G5). Which bans this project turns on; an unlisted ban SKIPs with a reason.
+# A ban's mechanism lives in .goblin/manifest/bans.tsv; the engine is .goblin/bin/goblin-bans.
+bans: [{{BANS}}]
+
+# Narrow, explicit, reviewed exceptions (Dune rule 5): "- <ban id> <path prefix>".
+bans_exempt:
+{{BANS_EXEMPT}}
+
+# What BN-05 reads: "<from> <to>" layer pairs. Empty -> BN-05 SKIPs with a reason.
+layers:
+{{LAYERS}}
+
 # How a harness proves RED on the pre-change tree (HS-02). Set commit: to the pinned
 # pre-change SHA once the round it guards has landed; until then HS-02 is skipped with a reason.
 replay:

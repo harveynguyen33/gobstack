@@ -33,3 +33,5 @@ perf_baseline_value: 0
 perf_measured: ""
 perf_host_gate: ""
 notes: mark every unsourced claim [unverified]; the freshness/lint gate over notes is optional.
+# The ban list this class turns on (G5). An unlisted ban SKIPs with a reason.
+bans: ""
