@@ -146,8 +146,6 @@ check "  and the same paragraph now scopes it to verify time" "$?"
 DAYONE=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
 printf '%s\n' "$DAYONE" | grep -qE '^42 passed, 1 failed, 11 advisory, 24 skipped$'
 check "the day-one run prints the shape the guide documents ($DAYONE)" "$?"
-grep -qF "$DAYONE" "$GUIDE"
-check "  and the guide quotes that exact line (it says 42 passed, 1 failed, 11 advisory, 24 skipped)" "$?"
 
 HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
@@ -155,8 +153,21 @@ git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
 printf '%s\n' "$GREEN" | grep -qE '^43 passed, 0 failed, 11 advisory, 24 skipped$'
 check "naming a real commit makes it green ($GREEN)" "$?"
-grep -qF "$GREEN" "$GUIDE"
-check "  and the guide quotes that green-path line too (§9)" "$?"
+
+# EVERY summary-shaped line in the guide must be one of the two a real run printed. The loose form
+# of this (does the file contain the measured line?) is defeated by the claim living in three
+# places: measured on a deliberately doctored copy that said 41 passed in §9 while §4 still said 42,
+# the loose form reported ok. A quoting claim that lives in three places is exactly how a stale
+# number survives, so the tight form is the control.
+SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped' "$GUIDE" \
+         | sed -n 's/^[[:space:]]*\([0-9]* passed, [0-9]* failed, [0-9]* advisory, [0-9]* skipped\).*/\1/p' | sort -u)
+if [ "$SHAPES" = "$(printf '%s\n%s' "$DAYONE" "$GREEN" | sort -u)" ]; then
+  note "ok   every summary line the guide quotes is one a run printed ($(printf '%s' "$SHAPES" | tr '\n' ' ' | sed 's/ $//'))"
+else
+  note "FAIL the guide quotes a summary line no run printed:"
+  diff <(printf '%s\n' "$SHAPES") <(printf '%s\n%s' "$DAYONE" "$GREEN" | sort -u) | sed 's/^/        /'
+  fail=1
+fi
 
 # ---- the exercise must not destroy the reader's own uncommitted work ---------------------------
 # The block is path-limited on purpose, and the guide says so in its own parenthetical ("your own
@@ -170,9 +181,17 @@ git config user.email "runner@example.com"
 HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install goblin-stack"
 printf '  # the reader-own edit §5 step 3 leaves behind\n' >> .goblin/goblin.yaml
-run_replay "$WORK/replay.1" >/dev/null 2>&1
-grep -q 'the reader-own edit' .goblin/goblin.yaml
-check "the guide's REPLAY exercise leaves the reader's own uncommitted edit in place" "$?"
+# The guard is not decoration: with no block extracted there is nothing to run, the edit survives
+# for free, and the assertion would be green on BOTH trees - which is the one thing a control here
+# may never be. Missing block = FAIL.
+if [ -s "$WORK/replay.1" ]; then
+  run_replay "$WORK/replay.1" >/dev/null 2>&1
+  grep -q 'the reader-own edit' .goblin/goblin.yaml
+  check "the guide's REPLAY exercise leaves the reader's own uncommitted edit in place" "$?"
+else
+  note "FAIL no REPLAY block to run: 'your own edits stay put' is asserted by nothing"
+  fail=1
+fi
 
 if [ "$fail" -eq 0 ]; then note "t-doc-guide: PASS"; else note "t-doc-guide: FAIL"; fi
 exit "$fail"
