@@ -16,9 +16,10 @@ Use when adopting goblin-stack in a repo, or starting one.
    Twenty-four rows skip with a reason, and the reason matters: `HS-02`
    (no pinned pre-change commit yet, so the REPLAY is not provable), `AU-02`/`AU-03` (no report
    has been filed in this repo), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile, no
-   audit record), `PF-01` (no perf baseline measured yet), `BN-01`/`BN-02`/`BN-03`/`BN-05` and the
-   four electron bans `BN-06`..`BN-09`
-   (the ban table is installed but this fresh repo has no `src/` for a ban to read),
+   audit record), `PF-01` (no perf baseline measured yet), `BN-01`/`BN-02`/`BN-05` (the ban table is
+   installed but this fresh repo has no `src/` for a ban to read) and `BN-03` with the four electron
+   bans `BN-06`..`BN-09` (not in this class's `bans: [BN-01, BN-02, BN-05]`, so they skip as
+   *not enabled* rather than as *unread*),
    `FM-01`/`FM-02`/`VA-01` (no feature map and no declared `verify_doctor:` yet), and `JG-01` with
    `LP-01`..`LP-05` (no `.goblin/loop/` record, because no loop has run in this repo yet). Each is
    a *not yet*, not a pass.

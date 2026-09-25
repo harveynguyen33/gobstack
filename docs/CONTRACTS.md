@@ -140,14 +140,17 @@ Measured on a fresh class-A install, committed with no hand edit: **`43 passed, 
 is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `AU-02` and `AU-03`, which
 have no report to audit in a repo where no reporter has run — `SC-06`, `SC-07` and `SC-08`, which
 have no dependency manifest, no lockfile and no audit record to read yet — `PF-01`, which has
-no measured perf baseline — `BN-01`/`BN-02`/`BN-03`/`BN-05` plus the four electron bans
-`BN-06`..`BN-09`, which have no `src/` tree for a ban to read — `FM-01`/`FM-02`/`VA-01`, which have no feature map and no declared
+no measured perf baseline — `BN-01`/`BN-02`/`BN-05`, which have no `src/` tree for a ban to read,
+and `BN-03` with the four electron bans
+`BN-06`..`BN-09`, which this class does not enable (`bans: [BN-01, BN-02, BN-05]`), so they skip as
+*not enabled* rather than as *unread* — `FM-01`/`FM-02`/`VA-01`, which have no feature map and no declared
 `verify_doctor:` yet (`feature_map:` and `verify_doctor:` ship empty on purpose: a fresh install
 must not be born RED — G1, `docs/LIMITS.md` #30) — and `JG-01` with `LP-01`..`LP-05`, which have
 no `.goblin/loop/` record because no loop has run in this repo: the six judge/loop rows are
-**absent-state** rows, and a fresh install must not be born RED either. The four new rows that do
-**not** skip are the CI lane's: `PG-05` and `PG-06` read the workflow this class installs, and
-`BN-06`..`BN-09` would PASS-or-SKIP the same way on any tree without a renderer. Every skip above
+**absent-state** rows, and a fresh install must not be born RED either. **Two** rows do
+**not** skip, both of them the CI lane's: `PG-05` and `PG-06` read the workflow this class installs.
+Two, not four — the four electron bans named in the skip list above do skip here, and a tree without
+a renderer would skip them the same way. Every skip above
 is a *not yet*, not a pass.
 
 Two of the eleven advisories arrive with the same lane. `JG-02` reports that the judge lane

@@ -68,12 +68,14 @@ the fix are step 2 of `docs/GUIDE.md`.**
 Twenty-four rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
 `AU-02` and `AU-03` have no report to audit; `SC-06`, `SC-07` and `SC-08` have no dependency
 manifest, no lockfile and no audit record to read; `PF-01` has no measured perf baseline;
-`BN-01`/`BN-02`/`BN-03`/`BN-05` plus the four electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` have no
-`src/` for a ban to read; `FM-01`/`FM-02`/`VA-01`
+`BN-01`/`BN-02`/`BN-05` have no `src/` for a ban to read, and `BN-03` plus the four electron bans
+`BN-06`/`BN-07`/`BN-08`/`BN-09` are not in this class's `bans:` list (`bans: [BN-01, BN-02, BN-05]`),
+so they skip as *not enabled* rather than as *unread*; `FM-01`/`FM-02`/`VA-01`
 have no feature map and no declared `verify_doctor:` yet; and `JG-01` with `LP-01`..`LP-05`
-have no loop record, because no loop has run in this repo yet). The four rows that do **not** skip
-are the CI lane's: this class installs `.github/workflows/goblin-gate.yml`, so `PG-05` and `PG-06`
-read it and pass. Two of the eleven advisories
+have no loop record, because no loop has run in this repo yet). **Two** rows do **not** skip: `PG-05`
+and `PG-06`, the CI lane's. This class installs `.github/workflows/goblin-gate.yml`, so the two of
+them read it and pass. Two, not four — the four electron bans named above are among the skips. Two of
+the eleven advisories
 are new with the judge lane: `JG-02` reports that the judge lane resolves to no profile on this
 fleet (it prints the one-line remedy and never fails a repo for a fleet's routing), and `JG-03`
 is the counted row the advisory ceiling had left for it. The parts

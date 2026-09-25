@@ -111,8 +111,10 @@ the one expected red (`42 passed, 1 failed`). Both numbers are measured, not ass
 (`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Twenty-four rows skip with a reason: `HS-02` (no
 pinned pre-change commit yet), `AU-02`/`AU-03` (no report has been filed, so there is nothing to
 dedup and no reporter run to audit), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile,
-no audit record), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-03`/`BN-05` plus the four
-electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` (no `src/` for a ban to read), `FM-01`/`FM-02`/`VA-01`
+no audit record), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-05` (no `src/` for a ban
+to read) and `BN-03` with the four
+electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` (not in this class's `bans: [BN-01, BN-02, BN-05]`, so
+they skip as *not enabled* rather than as *unread*), `FM-01`/`FM-02`/`VA-01`
 (no feature map and no declared `verify_doctor:` yet) and `JG-01` with `LP-01`..`LP-05` (no
 `.goblin/loop/` record, because no loop has run here yet). The class's required parts that only a
 round can produce pass *vacuously* (zero `reviews/*.md` to check; the declared gate is still the
