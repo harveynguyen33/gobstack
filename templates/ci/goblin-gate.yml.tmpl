@@ -1,0 +1,46 @@
+# .github/workflows/goblin-gate.yml — written once by goblin-stack for class {{CLASS}}.
+#
+# WHAT THIS IS. One job that runs the gate set this project DECLARES in `.goblin/goblin.yaml`.
+# `.goblin/bin/goblin-verify` executes every declared gate (GT-02) and every rule that carries a
+# command, so CI and a local verify cannot report two different truths about one SHA (PG-06).
+# The job carries NO `if:` at any level, on purpose: GitHub reports a SKIPPED job as Success even
+# when it is a required check, so a conditional here would be a green light with no bulb (PG-05).
+#
+# A WORKFLOW FILE IS NOT A GATE. Four things make it one, and all four are yours to do:
+#   1. REQUIRED CHECK — mark the `gate` job required for this branch (Settings -> Branches, or a
+#      ruleset). Until then the job runs and nothing waits for it.
+#   2. NO BYPASS — tick "Do not allow bypassing the above settings". Without it the restriction
+#      does not apply to admins, and an admin push skips the check entirely.
+#   3. A PUSH IDENTITY — a required check binds nobody while the only committer is the repo's
+#      sole admin. Push from a non-admin account or token, or accept that the gate is advisory
+#      for your own pushes. This is a forge change, not a file change: that is why PG-04 is the
+#      row that records it, and why PG-04 is advisory rather than a gate.
+#   4. NEVER CONDITIONAL — keep every job and step unconditional (PG-05 enforces it).
+#
+# WHAT IT CANNOT SEE. It runs on a runner you do not own, from a checkout of your repo. Any gate
+# that needs a display, a licence, a GPU or a signed-in session is a HOST gate: declare it in the
+# HANDOFF's measured numbers, do not try to run it here. On a private repo the minutes are billed
+# to your account, so a long job is not free.
+#
+# For a zizmor-clean workflow, pin `uses:` to a commit SHA instead of a tag:
+#   gh api repos/actions/checkout/git/refs/tags/v4 --jq .object.sha
+# (left as a tag here so the file is readable; nothing in goblin-stack reads a workflow's SHA).
+name: goblin-gate
+on:
+  push:
+    branches: [{{BRANCH}}]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: goblin-gate-{{BRANCH}}
+  cancel-in-progress: true
+jobs:
+  gate:
+    name: the declared gate set
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: run the declared gate set
+        run: bash .goblin/bin/goblin-verify

@@ -136,8 +136,8 @@ fi
 
 CLASS=$(g_yaml_scalar "$CONFIG" class)
 case "$CLASS" in
-  A|B|C|D|E) ;;
-  *) g_err "unknown class '${CLASS:-<empty>}' in $CONFIG (expected A|B|C|D|E)"; exit 2 ;;
+  A|B|C|D|E|F) ;;
+  *) g_err "unknown class '${CLASS:-<empty>}' in $CONFIG (expected A|B|C|D|E|F)"; exit 2 ;;
 esac
 
 # Root vs git toplevel. find_installed_root resolves the CONFIG lookup correctly, but the
@@ -678,20 +678,138 @@ check_pg_03() {
 }
 
 check_pg_05() {
+  # PG-05 - "No required check that self-skips". The old body counted only "every step is
+  # guarded", so the REAL shape passed: in the estate's one existing workflow a deliberately
+  # UNGUARDED credential step decides whether the guarded compile step runs, so
+  # `guarded < steps` and the
+  # row reported PASS on the workflow it exists to catch (G8 section 3, re-measured V3-4). G6
+  # section A.6 named the mechanisable tell - a job whose GATE STEP is conditional can reach its
+  # end without running the gate while the required check still reports Success - so the row now
+  # carries three clauses per job:
+  #   (a) the job declares at least one run:/uses: step (otherwise the check runs nothing);
+  #   (b) the JOB carries no `if:` (otherwise the whole required check self-skips);
+  #   (c) no STEP carries an `if:` (otherwise that step - possibly the gate step - self-skips,
+  #       and GitHub reports a skipped job as Success: docs S1/S2, RISKS.md K7).
+  # It is a TEXT reading, deliberately strict, and says so in its own why-cell: a `#` inside a
+  # quoted string is read as a comment, a flow-style `jobs:` mapping is refused rather than read
+  # as clean, and a condition that is genuinely needed belongs in the command or in a second
+  # job that is not the required check.
   local f n=0 bad=0
   for f in "$ROOT"/.github/workflows/*.yml "$ROOT"/.github/workflows/*.yaml; do
     [ -e "$f" ] || continue
     n=$((n + 1))
-    if awk '
-        /^[[:space:]]*-?[[:space:]]*if:/ { guarded++ }
-        /^[[:space:]]*-?[[:space:]]*uses:|^[[:space:]]*-?[[:space:]]*run:/ { steps++ }
-        END { exit !(steps > 0 && guarded >= steps) }
-      ' "$f"; then
-      printf '%s: every step is guarded by an if: - a skipped job reports Success\n' "$(basename "$f")"
+    awk -v FILE="$(basename "$f")" '
+      function closejob() {
+        if (jobname == "") return
+        if (steps == 0) { printf "%s: job \"%s\" declares no run:/uses: step - the required check runs nothing and still reports Success\n", FILE, jobname; bad = 1 }
+        if (jobif > 0)  { printf "%s: job \"%s\" carries a job-level if: (%d) - the whole required check self-skips and reports Success\n", FILE, jobname, jobif; bad = 1 }
+        if (stepif > 0) { printf "%s: job \"%s\" has %d conditional step(s) - a skipped step reports Success, and a skipped gate step green-lights a commit whose gate never ran\n", FILE, jobname, stepif; bad = 1 }
+        jobname = ""
+      }
+      {
+        line = $0
+        sub(/[ \t]+#.*$/, "", line)          # blank a trailing comment
+        if (line ~ /^[ \t]*#/) next
+        if (line ~ /^[ \t]*$/) next
+        if (!injobs) {
+          if (line ~ /^jobs:[ \t]*$/) { injobs = 1; jind = -1 }
+          else if (line ~ /^jobs:[ \t]*[^ \t]/) { printf "%s: the jobs: block is a flow mapping - it cannot be read here, so it is refused rather than read as clean\n", FILE; bad = 1; injobs = 1; jind = -1 }
+          next
+        }
+        lead = match(line, /[^ \t]/) - 1
+        if (jind >= 0 && lead == jind && line !~ /^[ \t]*-/) {
+          closejob()
+          jobname = line; sub(/^[ \t]*/, "", jobname); sub(/[ \t]*:.*/, "", jobname)
+          steps = 0; stepregion = 0; jobif = 0; stepif = 0
+          next
+        }
+        if (jind < 0) {
+          jind = lead
+          jobname = line; sub(/^[ \t]*/, "", jobname); sub(/[ \t]*:.*/, "", jobname)
+          steps = 0; stepregion = 0; jobif = 0; stepif = 0
+          next
+        }
+        if (lead <= jind) next
+        if (line ~ /^[ \t]*-/) stepregion = 1
+        if (line ~ /(^|[ \t-])(run|uses):/) { steps++; next }
+        if (line ~ /^[ \t]*-?[ \t]*if:/) { if (stepregion) stepif++; else jobif++ }
+      }
+      END {
+        closejob()
+        if (!injobs) { printf "%s: no jobs: block - the workflow declares no check at all\n", FILE; bad = 1 }
+        exit bad
+      }
+    ' "$f" || bad=1
+  done
+  if [ "$n" -eq 0 ]; then
+    printf '0 workflow file(s) - no required check here to skip (vacuous by design: nothing declares one)\n'
+  else
+    printf '%d workflow file(s) checked for a self-skipping required check\n' "$n"
+  fi
+  [ "$bad" -eq 0 ]
+}
+
+check_pg_06() {
+  # PG-06 (G6 section A.6, row 2) - "The gate CI runs is the gate the project declares." The
+  # failure mode is R5 section 1.1 measured: review and CI and goblin-verify reporting different
+  # truths about one SHA, so a green required check says nothing about the gate the project
+  # actually declares. The declared set comes from g_yaml_gates - GT-01's own reader, reused
+  # rather than re-derived, so a gate cannot vanish from the comparison in silence (G8-3).
+  # A workflow satisfies the row when the whole declared set is RUN: either the verifier with no
+  # `--only` (a full run executes every declared gate through GT-02), or each declared gate
+  # command appearing verbatim. Comments are blanked first, so a commented-out verifier call is
+  # not a run, and key lines other than `run:` are dropped, so a command sitting in a `name:`
+  # cannot satisfy it. Partial by construction: it proves the gate is INVOKED in a file under
+  # `.github/workflows/`, never that GitHub marks that job required, and never that the invoker
+  # is the job the forge waits on.
+  local f n=0 bad=0 gname gcmd ngates=0 gates="" runtext miss="" nrun nc
+  while IFS=$'\t' read -r gname gcmd; do
+    [ -n "$gname" ] || continue
+    ngates=$((ngates + 1))
+    [ -n "$gcmd" ] && gates="$gates$gcmd"$'\n'
+  done < <(g_yaml_gates "$CONFIG")
+  for f in "$ROOT"/.github/workflows/*.yml "$ROOT"/.github/workflows/*.yaml; do
+    [ -e "$f" ] || continue
+    n=$((n + 1))
+    runtext=$(awk '
+      {
+        line = $0
+        sub(/[ \t]+#.*$/, "", line)
+        if (line ~ /^[ \t]*#/) next
+        if (line ~ /^[ \t]*$/) next
+        if (line ~ /^[ \t]*-?[ \t]*run:/) { print substr(line, index(line, "run:") + 4); next }
+        if (line ~ /^[ \t]*-?[ \t]*[A-Za-z_][A-Za-z0-9_.-]*:/) next
+        print line
+      }
+    ' "$f")
+    if printf '%s\n' "$runtext" | grep -q 'goblin-verify' \
+       && ! printf '%s\n' "$runtext" | grep -q 'goblin-verify[^&|;]*--only'; then
+      printf '%s: runs the verifier, which executes every declared gate\n' "$(basename "$f")"
+      continue
+    fi
+    # The verbatim path: compare on whitespace-normalised text, so a YAML line wrap or a dropped
+    # `2>/dev/null` does not read as "not the declared gate".
+    nrun=$(printf '%s\n' "$runtext" | tr '\n' ' ' | sed 's#2>/dev/null##g' | tr -s ' ')
+    miss=""
+    while IFS= read -r gcmd; do
+      [ -n "$gcmd" ] || continue
+      nc=$(printf '%s' "$gcmd" | sed 's#2>/dev/null##g' | tr -s ' ')
+      printf '%s' "$nrun" | grep -qF -- "$nc" || miss="$miss [$gcmd]"
+    done <<EOF
+$gates
+EOF
+    if [ -n "$miss" ]; then
+      printf '%s: runs no gate the project declares - declared but not run:%s\n' "$(basename "$f")" "$miss"
       bad=1
+    else
+      printf '%s: runs all %d declared gate(s) verbatim\n' "$(basename "$f")" "$ngates"
     fi
   done
-  printf '%d workflow file(s)\n' "$n"
+  if [ "$n" -eq 0 ]; then
+    printf 'no workflow file to check - CI runs no gate here\n'
+    return 3
+  fi
+  printf '%d workflow file(s) compared with the %d declared gate(s)\n' "$n" "$ngates"
   [ "$bad" -eq 0 ]
 }
 
@@ -1045,6 +1163,12 @@ check_bn_01() { check_bn_run BN-01; }
 check_bn_02() { check_bn_run BN-02; }
 check_bn_03() { check_bn_run BN-03; }
 check_bn_05() { check_bn_run BN-05; }
+# G6 section B.2: the Electron failure surface, as bans. Same engine, same exit contract, same
+# SKIP-when-unlisted behaviour - the mechanism is G5's, only the patterns are new.
+check_bn_06() { check_bn_run BN-06; }
+check_bn_07() { check_bn_run BN-07; }
+check_bn_08() { check_bn_run BN-08; }
+check_bn_09() { check_bn_run BN-09; }
 
 check_pf_01() {
   # The perf NUMBER lives in `ratchet:` (GT-04/GT-05 unchanged). This row is the other half: the
@@ -1160,6 +1284,10 @@ class_part_artifact() {
     review-panel) [ -d "$ROOT/reviews" ] ;;
     playbooks)    [ -f "$ROOT/.hermes/skills/goblin-mode/SKILL.md" ] ;;
     tokens)       [ -f "$ROOT/.goblin/tokens.yaml" ] ;;
+    # The CI lane's artifact is the workflow goblin-stack WRITES, not the directory: a repo is
+    # allowed to have its own workflows, and `-` on this part means "goblin-stack must not have
+    # placed one here", not "this repo may not have CI" (G6 A.6).
+    ci-gate)      [ -f "$ROOT/.github/workflows/goblin-gate.yml" ] ;;
     *)            return 0 ;;
   esac
 }
@@ -1752,7 +1880,8 @@ else
   printf '      %d passed, %d failed, %d advisory, %d skipped\n' "$PASS" "$FAIL" "$ADV" "$SKIP"
   cat <<'SEE'
       cannot see: whether a check in the harness dir tests the right path rather than
-      merely passing; whether the target repo has CI; whether a human read the diff;
+      merely passing; whether the forge is bound by the workflow CL-01 found; whether a human
+      read the diff;
       whether the model mapping names a family that actually differs (MD-02 reports it
       and cannot change it); and whether .goblin/installed.json — the record every drift
       check trusts — was itself rewritten. It is not signed, so one edit to it (with the
@@ -1766,7 +1895,14 @@ else
       wrote the line. The judge/loop lane adds its own: every JG-/LP- row reads a RECORD, so
       it proves a handle, a pin, a budget and a pointer exist — never that the loop made
       progress (a changed pointer is a proxy, docs/LIMITS.md #33), never which lane returned
-      a verdict, and never that the predicate was the right one or was really run.
+      a verdict, and never that the predicate was the right one or was really run. The CI lane
+      adds its own: PG-05 and PG-06 read a workflow's TEXT, so PG-05 sees a job whose gate step is
+      conditional and cannot see branch protection, the required-check list, or a forge that never
+      ran the job at all, and PG-06 proves a declared gate is INVOKED in a file under
+      .github/workflows/ — never that the forge marks that job required, never that it is the job
+      the forge waits on, and never that the workflow can fail (that is PG-05). A required check
+      that reports Success after skipping its gate is a green light for a commit whose gate never
+      ran (docs/CI.md).
 SEE
 fi
 

@@ -3,7 +3,7 @@
 #
 # Usage: goblin-install --target <dir> [options]
 #   --target <dir>        required; the repo root to install into
-#   --class A|B|C|D|E     required unless --uninstall or --re-pin; anything else needs an explicit class
+#   --class A|B|C|D|E|F    required unless --uninstall or --re-pin; anything else needs an explicit class
 #   --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)
 #   --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md)
 #   --parts <list>        comma list to install; default = every part the class requires
@@ -104,7 +104,10 @@ if [ "$UNINSTALL" -eq 1 ]; then
     [ -e "$TARGET/$p" ] || continue
     if [ "$DRY_RUN" -eq 1 ]; then g_info "would remove $p"; else rm -f "$TARGET/$p"; fi
     n=$((n + 1))
-    case "$p" in */*) PARENTS="$PARENTS${p%/*}"$'\n' ;; esac
+    # EVERY ancestor directory, not just the immediate parent: a file at
+    # .github/workflows/goblin-gate.yml empties two levels, and collecting only `${p%/*}` left
+    # .github/ behind with nothing named (the shape t-uninstall.sh asserts against).
+    d="$p"; while [ "${d%/*}" != "$d" ]; do d="${d%/*}"; PARENTS="$PARENTS$d"$'\n'; done
   done < <(g_installed_files "$INSTALLED")
   # The config is goblin-stack's own file, so it goes too. HANDOFF/AGENTS/SPEC/reviews do not:
   # they are the project's record, not the harness's.
@@ -220,8 +223,8 @@ if [ "$RE_PIN" -eq 1 ]; then
   exit 0
 fi
 
-[ -n "$CLASS" ] || { g_err "--class is required (A|B|C|D|E)"; exit 2; }
-case "$CLASS" in A|B|C|D|E) ;; *) g_err "--class must be one of A B C D E, got '$CLASS'"; exit 2 ;; esac
+[ -n "$CLASS" ] || { g_err "--class is required (A|B|C|D|E|F)"; exit 2; }
+case "$CLASS" in A|B|C|D|E|F) ;; *) g_err "--class must be one of A B C D E F, got '$CLASS'"; exit 2 ;; esac
 case "$SKILLS" in yes|no) ;; *) g_err "--skills must be yes or no"; exit 2 ;; esac
 
 PRESET=$(ls "$SRC"/presets/"$CLASS"-*.yaml 2>/dev/null | head -n 1)
@@ -269,7 +272,7 @@ need() { g_class_need "$CLASSES_TSV" "$CLASS" "$1"; }
 
 # parts that are OFF for this class become real opt-outs, not silent absences
 DISABLED=""
-for p in handoff spec gate replay ratchet pr-gate review-panel playbooks tokens; do
+for p in handoff spec gate replay ratchet pr-gate review-panel playbooks tokens ci-gate; do
   [ "$(need "$p")" = "-" ] && DISABLED="$DISABLED$p,"
 done
 [ "$SKILLS" = "no" ] && DISABLED="$DISABLED""playbooks,"
@@ -289,6 +292,10 @@ WANT_SPEC=1; [ "$(need spec)" = "-" ] && WANT_SPEC=0
 WANT_REVIEWS=0
 case "$(need pr-gate)$(need review-panel)" in *R*|*O*) WANT_REVIEWS=1 ;; esac
 WANT_RATCHET=1; [ "$(need ratchet)" = "-" ] && WANT_RATCHET=0
+# The CI lane (G6 A.6). Installed for a class that requires or permits it (A, C, E, F) and never
+# for one that forbids it (B, D) - where CL-01 then requires the file to be ABSENT, which is why
+# class_part_artifact keys off this exact path rather than off .github/workflows/.
+WANT_CI_GATE=1; [ "$(need ci-gate)" = "-" ] && WANT_CI_GATE=0
 [ "$ARCHIVE" = "true" ] && { WANT_SPEC=0; WANT_REVIEWS=0; SCAFFOLD=no; }
 
 OWNER_EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
@@ -544,6 +551,15 @@ put_once "AGENTS.md" "$TMP/agents"
 if [ "$WANT_REVIEWS" -eq 1 ]; then
   printf '# Review verdicts live here: reviews/<slug>-<head7>.md, each naming the SHA it reviewed.\n' > "$TMP/gitkeep"
   put_once "reviews/.gitkeep" "$TMP/gitkeep"
+fi
+
+# The CI lane (G6): one workflow, rendered and placed. The header of the template states what
+# makes a workflow a GATE (a required check, no admin bypass, a push identity that is not the
+# repo's sole admin) - because a workflow file nobody is bound by is decoration. The job carries
+# no `if:` at any level, so PG-05 passes on goblin-stack's own output.
+if [ "$WANT_CI_GATE" -eq 1 ] && part_wanted ci-gate && [ -f "$SRC/templates/ci/goblin-gate.yml.tmpl" ]; then
+  render "$SRC/templates/ci/goblin-gate.yml.tmpl" CLASS "$CLASS" BRANCH "$BRANCH" DATE "$STAMP" > "$TMP/gate.yml"
+  put ".github/workflows/goblin-gate.yml" "$TMP/gate.yml"
 fi
 
 if [ "$SCAFFOLD" = "yes" ]; then

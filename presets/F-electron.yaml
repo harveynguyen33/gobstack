@@ -1,0 +1,67 @@
+# presets/F-electron.yaml — class F: desktop shell (Electron).
+#
+# A class is not a stringency level: it selects WHICH PARTS are required, optional or off
+# (manifest/classes.tsv) and supplies the default gate/ratchet shape. A desktop shell needs a
+# part no other class has — a HOST gate, a number measured on a machine with a display — and it
+# forbids a thing the others allow: a renderer that reaches the filesystem or Node directly.
+# That is a new row-set, not a flag on class A (G6 section B.2, Part B).
+#
+# THE PERF LANE IS THE SHIPPED RATCHET, NOT A SECOND ONE (G6 section B.3). There is one
+# mechanism — `ratchet: {name, cmd, ceiling}`, enforced by GT-04/GT-05 and pinned to a commit by
+# PF-01 — and this class reuses it verbatim. What the ratchet measures here is the one hermetic
+# perf number a desktop shell has: the packaged bundle's byte count. A fat bundle is a slow
+# cold start on every machine, and the number needs no browser, no display and no dependency.
+#
+# THE FPS NUMBER IS A HOST GATE, and this is a DEVIATION from G6 section B.3, recorded with its
+# measured reason. G6 wants `main_thread_busy_pct` in the ratchet. It cannot be: the instrument
+# that produces it (CDP `Performance.getMetrics` over a real Chromium, or
+# `app.getAppMetrics()[i].cpu.percentCPUUsage` inside a real Electron) needs Playwright or
+# Electron plus a GUI, and the dependency contract (docs/CONTRACTS.md) allows a shipped rule
+# nothing but bash/git/awk/sed/grep/python3. A `ratchet.cmd` that cannot run on a fresh install
+# makes a fresh install BORN RED, which is the one thing every class must not be. So the probe
+# belongs to the project, next to the code it measures, and the number it produces is declared
+# here as a host gate and carried in the HANDOFF with its date (the class C pattern).
+#
+# Why frame time is the WRONG number, measured in G6 on a real Chromium (CDP, 0 to 32 ms of
+# work per frame): p50 frame time stayed FLAT at 16.70 ms while the main thread went from 1.8%
+# to 54.5% busy, and the dropped-frame count was non-monotone (0,0,0,1,3,11,0 — the worst
+# workload read 0). A frame-time gate at 16.7 ms is green on the idle tree AND on the loaded
+# tree: PROJECT-PRACTICE section 3, reproduced live in the exact metric the note proposed.
+# `main_thread_busy_pct` is the only monotone instrument in that sweep (1.8 -> 13.5 -> 26.0 ->
+# 54.5 -> 76.9 -> 99.5%), which is why it is named here as the host gate's metric.
+# docs/CI.md carries the sweep; docs/LIMITS.md #34 carries the gap.
+label: Desktop shell
+done_means: the renderer is isolated from Node, the main process is not busy, and the packaged bundle ships no dev dependency
+harness_dir: checks
+scaffold_checks: yes
+gate_name: commit
+gate_cmd: git rev-parse --verify --quiet HEAD
+ratchet_name: app_bundle_bytes
+ratchet_cmd: find dist out release -type f -exec cat {} + 2>/dev/null | wc -c
+ratchet_ceiling: measure
+replay_env: GOBLIN_PRE_COMMIT
+replay_cmd: node checks/{name}.mjs
+runtime_data: .goblin/state.json
+sec_gitignore_family: yes
+sec_build_output: dist out release
+sec_audit_cmd: npm audit --json
+sec_audit_max_age_days: 90
+sec_waiver_max_age_days: 180
+sec_write_routes: ""
+# perf_metric must EQUAL ratchet_name (PF-01 fails when the budget and the measurement disagree),
+# so the hermetic metric is named here too, and the host gate carries the FPS number beside it.
+perf_metric: app_bundle_bytes
+perf_cmd: find dist out release -type f -exec cat {} + 2>/dev/null | wc -c
+perf_baseline_commit: ""
+perf_baseline_value: 0
+perf_measured: ""
+perf_host_gate: "Electron run - main_thread_busy_pct with a window open (app.getAppMetrics()[i].cpu.percentCPUUsage, or CDP Performance.getMetrics), on a machine with a display"
+# The nine electron bans (G5's mechanism, G6's failure surface): nodeIntegration, context
+# isolation / sandbox, the dangerous webPreferences, and synchronous IPC / @electron/remote.
+# An unlisted ban SKIPs with a reason, so the other classes are unaffected by this list.
+bans: BN-01, BN-02, BN-05, BN-06, BN-07, BN-08, BN-09
+notes: a perf number measured on one box is not a user's experience - the renderer half can be a CI job, the Electron half is a host gate and cannot be.
+
+# The loop ceiling (G2, LP-03): the most turns ONE loop record may declare in its budget.
+# The same number for every class - a ceiling, not a per-class policy. 20 is the engine default.
+loop_max_turns_ceiling: 20
