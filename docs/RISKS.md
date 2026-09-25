@@ -18,11 +18,14 @@
 | K12 | **A check green on both trees** (the failure mode the REPLAY exists for) | `HS-02` runs the harness set against the pinned pre-change commit and requires **every** harness to be RED there. The shipped scaffold harness is deliberately such a check and is therefore reported as unproven until it is replaced. | Handled by design; see `docs/LIMITS.md` |
 | K13 | **A nightly automation files the same defect twice, or files one that is not there** | A content-only dedup key (`--idempotency-key`, checked by `AU-02`) plus the board's own `recent_success` and `active_pr` guards; a report whose `revision` does not resolve is a refusal, not a card; `--max-runtime`, `--max-retries 1` and the failure limit auto-block a looping card. The producer's own ceiling bounds filings per day. | Handled by design; the key is a dedup, not a mutex (`docs/LIMITS.md` #20) |
 | K14 | **A waiver becomes a permanent blind spot** - a dated exception nobody re-decides, or an audit record nobody re-takes, so `SC-07` passes against facts that are no longer true | The record's date is checked against `security.audit_max_age_days` (90) and every waiver's date against `security.waiver_max_age_days` (180); the waiver count is printed on the gate line so the debt is loud even when the row passes; `goblin-audit` writes a refusal (exit 5) instead of an empty record, so "no advisories" can never mean "the parse found nothing". | Handled by design; the policy is unmeasured against a real registry (`docs/LIMITS.md` #22) |
+| K15 | **goblin-stack installs agent-authored skills, and the one controlled study of that practice puts it BELOW the no-skill baseline.** SkillsBench 1.1's self-generated condition (the agent authors its own Skills before solving) reports all three tested configurations below their no-Skills baseline (-8.1, -11.3, -11.5 points), while curated Skills rose +16.6 points across 18 configurations. A generated skill accepted after a skim is a different proposition from a written one. | `P6` hands every generated verification skill to `P12`, and `verified:` does not advance until an eval record exists; the record's shape, the eleven-token ban, the cheap-checks-first ladder and the pass condition (every seeded defect detected, the control at zero, every correction RED before GREEN) are specified in `skills/goblin-eval/SKILL.md`. The evidence is cited with its pin in `docs/LIMITS.md` #15. | **Stated requirement, not an enforced one**: the runner is not shipped and no row reads a lane (`docs/LIMITS.md` #31) |
+| K16 | **The feature map rots, or claims coverage it does not have** - a route renamed under a recipe that still "works", a feature file nobody indexed, a `verified:` date nobody drove | `FM-01` (every feature file indexed, the four-H2 entry contract, the slug matches the filename), `FM-02` (every declared entry path still resolves under `source_root:`, no entry path changed after its `verified:` date), `VA-01` (the declared `verify_doctor:` exits 0); the upkeep pass and the rot table live in `skills/goblin-feature-map/SKILL.md`. | Handled by design for everything the map LISTED; completeness is not checkable (`docs/LIMITS.md` #30) |
 
 ## The advisory rows, named
 
-Eight rows are labelled `advisory`, and the count is capped by `SK-03` (default ceiling 10).
-Seven carry **no executable check at all**:
+Nine rows are labelled `advisory` (this sentence said eight until 2026-09-25: the ninth, `SC-09`,
+landed with G4's guard rails), and the count is capped by `SK-03` (default ceiling 10).
+Eight carry **no executable check at all**:
 
 - **HP-04** — a stale sentence is corrected in place with a dated parenthetical, never deleted.
 - **HS-03** — source probes read text with comments blanked first.
@@ -31,6 +34,7 @@ Seven carry **no executable check at all**:
 - **PG-04** — never bypass what the forge enforces.
 - **DOC-01** — a significant change updates the docs that teach it.
 - **DOC-02** — system-level changes are recorded in the vault via the `pkm` profile.
+- **SC-09** — auth is applied consistently across sibling routes.
 
 One is advisory-labelled but still **reports its state** as `ADV`:
 

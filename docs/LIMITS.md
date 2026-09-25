@@ -58,9 +58,30 @@ deliberate trade or an unfilled gap.
 
 ## Unproven at the level that matters
 
-15. **No controlled study of skill efficacy exists.** Published work ablates *context files*, not
-    skills, so **nothing here claims the installed skills change agent behaviour.** `P12`
-    (`goblin-eval`) is the mechanism to find out, and it has never been run.
+15. **The controlled evidence now exists, and its counter-finding is about this repo (corrected
+    2026-09-25).** This entry used to say that **no controlled study of skill efficacy exists**, so
+    that nothing here claimed the installed skills change agent behaviour. That is out of date:
+    **SkillsBench 1.1** (benchmark published 2026-06-16) reports that **curated Skills raise the
+    mean task-resolution rate from 33.9% to 50.5% — +16.6 points, a 25.5% normalized gain — across
+    87 tasks, 8 domains and 18 model–harness configurations**, with every one of the 18
+    configurations higher with Skills (configuration-level gains from +4.1 to +25.7 points).
+    **The counter-finding matters more here than the headline:** in the same benchmark's
+    **self-generated condition — the agent authors its own Skills before solving — all three tested
+    configurations landed BELOW their no-Skills baseline** (−8.1, −11.3 and −11.5 points), while
+    curated Skills stayed above it. **goblin-stack installs agent-authored skills**, so the lower
+    row of that result is a warning about its own output, not someone else's: a generated skill
+    accepted after a skim is a different proposition from a written one. It is why `P6` hands the
+    generated skill to `P12` before any `verified:` date advances (`docs/RISKS.md` K15).
+    **`P12` is still the mechanism to find out, and it has still never been run**: the record format
+    is now specified (`skills/goblin-eval/SKILL.md`) and **no row reads a lane** (#31).
+    Pin: `https://www.skillsbench.ai/blogs/skillsbench-1-1`, sha256 of the retrieved page
+    `d812bb7c2da702cc67556eb5f46b9e93faaca19d3545376544866e940126ef15`, fetched 2026-09-25; the
+    eleven-token ban and the judge procedure are argued in
+    `https://ai.engineer/talks/0vphxNt4wyk-don-t-ship-skills-without-evals`. **Not registered**:
+    the source registry is `manifest/sources.tsv` (G9's artifact) and that file does not exist in
+    this repo — measured, `git ls-files manifest/` names five files and none of them is
+    `sources.tsv` — so the registry row is composed in the W2 report for G9's patch instead of
+    being written into a file this card does not own.
 16. **Every number in the design is a file read or a third-party published number; none of it is
     a measurement of this harness under load.** The harness was built and its verifier was shown
     RED under a deliberate break; that is a statement about the mechanism, not about outcomes.
@@ -114,6 +135,33 @@ deliberate trade or an unfilled gap.
     measured, 10 advisory rows at a ceiling of 10 **pass**, and the 11th FAILs (10 at a ceiling
     of 9 FAILs). So the tenth row is allowed; the eleventh is not. Whoever lands second brings a
     real command.
+    **Decided 2026-09-25 (W2):** G1's `FM-03` does **not** take the slot. The feature map ships
+    `FM-01` and `FM-02` as real commands, and the one thing they cannot check — whether the map
+    lists every feature — is recorded as #30 instead of as a counted row; the slot is left free for
+    G2's `JG-03`, whose judge is the mechanism `P12` actually needs. Measured after W2, `SK-03`
+    still reads `advisory 9 of ceiling 10 (1 free slot)`.
+30. **The feature map is an inventory, and nothing checks that it is complete.** `FM-01` checks the
+    index against the feature files that exist and the four-H2 entry contract; `FM-02` is a tripwire
+    over `entry_paths:`. **Neither can see a feature nobody wrote down** — that needs semantic
+    judgement over the app, which no command here performs. Three smaller blind spots are named in
+    the rows' own why-cells and repeated here: `FM-02` searches for the token under `source_root:`
+    and therefore **reads a vendored copy, a lockfile or a build artifact as "still resolves"**; it
+    sees a *file* change and not a *behaviour* change, so a refactor that leaves the route alone
+    reports stale-and-wrong and a behaviour change in a file the token does not appear in is missed;
+    and a `verified:` date is a **claim the row cannot test** — nothing distinguishes a feature
+    driven that day from a date typed that day. The first of those is why `source_root:` should name
+    the source tree, not the repo root, and the third is why the upkeep pass in
+    `skills/goblin-feature-map/SKILL.md` requires the date to advance only for a feature someone
+    actually drove.
+31. **The P6↔P12 loop is wired as a contract with no runner.** `P6` now hands a generated
+    verification skill to `P12` and `verified:` does not advance until an eval record exists; the
+    record's shape, the eleven-token ban, the cheap-checks-first ladder, the merge rule and the pass
+    condition (every seeded defect detected, the control's number at zero, every correction RED
+    before GREEN) are all specified in `skills/goblin-eval/SKILL.md`. **No row reads a lane, and
+    nothing executes an eval** — measured after W2, `manifest/enforcement.tsv` has no `EV-*` row,
+    and `P12` has still never been run. The runner and the record checks (`EV-01`..`EV-04` in G1's
+    design) are deferred to a follow-up card, deliberately and in the open, rather than half-built:
+    a row that reads a record nobody writes would pass vacuously and look like enforcement.
 
 ## What the harness refuses to do
 

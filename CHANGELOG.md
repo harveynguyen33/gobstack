@@ -28,15 +28,39 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   ceiling no longer passes while printing the contradiction (G8-6b). The verifier's "cannot see"
   footer now names the ban lane's own blind spots (V3-8), and `docs/ROLES.md`'s "exactly two
   scripts" is corrected to the four an install actually writes (V3-6).
-- `manifest/enforcement.tsv` is **67 rules** (62 target, 5 source); `tests/t-verify-red.sh`
-  carries **73** controls (+5 `expect_green`) over the 62 target rows.
-- A fresh class-A install verifies **`42 passed, 0 failed, 9 advisory, 11 skipped`**, exit 0
-  (eleven rows skip with a reason: `HS-02`, `AU-02`, `AU-03`, `SC-06`, `SC-07`, `SC-08`,
-  `PF-01`, and `BN-01`/`BN-02`/`BN-03`/`BN-05` on a repo with no `src/`). A fresh class-B install
-  (`bans: []`) verifies `37 passed, 0 failed, 8 advisory, 17 skipped` — the four BN rows SKIP with
-  "not enabled in `bans:`"; class-C verifies `42 passed, 0 failed, 9 advisory, 11 skipped`; class-E
-  (`bans: [BN-02]`) verifies `41 passed, 0 failed, 9 advisory, 12 skipped`. All measured on fresh
-  installs, committed with no hand edit.
+- **The feature map, the P6↔P12 wiring, and the skills evidence (G1, W2).**
+  `skills/goblin-feature-map/SKILL.md` is the map's contract — the README index, the four-H2 entry
+  contract, the rot table, the upkeep pass — and three **declared** config keys drive it:
+  `feature_map:` (the map's README; **empty means both FM rows SKIP with that reason**, so a fresh
+  install is not born RED), `source_root:` and `verify_doctor:`. Three new rows: `FM-01` (every
+  feature file indexed and linked, `feature:` equal to the filename stem, at least one
+  `entry_paths:`, the four H2s in order), `FM-02` (every declared entry path still resolves under
+  `source_root:` and none changed after its `verified:` date — a tripwire, never a proof) and
+  `VA-01` (the declared doctor exits 0, the executable half of P6's "never executed is a draft").
+  `P6` gains step 5 (seed the map) and step 6 (hand the generated skill to `P12`: `verified:` does
+  not advance until an eval record exists); `P12` gains the record format (`evals/<slug>/`), the
+  eleven-token ban, the cheap-checks-first ladder, the merge rule and the pass condition. The eval
+  **runner is not shipped** and no row reads a lane (`docs/LIMITS.md` #31). `docs/LIMITS.md` #15 is
+  corrected: the controlled evidence now exists — SkillsBench 1.1 measures curated Skills at
+  **+16.6 points (33.9% → 50.5%, 18 model–harness configurations, 87 tasks)**, and its
+  **self-generated condition put all three tested configurations BELOW their no-Skills baseline**
+  (`docs/RISKS.md` K15) — a warning about this repo's own agent-authored output, not someone
+  else's.
+- `manifest/enforcement.tsv` is **70 rules** (65 target, 5 source; advisory still **9 of ceiling
+  10**, because G1's `FM-03` declined the slot and the completeness claim is `docs/LIMITS.md` #30
+  rather than a counted row); `tests/t-verify-red.sh` carries **80** controls and **7**
+  `expect_green` asserts over the 65 target rows. (Superseded 2026-09-25: this line read 67 rules /
+  62 target / 73 controls before G1 landed.)
+- A fresh class-A install verifies **`42 passed, 0 failed, 9 advisory, 14 skipped`**, exit 0
+  (fourteen rows skip with a reason: `HS-02`, `AU-02`, `AU-03`, `SC-06`, `SC-07`, `SC-08`, `PF-01`,
+  `BN-01`/`BN-02`/`BN-03`/`BN-05` on a repo with no `src/`, and `FM-01`/`FM-02`/`VA-01` with no map
+  and no doctor declared). A fresh class-B install (`bans: []`) verifies
+  `37 passed, 0 failed, 8 advisory, 20 skipped` — the four BN rows SKIP with "not enabled in
+  `bans:`"; class-C verifies `42 passed, 0 failed, 9 advisory, 14 skipped`; class-E
+  (`bans: [BN-02]`) verifies `41 passed, 0 failed, 9 advisory, 15 skipped`; class-A with
+  `--skills no` verifies `38 passed, 0 failed, 9 advisory, 18 skipped`. All measured on fresh
+  installs, committed with no hand edit. (Superseded 2026-09-25: these lines read 11 / 17 / 11 / 12
+  / 15 skipped before G1's three rows landed.)
 
 ## 0.2.0
 
