@@ -46,21 +46,46 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   **self-generated condition put all three tested configurations BELOW their no-Skills baseline**
   (`docs/RISKS.md` K15) — a warning about this repo's own agent-authored output, not someone
   else's.
-- `manifest/enforcement.tsv` is **70 rules** (65 target, 5 source; advisory still **9 of ceiling
-  10**, because G1's `FM-03` declined the slot and the completeness claim is `docs/LIMITS.md` #30
-  rather than a counted row); `tests/t-verify-red.sh` carries **80** controls and **7**
-  `expect_green` asserts over the 65 target rows. (Superseded 2026-09-25: this line read 67 rules /
-  62 target / 73 controls before G1 landed.)
-- A fresh class-A install verifies **`42 passed, 0 failed, 9 advisory, 14 skipped`**, exit 0
-  (fourteen rows skip with a reason: `HS-02`, `AU-02`, `AU-03`, `SC-06`, `SC-07`, `SC-08`, `PF-01`,
-  `BN-01`/`BN-02`/`BN-03`/`BN-05` on a repo with no `src/`, and `FM-01`/`FM-02`/`VA-01` with no map
-  and no doctor declared). A fresh class-B install (`bans: []`) verifies
-  `37 passed, 0 failed, 8 advisory, 20 skipped` — the four BN rows SKIP with "not enabled in
-  `bans:`"; class-C verifies `42 passed, 0 failed, 9 advisory, 14 skipped`; class-E
-  (`bans: [BN-02]`) verifies `41 passed, 0 failed, 9 advisory, 15 skipped`; class-A with
-  `--skills no` verifies `38 passed, 0 failed, 9 advisory, 18 skipped`. All measured on fresh
-  installs, committed with no hand edit. (Superseded 2026-09-25: these lines read 11 / 17 / 11 / 12
-  / 15 skipped before G1's three rows landed.)
+- **The judge role and the loop contract (G2, W3).** `role-judge` in `roles.yaml` — a capability,
+  never a model — plus `skills/goblin-judge` (what a judge is, and what it must refuse) and
+  `skills/goblin-loop` (the record it leaves). `docs/LOOP.md` is the contract **and** the measured
+  reading of Hermes's own `goal_mode`: the judge is called as `judge_goal(goal_text,
+  last_response)`, with **no contract, no subgoals and no quality gates**
+  (`hermes_cli/goals.py:1660`); it sees the card's goal (2000 chars) and the worker's own most
+  recent response (4000) (`:38`, `:901-905`); and the loop has **no progress detector at all** —
+  its whole state is `last_response`, `turns_used`, `nudged_to_finalize` (`:1634-1636`). Eight new
+  rows. `JG-01`: a `done` verdict may only cite a **handle the repo can resolve** (`sha:` a commit
+  in `git rev-list --all`, `file:` a path under the root, `sha256:` a file under `.goblin/loop/`) —
+  a `cmd:` token resolves **nothing**, because the command's output is not in the record.
+  `JG-02`: the declared judge lane must be **disjoint** from the author's — a FAIL, not a report;
+  an unresolved lane is an `ADV` with a one-line remedy, because a repo cannot choose the fleet's
+  routing. `JG-03`: a judge lane with no non-`done` verdict is escalated — **counted, never gated**,
+  and the advisory slot W2 left free for G2. `LP-01`..`LP-05`: one predicate command, run and
+  recorded (`exit=<n> ts=<ISO8601>`) **before iteration 1**; pinned by digest and never relaxed;
+  a budget under the new `loop_max_turns_ceiling` (default **20** — the engine's own
+  `DEFAULT_MAX_TURNS`, so the two numbers agree); no three consecutive rows on one evidence
+  pointer without reaching `predicate:green`; and a `.goblin/loop/stuck.md` naming the predicate
+  when the loop ends red. `templates/loop/` ships a copy-ready predicate and record header, and
+  **nothing installs them**: a fresh install must not be born with a loop record. `P10`'s role is
+  now `code + judge`, `P7` gains the S3+ foreman (`role-judge`, one decision from N lane verdicts),
+  and `docs/INTEGRATION.md`'s claim that the auxiliary judge "is the predicate re-check" is
+  corrected in place with the measured calls. `docs/LIMITS.md` #32 and #33 and `docs/RISKS.md` K17
+  record what the lane cannot see.
+- `manifest/enforcement.tsv` is **78 rules** (73 target, 5 source); the advisory count is **10 of
+  ceiling 10 — full**, so the next advisory row must raise the ceiling in the same change;
+  `tests/t-verify-red.sh` carries **93** controls and **14** `expect_green` over the 70 target rows
+  that carry an executable rule. (Superseded 2026-09-25: this line read 70 rules / 65 target /
+  9 advisory / 80 controls / 7 green before G2's eight rows landed.)
+- A fresh class-A install verifies **`42 passed, 0 failed, 11 advisory, 20 skipped`**, exit 0
+  (twenty rows skip with a reason: `HS-02`, `AU-02`, `AU-03`, `SC-06`, `SC-07`, `SC-08`, `PF-01`,
+  `BN-01`/`BN-02`/`BN-03`/`BN-05` on a repo with no `src/`, `FM-01`/`FM-02`/`VA-01` with no map
+  and no doctor declared, and `JG-01` + `LP-01`..`LP-05` with no `.goblin/loop/` record). A fresh
+  class-B install (`bans: []`) verifies `37 passed, 0 failed, 10 advisory, 26 skipped`; class-C
+  verifies `42 passed, 0 failed, 11 advisory, 20 skipped`; class-E (`bans: [BN-02]`) verifies
+  `41 passed, 0 failed, 11 advisory, 21 skipped`; class-A with `--skills no` verifies
+  `38 passed, 0 failed, 11 advisory, 24 skipped`. All measured on fresh installs, committed with no
+  hand edit. (Superseded 2026-09-25: these lines read 42/0/9/14, 37/0/8/20, 42/0/9/14, 41/0/9/15
+  and 38/0/9/18 before G2's eight rows landed.)
 
 ## 0.2.0
 
