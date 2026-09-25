@@ -3,7 +3,7 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 116 `expect_red` call sites and 23 `expect_green` - 139 calls over
+# One control per target-scope row: 121 `expect_red` call sites and 28 `expect_green` - 149 calls over
 # all 78 of the matrix's 78 target rows (the other five rows are source-scope and carry controls of
 # their own). Measured at this revision: 78 distinct ids, 0 phantom ids (every id used here is a row
 # in the matrix) and 0 target row left without a control. Five of the 78 - `DOC-01`, `DOC-02`
@@ -36,7 +36,13 @@
 # interpolates no `{name}`), one for `IN-03`'s newly-enforced enum, one for `FM-02`'s tracked-file
 # clause, one for `SC-03`'s hit count, one text assertion over the summary's advisory arithmetic
 # (Z1-7 - a `check`, not an `expect_*` call, for the judge-lane reason below) and one pinning the
-# drift guard that catches a defanged ban probe. Measured against a054289 with the pre-fix
+# drift guard that catches a defanged ban probe, and the ten added with AA1/Z2 - two for Z2-2's
+# minified lockfile (the FAIL half that used to PASS vacuously, and the allowlisted half that
+# proves the fix is not "any minified lock FAILs"), one for Z2-3's metacharacter-bearing harness
+# name, six for Y1 §7 items 1/2/6 (item 1 in both directions, item 6's subtree/sibling pair plus
+# the trailing-slash case, item 2's env contract in both directions - the cluster Z1 named as the
+# one with a real engine underneath), and one assertion on the LINE the alignment control reports
+# (a `check`, not an `expect_*`, for the judge-lane reason below). Measured against a054289 with the pre-fix
 # `bin/goblin-verify` and `manifest/enforcement.tsv` restored and these tests kept: five of the six
 # are RED there - they are the pre-fix run's ONLY five FAILs - which is what makes them controls;
 # the sixth (`W5-12`) is a PIN, holding on both trees, because it asserts the limitation Z1 chose to
@@ -44,14 +50,15 @@
 # the row is not always-red, not that a fix bites). No other control in this file changes verdict
 # between the two trees.
 # The judge-lane family comparison is two text assertions rather than `expect_*` calls, because
-# `MD-02` is advisory and exits 0 either way; its control reads the line it prints. Twenty-three of
+# `MD-02` is advisory and exits 0 either way; its control reads the line it prints. Twenty-eight of
 # the controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, two that seed a feature
 # map and require it to PASS, seven that seed a loop record or a judge lane and require
 # `JG-01`, `JG-02` and `LP-01`..`LP-05` to PASS, five that pin a new row's non-failing half -
 # a commented-out `if:`, the installed workflow, a verbatim gate run, the no-workflow SKIP and an
-# unlisted ban - and four that prove the two escapes, the recorded re-scope and the replay row's
+# unlisted ban - four that prove the two escapes, the recorded re-scope and the replay row's
 # declared command are not
-# always-red). The `--only <id>` form is used
+# always-red, and the five AA1 added: Z2-2's allowlisted minified lock, Z2-3's metacharacter-bearing
+# harness name, and the non-failing half of each of Y1 §7's items 1, 2 and 6). The `--only <id>` form is used
 # so a mutation in one row cannot be masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
@@ -176,6 +183,14 @@ restore_all() {
   rm -f checks/green.mjs checks/red.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
         .goblin/state.json .goblin/last-gate-line .goblin/.ds-report .goblin/ratchet-last \
         .envrc .goblin/audit.tsv package.json package-lock.json
+  # Z2-3's harness carries shell metacharacters in its NAME, so it needs its own rm: `checks/*.mjs`
+  # would expand to it, but an unquoted glob in a restore path is exactly the habit that control
+  # exists to break.
+  rm -f 'checks/z2;true;#.mjs'
+  # The allowlist is mutated by m_sc_08_minified_ok (Z2-2's green half) and was backed up but never
+  # restored - a leftover entry would make the fixture's own .goblin/install-hooks.allowlist differ
+  # from the install record, i.e. an IN-02 drift in the final full run.
+  cp -a "$BK/install-hooks.allowlist" .goblin/install-hooks.allowlist
   cp -a "$BK/assert.mjs" checks/assert.mjs
   rm -f reviews/fixture-*.md
   # G2: the planted loop record. A leftover .goblin/loop/ would leave JG-01/LP-* green by
@@ -316,6 +331,14 @@ m_hs_03()         { m_row_fails HS-03; }
 #                      interpolates no `{name}` and so replayed nothing.
 m_replay_all_red()   { rm -f checks/*.mjs; printf 'process.exit(1)\n' > checks/red.mjs; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" .goblin/goblin.yaml; }
 m_replay_cmd_false() { m_replay_all_red; sed -i 's|^  cmd: node checks/{name}.mjs|  cmd: false|' .goblin/goblin.yaml; }
+# Z2-3: the harness FILE NAME is part of the command text the shell parses, because Z1-4 made the
+# row run the DECLARED command instead of `node "$f"`. The name is therefore substituted shell-
+# quoted, and this is the measurement: the file is named with `;` and `#`. Unquoted, the name
+# split into two commands and the trailing `true` decided the exit code, so the row reported the
+# file GREEN on the pre-change tree and FAILed - measured on 846c132's bin/goblin-verify: rc 1,
+# "z2;true;#.mjs was GREEN on the pre-change tree". Quoted, `node` receives ONE argument, the
+# harness runs, exits 1, and the row passes - which is what this control asserts.
+m_replay_meta_name() { rm -f checks/*.mjs; printf 'process.exit(1)\n' > 'checks/z2;true;#.mjs'; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" .goblin/goblin.yaml; }
 
 m_bad_author()    { git -c user.email=someone@else.test commit -q --allow-empty -m "test: ambient author"; }
 m_cm_02()         { m_row_fails CM-02; }
@@ -385,6 +408,13 @@ m_sc_05()  { mkdir -p app/api/contact; printf 'export async function POST(req) {
 m_sc_06()  { printf '{"name":"fixture","version":"1.0.0"}\n' > package.json; }
 m_sc_07()  { printf '# .goblin/audit.tsv - written by goblin-audit 0.2.0 on 2020-01-01\n# command: npm audit --json\nmeasured 2020-01-01\n' > .goblin/audit.tsv; }
 m_sc_08()  { printf '{\n  "packages": {\n    "node_modules/esbuild": {\n      "version": "0.1.0",\n      "hasInstallScript": true\n    }\n  }\n}\n' > package-lock.json; }
+# Z2-2: the SAME lockfile on ONE LINE. The reader is line-anchored, so before the fix this shape
+# matched nothing and the row printed `0 install hook(s), 0 allowlisted` - a PASS, exit 0, where
+# the pnpm/yarn branch above already reports a SKIP. Two halves: the unlisted hook must FAIL here
+# (it did not - a vacuous PASS), and the allowlisted one must PASS (so the fix is not "any
+# minified lock FAILs").
+m_sc_08_minified()    { printf '{"name":"fixture","lockfileVersion":3,"packages":{"node_modules/esbuild":{"version":"0.1.0","hasInstallScript":true}}}\n' > package-lock.json; }
+m_sc_08_minified_ok() { m_sc_08_minified; printf 'esbuild\n' >> .goblin/install-hooks.allowlist; }
 m_sc_09()  { m_row_fails SC-09; }
 m_pf_01()  { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e 's/^  baseline_commit: .*/  baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^  baseline_value: .*/  baseline_value: 1/' -e 's/^  measured: .*/  measured: 2026-01-01/' .goblin/goblin.yaml; }
 # G8-6b: the budget and the measurement have to be the SAME number. Two controls - the honest
@@ -432,9 +462,12 @@ m_bn_09()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-09]/' .gobli
 # `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` were documented in three places and
 # exercised by NOTHING (`grep -rn bans_exempt tests/` = 0 hits at 7fec08f), which is why W5's
 # regression - a documented escape that produced a permanent RED - shipped unnoticed. These five
-# controls are that missing pair, and every one of them is RED on the pre-fix tree (measured:
-# the exempt-path green is rc 1 there, and the two BAN-OK reds are PASSes there because the
-# marker does nothing).
+# controls are that missing pair. Every one of them NAMES a row that is RED on the pre-fix tree,
+# and TWO of the five controls themselves FAIL there - measured at 7fec08f, the two `expect_green`
+# halves (the exempt path's PASS and the inline marker's PASS both come back rc 1, because the
+# escape did nothing there) while the three `expect_red` halves report ok, the row they drive
+# being red for the old reason. This comment claimed "every one of them is RED on the pre-fix
+# tree" without that distinction (Z2-4); CHANGELOG.md 0.4.1 states which sense it means.
 m_bn_01_exempt()      { m_bn_01; awk '{ if ($0 ~ /^bans_exempt:/) { print; print "  - BN-01 src"; next } print }' .goblin/goblin.yaml > .goblin/goblin.yaml.n && mv .goblin/goblin.yaml.n .goblin/goblin.yaml; }
 # The other direction: the exception names a DIFFERENT path, so the same violation still counts.
 # Without this half, an engine that exempted everything would pass the control above.
@@ -445,6 +478,39 @@ m_bn_01_banok_noreason() { mkdir -p src; printf 'export const a: any = 1; // BAN
 # The marker names the ban it clears. A BAN-OK for another ban must not clear this one - which is
 # what stops a sloppy `BAN-OK\(` matcher from becoming a blanket escape.
 m_bn_01_banok_other() { mkdir -p src; printf 'export const a: any = 1; // BAN-OK(BN-02): another ban\n' > src/bn01.ts; }
+
+# ---- AA1: Y1 §7 items 1, 2 and 6 - the LAYER probe, the env contract, the alignment ------------
+# Y1 §7 named eighteen documented mechanisms with no control; Z1 fixed 2 and closed 2, and its
+# own note said "a later wave that wants more controls should start with items 1, 2 and 6, which
+# are the cluster with a real engine underneath". These are those three. Helpers rather than
+# copies, because every case needs the same `layers:` pair and an entry appended to the
+# `bans_exempt:` key the installer wrote.
+add_layers() { printf '\nlayers:\n  - src/renderer src/main\n' >> .goblin/goblin.yaml; mkdir -p src/renderer src/main; }
+add_exempt() { awk -v v="$1" '{ if ($0 ~ /^bans_exempt:/) { print; print "  - " v; next } print }' .goblin/goblin.yaml > .goblin/goblin.yaml.n && mv .goblin/goblin.yaml.n .goblin/goblin.yaml; }
+# item 1 - `bans_exempt:` honoured by the LAYER probe. This is bans/layer-check.sh, a different
+# file from grep-ban.sh, which is the only probe the five W5-1/W5-2 controls above reach; and it
+# is the sibling of the probe whose regression (a documented escape that produced a permanent
+# RED) started this chain. The crossing import sits INSIDE the exempted path...
+m_bn_05_exempt()      { add_layers; mkdir -p src/renderer/legacy; printf "import { db } from '../../main/db';\nexport const r = db;\n" > src/renderer/legacy/p.ts; add_exempt "BN-05 src/renderer/legacy"; }
+# ...and the SAME violation with the exemption naming another path still counts. Without this
+# half, a probe that exempted everything would pass the first one.
+m_bn_05_exempt_else() { add_layers; mkdir -p src/renderer/legacy; printf "import { db } from '../../main/db';\nexport const r = db;\n" > src/renderer/legacy/p.ts; add_exempt "BN-05 src/renderer/app"; }
+# item 6, both directions: an exempt prefix covers its OWN subtree, and it does not swallow a
+# sibling whose name merely starts with it (`src/ok` vs `src/okay`).
+m_bn_05_exempt_subtree() { add_layers; mkdir -p src/renderer/ok; printf "import { db } from '../../main/db';\n" > src/renderer/ok/a.ts; add_exempt "BN-05 src/renderer/ok"; }
+m_bn_05_exempt_align()   { add_layers; mkdir -p src/renderer/ok src/renderer/okay; printf "import { db } from '../../main/db';\n" > src/renderer/ok/a.ts; printf "import { db } from '../../main/db';\n" > src/renderer/okay/y.ts; add_exempt "BN-05 src/renderer/ok"; }
+# ...and the documented form needs no trailing slash: `src/legacy/` strips nothing, so it matches
+# no file and exempts nothing (a prefix is compared as written).
+m_bn_05_exempt_slash()   { add_layers; mkdir -p src/renderer/legacy; printf "import { db } from '../../main/db';\n" > src/renderer/legacy/q.ts; add_exempt "BN-05 src/renderer/legacy/"; }
+# item 2 - the engine->probe env contract itself, which nothing in tests/ has ever asserted
+# (`grep -c GOBLIN_BANS_EXEMPT tests/` = 0). The detect column is replaced by a probe a PROJECT
+# could write: it exits 0 only when the engine put BOTH GOBLIN_BANS_ID and GOBLIN_BANS_EXEMPT in
+# its environment. The exemption supplies the prefix, so with it the probe passes; with none
+# declared the same probe FAILs, which is the half that proves the value is config-driven and not
+# ambient.
+m_bn_01_probe_env()      { set_bn01_probe; mkdir -p src; printf 'export const a: number = 1;\n' > src/clean.ts; add_exempt "BN-01 src"; }
+m_bn_01_probe_env_none() { set_bn01_probe; mkdir -p src; printf 'export const a: number = 1;\n' > src/clean.ts; }
+set_bn01_probe() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "test \"$GOBLIN_BANS_ID\" = BN-01 && test \"$GOBLIN_BANS_EXEMPT\" = src"; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; }
 
 m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
@@ -552,6 +618,10 @@ expect_red "a harness green on both trees"         HS-02 1 m_green_harness
 # that never ran one.
 expect_green "a harness set RED on the pre-change tree, run as the declared command" HS-02 m_replay_all_red
 expect_red   "Z1-4: a replay.cmd that interpolates no {name}"                       HS-02 1 m_replay_cmd_false
+# Z2-3: the name is shell-quoted before it is substituted into the declared command. This control
+# is the measurement - unquoted, the name split and the row reported the file GREEN pre-change (rc
+# 1, measured on 846c132's verifier); quoted, the name is ONE argument and the row passes.
+expect_green "Z2-3: a harness file name carrying shell metacharacters reaches node as ONE argument" HS-02 m_replay_meta_name
 expect_red "HS-03 (advisory row: wired, not biting)" HS-03 1 m_hs_03
 
 expect_red "an ambient commit author"              CM-01 1 m_bad_author
@@ -619,6 +689,12 @@ expect_red "a write route with no validator"        SC-05 1 m_sc_05
 expect_red "a manifest with no lockfile"           SC-06 1 m_sc_06
 expect_red "an audit record nobody re-took"        SC-07 1 m_sc_07
 expect_red "an install hook nobody decided on"     SC-08 1 m_sc_08
+# Z2-2: the same hook in a ONE-LINE lockfile. It used to print `0 install hook(s), 0 allowlisted`
+# and exit 0 - a vacuous PASS, the defect family this harness exists to prevent; the reader now
+# normalises the text into the pretty shape, and the allowlisted half proves the fix is not "any
+# minified lock FAILs".
+expect_red   "Z2-2: the same unlisted hook in a MINIFIED (one-line) lockfile"   SC-08 1 m_sc_08_minified
+expect_green "Z2-2: the same hook ALLOWLISTED in a minified lockfile passes"    SC-08 m_sc_08_minified_ok
 expect_red "SC-09 (advisory row: wired, not biting)" SC-09 1 m_sc_09
 expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
 expect_green "G8-6b: the ceiling matches the recorded baseline"        PF-01 m_pf_ceiling_match
@@ -680,6 +756,38 @@ expect_red   "W5-1: the same violation outside the exempt path still FAILs"  BN-
 expect_green "W5-2: inline BAN-OK(<id>): <reason> clears the offending line" BN-01 m_bn_01_banok
 expect_red   "W5-2: a BAN-OK with no reason is not an escape"                BN-01 1 m_bn_01_banok_noreason
 expect_red   "W5-2: a BAN-OK naming another ban does not clear this one"     BN-01 1 m_bn_01_banok_other
+
+# ---- AA1: Y1 §7 items 1, 2 and 6 - the direct controls for the ban cluster --------------------
+# LIMITS #41 recorded these three as exercised only INDIRECTLY, and `grep -c GOBLIN_BANS_EXEMPT
+# tests/` was 0: the five W5-1/W5-2 controls above all drive BN-01, i.e. grep-ban.sh. Item 1 is a
+# different file (bans/layer-check.sh), item 2 is the contract between the engine and ANY probe a
+# project writes, and item 6 is the predicate both shipped probes implement. PR-03's second branch
+# applies rather than the pre-change tree - Y1 measured each of the three WORKING, which is why the
+# census calls them "verified working, control missing", so the RED direction is a deliberately
+# broken copy of the module under test; each has one below, and the measurement is in AA1.md.
+#
+# item 1: the crossing import is inside the exempted path, and reaches the LAYER probe.
+expect_green "AA1 §7-1: bans_exempt is honoured by the LAYER probe (not only grep-ban)" BN-05 m_bn_05_exempt
+expect_red   "AA1 §7-1: the same crossing import outside the exempt path still FAILs"   BN-05 1 m_bn_05_exempt_else
+# item 6, both directions: the prefix covers its own subtree; `src/ok` does not swallow `src/okay`.
+expect_green "AA1 §7-6: an exempt prefix covers its own subtree"                        BN-05 m_bn_05_exempt_subtree
+expect_red   "AA1 §7-6: an exempt src/ok does not swallow a violation in src/okay"      BN-05 1 m_bn_05_exempt_align
+# The alignment claim is about WHICH line survives the filter, not only about the exit code, so it
+# is asserted on the reported line as well: the exempted hit is dropped, the sibling's is printed.
+m_bn_05_exempt_align
+out=$(bash .goblin/bin/goblin-verify --only BN-05 2>&1)
+printf '%s' "$out" | grep -q 'src/renderer/okay/y.ts'; hit=$?
+printf '%s' "$out" | grep -q 'src/renderer/ok/a.ts' && hit=1
+check "AA1 §7-6: the exempt subtree's hit is dropped, the sibling's is the one reported" "$hit"
+restore_all
+# ...and a prefix written with a TRAILING SLASH strips nothing, so it exempts nothing.
+expect_red   "AA1 §7-6: a prefix written with a trailing slash exempts nothing"         BN-05 1 m_bn_05_exempt_slash
+# item 2: a probe of the project's own reading both variables out of its environment. The engine
+# has to put them there - with the exemption declared the probe passes, with none declared the SAME
+# probe fails, which is the half that proves the value comes from the config and not from ambient
+# state.
+expect_green "AA1 §7-2: the engine hands the probe GOBLIN_BANS_ID and GOBLIN_BANS_EXEMPT" BN-01 m_bn_01_probe_env
+expect_red   "AA1 §7-2: with no exemption declared the probe sees an EMPTY GOBLIN_BANS_EXEMPT" BN-01 1 m_bn_01_probe_env_none
 
 # ---- G1: the feature map (FM-01, FM-02) and the generated skill's doctor (VA-01) --------------
 # P6 authors the map (skills/goblin-feature-map); FM-01 is the entry contract + index hygiene,
