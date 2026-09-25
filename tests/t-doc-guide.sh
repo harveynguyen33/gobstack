@@ -1,0 +1,178 @@
+#!/usr/bin/env bash
+# t-doc-guide.sh — `docs/GUIDE.md` is the front door: the file this project hands to other
+# developers. Until AB2 nothing in `tests/` read it (measured: `grep -rn GUIDE tests/*.sh` -> 0
+# hits), which is why four sentences a measurement contradicted survived in it. This file is the
+# control.
+#
+# What it asserts, and why each one is here:
+#
+#   D1  the guide's hands-on REPLAY exercise is RUN, not paraphrased: the block is extracted from
+#       `docs/GUIDE.md` (both copies, §7 and the appendix) between two sentinels the guide carries,
+#       the two copies must be identical, and every `goblin-verify` line in it must do what its own
+#       `# expect PASS|FAIL` annotation promises - verdict AND exit code. At d5424be the exercise
+#       promised a FAIL from `--only GT-02` that the shipped configuration cannot produce
+#       (measured: PASS rc 0), i.e. the guide taught the lesson backwards.
+#   D4  `created 49` is the installer's count of the files it TRACKS; it writes 50, because
+#       `.goblin/installed.json` is written but not counted. The number in the guide is checked
+#       against a real install and the gloss must say which file the counter omits.
+#   D5  §1's network claim must be scoped the way every other copy of it is (GUARDRAILS: "No
+#       network at verify time"; README/CONTRACTS: under "Dependencies").
+#   §3/§9  the guide's own reproducible numbers, re-measured here on a fresh class-A install: the
+#       `created 49` line, the day-one line (`42 passed, 1 failed, 11 advisory, 24 skipped`) and the
+#       green-path line (`43 passed, 0 failed, 11 advisory, 24 skipped`). A number no run prints is
+#       the defect this half exists to catch.
+#
+# RED on d5424be / GREEN at the tip: the REPLAY block does not exist there at all, the `created 49`
+# gloss is the false one, and §1 carries the unscoped claim.
+set -uo pipefail
+
+SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+GUIDE="$SRC/docs/GUIDE.md"
+WORK=$(mktemp -d)
+HOMEDIR="$WORK/home"
+fail=0
+note() { printf '      %s\n' "$*"; }
+check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
+
+# ---- D1, part 1: extract the guide's own exercise ---------------------------------------------
+# The sentinels are comment lines the exercise carries, so the block a reader copies is exactly the
+# block this test runs. Two copies are required (§7 and the appendix) and they must agree.
+n=$(awk -v dir="$WORK" '
+  /REPLAY-BEGIN/ { n++; f = 1; next }
+  /REPLAY-END/   { f = 0; next }
+  f              { print > (dir "/replay." n) }
+  END            { print n + 0 }
+' "$GUIDE")
+check "the guide carries the REPLAY exercise between its sentinels ($n block(s) found)" \
+  "$([ "${n:-0}" -ge 1 ] && echo 0 || echo 1)"
+check "  and it carries it in both copies (§7 and the appendix), so neither can contradict the other" \
+  "$([ "${n:-0}" -ge 2 ] && echo 0 || echo 1)"
+if [ "${n:-0}" -ge 2 ]; then
+  if diff <(sed 's/^[[:space:]]*//' "$WORK/replay.1") <(sed 's/^[[:space:]]*//' "$WORK/replay.2") >/dev/null; then
+    note "ok   the two copies are identical"
+  else
+    note "FAIL the two copies of the REPLAY exercise differ:"; fail=1
+    diff <(sed 's/^[[:space:]]*//' "$WORK/replay.1") <(sed 's/^[[:space:]]*//' "$WORK/replay.2") | sed 's/^/        /'
+  fi
+fi
+
+# ---- the target the block runs in: the guide's own command, and nothing else -------------------
+# Exactly §3: an EMPTY repo (no seed commit - the installer fills HANDOFF.md from HEAD when one
+# exists, which is not the day-one shape the guide documents), then the install, then the commit.
+mkdir -p "$WORK/target" "$HOMEDIR"
+cd "$WORK/target"
+git init -q -b main
+git config user.name "Test Runner"
+git config user.email "runner@example.com"
+
+# The reader's $HOME must not matter to any number below (the control runs with a throwaway one).
+INSTALL=$(HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . --class A 2>&1)
+check "the guide's install command exits 0" "$?"
+printf '%s\n' "$INSTALL" | head -1 | grep -qE '^created [0-9]+ · updated 0 · unchanged 0 · skipped 0$'
+check "  and prints the created/updated/unchanged/skipped line" "$?"
+CREATED=$(printf '%s\n' "$INSTALL" | sed -n 's/^created \([0-9]*\) .*/\1/p' | head -1)
+
+git add -A && git commit -q -m "chore: install goblin-stack"
+
+# ---- D1, part 2: RUN the block the guide writes ------------------------------------------------
+run_replay() { # <block file>
+  local file="$1" line cmd want out rc id
+  while IFS= read -r line; do
+    line="${line#"${line%%[![:space:]]*}"}"                 # the block is indented in the doc
+    case "$line" in ''|'#'*) continue ;; esac
+    want=""
+    case "$line" in
+      *'# expect PASS'*) want=PASS ;;
+      *'# expect FAIL'*) want=FAIL ;;
+    esac
+    cmd=$(printf '%s' "$line" | sed 's/[[:space:]]*# expect \(PASS\|FAIL\)[[:space:]]*$//')
+    if printf '%s' "$cmd" | grep -q 'goblin-verify'; then
+      if [ -z "$want" ]; then
+        note "FAIL the guide's own '$(printf '%s' "$cmd" | cut -c1-46)...' carries no '# expect' annotation"
+        fail=1; continue
+      fi
+    fi
+    out=$(HOME="$HOMEDIR" bash -c "$cmd" 2>&1); rc=$?
+    [ -n "$want" ] || continue
+    id=$(printf '%s' "$cmd" | sed -n 's/.*--only[[:space:]]*\([A-Z][A-Z]-[0-9][0-9]*\).*/\1/p')
+    local want_rc=0; [ "$want" = FAIL ] && want_rc=1
+    if [ "$rc" -ne "$want_rc" ]; then
+      note "FAIL the guide says '# expect $want' and '$(printf '%s' "$cmd" | cut -c1-44)...' exits $rc"
+      fail=1; continue
+    fi
+    if [ -n "$id" ] && ! printf '%s\n' "$out" | grep -qE "^$want[[:space:]]+$id"; then
+      note "FAIL the guide says '# expect $want' but the run prints: $(printf '%s' "$out" | head -1 | cut -c1-60)"
+      fail=1; continue
+    fi
+    note "ok   the guide's '$want' holds: $(printf '%s' "$out" | grep -m1 -E '^(PASS|FAIL|SKIP|ADV)' | cut -c1-58)"
+  done < "$file"
+}
+if [ "${n:-0}" -ge 1 ]; then
+  run_replay "$WORK/replay.1"
+  # the exercise must leave the tree as it found it
+  check "the guide's exercise restores the tree it broke" \
+    "$([ -z "$(git status --porcelain)" ] && echo 0 || echo 1)"
+fi
+
+# ---- D4: the file count, and the gloss the guide puts on it ------------------------------------
+ONDISK=$(find . -path ./.git -prune -o -type f -print | wc -l)
+[ "$ONDISK" = "50" ]
+check "a class-A install writes 50 files (measured here: $ONDISK; the installer reports created $CREATED)" "$?"
+check "  and the guide quotes the installer's own count ($CREATED)" \
+  "$(printf '%s' "$CREATED" | grep -qE '^49$' && echo 0 || echo 1)"
+grep -qF "created $CREATED · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
+check "  and the guide's transcript of it is the line the installer printed" "$?"
+! grep -q 'means it wrote 49 files' "$GUIDE"
+check "  and the false gloss ('created 49 means it wrote 49 files') is gone (D4)" "$?"
+GLOSS_LINE=$(grep -n "created $CREATED" "$GUIDE" | head -1 | cut -d: -f1)
+if [ -n "$GLOSS_LINE" ] && sed -n "${GLOSS_LINE},$((GLOSS_LINE + 12))p" "$GUIDE" | grep -q 'installed\.json'; then
+  note "ok   the gloss names the file the counter does not count (.goblin/installed.json)"
+else
+  note "FAIL the gloss on 'created $CREATED' does not say which file the installer omits from the count"
+  fail=1
+fi
+
+# ---- D5: the network claim is scoped -----------------------------------------------------------
+! grep -q 'It adds no network calls' "$GUIDE"
+check "the unscoped claim ('It adds no network calls') is gone from §1 (D5)" "$?"
+# The paragraph that carries the dependency list must scope the network claim itself: the sentence
+# whose subject is "no server and no dependencies" is the one a new reader meets FIRST, and the
+# unscoped version of it stood while §8 and §11 both said the audit step is the network step.
+awk '/no server and no dependencies/{f=1} f{print} f && /^[[:space:]]*$/{exit}' "$GUIDE" \
+  | grep -qi 'verify'
+check "  and the same paragraph now scopes it to verify time" "$?"
+
+# ---- §3/§9: the guide's own numbers, re-measured ------------------------------------------------
+DAYONE=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
+printf '%s\n' "$DAYONE" | grep -qE '^42 passed, 1 failed, 11 advisory, 24 skipped$'
+check "the day-one run prints the shape the guide documents ($DAYONE)" "$?"
+grep -qF "$DAYONE" "$GUIDE"
+check "  and the guide quotes that exact line (it says 42 passed, 1 failed, 11 advisory, 24 skipped)" "$?"
+
+HEAD_NOW=$(git rev-parse --short HEAD)
+sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
+git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
+GREEN=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
+printf '%s\n' "$GREEN" | grep -qE '^43 passed, 0 failed, 11 advisory, 24 skipped$'
+check "naming a real commit makes it green ($GREEN)" "$?"
+grep -qF "$GREEN" "$GUIDE"
+check "  and the guide quotes that green-path line too (§9)" "$?"
+
+# ---- the exercise must not destroy the reader's own uncommitted work ---------------------------
+# The block is path-limited on purpose, and the guide says so in its own parenthetical ("your own
+# edits stay put"). §5 step 3 leaves an uncommitted `.goblin/goblin.yaml` edit in a real reading, so
+# an unqualified `git stash` + `git stash drop` would silently delete the reader's config. Measured
+# here rather than claimed.
+mkdir -p "$WORK/reader" && cd "$WORK/reader"
+git init -q -b main
+git config user.name "Test Runner"
+git config user.email "runner@example.com"
+HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1
+git add -A && git commit -q -m "chore: install goblin-stack"
+printf '  # the reader-own edit §5 step 3 leaves behind\n' >> .goblin/goblin.yaml
+run_replay "$WORK/replay.1" >/dev/null 2>&1
+grep -q 'the reader-own edit' .goblin/goblin.yaml
+check "the guide's REPLAY exercise leaves the reader's own uncommitted edit in place" "$?"
+
+if [ "$fail" -eq 0 ]; then note "t-doc-guide: PASS"; else note "t-doc-guide: FAIL"; fi
+exit "$fail"

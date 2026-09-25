@@ -3,7 +3,7 @@
 A step-by-step guide for your first week. **Read this before the README.** The README tells you
 what the pieces are; this tells you what to *do*, in order, and what you should see when it works.
 
-Version: `0.4.2` · Last measured: 2026-09-25 · Every command and every output below was run on a
+Version: `0.4.3` · Last measured: 2026-09-25 · Every command and every output below was run on a
 real repository while writing this guide.
 
 ---
@@ -42,7 +42,9 @@ goblin-stack is **a folder of files you copy into a project**. Once copied, thre
   rules turning into decoration.
 
 It is not a framework, not a service, and not a runtime. It has no server and no dependencies
-beyond `bash`, `git`, `awk`, `sed`, `grep` and `python3`. It adds no network calls.
+beyond `bash`, `git`, `awk`, `sed`, `grep` and `python3`. It makes **no network call at verify
+time** — the one command in the toolbox that reaches the network is `goblin-audit`, which you run
+deliberately, and §8 and §11 say why.
 
 ### The one idea worth holding onto
 
@@ -100,7 +102,10 @@ Expected output (this is a real transcript, trimmed):
       3. edit .goblin/goblin.yaml: replace the default gate with your real commands (P8 step 3)
       4. hermes skills trust /tmp/gs-try   # one-time, so the project-tier skills load
 
-**`created 49`** means it wrote 49 files. It has written nothing outside this directory.
+**`created 49`** is the installer's count of the files it **tracks** — the 40 in its `files` map,
+the 8 it `owns`, and `.gitignore`. It writes **50**: the 50th is `.goblin/installed.json`, the
+record it keeps for itself, which it writes but does not count. It has written nothing outside this
+directory.
 
 ### Why `git init -b main` matters
 
@@ -287,13 +292,29 @@ honest entry, and the harness treats it as one.
 
 > **Prove it was broken first.**
 
-Before you trust a check, break the thing it checks and watch it go red:
+Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes every file the
+installer wrote, so editing one of them drifts it.
 
-    # the fix is in. now undo it, and confirm the check notices
-    git stash
-    .goblin/bin/goblin-verify --only GT-02     # expect FAIL
-    git stash pop
-    .goblin/bin/goblin-verify --only GT-02     # expect PASS
+    # REPLAY-BEGIN (this exact block is run by tests/t-doc-guide.sh - keep the two copies identical)
+    .goblin/bin/goblin-verify --only IN-02                 # expect PASS
+    printf '\n<!-- a deliberate edit -->\n' >> .goblin/bans/README.md
+    .goblin/bin/goblin-verify --only IN-02                 # expect FAIL
+    git stash push -- .goblin/bans/README.md               # path-limited: your own edits stay put
+    .goblin/bin/goblin-verify --only IN-02                 # expect PASS
+    git stash drop                                         # the break was deliberate: discard it
+    # REPLAY-END
+
+Read the direction: the edit makes the check go **red**, and putting the file back makes it green.
+That is the whole habit — the change you *undo* is a deliberate break, not a fix, because `IN-02`
+measures the shipped files rather than your work.
+
+`GT-02` is the row most readers reach for first, and it will **not** work as a REPLAY demo on the
+shipped configuration: it runs the gates you declared (`commit`, `todo_ceiling`), and stashing a
+local change does not change either command's exit status — so it prints `PASS` before and after,
+which is exactly the "green on both trees" result this rule exists to kill. REPLAY a gate of your
+own the same way, once that gate is real: declare it in `.goblin/goblin.yaml` and stash a change it
+can see.
 
 A check that is green on **both** the broken and the fixed tree proves nothing — it would have been
 green anyway. goblin-stack calls this the **REPLAY** rule, and it is the single practice that has
@@ -518,10 +539,15 @@ with *"prove it was broken first"* — it is the one practice that survives cont
     # 3. make it yours
     $EDITOR .goblin/goblin.yaml     # branch, owner_email, and YOUR real gates:
 
-    # 4. prove a check can fail (the habit that matters)
-    .goblin/bin/goblin-verify --only GT-02                   # expect PASS
-    git stash && .goblin/bin/goblin-verify --only GT-02      # expect FAIL
-    git stash pop
+    # 4. prove a check can fail (the habit that matters) - the same block §7 runs
+    # REPLAY-BEGIN (this exact block is run by tests/t-doc-guide.sh - keep the two copies identical)
+    .goblin/bin/goblin-verify --only IN-02                 # expect PASS
+    printf '\n<!-- a deliberate edit -->\n' >> .goblin/bans/README.md
+    .goblin/bin/goblin-verify --only IN-02                 # expect FAIL
+    git stash push -- .goblin/bans/README.md               # path-limited: your own edits stay put
+    .goblin/bin/goblin-verify --only IN-02                 # expect PASS
+    git stash drop                                         # the break was deliberate: discard it
+    # REPLAY-END
 
     # 5. do it for real, in a repo you care about
     cd ~/projects/your-project
