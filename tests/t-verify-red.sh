@@ -468,7 +468,8 @@ m_bn_09()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-09]/' .gobli
 # halves (the exempt path's PASS and the inline marker's PASS both come back rc 1, because the
 # escape did nothing there) while the three `expect_red` halves report ok, the row they drive
 # being red for the old reason. This comment claimed "every one of them is RED on the pre-fix
-# tree" without that distinction (Z2-4); CHANGELOG.md 0.4.1 states which sense it means.
+# tree" without that distinction (Z2-4); the CHANGELOG's corrected sentence - in the 0.4.0 entry,
+# corrected by 0.4.1 - says which sense it means.
 m_bn_01_exempt()      { m_bn_01; awk '{ if ($0 ~ /^bans_exempt:/) { print; print "  - BN-01 src"; next } print }' .goblin/goblin.yaml > .goblin/goblin.yaml.n && mv .goblin/goblin.yaml.n .goblin/goblin.yaml; }
 # The other direction: the exception names a DIFFERENT path, so the same violation still counts.
 # Without this half, an engine that exempted everything would pass the control above.
