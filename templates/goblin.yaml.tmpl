@@ -77,10 +77,12 @@ verify_doctor: {{VERIFY_DOCTOR}}
 loop_max_turns_ceiling: {{LOOP_MAX_TURNS}}
 
 # The gate set. DECLARED, never inferred from the stack. Replace the default below with the
-# real commands for this project; each must exit 0.
+# real commands for this project; each must exit 0. The whole block is rendered by one
+# placeholder (a class may declare a second gate - A's TODO ceiling), so a second, empty
+# placeholder line below it leaked an unsubstituted token into every class's installed config
+# and nothing rendered it (Z1-3).
 gates:
 {{GATES}}
-{{GATE2}}
 
 # A count that must not rise, with its ceiling. The ceiling was measured at install time.
 ratchet:

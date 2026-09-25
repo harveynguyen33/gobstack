@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-tests.sh — every source-scope rule (PR-01..PR-04) plus the test scripts.
+# run-tests.sh — every source-scope rule (PR-01..PR-05) plus the test scripts.
 # Exits non-zero on any failure and prints one line per test.
 #
 #   bash tests/run-tests.sh
@@ -8,13 +8,19 @@
 # PR-02  a second install is a no-op                     -> t-install-idempotent.sh
 # PR-03  every target-scope check goes RED under its own violation -> t-verify-red.sh
 # PR-04  the repo is portable: no personal path in a reusable rule -> the PT-01 body below
+# PR-05  the automation producer is silent when there is nothing to report -> t-automation-silent.sh
+#
+# (This line listed PR-01..PR-04 until Z1-8 while the matrix carried five source rows and the
+# suite below did run t-automation-silent.sh - off by one in the conservative direction, in the
+# file that pins counts. The fifth row is PR-05, enforcement.tsv:84.)
 #
 # The installer's own contract (a refusal exits 1, a file it did not create is never
 # overwritten) is t-install-refusal.sh. The verifier's refusal to read an enclosing repo
 # (F2-1) is t-verify-nested.sh; `--uninstall`'s directory cleanup (F2-7) is t-uninstall.sh;
 # the documents that claim to render the matrix (F2-3, F2-4, F2-8, F2-9) are
 # t-doc-sync.sh; and the practice pin's explicit re-pin path (F4-followup) is
-# t-practice-repin.sh.
+# t-practice-repin.sh. Z1-3's "a rendered install carries no unsubstituted {{...}} token"
+# is t-render-tokens.sh.
 
 set -uo pipefail
 
@@ -71,7 +77,10 @@ else
 fi
 
 # ---- the manifest's own integrity -------------------------------------------
-if awk -F'\t' 'NR>1 && ($6=="" || ($6=="advisory" && $4!="advisory")) {n++} END{exit n>0}' manifest/enforcement.tsv; then
+# IN-03's body, run over the SOURCE manifest (the installed copy is the same file). It carries
+# the same three clauses as the row's own check cell: a row with no check must be labelled
+# advisory, and `enforced_by` must stay inside the closed enum (Z1-5).
+if awk -F'\t' 'NR>1 && ($6=="" || ($6=="advisory" && $4!="advisory") || $4 !~ /^(script|lint|gate|advisory|test)$/) {n++} END{exit n>0}' manifest/enforcement.tsv; then
   line "IN-03 manifest self-check" "ok"
 else
   line "IN-03 manifest self-check" "FAIL"; FAIL=1
@@ -79,7 +88,8 @@ fi
 
 # ---- the test scripts --------------------------------------------------------
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
-         t-verify-nested t-uninstall t-doc-sync t-practice-repin t-automation-silent t-audit; do
+         t-verify-nested t-uninstall t-doc-sync t-practice-repin t-automation-silent t-audit \
+         t-render-tokens; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi
