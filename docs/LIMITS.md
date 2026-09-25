@@ -105,6 +105,15 @@ deliberate trade or an unfilled gap.
     host without it the row FAILS with the reason rather than assuming the record is fresh.
 25. **`SC-04` reads one statement, not one program.** A cookie write spread over three lines (or
     assembled through a helper) is not seen, and the row says so in its own cell.
+26. **The last advisory slot is an open decision, not a rule.** Measured (V1): the advisory rows
+    are `HP-04`, `HS-03`, `CM-02`, `MD-02`, `MD-03`, `PG-04`, `DOC-01`, `DOC-02`, `SC-09` — 9 at a
+    ceiling of 10 — so **exactly one slot is free**, and `SK-03` reports that arithmetic on every
+    run (`advisory 9 of ceiling 10 (1 free slot)`). Two planned cards each wanted the slot: G1's
+    `FM-03` (the feature map) and G2's `JG-03` (the judge agent). **Nothing in this repo chooses
+    between them**, and V1 deliberately spent nothing. The cap is a count, not a strict bound:
+    measured, 10 advisory rows at a ceiling of 10 **pass**, and the 11th FAILs (10 at a ceiling
+    of 9 FAILs). So the tenth row is allowed; the eleventh is not. Whoever lands second brings a
+    real command.
 
 ## What the harness refuses to do
 

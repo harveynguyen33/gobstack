@@ -95,8 +95,22 @@ report their state.
 - **DOC-02** (no check at all) - System-level changes are recorded in the vault via the pkm profile.
 
 `advisory_ceiling` (default 10) caps that count: **SK-03 fails the run when the advisory
-count exceeds it.** The number of unenforceable rules is itself a gate. Measured now:
-`advisory 8 of ceiling 10`.
+count exceeds it.** The number of unenforceable rules is itself a gate. Measured at `43f7f69`:
+`advisory 9 of ceiling 10`.
+
+**The budget, stated so the next rule author does not have to work it out (V1/G8-5).** The
+count is 9 of a ceiling of 10, so **exactly one advisory slot is free**, and the row that
+takes it must arrive with a real command. `SK-03` now prints the arithmetic on every run
+(`advisory 9 of ceiling 10 (1 free slot)`; at the cap, `0 free slots: the next advisory row
+FAILs`), and a ceiling that is not a number is a FAIL rather than a silent ADVISORY.
+
+Two planned rows each wanted that slot - **`FM-03`** (G1, the feature map) and **`JG-03`**
+(G2, the judge agent) - and **nothing at HEAD decides which of them gets it**. That decision
+is still open and is recorded in `docs/LIMITS.md` (V1). Whichever card lands second must bring
+a real command, or the suite goes RED; the other is the one that spends the slot.
+
+`SK-03`'s count is the count the run itself uses: a row is advisory if its `check` cell says so
+OR its `enforced_by` cell does.
 
 ## The class matrix
 

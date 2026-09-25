@@ -1007,12 +1007,29 @@ check_sk_02() {
 }
 
 check_sk_03() {
-  local k
+  local k free plural
+  # A malformed ceiling is a FAIL, not an advisory: `[ n -le ten ]` returns 2, and the runner
+  # reads 2 as ADV, so a broken cap used to disappear into the advisory count instead of
+  # stopping the run (V1/G8-5).
+  case "$ADV_CEILING" in
+    ''|*[!0-9]*) printf 'advisory_ceiling is not a number: %s\n' "${ADV_CEILING:-<empty>}"; return 1 ;;
+  esac
   # Count what the run counts: a row is advisory if its check column says so OR its enforced_by
   # does (MD-02 is advisory-labelled but its check column holds a builtin marker). Counting only
   # the literal column printed 7 while the summary printed 8 (D13).
   k=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "$MANIFEST")
-  printf 'advisory %d of ceiling %d\n' "$k" "$ADV_CEILING"
+  # The REMAINING BUDGET is reported, not implied: the ceiling is the one scarce resource a rule
+  # author spends, and two cards (G1's FM-03, G2's JG-03) each wanted the last slot. A count with
+  # no arithmetic leaves the next author to work it out (G8-5).
+  free=$((ADV_CEILING - k))
+  plural=""; [ "$free" -eq 1 ] || plural="s"
+  if [ "$free" -gt 0 ]; then
+    printf 'advisory %d of ceiling %d (%d free slot%s)\n' "$k" "$ADV_CEILING" "$free" "$plural"
+  elif [ "$free" -eq 0 ]; then
+    printf 'advisory %d of ceiling %d (0 free slots: the next advisory row FAILs)\n' "$k" "$ADV_CEILING"
+  else
+    printf 'advisory %d of ceiling %d (over by %d: this FAILs)\n' "$k" "$ADV_CEILING" "$((-free))"
+  fi
   [ "$k" -le "$ADV_CEILING" ]
 }
 

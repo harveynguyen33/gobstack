@@ -3,10 +3,10 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One `expect_red` per target-scope row: 61 controls over the 57 target rows (42 at v0.1 plus the
+# One `expect_red` per target-scope row: 62 controls over the 57 target rows (42 at v0.1 plus the
 # five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01), the
-# three F4/G4 extras and the G8-2 extra added in V1 included. The `--only <id>` form is used so a
-# mutation in one row cannot be masked by another row failing first.
+# three F4/G4 extras and the two V1 extras (G8-2, G8-5) included. The `--only <id>` form is used
+# so a mutation in one row cannot be masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
 # rows whose bodies F4 rewrote, so beyond the one `expect_red` each already had, four more controls
@@ -259,6 +259,9 @@ m_pf_01()  { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e 's/^  bas
 m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
 m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 7/' .goblin/goblin.yaml; }
+# V1/G8-5: a ceiling that is not a number made `[ n -le ten ]` return 2, and the runner reads 2
+# as ADV - so the cap silently stopped capping and the run still exited 0. It is a FAIL now.
+m_adv_ceiling_bad() { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: ten/' .goblin/goblin.yaml; }
 
 # ---- the automation rows (G3): AU-01..AU-04, SK-04 -------------------------------------------
 # These five rows are NEW, so there is no pre-change tree for their controls: what the control
@@ -365,6 +368,7 @@ expect_red "DOC-02 (advisory row: wired, not biting)" DOC-02 1 m_doc_02
 expect_red "a skill with no frontmatter"           SK-01 1 m_skill_frontmatter
 expect_red "an edited installed skill"             SK-02 1 m_skill_drift
 expect_red "the advisory cap evaded by a builtin"  SK-03 1 m_adv_ceiling
+expect_red "an advisory ceiling that is not a number" SK-03 1 m_adv_ceiling_bad
 expect_red "a shipped skill with no cannot-see section" SK-04 1 m_sk_04
 
 expect_red "a tenant string in an installed rule"  PT-01 1 m_tenant_leak
@@ -388,6 +392,25 @@ expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
 
 expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip
+
+# ---- V1/G8-5: the advisory budget is reported, not left to arithmetic --------------------------
+# The ceiling is the one scarce resource a rule author spends, and two cards (G1's FM-03, G2's
+# JG-03) each wanted that last slot: nothing at HEAD decided which, and SK-03 printed the COUNT
+# with no remaining budget, so the author had to work the arithmetic out. Both statements below
+# are RED against 43f7f69, where the line was `advisory 9 of ceiling 10` and nothing else -
+# measured in V1.md. The numbers come from the fixture, not from this file, so the control still
+# holds if a later card legitimately spends the slot.
+ADV_N=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' .goblin/manifest/enforcement.tsv)
+ADV_C=$(sed -n 's/^advisory_ceiling:[[:space:]]*//p' .goblin/goblin.yaml | head -n 1)
+: "${ADV_C:=10}"
+out=$(bash .goblin/bin/goblin-verify --only SK-03 2>&1)
+printf '%s' "$out" | grep -qE "advisory $ADV_N of ceiling $ADV_C \([0-9]+ free slots?\)"
+check "SK-03 reports the advisory count AND the remaining budget ($ADV_N of $ADV_C)" "$?"
+sed -i "s/^advisory_ceiling: .*/advisory_ceiling: $ADV_N/" .goblin/goblin.yaml
+out=$(bash .goblin/bin/goblin-verify --only SK-03 2>&1)
+printf '%s' "$out" | grep -qE "advisory $ADV_N of ceiling $ADV_N \(0 free slots: the next advisory row FAILs\)"
+check "  at the ceiling it says so, and names what the next row does" "$?"
+sed -i "s/^advisory_ceiling: .*/advisory_ceiling: $ADV_C/" .goblin/goblin.yaml
 
 # ---- F2-6: --only must refuse a selection that runs no target row -------------
 # A valid SOURCE-scope id selects nothing in an installed repo, so the run printed
