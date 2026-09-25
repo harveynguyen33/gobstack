@@ -59,7 +59,12 @@ if [ -z "$MD" ]; then line "MD-01 no hardcoded model name" "ok (0 hits)"; else
 fi
 
 # ---- MD-01 positive control: the pattern must still catch a real model name --
-if printf 'model: deepseek-v9-turbo\n' | grep -qE '(d[e]epseek|cl[a]ude|g[p]t-[0-9]|gr[o]k|g[e]mini|g[l]m-[0-9]|k[i]mi)[a-z0-9.:_-]*'; then
+# The slug is ASSEMBLED at run time, never written literally: a literal model name in this file
+# was one of the two repo-wide MD-01 hits G8-10 measured (the other is the control in
+# tests/t-verify-red.sh). Same fix F2-5 gave the tenant string - the control must not be the leak
+# its own rule exists to catch.
+MD_SLUG="$(printf '%s%s' 'deep' 'seek-v9-turbo')"
+if printf 'model: %s\n' "$MD_SLUG" | grep -qE '(d[e]epseek|cl[a]ude|g[p]t-[0-9]|gr[o]k|g[e]mini|g[l]m-[0-9]|k[i]mi)[a-z0-9.:_-]*'; then
   line "MD-01 positive control" "ok (a real model name is caught)"
 else
   line "MD-01 positive control" "FAIL (the pattern no longer catches anything)"; FAIL=1

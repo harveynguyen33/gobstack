@@ -218,7 +218,12 @@ m_bad_author()    { git -c user.email=someone@else.test commit -q --allow-empty 
 m_cm_02()         { m_row_fails CM-02; }
 m_dirty_tree()    { printf 'untracked\n' > newfile.txt; }
 
-m_model_leak()    { printf '\nmodel: deepseek-v9-turbo\n' >> .hermes/skills/goblin-mode/SKILL.md; }
+# The slug is assembled at run time, never written literally (G8-10 - the same fix F2-5 gave the
+# tenant string). A literal model name here was one of the two repo-wide MD-01 hits: MD-01's own
+# scope does not read tests/, so the ROW was clean, but the control was the leak its own rule
+# exists to catch, and a reviewer grepping the repo found it. The repo-wide count is 0 now.
+MD_SLUG="$(printf '%s%s' 'deep' 'seek-v9-turbo')"
+m_model_leak()    { printf '\nmodel: %s\n' "$MD_SLUG" >> .hermes/skills/goblin-mode/SKILL.md; }
 m_md_02()         { m_row_fails MD-02; }
 m_md_03()         { m_row_fails MD-03; }
 
