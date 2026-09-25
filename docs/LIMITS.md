@@ -309,11 +309,13 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     compares its model with the code lane's, so the state is loud — but it stays `advisory`
     (`return 2`, never a FAIL): goblin-stack cannot choose the fleet's models, and a repo-local file
     cannot observe *which* model a lane actually ran. Measured on this box at X1: Harvey's
-    `fleet-model.yaml` resolves **every** profile — `default`, `architect`, `reviewer`, `coder`,
-    `chef`, `homelab`, `pkm`, `news-digest`, `researcher` — to one model under an active promotion,
-    so the judge *is* the author's family here and `MD-02` says so on the ADV line. The comparison
-    is exact model equality, not a version-stripped "family": two spellings of the same family that
-    differ only in a suffix would read as different.
+    `fleet-model.yaml` names **no `judge:` profile at all**, so `MD-02` reports the judge lane
+    **unresolved** and prints the one-line remedy, while every profile it *does* name — `default`,
+    `architect`, `reviewer`, `coder`, `chef`, `homelab`, `pkm`, `news-digest`, `researcher` —
+    resolves to one model under an active promotion. So on this box the honest reading is: the judge
+    lane is not mapped, and the moment it is mapped it will be the author's own family. The
+    comparison is exact model equality, not a version-stripped "family": two spellings of the same
+    family that differ only in a suffix would read as different.
 39. **`LP-02` cannot tell a weaker predicate from a re-scope. The close-and-reopen is recorded, not
     prevented.** A loop could archive its bar under `closed-<date>/`, write a weaker one, re-pin,
     and pass `LP-02` and `LP-05` with nothing in the record (W5-7, measured). The row now requires

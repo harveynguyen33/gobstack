@@ -20,8 +20,9 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   `harness_dir` and the map's own directory are skipped, so a stub map that echoes the template
   FAILs (W5-4, `docs/LIMITS.md` #37). `MD-02` now resolves the **judge** lane and compares its model
   with the code lane's, instead of leaving the judge distinct by profile name only; it stays
-  advisory, and the measured state is recorded (#38 — on this box the promotion resolves *every*
-  profile to one model, so the judge is the author's family and the ADV line says so). `LP-02`
+  advisory, and the measured state is recorded (#38 — on this box the live mapping names **no
+  `judge:` profile at all**, so the judge lane reads unresolved, while every profile it does name
+  resolves to one model: map a judge and it is the author's family). `LP-02`
   requires a close-and-reopen to archive the predicate **and** the pin it was closed under and to
   name the archived digest on a `previous:` line, so a silent relaxation FAILs while a real re-scope
   costs one line (#39 — whether the new bar is *weaker* is not decidable from a digest). And
