@@ -8,7 +8,7 @@
 #   F2-8  docs/ROLES.md must say bin/goblin-model is checkout-only, because the installer does
 #         not install it (measured in t-uninstall.sh) and it has no enforcement.tsv row.
 #   F2-9  "A fresh install is not automatically green" is false as measured - a fresh class-A
-#         install verifies 42 passed, 0 failed, 11 advisory, 20 skipped, exit 0. The claim was
+#         install verifies 43 passed, 0 failed, 11 advisory, 24 skipped, exit 0. The claim was
 #         written in FOUR places, not three: README.md, docs/CONTRACTS.md, docs/ADOPTION.md and
 #         skills/goblin-bootstrap/SKILL.md - the last one being the copy the installer writes
 #         into every target (bin/goblin-install:357-360), so a green target shipped the claim
@@ -121,11 +121,56 @@ check "no shipped doc or skill claims a fresh install is not automatically green
 # shipped skills do not discuss a verify run and are not required to.
 GREEN_CLAIM=""
 for f in README.md docs/CONTRACTS.md docs/ADOPTION.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '42 passed, 0 failed, 11 advisory, 20 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '43 passed, 0 failed, 11 advisory, 24 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, CONTRACTS, ADOPTION and the shipped bootstrap skill state the measured green path" \
   "$([ -z "$GREEN_CLAIM" ] && echo 0 || echo 1)"
+
+# ---- W4-A: the CI lane's blind spots are stated where a run will see them --------------------
+# The lane's own finding is that a workflow file is not a gate: GitHub reports a SKIPPED job as
+# Success, and an admin can push straight past a protection rule. PROJECT-PRACTICE section 3
+# requires every claim to say what it CANNOT see, and the "cannot see" footer is the place a run
+# shows it - the V3-8 precedent, one lane over. The four settings a workflow needs to BE a gate
+# live in docs/CI.md, because a template cannot arm a check.
+awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /CI lane/) found = 1 } END { exit !found }' bin/goblin-verify
+check "the verifier's 'cannot see' footer names the CI lane (W4-A)" "$?"
+awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /required check/) found = 1 } END { exit !found }' bin/goblin-verify
+check "  and says a required check is not the same thing as a gate" "$?"
+for marker in 'required check' 'Do not allow bypassing' 'sole admin' 'skipped'; do
+  grep -qi -- "$marker" docs/CI.md
+  check "docs/CI.md states '$marker' - the settings that make a workflow a gate" "$?"
+done
+grep -q 'main_thread_busy_pct' docs/CI.md && grep -q 'app_bundle_bytes' docs/CI.md
+check "docs/CI.md carries the Electron perf deviation, both metrics named" "$?"
+
+# ---- W4-B: the class matrix is rendered from manifest/classes.tsv ----------------------------
+# The part/class table is where a reader decides what a class owes, so it is the one place a sixth
+# class can rot in silence: the row set moved to `ci-gate R/-/O/-/O/R` at W4 and
+# docs/ENFORCEMENT.md's table has to move with it. The tsv is one row per (class, part) pair -
+# `class<TAB>part<TAB>need` - and the doc renders a missing part as an em dash, so normalise.
+# docs/ADOPTION.md's matrix is prose ("SPEC before change", "Design tokens"), so it is checked for
+# its COLUMNS, not cell by cell.
+CLASS_DRIFT=""
+CLS=$(awk -F'\t' 'NR>1 { if (!seen[$2]++) print $2 }' manifest/classes.tsv)
+for part in $CLS; do
+  want=$(for c in A B C D E F; do
+           need=$(awk -F'\t' -v c="$c" -v p="$part" '$1==c && $2==p { print $3 }' manifest/classes.tsv)
+           printf '%s|' "${need:--}"
+         done | sed 's/|$//')
+  got=$(grep -m1 "^| *$part *|" docs/ENFORCEMENT.md | tr -d ' `' \
+        | awk -F'|' '{ out=""; for (i=3; i<=NF; i++) { gsub(/[ \t]/,"",$i); if ($i == "") continue; out = out "|" $i } sub(/^\|/,"",out); print out }')
+  [ "$got" = "$want" ] || CLASS_DRIFT="$CLASS_DRIFT $part(doc=$got tsv=$want)"
+done
+[ -z "$CLASS_DRIFT" ] || note "class matrix drifted from manifest/classes.tsv:$CLASS_DRIFT"
+check "docs/ENFORCEMENT.md renders the class matrix from manifest/classes.tsv (W4-B)" \
+  "$([ -z "$CLASS_DRIFT" ] && echo 0 || echo 1)"
+grep -q '^| \*\*F\. Desktop shell\*\* |' docs/ADOPTION.md
+check "docs/ADOPTION.md names the sixth class (W4-B)" "$?"
+grep -qi '^| CI lane |' docs/ADOPTION.md
+check "  and gives it a CI-lane row in the preset matrix" "$?"
+grep -q 'docs/CI.md' README.md
+check "README's document table names the CI lane (W4-B)" "$?"
 
 # ---- F2-3: the unsigned record is admitted -----------------------------------
 grep -qi 'is not signed' docs/LIMITS.md

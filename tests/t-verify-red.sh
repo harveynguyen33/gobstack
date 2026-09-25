@@ -3,13 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 93 `expect_red` call sites and 14 `expect_green` - 107 calls over
-# all 73 of the matrix's 73 target rows (the other five rows are source-scope and carry controls of
-# their own). Measured at this revision: 73 distinct ids, 0 phantom ids (every id used here is a row
-# in the matrix) and 0 target row left without a control. Three of the 73 - `DOC-01`, `DOC-02`
-# (advisory) and `JG-03` (advisory, G2) - carry no executable check at all (docs/LIMITS.md and
-# docs/RISKS.md name them and say why), so their one control replaces the row's check column with a
-# command that fails and proves the row is WIRED, not that a rule bites. This paragraph was counted
+# One control per target-scope row: 105 `expect_red` call sites and 19 `expect_green` - 124 calls over
+# all 78 of the matrix's 78 target rows (the other five rows are source-scope and carry controls of
+# their own). Measured at this revision: 78 distinct ids, 0 phantom ids (every id used here is a row
+# in the matrix) and 0 target row left without a control. Five of the 78 - `DOC-01`, `DOC-02`
+# (advisory) and `JG-03` (advisory, G2) plus `PG-04` and the other advisory rows - carry no
+# executable check at all (docs/LIMITS.md and docs/RISKS.md name them and say why), so their one
+# control replaces the row's check column with a command that fails and proves the row is WIRED,
+# not that a rule bites. This paragraph was counted
 # from the file rather than carried: it said "63 of the matrix's 65 target rows. The two it does not
 # cover are `DOC-01` and `DOC-02`" until G2, and "70 ... the three as rules" for one commit
 # - both were one count behind, because a row whose control exists was still described as uncovered.
@@ -21,10 +22,16 @@
 # FM-01/FM-02/VA-01 - four of FM-01's clauses, FM-02's two, and the failing doctor - and the
 # fourteen added with G2's JG-01..JG-03 and LP-01..LP-05 (one expectation per clause the rows
 # mechanise, plus a seeded loop record that has to PASS, which is the half of a control that
-# proves a new row is not always-red). Fourteen of the
+# proves a new row is not always-red), and the seventeen added with G6/W4's CI lane and Electron
+# class (five re-declared PG-05 shapes with the GREEN half that proves the new strictness is not
+# "any file that mentions if:", six controls for the new PG-06 row - one per clause plus the two
+# halves that prove it is not always-red and not always-green, five electron bans with the SKIP
+# control, and the second class-B part control). Nineteen of the
 # controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, two that seed a feature
-# map and require it to PASS, and seven that seed a loop record or a judge lane and require
-# `JG-01`, `JG-02` and `LP-01`..`LP-05` to PASS). The `--only <id>` form is used
+# map and require it to PASS, seven that seed a loop record or a judge lane and require
+# `JG-01`, `JG-02` and `LP-01`..`LP-05` to PASS, and five that pin a new row's non-failing half -
+# a commented-out `if:`, the installed workflow, a verbatim gate run, the no-workflow SKIP and an
+# unlisted ban). The `--only <id>` form is used
 # so a mutation in one row cannot be masked by another row failing first.
 #
 # PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
@@ -41,9 +48,10 @@
 # (`expect_red`) and m_no_date_example (`expect_green`). Neither is green on both trees - measured
 # in V1.md against 43f7f69 with this same file.
 #
-# WHAT THE ADVISORY-ROW CONTROLS DO AND DO NOT PROVE. Nine target rows are labelled
-# `advisory` by design (HP-04, HS-03, CM-02, MD-02, MD-03, PG-04, DOC-01, DOC-02, SC-09 — the
-# ninth landed with G4's guard rails; this sentence said eight until 2026-09-25): their rules
+# WHAT THE ADVISORY-ROW CONTROLS DO AND DO NOT PROVE. Ten target rows are labelled
+# `advisory` by design (HP-04, HS-03, CM-02, MD-02, MD-03, PG-04, DOC-01, DOC-02, SC-09, JG-03 —
+# the ninth landed with G4's guard rails and the tenth with G2's judge row; this sentence said
+# eight until 2026-09-25, then nine until the count was taken again at W4): their rules
 # are not mechanically checkable, so there is no violation of the *rule* to produce. Their
 # control mutates the row's check column to a command that fails, and asserts the run then
 # reports that row FAIL. That proves the row is wired into the runner and that its id is
@@ -111,6 +119,11 @@ cp -a .goblin/manifest/bans.tsv "$BK/bans.tsv"
 # PASS for every control below it.
 cp -a .goblin/roles.yaml "$BK/roles.yaml"
 cp -a "$WORK/models.yaml" "$BK/models.yaml"
+# W4: the CI lane. A class-A install now carries .github/workflows/goblin-gate.yml, and CL-01
+# requires it (ci-gate is `R` for A), so it must come back byte-for-byte after every workflow
+# mutation below - the `rm -rf .github` this used to be would have left the final full run RED on
+# a required part.
+cp -a .github "$BK/github"
 # .gitignore is mutated by m_sc_02 and must come back byte-for-byte: the fixture-green check at
 # the end of this file is what caught its absence.
 cp -a .gitignore "$BK/gitignore"
@@ -139,6 +152,7 @@ restore_all() {
   rm -rf .goblin/loop
   rm -rf reports
   rm -rf .github
+  cp -a "$BK/github" .github
   rm -rf dist src app .hermes/skills/verify-fix
   git add -A >/dev/null 2>&1
   git commit -q -m "test: restore fixture" >/dev/null 2>&1 || true
@@ -276,6 +290,35 @@ m_bad_stakes()    { mkdir -p reviews; printf 'head: %s\nbase: %s\npatch-id: x\ns
 m_bad_review()    { mkdir -p reviews; printf 'head: %s\nbase: %s\npatch-id: deadbeef\nstakes: S2\nchecks-run:\n' "$(git rev-parse HEAD)" "$PRE_CHANGE" > reviews/fixture-abc1234.md; }
 m_pg_04()         { m_row_fails PG-04; }
 m_self_skip_wf()  { mkdir -p .github/workflows; printf 'jobs:\n  a:\n    steps:\n      - if: ${{ secrets.NOPE }}\n        run: echo hi\n' > .github/workflows/ci.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: self-skipping workflow" >/dev/null 2>&1; }
+# ---- W4/G6: the PG-05 hole G8 measured, and the PG-06 row that closes the other half ---------
+# The four shapes below are all PASSES on the pre-change predicate (measured - see W4.md), because
+# it counted "every step is guarded": a JOB-level condition reads as zero guarded steps, a job with
+# no step has nothing to guard, and an UNGUARDED step that decides whether the guarded gate step
+# runs makes the count 1-of-2. Each one reaches the end of the job without running the gate while
+# the required check reports Success (R5's trap, one level up).
+m_job_if_wf()     { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    if: ${{ github.event_name == '"'"'push'"'"' }}\n    steps:\n      - run: bash .goblin/bin/goblin-verify\n' > .github/workflows/jobif.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: a job-level if:" >/dev/null 2>&1; }
+m_nosteps_wf()    { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    runs-on: ubuntu-latest\n' > .github/workflows/nosteps.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: a job with no steps" >/dev/null 2>&1; }
+m_nojobs_wf()     { mkdir -p .github/workflows; printf 'name: nothing\non: push\n' > .github/workflows/nojobs.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: a workflow with no jobs" >/dev/null 2>&1; }
+m_decider_wf()    { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    steps:\n      - id: check\n        run: echo ready=true >> "$GITHUB_OUTPUT"\n      - if: steps.check.outputs.ready == '"'"'true'"'"'\n        run: bash .goblin/bin/goblin-verify\n' > .github/workflows/decider.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: an unguarded decider step" >/dev/null 2>&1; }
+# The probe is a TEXT reading and the row says so: a `#` before the step keeps the words and
+# removes the step. This is the expect_green half - it proves the new strictness is not "any file
+# that mentions if:".
+m_wf_comment_if() { sed -i '1i # the old shape, kept for reference: if: steps.check.outputs.ready == true' .github/workflows/goblin-gate.yml; }
+# PG-06, clause 1: a workflow that runs something else entirely.
+m_wf_npm_test()   { rm -f .github/workflows/goblin-gate.yml; printf 'jobs:\n  gate:\n    steps:\n      - run: npm test\n' > .github/workflows/ci.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: CI runs npm test" >/dev/null 2>&1; }
+# PG-06, clause 1: the verifier IS called, but narrowed - a subset of the declared gates is a
+# different truth about the same SHA, which is the failure mode the row exists for.
+m_wf_only()       { sed -i 's|run: bash .goblin/bin/goblin-verify$|run: bash .goblin/bin/goblin-verify --only IN-02|' .github/workflows/goblin-gate.yml; }
+# PG-06: the call is COMMENTED OUT. The words are still in the file, so a probe that reads text
+# without blanking comments first would call this a run (HS-03's rule, applied to the CI lane).
+m_wf_commented()  { sed -i 's|^\( *\)run: bash .goblin/bin/goblin-verify|\1# run: bash .goblin/bin/goblin-verify|' .github/workflows/goblin-gate.yml; }
+# PG-06, clause 2: the workflow runs each DECLARED gate command verbatim instead of the verifier.
+m_wf_verbatim()   { rm -f .github/workflows/goblin-gate.yml; { printf 'jobs:\n  gate:\n    steps:\n'; sed -n 's/^    cmd: /      - run: /p' .goblin/goblin.yaml; } > .github/workflows/ci.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: CI runs the declared gates verbatim" >/dev/null 2>&1; }
+# PG-06 is a SKIP (not a pass) when there is no workflow to compare: the HS-01 precedent.
+m_wf_none()       { rm -rf .github; git add -A >/dev/null 2>&1; git commit -q -m "test: no workflow" >/dev/null 2>&1; }
+# The do-nothing mutation, for the two expect_green controls whose point is the state the install
+# already produced (the shipped workflow passes, and PG-06 skips when there is nothing to read).
+m_wf_nothing()    { :; }
 
 m_tracked_runtime() { sed -i 's|^  - .goblin/state.json|  - README.md|' .goblin/goblin.yaml; }
 m_drop_ds_report()  { rm -f .goblin/.ds-report; }
@@ -323,6 +366,17 @@ m_bn_05()          { printf '\nlayers:\n  - src/renderer src/main\n' >> .goblin/
 # with that reason, never pass vacuously.
 m_bn_05_nolayers() { mkdir -p src/renderer; printf 'export const r = 1;\n' > src/renderer/p.ts; }
 
+# ---- W4/G6: the Electron failure surface, as bans (BN-06..BN-09) -----------------------------
+# Each mutation turns its ban ON in the config (a class-A install does not list them - the SKIP
+# control below is the other half) and writes the exact line the row exists to catch. The pattern
+# is the wrongEnough-shape: these are the keys Electron's own security checklist names, which is
+# why they are one-line rules rather than a dependency-graph run.
+m_bn_06()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-06]/' .goblin/goblin.yaml; mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
+m_bn_06_unlisted() { mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
+m_bn_07()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-07]/' .goblin/goblin.yaml; mkdir -p src; printf 'export const prefs = { contextIsolation: false };\n' > src/isolate.ts; }
+m_bn_08()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-08]/' .goblin/goblin.yaml; mkdir -p src; printf 'export const prefs = { webSecurity: false };\n' > src/webs.ts; }
+m_bn_09()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-09]/' .goblin/goblin.yaml; mkdir -p src; printf 'const v = ipcRenderer.sendSync("chan", 1);\n' > src/ipc.ts; }
+
 m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
 m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 7/' .goblin/goblin.yaml; }
@@ -365,9 +419,13 @@ bash "$SRC/bin/goblin-install" --target "$TARGET_B" --class B --models "$WORK/mo
 git add -A && git commit -q -m "chore: install goblin-stack (class B)"
 cd "$TARGET"
 m_b_tokens() { printf 'a_part_class_B_turns_off: true\n' > .goblin/tokens.yaml; }
-restore_b()  { rm -f .goblin/tokens.yaml; }
+restore_b()  { rm -f .goblin/tokens.yaml; rm -rf .github; }
+# W4: ci-gate is `-` for class B, so the workflow goblin-stack writes elsewhere must be ABSENT
+# here. CL-01 keys off the exact path, not the directory, so a class-B repo is still allowed to
+# carry CI of its own - which is why this control plants goblin-stack's own filename.
+m_b_workflow() { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    steps:\n      - run: echo hi\n' > .github/workflows/goblin-gate.yml; }
 
-# ---- the 42 target-scope rows, in manifest order ------------------------------
+# ---- the 78 target-scope rows, in manifest order ------------------------------
 expect_red "a manifest with no version"            IN-01 1 m_in_01
 expect_red "one edited byte of the standard"       IN-02 1 m_edit_practice
 expect_red "a manifest row with no check"          IN-03 3 m_blank_row
@@ -429,7 +487,22 @@ expect_red "a review naming no real SHA"           PG-01 1 m_review_no_sha
 expect_red "a review with an unknown stakes tier"  PG-02 1 m_bad_stakes
 expect_red "a review with a wrong patch-id"        PG-03 1 m_bad_review
 expect_red "PG-04 (advisory row: wired, not biting)" PG-04 1 m_pg_04
-expect_red "a self-skipping workflow"              PG-05 1 m_self_skip_wf
+# W4/G6: re-declared PG-05. The old body counted "every step is guarded", so the four shapes
+# below all PASSED it. Measured on the pre-change tree: see W4.md section 3.
+expect_red   "a self-skipping workflow (every step guarded)"   PG-05 1 m_self_skip_wf
+expect_red   "G8's hole: a JOB-level if: makes every step self-skip" PG-05 1 m_job_if_wf
+expect_red   "a job that declares no step at all"              PG-05 1 m_nosteps_wf
+expect_red   "a workflow with no jobs to run"                  PG-05 1 m_nojobs_wf
+expect_red   "the real shape: one UNGUARDED step decides whether the gate step runs" PG-05 1 m_decider_wf
+expect_green "a commented-out if: is not a conditional gate"    PG-05 m_wf_comment_if
+# W4/G6: PG-06 - the gate CI runs is the gate the project declares. One control per clause, plus
+# the SKIP half: nothing to compare is reported as a reason, never as a pass.
+expect_green "the installed workflow runs the declared gate set" PG-06 m_wf_nothing
+expect_red   "a workflow that runs npm test instead"            PG-06 1 m_wf_npm_test
+expect_red   "the verifier called with --only (a different truth for the same SHA)" PG-06 1 m_wf_only
+expect_red   "the verifier call commented out"                  PG-06 1 m_wf_commented
+expect_green "each declared gate command run verbatim"          PG-06 m_wf_verbatim
+expect_green "no workflow at all -> PG-06 skips with a reason"   PG-06 m_wf_none
 
 expect_red "a runtime_data path that is git-tracked" DS-01 1 m_tracked_runtime
 expect_red "no DS-01 snapshot to verify"           DS-02 1 m_drop_ds_report
@@ -475,6 +548,15 @@ expect_red "an import across a declared layer boundary"       BN-05 1 m_bn_05
 # BN-05 is a SKIP (not a FAIL) when no layers are declared - the HS-01 precedent: nothing to
 # read is reported as a reason, never as a pass.
 expect_green "no layers declared -> BN-05 skips with a reason"  BN-05 m_bn_05_nolayers
+# W4/G6: the Electron surface, one control per row, plus the SKIP half. A new row has no
+# pre-change tree to be RED on, so PR-03's other branch applies: the mutation is the deliberately
+# broken copy (a renderer with the key set) and the SKIP control proves the row is not
+# always-red.
+expect_red   "a renderer with nodeIntegration: true"            BN-06 1 m_bn_06
+expect_green "an unlisted electron ban skips with a reason"     BN-06 m_bn_06_unlisted
+expect_red   "a renderer with contextIsolation: false"          BN-07 1 m_bn_07
+expect_red   "a renderer with webSecurity: false"               BN-08 1 m_bn_08
+expect_red   "a synchronous IPC call in a hot path"             BN-09 1 m_bn_09
 
 # ---- G1: the feature map (FM-01, FM-02) and the generated skill's doctor (VA-01) --------------
 # P6 authors the map (skills/goblin-feature-map); FM-01 is the entry contract + index hygiene,
@@ -653,6 +735,14 @@ expect_red   "a loop that ended not-green and left no write-up"  LP-05 1 m_lp_05
 expect_red   "a write-up shorter than three lines"               LP-05 1 m_lp_05_short
 
 expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
+expect_red "a class-B repo carrying the CI lane it forbids" CL-01 1 m_b_workflow "$TARGET_B" restore_b
+# The complement, on class A: there `ci-gate` is `R`, so the SAME path being absent is the class
+# contract violated. Both controls move one file in opposite directions, which is the point of
+# keying the artifact on the path rather than on the `.github/` directory - each carries its own
+# restore, because a control that leaves the tree changed makes the next one lie.
+m_a_nowf()  { mv .github/workflows/goblin-gate.yml "$WORK/gg.bak"; }
+restore_a() { mkdir -p .github/workflows; mv "$WORK/gg.bak" .github/workflows/goblin-gate.yml; }
+expect_red "a class-A repo with the CI lane its class REQUIRES removed" CL-01 1 m_a_nowf "$TARGET" restore_a
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip
 
 # ---- V1/G8-5: the advisory budget is reported, not left to arithmetic --------------------------

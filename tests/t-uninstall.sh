@@ -35,6 +35,10 @@ check "the installer's .goblin/bin holds exactly the four shipped scripts" \
   "$([ "$(ls .goblin/bin | sort | tr '\n' ' ')" = "goblin-audit goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
 check "  so bin/goblin-model is checkout-only, as docs/ROLES.md says" \
   "$([ ! -e .goblin/bin/goblin-model ] && echo 0 || echo 1)"
+# W4/G6: the CI lane is a part now, so the fixture has to prove it was PLACED before asserting it
+# is removed - otherwise the removal check below passes on a repo that never had one.
+check "the CI lane was installed for this class" \
+  "$([ -f .github/workflows/goblin-gate.yml ] && echo 0 || echo 1)"
 git add -A && git commit -q -m "chore: install goblin-stack"
 
 DIRS_BEFORE=$(find . -path ./.git -prune -o -type d -print | wc -l | tr -d ' ')
@@ -56,6 +60,11 @@ printf '%s' "$OUT" | grep -q 'kept .goblin/audit-waiver.tsv (you edited it'
 check "  and the summary names it rather than deleting it in silence" "$?"
 check ".hermes/ is gone (every installed skill dir was emptied and removed)" \
   "$([ ! -d .hermes ] && echo 0 || echo 1)"
+# W4/G6: the CI lane's artifact is a file two levels deep, so emptying it has to take BOTH
+# `.github/workflows/` and `.github/`. The generic empty-directory check below would catch a
+# survivor, but naming it is what makes the installer's ancestor walk a stated contract.
+check "the CI lane's .github/ is gone (the one workflow emptied both levels)" \
+  "$([ ! -d .github ] && echo 0 || echo 1)"
 EMPTY=$(find . -path ./.git -prune -o -type d -empty -print)
 check "no empty directory is left behind (pre-fix: 15)" \
   "$([ -z "$EMPTY" ] && echo 0 || { printf '%s\n' "$EMPTY" | sed 's/^/      /'; echo 1; })"
