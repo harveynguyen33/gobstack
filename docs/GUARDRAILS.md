@@ -21,7 +21,9 @@ rung below must be *demonstrably unable* to see it - the reason is recorded in t
    a real command, the literal `advisory`, or `goblin-verify --only <ID>` for a multi-line body.
    Every row here obeys that, and `IN-03` fails the manifest otherwise.
 3. **`advisory_ceiling` is 10 and the count was 8.** This design spends **one** slot (`SC-09`),
-   leaving the count at **9 of 10**. Nothing else in this lane is prose dressed as a check.
+   which took the count to 9 of 10. **Corrected 2026-09-25 (AB3):** it is **10 of 10** now —
+   `JG-03` took the tenth slot in W3, and the run prints `advisory 10 of ceiling 10 (0 free
+   slots: the next advisory row FAILs)`. Nothing else in this lane is prose dressed as a check.
 
 ## T1 - secrets and the config surface (`SC-01`..`SC-04`)
 

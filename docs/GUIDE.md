@@ -293,8 +293,9 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes every file the
-installer wrote, so editing one of them drifts it.
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the **40 files it
+tracks** — not the 8 it `owns` (including `.goblin/goblin.yaml`, which §5 has you editing) and not
+`.goblin/installed.json`; edit one of the 40 — the exercise below uses `.goblin/bans/README.md`.
 
     # REPLAY-BEGIN (this exact block is run by tests/t-doc-guide.sh - keep the two copies identical)
     .goblin/bin/goblin-verify --only IN-02                 # expect PASS
@@ -497,8 +498,9 @@ Stated plainly, because a guide that oversells its tool is worse than no guide:
   No service, no daemon, no support contract.
 
 The current status, if you want the honest number: a separate review pass verified the artifact at
-**9/10**, and the point it withheld was not a missing feature — it was sentences in the record that
-a measurement contradicted. `docs/LIMITS.md` is the list of what the harness cannot see.
+**9/10** (that was 0.4.2), and the point it withheld was not a missing feature — it was sentences
+in the record that a measurement contradicted. `docs/LIMITS.md` is the list of what the harness
+cannot see.
 
 ---
 

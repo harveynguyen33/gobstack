@@ -144,13 +144,15 @@ deliberate trade or an unfilled gap.
     assembled through a helper) is not seen, and the row says so in its own cell.
 26. **The last advisory slot is an open decision, not a rule.** Measured (V1): the advisory rows
     are `HP-04`, `HS-03`, `CM-02`, `MD-02`, `MD-03`, `PG-04`, `DOC-01`, `DOC-02`, `SC-09` — 9 at a
-    ceiling of 10 — so **exactly one slot is free**, and `SK-03` reports that arithmetic on every
-    run (`advisory 9 of ceiling 10 (1 free slot)`). Two planned cards each wanted the slot: G1's
-    `FM-03` (the feature map) and G2's `JG-03` (the judge agent). **Nothing in this repo chooses
-    between them**, and V1 deliberately spent nothing. The cap is a count, not a strict bound:
-    measured, 10 advisory rows at a ceiling of 10 **pass**, and the 11th FAILs (10 at a ceiling
-    of 9 FAILs). So the tenth row is allowed; the eleventh is not. Whoever lands second brings a
-    real command.
+    ceiling of 10 — so **exactly one slot was free**, and `SK-03` reported that arithmetic at the
+    time (`advisory 9 of ceiling 10 (1 free slot)`; **corrected 2026-09-25 (AB3):** the run prints
+    `advisory 10 of ceiling 10 (0 free slots: the next advisory row FAILs)`, W3's `JG-03` having
+    taken the slot — the two notes below carry the chronology). Two planned cards each wanted the
+    slot: G1's `FM-03` (the feature map) and G2's `JG-03` (the judge agent). **Nothing in this repo
+    chooses between them**, and V1 deliberately spent nothing. The cap is a count, not a strict
+    bound: measured, 10 advisory rows at a ceiling of 10 **pass**, and the 11th FAILs (10 at a
+    ceiling of 9 FAILs). So the tenth row is allowed; the eleventh is not. Whoever lands second
+    brings a real command.
     **Decided 2026-09-25 (W2):** G1's `FM-03` does **not** take the slot. The feature map ships
     `FM-01` and `FM-02` as real commands, and the one thing they cannot check — whether the map
     lists every feature — is recorded as #30 instead of as a counted row; the slot is left free for
