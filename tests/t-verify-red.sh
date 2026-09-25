@@ -6,11 +6,13 @@
 # One control per target-scope row: 121 `expect_red` call sites and 28 `expect_green` - 149 calls over
 # all 78 of the matrix's 78 target rows (the other five rows are source-scope and carry controls of
 # their own). Measured at this revision: 78 distinct ids, 0 phantom ids (every id used here is a row
-# in the matrix) and 0 target row left without a control. Five of the 78 - `DOC-01`, `DOC-02`
-# (advisory) and `JG-03` (advisory, G2) plus `PG-04` and the other advisory rows - carry no
-# executable check at all (docs/LIMITS.md and docs/RISKS.md name them and say why), so their one
-# control replaces the row's check column with a command that fails and proves the row is WIRED,
-# not that a rule bites. This paragraph was counted
+# in the matrix) and 0 target row left without a control. Nine of the 78 - `HP-04`, `HS-03`,
+# `CM-02`, `MD-03`, `PG-04`, `DOC-01`, `DOC-02`, `SC-09` and `JG-03`, the rows whose check column is
+# literally `advisory` (docs/LIMITS.md and docs/RISKS.md name them and say why) - carry no
+# executable check at all, and ten carry the wire control below (those nine plus `MD-02`, whose
+# check column holds a real command of its own). For a row with no check of its own, its control
+# replaces the row's check column with a command that fails and proves the row is WIRED, not that a
+# rule bites. This paragraph was counted
 # from the file rather than carried: it said "63 of the matrix's 65 target rows. The two it does not
 # cover are `DOC-01` and `DOC-02`" until G2, and "70 ... the three as rules" for one commit
 # - both were one count behind, because a row whose control exists was still described as uncovered.
@@ -44,12 +46,12 @@
 # one with a real engine underneath), plus one assertion on the LINE the alignment control reports
 # (a `check`, not an `expect_*`, for the judge-lane reason below): ten call sites, eleven
 # assertions. Measured against a054289 with the pre-fix
-# `bin/goblin-verify` and `manifest/enforcement.tsv` restored and these tests kept: five of the six
-# are RED there - they are the pre-fix run's ONLY five FAILs - which is what makes them controls;
-# the sixth (`W5-12`) is a PIN, holding on both trees, because it asserts the limitation Z1 chose to
-# record rather than fix, and the GREEN half of the `HS-02` pair is the same kind of half (it proves
-# the row is not always-red, not that a fix bites). No other control in this file changes verdict
-# between the two trees.
+# `bin/goblin-verify` and `manifest/enforcement.tsv` restored and these tests kept: SIX controls are
+# RED there - `Z1-4`, `Z1-5`, `Z1-6`, `Z1-7` and `W5-11` (Z1's five) plus `Z2-2`, the
+# minified-lockfile FAIL half AA1 added - and they are the ONLY controls in this file that change
+# verdict between the two trees. (`W5-12` is a PIN, holding on both trees, because it asserts the
+# limitation Z1 chose to record rather than fix, and the GREEN half of the `HS-02` pair is the same
+# kind of half - it proves the row is not always-red, not that a fix bites.)
 # The judge-lane family comparison is two text assertions rather than `expect_*` calls, because
 # `MD-02` is advisory and exits 0 either way; its control reads the line it prints. Twenty-eight of
 # the controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, two that seed a feature
@@ -94,8 +96,10 @@
 # this file run from a copy that keeps these tests and restores `bin/goblin-verify` and
 # `manifest/enforcement.tsv` from a054289: `Z1-4` (HS-02 exit 0, wanted 1), `Z1-5` (IN-03 exit 0,
 # wanted 1), `Z1-6` (FM-02 exit 0, wanted 1), `W5-11` (the run still prints the character count) and
-# `Z1-7` (the summary prints no arithmetic line) all go RED there, and they are the ONLY five
-# controls in the file that change verdict between the two trees.
+# `Z1-7` (the summary prints no arithmetic line) all go RED there. They were the Z1-era file's ONLY
+# five FAILs; at 0.4.2 the same procedure yields SIX - these five plus `Z2-2`, whose minified-lock
+# FAIL half is RED on the 0.4.0 verifier too (168 ok, 6 FAIL, 174 assertions in all) - and those six
+# are the only controls in the file that change verdict between the two trees.
 set -uo pipefail
 
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -189,8 +193,12 @@ restore_all() {
   # exists to break.
   rm -f 'checks/z2;true;#.mjs'
   # The allowlist is mutated by m_sc_08_minified_ok (Z2-2's green half) and was backed up but never
-  # restored - a leftover entry would make the fixture's own .goblin/install-hooks.allowlist differ
-  # from the install record, i.e. an IN-02 drift in the final full run.
+  # restored. This is FIXTURE HYGIENE, not drift prevention: .goblin/install-hooks.allowlist is an
+  # `owned` file, and IN-02 hashes only the `files` map (40 entries, the allowlist not among them),
+  # so a leftover entry is not drift-checked by IN-02 at all. Measured at 0.4.2: an allowlist edited
+  # by hand still prints `IN-02 ... 40 installed files hashed | practice pin ok` at exit 0, and this
+  # file exits 0 (`t-verify-red: PASS`) with this `cp` line deleted. The restore is what keeps the
+  # fixture byte-accurate for the green check at the end of the file.
   cp -a "$BK/install-hooks.allowlist" .goblin/install-hooks.allowlist
   cp -a "$BK/assert.mjs" checks/assert.mjs
   rm -f reviews/fixture-*.md
