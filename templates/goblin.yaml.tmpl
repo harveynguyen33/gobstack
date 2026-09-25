@@ -70,6 +70,12 @@ feature_map: {{FEATURE_MAP}}
 source_root: {{SOURCE_ROOT}}
 verify_doctor: {{VERIFY_DOCTOR}}
 
+# The loop ceiling (G2, LP-03). The most turns ONE loop record may declare in its budget, so a
+# runaway loop cannot buy itself unlimited iterations. 20 is the engine's own default for a
+# kanban goal loop, measured; a ceiling that does not match the engine's default is a number
+# someone made up. It bounds one loop's turns, never how many loops exist.
+loop_max_turns_ceiling: {{LOOP_MAX_TURNS}}
+
 # The gate set. DECLARED, never inferred from the stack. Replace the default below with the
 # real commands for this project; each must exit 0.
 gates:

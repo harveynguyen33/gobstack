@@ -36,3 +36,7 @@ perf_host_gate: ""
 notes: the order is dry-run, then one profile, then verify, then apply-all.
 # The ban list this class turns on (G5). An unlisted ban SKIPs with a reason.
 bans: BN-02
+
+# The loop ceiling (G2, LP-03): the most turns ONE loop record may declare in its budget.
+# The same number for every class - a ceiling, not a per-class policy. 20 is the engine default.
+loop_max_turns_ceiling: 20

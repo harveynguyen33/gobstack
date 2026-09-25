@@ -37,9 +37,18 @@ role-investigate:
   profiles: [researcher]
   used_by: P1 (read-only half)
 
+role-judge:
+  capability: decides whether a process met its own predicate, from a command's output and a
+              pointer it can resolve, never from a report
+  profiles: [judge]
+  used_by: P10 (the exit predicate), P12 (grading), P7 at S3+ (the panel's foreman), the terminal
+           handoff gate, an automation agent's "did the fix land"
+  budget: one lane per verdict - a verdict is a decision, so this role never fans out
+
 # Role-pinned fan-out goes through the kanban, never through a bare subagent spawn:
 # delegate_task takes no model or provider parameter, so it cannot honour a role.
 # kanban_create takes both. docs/ROLES.md states this as a rule.
 fanout:
   carrier: kanban
   rule: one card per lane, each carrying the resolved provider/model, the pinned SHA, the diff and one focus
+  judge_is_not_a_panel: role-judge is a single lane; N independent verdicts is role-review-panel

@@ -240,6 +240,9 @@ REPLAY_ENV=$(preset replay_env)
 REPLAY_CMD=$(preset replay_cmd)
 RUNTIME_DATA=$(preset runtime_data)
 ADV_CEILING=$(preset advisory_ceiling); [ -n "$ADV_CEILING" ] || ADV_CEILING=10
+# The loop ceiling (G2, LP-03) is a CEILING, not a per-class policy: every class gets the same
+# one, defaulted to the engine's own DEFAULT_MAX_TURNS when a preset predates the key.
+LOOP_MAX_TURNS=$(preset loop_max_turns_ceiling); [ -n "$LOOP_MAX_TURNS" ] || LOOP_MAX_TURNS=20
 # The optional second gate (class A: the TODO ceiling). Empty for every other class.
 GATE2_NAME=$(preset gate2_name)
 GATE2_CMD=$(preset gate2_cmd)
@@ -466,6 +469,7 @@ render_config() {
     FEATURE_MAP "" \
     SOURCE_ROOT "." \
     VERIFY_DOCTOR "" \
+    LOOP_MAX_TURNS "$LOOP_MAX_TURNS" \
     GATES "$gates" \
     RATCHET_NAME "$RAT_NAME" \
     RATCHET_CMD "$RAT_CMD" \

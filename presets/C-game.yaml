@@ -32,3 +32,7 @@ perf_host_gate: "Editor run - frame time on the target device"
 notes: the Editor suite is a host gate, not a hermetic one - declare it as such and do not expect it to run in CI.
 # The ban list this class turns on (G5). An unlisted ban SKIPs with a reason.
 bans: BN-01, BN-02, BN-05
+
+# The loop ceiling (G2, LP-03): the most turns ONE loop record may declare in its budget.
+# The same number for every class - a ceiling, not a per-class policy. 20 is the engine default.
+loop_max_turns_ceiling: 20
