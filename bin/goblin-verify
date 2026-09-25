@@ -1290,7 +1290,13 @@ else
       and cannot change it); and whether .goblin/installed.json — the record every drift
       check trusts — was itself rewritten. It is not signed, so one edit to it (with the
       matching edit to the file it protects) defeats IN-02, SK-02 and HS-01 at once
-      (docs/LIMITS.md #18).
+      (docs/LIMITS.md #18). The ban lane carries the same blind spot and two of its own:
+      the ban table is a manifest file under the same unsigned record, so a defanged ban
+      passes BN-00 (docs/LIMITS.md #28); a ban probe is a TEXT probe with no AST, so a
+      `Record<string, any>` is missed and a `: any` inside a string is reported
+      (docs/LIMITS.md #27); and no check here can reach a ban IN CONTEXT — the row proves
+      the forbidden path fails mechanically, never that the ban reached the agent that
+      wrote the line.
 SEE
 fi
 

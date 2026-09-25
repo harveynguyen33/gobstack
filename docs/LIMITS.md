@@ -119,8 +119,9 @@ deliberate trade or an unfilled gap.
 
 It does not claim a green run means the work is right. `goblin-verify` asserts that the installed
 files are the files on disk, that every rule with a command still passes, and that the
-untestable remainder is counted and capped — and it prints, on every single run, the five things
-it cannot see.
+untestable remainder is counted and capped — and it prints, on every single run, what it cannot
+see: the five upstream blind spots, plus the ban lane's own (the unsigned ban table #28, the
+text-probe gap #27, and a ban that is invisible until verify runs, `V3-1`).
 
 27. **The ban probes are text probes, not ASTs.** `BN-01`, `BN-02`, `BN-03` and `BN-05` are
     `grep` over source under `bash`/`grep`/`awk` only — the dependency contract in
