@@ -303,8 +303,8 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     `tests/` or build output: a token that occurs only there still reads as resolved, and excluding
     them would be a guess about a layout goblin-stack does not know. Nor is there a frequency bound
     — a common token ("export", "main") is satisfied by the first of hundreds of files.
-38. **The judge lane's model family is reported, never enforced — and on this box it is the same
-    family.** `JG-02` proves the declared profile *names* are disjoint; W5-6 measured that a `judge`
+38. **The judge lane's model family is reported, never enforced — and on this box it is not even
+    mapped yet.** `JG-02` proves the declared profile *names* are disjoint; W5-6 measured that a
     profile mapped to the author's own model passed it. `MD-02` now resolves the judge lane and
     compares its model with the code lane's, so the state is loud — but it stays `advisory`
     (`return 2`, never a FAIL): goblin-stack cannot choose the fleet's models, and a repo-local file
@@ -325,6 +325,14 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     edited it, is not decidable from a digest, and a predicate that calls a script elsewhere is
     pinned only at its call site. The residual is the same one `LP-01` carries one file over: the
     record is evidence, not proof that the loop stopped for the right reason.
+40. **A fresh install into a repo with no commits is born RED, and X1 did not change that.** Measured
+    at X1: `goblin-install --class A` into a `git init` with zero commits, then `goblin-verify`, gives
+    `37 passed, 6 failed, 11 advisory, 24 skipped`, exit 1 — `HP-05`, `SP-02`, `GT-02`, `CM-01`,
+    `CM-03` and `PT-02` all read a HEAD that does not exist yet. The install never creates the seed
+    commit (`bin/goblin-install` writes files and stops), and it must not: a tool that commits into
+    Harvey's repo on first contact is the overreach `docs/CONTRACTS.md` rules out. Carried from W5
+    §5's `G8-9` rather than fixed here — it is a **sequencing** limit, not a hole in a row: one commit
+    clears all six, and `tests/t-verify-green.sh` seeds one before it installs.
 
 ## Verdicts recorded, not built (the note-8 questions)
 
