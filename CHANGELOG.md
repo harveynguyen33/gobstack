@@ -3,6 +3,57 @@
 One line per released version. `goblin-install --upgrade` prints the delta between the
 version recorded in a target's `.goblin/installed.json` and the source `VERSION`.
 
+## 0.4.3
+
+Five defects an independent verification of 0.4.2 measured, and all five are the same species: a
+sentence in a reader-facing artifact that a measurement contradicts. Four are prose, one is a row
+that stayed GREEN under its own violation. No row was added, moved or re-labelled — `advisory` stays
+at **10 of 10**.
+
+- **`docs/GUIDE.md`'s only hands-on REPLAY exercise was false as written (D1, the BLOCKER).** §7 and
+  the appendix both told the reader `git stash && .goblin/bin/goblin-verify --only GT-02 # expect
+  FAIL`, and `GT-02` runs the gates the config declares (`commit`, `todo_ceiling`), whose exit status
+  a stash cannot change: measured on the shipped class-A configuration, `PASS` rc 0 before, during
+  and after — the guide taught the lesson backwards. The exercise REPLAYs `IN-02` now, the row that
+  hashes the files the installer wrote: break one, watch the row go `FAIL` rc 1, put the file back,
+  watch it go `PASS` rc 0. The restore is path-limited (`git stash push -- <path>`) so it cannot
+  swallow the uncommitted `.goblin/goblin.yaml` edit step 3 leaves behind, and both copies carry the
+  same block between sentinels.
+- **`docs/GUIDE.md` had no control at all, which is how four false sentences survived in it (D1's
+  cause).** `grep -rn GUIDE tests/*.sh` was **0** hits before this release. `tests/t-doc-guide.sh`
+  now extracts the guide's own exercise and RUNS it — every `goblin-verify` line must do what its
+  `# expect PASS|FAIL` annotation promises, verdict and exit code — and re-measures the guide's own
+  numbers on a fresh class-A install (`created 49` against **50** files on disk; the day-one and
+  green-path summary lines). RED on `d5424be`.
+- **`GT-03` was GREEN under its own violation (D2).** Its freshness clause compared the gate line
+  with `$(git rev-parse --git-dir)/HEAD`, and `.git/HEAD` is rewritten by **branch operations, never
+  by a commit**: measured, its mtime was unchanged across a real commit and `--only GT-03` stayed
+  `PASS` rc 0 while the round had moved on. The clause reads HEAD's **reflog** (`.git/logs/HEAD`) now,
+  which a commit rewrites in an attached *and* a detached worktree and whatever the refs' packing
+  state; the row's `—` why-cell became the two limits that remain (a disabled reflog passes
+  vacuously, and any HEAD movement counts as staleness). `tests/t-gt03-freshness.sh` controls it in
+  both directions: RED on `d5424be`.
+- **"The four rows that do not skip" is two (D3).** `README.md` and `docs/CONTRACTS.md` both said
+  four. Measured on the class-A run the paragraph describes: `PG-05` and `PG-06` PASS, and the four
+  electron bans named in the same breath (`BN-06`..`BN-09`) **SKIP**. Both copies say **two** now and
+  name them, and `docs/ADOPTION.md` and the shipped `skills/goblin-bootstrap/SKILL.md` no longer give
+  the bans' reason as "no `src/`" when five of those eight rows skip as *not enabled in `bans:`*.
+- **"`created 49` means it wrote 49 files" was one file short (D4).** The installer writes **50**
+  files into an empty repo: the 49 it counts (40 `files` + 8 `owned` + `.gitignore`) plus
+  `.goblin/installed.json`, the record it keeps for itself, which it writes and does not count. The
+  guide says exactly that now. The counter is unchanged — moving it would have moved every derived
+  number in every document that quotes a `created N` line.
+- **"It adds no network calls" was unscoped, and false (D5).** Every other copy of that claim is
+  scoped — `docs/GUARDRAILS.md` says "No network at **verify time**", README and `docs/CONTRACTS.md`
+  put it under "**Dependencies**", and `bin/goblin-audit`'s own header calls itself "the ONE command
+  in the toolchain that touches the network" — as does the guide itself in §8 and §11. §1, the first
+  sentence a new reader meets, now says `no network call at verify time`.
+- **`VERSION` is `0.4.3`** — `VERSION`, the five `bin/` version constants and this entry agree. The
+  seven dated `0.4.2` statements (this file's own 0.4.2 entry, `docs/LIMITS.md`'s AA1 note,
+  `docs/ENFORCEMENT.md`'s and `manifest/enforcement.tsv`'s SC-08 cells, and
+  `tests/t-verify-red.sh`'s two "measured at …" notes) describe a past revision and keep their
+  version.
+
 ## 0.4.2
 
 - **`SC-08` no longer passes vacuously on a minified lockfile (Z2-2).** `check_sc_08` read
