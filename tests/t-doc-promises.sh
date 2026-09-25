@@ -5,13 +5,25 @@
 # THE SPECIES THIS FILE EXISTS TO CLOSE. Twelve verification waves found the same defect: a claim
 # the artifact makes about itself that NOTHING reads. Each wave fixed the instance. This file is a
 # control over the CLASS, so a successor is caught by the same code that caught its predecessor:
-# it ENUMERATES its subjects from the artifact (the docs are walked, not hand-listed against) and
-# resolves each one against a measurement of the artifact itself.
+# it ENUMERATES its subjects from the artifact and resolves each one against a measurement of the
+# artifact itself.
+#
+# WHAT IT WALKS (AB6). Two sets, union, neither of them hand-typed, and the walk prints its
+# coverage - a green run that says nothing about what it did NOT read is the other half of the
+# species:
+#   * THE DOCUMENTS THE INSTALLER WRITES INTO A READER'S REPO. The write set is read from the
+#     record `goblin-install` itself writes - `.goblin/installed.json`, its `files` and `owned`
+#     maps - and cross-checked against what is on disk in the class-A install this test makes.
+#     Every `.md` in it is walked; the shipped glossary is walked for the count family. Add a
+#     markdown document to the installer and it joins this walk with no edit here. A file the
+#     record names that is not on disk, or a `.md` on disk the record does not name, is a FAIL
+#     that names it: a file the installer writes that the walk cannot classify is not a skip.
+#   * the checkout's own reader-facing docs, `README.md` and `docs/*.md`.
 #
 # ---------------------------------------------------------------------------------------------
 # (a) A COMMAND PATH THE DOCS HAND A READER
 #
-#     The extractor walks `README.md` and `docs/*.md` and takes every token whose DIRECTORY is a
+#     The extractor walks every document above and takes every token whose DIRECTORY is a
 #     COMMAND directory:
 #         `.goblin/bin/<name>`  -> must exist in a real class-A install this test makes itself
 #         `bin/<name>`          -> must exist in this checkout
@@ -40,6 +52,28 @@
 #         `reviews/<slug>-<head7>.md`, `evals/<slug>/`). Those are outputs of the reader's own
 #         work, not promises about the artifact.
 #
+# (a0) THE TOKENISER'S WRAP RULE (AB6 C2) - a promise a soft wrap split across two physical lines
+#     is REJOINED before it is read, so it is asserted like any other instead of being lost. This
+#     file used to be line-oriented: `.goblin/bin/` at the end of a line with the name on the next
+#     reported a PASS, which is a false green. Two forms are rejoined:
+#       * a command directory that ENDS a line (`.goblin/bin/`, `bin/`) takes the next line's
+#         leading token with NO separator, so `... .goblin/bin/` + `goblin-bans` reads as
+#         `.goblin/bin/goblin-bans` and is then asserted like any other path.
+#       * a count phrase whose NUMBER ends a line (`this ships 13`) takes the next line's leading
+#         token WITH a space, so `This ships 13` + `playbooks today.` reads as one sentence.
+#     A logical line that ends on a command directory with nothing after it - the promise the join
+#     could not repair - is a FAIL, never a quiet pass. That is the sensitivity the count family
+#     already had (`doc none` is a FAIL) applied to paths, and both are stated in this header.
+#
+#     STILL NOT REJOINED, named here rather than implied away:
+#       * a path broken BETWEEN its own directories (`.goblin/` + `bin/x`) or in the MIDDLE of a
+#         name (`.goblin/bin/gob` + `lin-bans`). The fragments are asserted as ordinary tokens, so
+#         a fragment that is not a shipped command still FAILs; a break that leaves both fragments
+#         resolvable is not seen as one path. Neither the checkout nor any class-A install prints
+#         such a break today.
+#       * a bare command name with no directory, and a `.goblin/`-rooted non-command path, as
+#         above. Wrap tolerance changes how a claim is READ, never which claims are in scope.
+#
 # (a2) The same walk gives the guide's own half, because the guide is the one document written FOR
 #     the reader's repo: a `manifest/<file>` token in `docs/GUIDE.md` names a file of THIS
 #     checkout, which is not where the reader's copy lives (the guide's own section 1 writes
@@ -52,7 +86,7 @@
 # ---------------------------------------------------------------------------------------------
 # (b) A SELF-COUNT A DOC STATES ABOUT THE ARTIFACT
 #
-#     Two source tables, two families of claim, both walked from the documents:
+#     Two source tables, three families of claim, all walked from the documents:
 #       * the playbook count. `manifest/playbooks.tsv` is the source (its data rows). Every
 #         `<N> playbook(s)` claim and every `<the artifact> ships <N>` claim must equal it. The
 #         second pattern is anchored on a subject - `this` or `goblin-stack` - because the same
@@ -65,6 +99,11 @@
 #         HISTORY (`advisory 9 of ceiling 10`, measured at a named revision, kept on purpose by the
 #         stale-sentence rule) and is NOT matched - the same live-vs-history split
 #         `tests/t-doc-sync.sh`'s AB3 section makes for the same file.
+#       * the census sentence (AB6 C3). `README.md` states the negative control's census as
+#         `<N> over <M> target rows`. `N` is read from the `expect_red` + `expect_green` call sites
+#         of `tests/t-verify-red.sh` and `M` from the matrix's target rows that actually carry one,
+#         with the ids themselves checked: a phantom id, or a target row with no control, is a
+#         FAIL. The sentence was true and read by nothing - the last live instance of the species.
 #
 #     RED case (B2, measured on the un-fixed tree): `docs/FLOWS.md:127` read
 #     `this ships 12 (plus the two automations below)` while the same file's line 1, its own
@@ -86,7 +125,7 @@ note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
 # ===============================================================================================
-# The installation the path half is measured against: a real class-A install, the guide's own
+# The installation every path promise is resolved against: a real class-A install, the guide's own
 # command. The reader's $HOME must not matter (throwaway HOME, as tests/t-doc-guide.sh does).
 # ===============================================================================================
 mkdir -p "$WORK/target" "$HOMEDIR"
@@ -99,38 +138,168 @@ check "the class-A install the path promises are resolved against exits 0" \
   "$([ -f .goblin/installed.json ] && echo 0 || echo 1)"
 [ -d .goblin/bin ] || note "  (no .goblin/bin in the install: $(printf '%s' "$INSTALLED" | head -1))"
 
-DOCS=$(ls "$SRC/README.md" "$SRC"/docs/*.md)
+# ===============================================================================================
+# THE SUBJECT SET (C1). Derived twice from two independent sources and required to agree: what the
+# installer RECORDED it wrote, and what is actually ON DISK in the fresh install. Nothing here is
+# typed, so adding a document to the installer adds it to the walk.
+# ===============================================================================================
+# shellcheck source=goblin-lib.sh
+. "$SRC/bin/goblin-lib.sh"
+INSTALL_JSON="$WORK/target/.goblin/installed.json"
+RECORD_MD=$( { g_installed_files "$INSTALL_JSON" | cut -f1
+               g_json_object "$INSTALL_JSON" owned | cut -f1
+             } | grep -E '\.md$' | sort -u )
+ON_DISK_MD=$( cd "$WORK/target" && find . -type f -name '*.md' | sed 's|^\./||' | sort )
+
+DRIFT=$(diff <(printf '%s' "$RECORD_MD") <(printf '%s' "$ON_DISK_MD") 2>/dev/null)
+check "the installer's record and the install on disk name the same markdown write set (C1)" \
+  "$([ -z "$DRIFT" ] && echo 0 || echo 1)"
+if [ -n "$DRIFT" ]; then
+  note "  the walk cannot classify this drift between the record and the install:"
+  printf '%s\n' "$DRIFT" | sed 's/^/        /'
+fi
+check "the installer writes at least one markdown document into the reader's repo (C1)" \
+  "$([ -n "$RECORD_MD" ] && echo 0 || echo 1)"
+
+WALK_LABEL=( "README.md" )
+WALK_PATH=( "$SRC/README.md" )
+for f in "$SRC"/docs/*.md; do
+  WALK_LABEL+=( "docs/$(basename "$f")" )
+  WALK_PATH+=( "$f" )
+done
+N_CHECKOUT=${#WALK_PATH[@]}
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  WALK_LABEL+=( "$p" )
+  WALK_PATH+=( "$WORK/target/$p" )
+done <<< "$RECORD_MD"
+N_INSTALLED=$(( ${#WALK_PATH[@]} - N_CHECKOUT ))
+
+# The count family also reads the glossary - the definition of "playbook" a reader is handed - in
+# both copies: the checkout's and the one the installer writes.
+SCAN_LABEL=( "${WALK_LABEL[@]}" "manifest/glossary.tsv" ".goblin/manifest/glossary.tsv" )
+SCAN_PATH=( "${WALK_PATH[@]}" "$SRC/manifest/glossary.tsv" "$WORK/target/.goblin/manifest/glossary.tsv" )
+
+MISSING=""
+for i in "${!SCAN_PATH[@]}"; do
+  [ -r "${SCAN_PATH[$i]}" ] || MISSING="$MISSING ${SCAN_LABEL[$i]}"
+done
+check "every document the walk names is readable (C1)" "$([ -z "$MISSING" ] && echo 0 || echo 1)"
+[ -z "$MISSING" ] || note "  unreadable:$MISSING"
+
+# The coverage statement AC5 asked for: a green run says what it read, so what it did NOT read is
+# a visible absence rather than an invisible one.
+note "coverage: ${#WALK_PATH[@]} documents walked - $N_CHECKOUT checkout doc(s) + $N_INSTALLED the installer writes into the reader's repo"
+note "          installer-written: $(printf '%s ' "${WALK_LABEL[@]:$N_CHECKOUT}")"
+note "          plus 2 glossary tables for the count family (checkout + installed)"
 
 # ===============================================================================================
-# (a) command paths: enumerate from the docs, resolve against the install / the checkout
+# The tokeniser: one logical line per claim, soft wraps rejoined (see (a0) in the header), and the
+# tokens read out of it in the same pass - one process per document, or the per-line greps cost
+# more than the install they check.
 # ===============================================================================================
-GOBLIN_BIN=$(grep -rhoE '\.goblin/bin/[A-Za-z0-9_.-]+' $DOCS | sort -u)
-# The checkout-rooted form must be taken from text with the `.goblin/bin/...` occurrences removed
-# first, or every `.goblin/bin/x` would also yield a spurious `bin/x`.
-BARE_BIN=$(grep -rhE '' $DOCS | sed -E 's|\.goblin/bin/[A-Za-z0-9_.-]+| |g' \
-           | grep -ohE '(^|[^A-Za-z0-9_./-])bin/[A-Za-z0-9_.-]+' | sed 's/^[^b]*//' | sort -u)
-
-# site_of <token> — the first `file:line` in the docs that prints it, so a FAIL names where the
-# reader meets the promise and not only the token.
-site_of() {
-  grep -rnE "(^|[^A-Za-z0-9_./-])$1([^A-Za-z0-9_.-]|$)" $DOCS 2>/dev/null | head -1 | sed "s|$SRC/||; s|:.*:.*||"
+SCAN_AWK=$(cat <<'SCAN'
+function tail(s,  t) { t = s; gsub(/[[:space:]]+$/, "", t); return t }
+function cmdpref(s,  t) {
+  t = tail(s)
+  return (t ~ "(^|[^A-Za-z0-9_./-])[.]goblin/bin/$" || t ~ "(^|[^A-Za-z0-9_./-])bin/$")
 }
-site_line() {
-  grep -rnE "(^|[^A-Za-z0-9_./-])$1([^A-Za-z0-9_.-]|$)" $DOCS 2>/dev/null | head -1 | cut -d: -f2
+function counttail(s, i,  t, nx) {
+  t = tail(s)
+  if (t ~ "(this|goblin-stack) ships [0-9]+$") return 1
+  if (t ~ "[0-9]+$") {
+    nx = L[i + 1]; sub(/^[[:space:]]+/, "", nx)
+    if (nx ~ "^playbooks?([^A-Za-z0-9_]|$)") return 1
+  }
+  return 0
 }
+function dangling(s,  t) {
+  t = s
+  gsub(/[[:space:]`"']+$/, "", t)
+  return (t ~ "(^|[^A-Za-z0-9_./-])[.]goblin/bin/$" || t ~ "(^|[^A-Za-z0-9_./-])bin/$")
+}
+function scan(text, ln,  s, m, tok) {
+  s = text
+  while (match(s, "[.]goblin/bin/[A-Za-z0-9_.-]+")) {
+    printf "%s\t%d\tTOK\t%s\n", path, ln, substr(s, RSTART, RLENGTH)
+    s = substr(s, RSTART + RLENGTH)
+  }
+  s = text
+  gsub(/[.]goblin\/bin\/[A-Za-z0-9_.-]+/, " ", s)
+  while (match(s, "(^|[^A-Za-z0-9_./-])bin/[A-Za-z0-9_.-]+")) {
+    m = substr(s, RSTART, RLENGTH); tok = m; sub(/^[^b]*/, "", tok)
+    printf "%s\t%d\tTOK\t%s\n", path, ln, tok
+    s = substr(s, RSTART + RLENGTH)
+  }
+  s = text
+  while (match(s, "[0-9]+ playbooks?")) {
+    printf "%s\t%d\tPB\t%s\n", path, ln, substr(s, RSTART, RLENGTH)
+    s = substr(s, RSTART + RLENGTH)
+  }
+  s = text
+  while (match(s, "(this|goblin-stack) ships [0-9]+")) {
+    printf "%s\t%d\tSHIP\t%s\n", path, ln, substr(s, RSTART, RLENGTH)
+    s = substr(s, RSTART + RLENGTH)
+  }
+}
+{ L[FNR] = $0 }
+END {
+  n = FNR
+  i = 1
+  while (i <= n) {
+    start = i
+    text = L[i]
+    while (i < n) {
+      if (cmdpref(text))          sep = ""
+      else if (counttail(text, i)) sep = " "
+      else break
+      i++
+      nx = L[i]; sub(/^[[:space:]]+/, "", nx)
+      text = text sep nx
+    }
+    if (dangling(text)) printf "%s\t%d\tDANGLE\t%s\n", path, start, tail(text)
+    scan(text, start)
+    i++
+  }
+}
+SCAN
+)
 
-for p in $GOBLIN_BIN; do
-  if [ -e "$p" ]; then
-    note "ok   the docs hand the reader '$p' and a real class-A install ships it"
-  else
-    note "FAIL $(site_of "$p"):$(site_line "$p") hands the reader '$p' - a real class-A install does NOT ship it"
-    fail=1
-  fi
+RECORDS=$(for idx in "${!SCAN_PATH[@]}"; do
+            awk -v path="${SCAN_LABEL[$idx]}" "$SCAN_AWK" "${SCAN_PATH[$idx]}"
+          done)
+
+DANGLE=$(printf '%s\n' "$RECORDS" | awk -F'\t' '$3=="DANGLE" { printf "%s:%s ", $1, $2 }')
+TOKENS=$(printf '%s\n' "$RECORDS" | awk -F'\t' '$3=="TOK" { print $4"|"$1"|"$2 }' \
+         | awk -F'|' '!seen[$1]++')
+
+# ===============================================================================================
+# (a) command paths: each distinct token resolved against the install / the checkout
+# ===============================================================================================
+for rec in $TOKENS; do
+  tok=${rec%%|*}; rest=${rec#*|}; label=${rest%%|*}; ln=${rest##*|}
+  case "$tok" in
+    .goblin/bin/*)
+      if [ -e "$tok" ]; then
+        note "ok   $label:$ln hands the reader '$tok' and a real class-A install ships it"
+      else
+        note "FAIL $label:$ln hands the reader '$tok' - a real class-A install does NOT ship it"
+        fail=1
+      fi ;;
+    bin/*)
+      if [ -e "$SRC/$tok" ]; then
+        note "ok   $label:$ln hands the reader '$tok' and this checkout ships it"
+      else
+        note "FAIL $label:$ln hands the reader '$tok' - this checkout does NOT ship it"
+        fail=1
+      fi ;;
+  esac
 done
-for p in $BARE_BIN; do
-  check "the docs hand the reader '$p' and this checkout ships it" \
-    "$([ -e "$SRC/$p" ] && echo 0 || echo 1)"
-done
+check "the walk hands the reader at least one command path at all (C1 - an empty walk is a FAIL)" \
+  "$([ -n "$TOKENS" ] && echo 0 || echo 1)"
+check "no walked document leaves a command directory dangling - an unreadable path is a FAIL (C2)" \
+  "$([ -z "$DANGLE" ] && echo 0 || echo 1)"
+[ -z "$DANGLE" ] || note "  a path whose name the tokeniser could not read:$DANGLE"
 
 # ===============================================================================================
 # (a2) the guide's own data paths: a bare `manifest/<file>` in the reader's front door
@@ -146,38 +315,20 @@ else
 fi
 
 # ===============================================================================================
-# (b) self-counts
+# (b) self-counts. (b0) the playbook count, (b2) the artifact's own subject line - both walked
+# from the documents above - and (b3) the matrix's shape, which lives in prose.
 # ===============================================================================================
 PB_SRC="$SRC/manifest/playbooks.tsv"
 ENF_SRC="$SRC/manifest/enforcement.tsv"
 PLAYBOOKS=$(awk -F'\t' 'NR>1 && NF>1 {n++} END{print n+0}' "$PB_SRC")
 
-# The documents walked for a count claim: every doc, plus the shipped glossary, which defines
-# "playbook" for a reader and carried the same stale number as the flow catalogue.
-COUNT_DOCS=$(ls "$SRC/README.md" "$SRC"/docs/*.md "$SRC"/manifest/glossary.tsv)
-
-# ---- (b1) the playbook count -------------------------------------------------------------------
-BAD_PB=""
-for f in $COUNT_DOCS; do
-  while IFS=: read -r ln token; do
-    [ -z "${token:-}" ] && continue
-    n=$(printf '%s' "$token" | grep -oE '^[0-9]+')
-    [ "$n" = "$PLAYBOOKS" ] || BAD_PB="$BAD_PB ${f#"$SRC"/}:$ln=$n"
-  done < <(grep -noE '[0-9]+ playbooks?' "$f")
-done
+BAD_PB=$(printf '%s\n' "$RECORDS" \
+         | awk -F'\t' -v want="$PLAYBOOKS" '$3=="PB" { split($4, a, " "); if (a[1] != want) printf " %s:%s=%s", $1, $2, a[1] }')
+BAD_SHIP=$(printf '%s\n' "$RECORDS" \
+         | awk -F'\t' -v want="$PLAYBOOKS" '$3=="SHIP" { split($4, a, " "); if (a[3] != want) printf " %s:%s=%s", $1, $2, a[3] }')
 check "every stated playbook count equals manifest/playbooks.tsv ($PLAYBOOKS data rows)" \
   "$([ -z "$BAD_PB" ] && echo 0 || echo 1)"
 [ -z "$BAD_PB" ] || note "  disagrees:$BAD_PB"
-
-# ---- (b2) the artifact's own subject line, `this ships N` / `goblin-stack ships N` ---------------
-BAD_SHIP=""
-for f in $COUNT_DOCS; do
-  while IFS=: read -r ln token; do
-    [ -z "${token:-}" ] && continue
-    n=$(printf '%s' "$token" | grep -oE '[0-9]+$')
-    [ "$n" = "$PLAYBOOKS" ] || BAD_SHIP="$BAD_SHIP ${f#"$SRC"/}:$ln=$n"
-  done < <(grep -noE '(this|goblin-stack) ships [0-9]+' "$f")
-done
 check "every 'this ships N' / 'goblin-stack ships N' equals the playbook count ($PLAYBOOKS)" \
   "$([ -z "$BAD_SHIP" ] && echo 0 || echo 1)"
 [ -z "$BAD_SHIP" ] || note "  disagrees:$BAD_SHIP  (pstack is the predecessor project; its count is not this artifact's and is not read here)"
@@ -218,6 +369,38 @@ check "  and states it against a row count that is the table's (doc ${a_second:-
   "$([ -n "$a_second" ] && { [ "$a_second" = "$m_target" ] || [ "$a_second" = "$m_total" ]; } && echo 0 || echo 1)"
 check "  and the 'carry no executable check' count equals the table's literal-advisory rows (doc ${a_lit:-none} vs table $m_litadv)" \
   "$([ -n "$a_lit" ] && [ "$a_lit" = "$m_litadv" ] && echo 0 || echo 1)"
+
+# ---- (b4) the census sentence in README.md (AB6 C3) -------------------------------------------
+# `<N> over <M> target rows`: N is the number of controls the negative control carries, M the
+# number of the matrix's target rows that carry one. Both are read, never typed.
+VERIFY_SH="$SRC/tests/t-verify-red.sh"
+c_sites=$(grep -vE '^[[:space:]]*#' "$VERIFY_SH" \
+          | grep -oE '\bexpect_(red|green)[[:space:]]+"[^"]*"[[:space:]]+[A-Z]{2,3}-[0-9]{2}')
+c_red=$(printf '%s\n' "$c_sites" | grep -c expect_red)
+c_green=$(printf '%s\n' "$c_sites" | grep -c expect_green)
+c_calls=$(( c_red + c_green ))
+c_ids=$(printf '%s\n' "$c_sites" | grep -oE '[A-Z]{2,3}-[0-9]{2}$' | sort -u)
+c_nids=$(printf '%s\n' "$c_ids" | grep -c .)
+c_phantom=$(comm -23 <(printf '%s\n' "$c_ids") \
+              <(awk -F'\t' 'NR>1 && NF>1 {print $1}' "$ENF_SRC" | grep -oE '[A-Z]{2,3}-[0-9]{2}' | sort -u) \
+            | tr -d '[:space:]')
+c_nocontrol=$(comm -13 <(printf '%s\n' "$c_ids") \
+              <(awk -F'\t' 'NR>1 && $2=="target" {print $1}' "$ENF_SRC" | grep -oE '[A-Z]{2,3}-[0-9]{2}' | sort -u) \
+              | tr -d '[:space:]')
+
+c_line=$(grep -m1 -nE '[0-9]+ over [0-9]+ target rows' "$SRC/README.md")
+c_where=${c_line%%:*}
+c_text=${c_line#*:}
+c_doc_calls=$(printf '%s' "$c_text" | grep -oE '[0-9]+ over' | grep -oE '[0-9]+')
+c_doc_rows=$(printf '%s' "$c_text" | grep -oE 'over [0-9]+' | grep -oE '[0-9]+')
+check "README.md:$c_where states the census count its own sources give (doc ${c_doc_calls:-none} vs $c_calls = $c_red expect_red + $c_green expect_green)" \
+  "$([ -n "$c_doc_calls" ] && [ "$c_doc_calls" = "$c_calls" ] && echo 0 || echo 1)"
+check "  and states it over the matrix's target rows that carry a control (doc ${c_doc_rows:-none} vs $c_nids distinct control ids)" \
+  "$([ -n "$c_doc_rows" ] && [ "$c_doc_rows" = "$c_nids" ] && echo 0 || echo 1)"
+check "  and every id the control uses is a matrix row (phantom: '${c_phantom:-0}')" \
+  "$([ -z "$c_phantom" ] && echo 0 || echo 1)"
+check "  and every target row in the matrix carries one (uncovered: '${c_nocontrol:-0}')" \
+  "$([ -z "$c_nocontrol" ] && echo 0 || echo 1)"
 
 if [ "$fail" -eq 0 ]; then note "t-doc-promises: PASS"; else note "t-doc-promises: FAIL"; fi
 exit "$fail"
