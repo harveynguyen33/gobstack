@@ -3,6 +3,41 @@
 One line per released version. `goblin-install --upgrade` prints the delta between the
 version recorded in a target's `.goblin/installed.json` and the source `VERSION`.
 
+## 0.4.4
+
+The five findings an independent verification of 0.4.3 left open (AB3). The blocker is the species
+this campaign keeps meeting: a false statement about the artifact's own enforcement, written into the
+guide **while** the wave that fixed five of the same kind was landing. No row was added, moved or
+re-labelled — `advisory` stays at **10 of 10**, and `manifest/enforcement.tsv` and
+`tests/t-verify-red.sh` are untouched, so the census cannot drift.
+
+- **`docs/GUIDE.md` §8's rule sentence was false (AB3-1, the BLOCKER).** It said `IN-02` "hashes
+  **every file the installer wrote**". Measured on a fresh class-A install: the installer writes
+  **50** files and the row's `files` map covers **40** — ten sit outside it, including
+  `.goblin/goblin.yaml`, the file §5 step 3 tells the reader to edit. Editing all ten at once still
+  printed `PASS IN-02 40 installed files hashed` rc 0, so a reader who followed §5 and then §8 would
+  watch REPLAY "confirm" a check that never moved. The sentence now names the 40, the 8 it `owns` and
+  `.goblin/installed.json`, and points the exercise at `.goblin/bans/README.md`.
+  `tests/t-doc-guide.sh` asserts the count the guide quotes equals the `files`-map length of the
+  install it made, and that the universal is gone — both RED at `58a6fe6`.
+- **The 9/10 in `docs/GUIDE.md` §11 was unversioned.** It presented a previous revision's score as
+  "the current status" in a file stamped `0.4.3`, so the next pass made it false in silence. The
+  sentence now carries the revision it was measured at (`0.4.2`, where AC1 measured 9.0), and
+  `t-doc-guide.sh` reads it — RED at `58a6fe6`.
+- **Two more live copies of the stale 9-of-10 advisory arithmetic.** `docs/GUARDRAILS.md`'s third
+  design constraint carried the count with no dating at all; `docs/LIMITS.md` #26 said `SK-03`
+  "reports that arithmetic **on every run** (`advisory 9 of ceiling 10 (1 free slot)`)" while the run
+  prints `advisory 10 of ceiling 10 (0 free slots: the next advisory row FAILs)`. Both now state the
+  measured value and date the correction, and `tests/t-doc-sync.sh` reads the two LIVE copies — RED at
+  `58a6fe6` — while the dated history (the CHANGELOG entries, `docs/ENFORCEMENT.md`'s chronology,
+  `t-verify-red.sh`'s pre-change note) keeps its own tense and is not read.
+- **`CHANGELOG.md`'s 0.4.0 census is annotated, not rewritten.** It claimed "**105** controls and
+  **19** `expect_green` — **124**", a figure that matched no tree even when it was written: 0.4.0's
+  own tree (`63d62d2`) measures **112** + **22** = **134**, and the tree at 0.4.3 measures **121** +
+  **28** = **149**. The released numbers stand and carry a dated correction beside them.
+- **`VERSION` is `0.4.4`** — `VERSION`, the five `bin/` version constants and this entry agree. No
+  logic changed in `bin/`, and no id, verdict or matrix cell moved.
+
 ## 0.4.3
 
 Five defects an independent verification of 0.4.2 measured, and all five are the same species: a
@@ -237,7 +272,10 @@ The wave proper (W1–W4) built on **0.3.0**'s ban list and added:
   ceiling 10 — full**, unchanged (both new rows are real commands, so no slot was spent);
   `tests/t-verify-red.sh` carries **105** controls and **19** `expect_green` — **124** over all 78
   target rows, 0 uncovered and 0 phantom. (Superseded 2026-09-25: this line read 78 rules / 73
-  target / 93 controls / 14 green before W4's five rows landed.)
+  target / 93 controls / 14 green before W4's five rows landed. **Corrected 2026-09-25 (AB3):** the
+  census above was wrong when it was written — 0.4.0's own tree (`63d62d2`) carries **112**
+  `expect_red` + **22** `expect_green` = **134**, not 105 + 19 = 124, and the tree at 0.4.3 measures
+  **121** + **28** = **149**. The released numbers stand as written; this is their correction.)
 - A fresh class-A install verifies **`43 passed, 0 failed, 11 advisory, 24 skipped`**, exit 0
   (twenty-four rows skip with a reason: `HS-02`, `AU-02`, `AU-03`, `SC-06`, `SC-07`, `SC-08`,
   `PF-01`, `BN-01`/`BN-02`/`BN-03`/`BN-05` plus `BN-06`..`BN-09` on a repo with no `src/`,
