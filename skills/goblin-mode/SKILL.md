@@ -58,6 +58,12 @@ model, which is exactly the review failure the panel exists to prevent. Use a bo
 lane — each carrying the resolved provider/model, the pinned SHA, the diff and one focus —
 never a subagent spawn. `docs/ROLES.md` states this as a rule.
 
+## Forbidden code
+
+`.goblin/bin/goblin-bans` runs the ban table `.goblin/manifest/bans.tsv`; the bans this repo
+turns on are named by `bans:` in `.goblin/goblin.yaml`. Run it before you write the line —
+`goblin-verify` only reports a ban once the code already exists.
+
 ## What this cannot see
 
 Whether the request was the right one to make. It routes; it does not judge intent.

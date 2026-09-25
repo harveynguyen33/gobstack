@@ -5,6 +5,10 @@ not a rule dump — the rules live in one executable place, and facts beat requi
 
 - **Rules and their checks:** `.goblin/manifest/enforcement.tsv` (one row per rule; every row
   carries a runnable check or the literal `advisory`).
+- **Forbidden code (the ban list):** `.goblin/bin/goblin-bans` runs the bans named by `bans:` in
+  `.goblin/goblin.yaml`; each ban's mechanism lives in `.goblin/manifest/bans.tsv`. Run it before
+  you write the line, not after — a ban is a gate, and `goblin-verify` only reports it once the
+  code exists.
 - **Verify:** `.goblin/bin/goblin-verify` — exit 0 pass, 1 a check failed, 2 could not run,
   3 the manifest is broken.
 - **Procedures:** the skills installed at `.hermes/skills/` (Hermes project tier — highest
