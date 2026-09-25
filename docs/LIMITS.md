@@ -139,3 +139,13 @@ it cannot see.
     rows were weakened, because `.goblin/manifest/bans.tsv` is hashed by `IN-02` and
     `.goblin/installed.json` is not signed (`docs/LIMITS.md` #18). The ban list is not
     tamper-proof; it is as strong as the record every drift check trusts.
+29. **The perf ceiling must EQUAL the recorded baseline, so a budget with headroom is not
+    expressible.** `PF-01` FAILs when `ratchet.ceiling` and `perf.baseline_value` disagree
+    (G8-6b), which is what stops a one-line ceiling raise from passing while printing the
+    contradiction. The cost is real and the row cannot see it: a project that wants the ratchet
+    to allow, say, 10% growth over the measured baseline cannot write `ceiling: 44000` beside
+    `baseline_value: 40000` — the row reads that as a disagreement. Headroom is expressed by
+    re-anchoring BOTH (measure on a pinned commit, then set `baseline_value` and `ceiling` to the
+    new number together, and record it as an operator action), which is the deliberate re-anchor
+    the row's own why-cell names. It is a bound on the budget's shape, not a claim that the
+    budget is the right one — and it still never re-measures.

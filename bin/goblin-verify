@@ -1054,6 +1054,21 @@ check_pf_01() {
     || { printf 'perf.baseline_commit does not resolve: %s\n' "$PERF_BASELINE_COMMIT"; bad=1; }
   ( cd "$ROOT" && git merge-base --is-ancestor "$PERF_BASELINE_COMMIT" HEAD 2>/dev/null ) \
     || { printf 'perf.baseline_commit is not an ancestor of HEAD: %s - the number describes a tree nobody has\n' "$PERF_BASELINE_COMMIT"; bad=1; }
+  # The cross-check G8-6b asked for: the budget and the measurement must be the SAME number.
+  # Without it a one-line `ceiling:` raise passed while the row printed `baseline_value 0 ...
+  # (ceiling 100000)` - the contradiction on its own passing line, seen by nothing. The ceiling
+  # is anchored on the recorded baseline; raising it is what "I never measured again" looks like.
+  local ceiling
+  ceiling=$(g_yaml_block_scalar "$CONFIG" ratchet ceiling)
+  case "$ceiling" in
+    ''|*[!0-9]*) printf 'ratchet.ceiling is not a number: %s\n' "${ceiling:-<empty>}"; bad=1 ;;
+    *)
+      if [ "$ceiling" != "$PERF_BASELINE_VALUE" ]; then
+        printf 'ratchet.ceiling (%s) and perf.baseline_value (%s) disagree - the budget no longer matches the measurement it was anchored on\n' \
+          "$ceiling" "$PERF_BASELINE_VALUE"
+        bad=1
+      fi ;;
+  esac
   [ "$bad" -eq 0 ] || return 1
   printf '%s = %s measured %s on %s (ceiling %s), host gate: %s\n' \
     "$PERF_METRIC" "$PERF_BASELINE_VALUE" "$PERF_MEASURED" "$PERF_BASELINE_COMMIT" \
