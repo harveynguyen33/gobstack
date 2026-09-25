@@ -3,21 +3,39 @@
 One line per released version. `goblin-install --upgrade` prints the delta between the
 version recorded in a target's `.goblin/installed.json` and the source `VERSION`.
 
-## 0.3.0
+## 0.4.0
 
-- **The ban list (G5).** `manifest/bans.tsv`, `bin/goblin-bans` and `bans/` install as
-  `.goblin/manifest/bans.tsv`, `.goblin/bin/goblin-bans` and `.goblin/bans/` — Dune rule 2 made
-  a gate: **a ban without a mechanism is a wish.** Four bans ship with a real command each
-  (`BN-01` no `any`, `BN-02` no `@ts-ignore`/`@ts-expect-error`, `BN-03` no `fetch` from a
-  component, `BN-05` no import across a declared layer boundary), plus `BN-00` (the coherence
-  row: every ban has an enforcement row, every row names a replacement, the table is not empty).
-  The config gains `bans:` (which bans this project turns on — an unlisted ban SKIPs with a
-  reason), `bans_exempt:` (narrow, explicit exceptions) and `layers:` (what `BN-05` reads).
-  Class A and C turn on `BN-01 BN-02 BN-05`; E turns on `BN-02`.
-- The ban probes are **text probes** (`grep`, no npm, no AST — `docs/CONTRACTS.md`), so G5's
-  `BN-04` (the nine named unnecessary-effect patterns) is **not shipped**: it cannot be
-  mechanised without a parser, and a ban that cannot go red is worse than advisory. Recorded in
-  `docs/LIMITS.md` #27 rather than spent as the last advisory slot. Advisory stays **9 of 10**.
+- **W5's regression is closed: the ban lane's two documented escapes now work (X1).** `bans_exempt:`
+  was a **permanent RED** after W1's V3-2 fix — the engine filtered the probe's stdout *after* the
+  probe had already chosen its exit code, so the filter was decorative and a violation inside an
+  exempted path had no remedy (measured `rc 0` at `72490f0` → `rc 1` at `7fec08f`, and
+  `grep -rn bans_exempt tests/` was **0 hits**, which is why nothing caught it). The engine now
+  exports `GOBLIN_BANS_ID` and `GOBLIN_BANS_EXEMPT` and the shipped probes filter the **file list
+  before judging**; the manifest's `escape` column is now true — `// BAN-OK(<id>): <reason>` on the
+  offending line clears that line, and a non-empty reason is required. Five controls, both
+  directions, all RED on the pre-fix tree; the residual (a project's own `detect` that ignores the
+  variables keeps the old, closed failure) is `docs/LIMITS.md` #36.
+- **W5's four half-instrumentations: closed where closable, recorded where not (X1).** `FM-02` no
+  longer resolves a token that occurs only in the harness — `.goblin/`, `.hermes/`, the declared
+  `harness_dir` and the map's own directory are skipped, so a stub map that echoes the template
+  FAILs (W5-4, `docs/LIMITS.md` #37). `MD-02` now resolves the **judge** lane and compares its model
+  with the code lane's, instead of leaving the judge distinct by profile name only; it stays
+  advisory, and the measured state is recorded (#38 — on this box the promotion resolves *every*
+  profile to one model, so the judge is the author's family and the ADV line says so). `LP-02`
+  requires a close-and-reopen to archive the predicate **and** the pin it was closed under and to
+  name the archived digest on a `previous:` line, so a silent relaxation FAILs while a real re-scope
+  costs one line (#39 — whether the new bar is *weaker* is not decidable from a digest). And
+  `PG-06`'s why-cell now says plainly that the CI lane's enforcement is the **target repo's**, not
+  goblin-stack's (#34), rather than reading as enforcement.
+- **The control census is counted, not carried.** `tests/t-verify-red.sh` now carries **112**
+  `expect_red` and **22** `expect_green` — **134** call sites over all 78 target rows, 78 distinct
+  ids, 0 uncovered, 0 phantom (W5-9 measured the header sentence one count behind at 105+19).
+- **`VERSION` is `0.4.0`.** It read `0.3.0` at `7fec08f` while the board and four build passes
+  called the wave v0.4 — this section is the entry the wave lacked, and the artifact no longer
+  calls itself a version its own build passes did not.
+
+The wave proper (W1–W4) built on **0.3.0**'s ban list and added:
+
 - **V3's four 9/10 blockers closed (W1).** `GT-01` FAILs when a declared gate carries no `cmd:` —
   deleted, blanked or re-indented — instead of silently counting the survivors (G8-3, the third
   condition of G8's own 9/10 sentence); the ban engine and the `bans:` switch are named in the
@@ -115,6 +133,31 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   hand edit. (Superseded 2026-09-25: these lines read 42/0/9/14, 37/0/8/20, 42/0/9/14, 41/0/9/15
   and 38/0/9/18 before G2's eight rows landed, and 42/0/11/20, 37/0/10/26, 42/0/11/20, 41/0/11/21
   and 38/0/11/24 before W4's five.)
+
+## 0.3.0
+
+- **The ban list (G5).** `manifest/bans.tsv`, `bin/goblin-bans` and `bans/` install as
+  `.goblin/manifest/bans.tsv`, `.goblin/bin/goblin-bans` and `.goblin/bans/` — Dune rule 2 made
+  a gate: **a ban without a mechanism is a wish.** Four bans ship with a real command each
+  (`BN-01` no `any`, `BN-02` no `@ts-ignore`/`@ts-expect-error`, `BN-03` no `fetch` from a
+  component, `BN-05` no import across a declared layer boundary), plus `BN-00` (the coherence
+  row: every ban has an enforcement row, every row names a replacement, the table is not empty).
+  The config gains `bans:` (which bans this project turns on — an unlisted ban SKIPs with a
+  reason), `bans_exempt:` (narrow, explicit exceptions) and `layers:` (what `BN-05` reads).
+  Class A and C turn on `BN-01 BN-02 BN-05`; E turns on `BN-02`.
+- The ban probes are **text probes** (`grep`, no npm, no AST — `docs/CONTRACTS.md`), so G5's
+  `BN-04` (the nine named unnecessary-effect patterns) is **not shipped**: it cannot be
+  mechanised without a parser, and a ban that cannot go red is worse than advisory. Recorded in
+  `docs/LIMITS.md` #27 rather than spent as the last advisory slot. Advisory stays **9 of 10**.
+- `manifest/enforcement.tsv` is **67 rules** (62 target, 5 source); `tests/t-verify-red.sh`
+  carries **68** controls over the 62 target rows.
+- A fresh class-A install verifies **`42 passed, 0 failed, 9 advisory, 11 skipped`**, exit 0
+  (eleven rows skip with a reason: `HS-02`, `AU-02`, `AU-03`, `SC-06`, `SC-07`, `SC-08`,
+  `PF-01`, and `BN-01`/`BN-02`/`BN-03`/`BN-05` on a repo with no `src/`). A fresh class-B install
+  (`bans: []`) verifies `37 passed, 0 failed, 8 advisory, 17 skipped` — the four BN rows SKIP with
+  "not enabled in `bans:`"; class-C verifies `42 passed, 0 failed, 9 advisory, 11 skipped`; class-E
+  (`bans: [BN-02]`) verifies `41 passed, 0 failed, 9 advisory, 12 skipped`. All measured on fresh
+  installs, committed with no hand edit.
 
 ## 0.2.0
 
