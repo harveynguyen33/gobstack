@@ -390,6 +390,24 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     agreed, and Z1 leaves it. This is the sentence Z1 added so the reason is visible in the shipped
     artifact rather than only in the wave's own notes.
 
+42. **The doc walk cannot read a path broken at the directory/name boundary.**
+    `tests/t-doc-promises.sh` reads a command directory only as `.goblin/bin/` or `bin/` **with its
+    trailing slash**; when a line ends on the bare directory (`.goblin/bin`, `bin`) and the slash
+    leads the next line (`/goblin-doctor`) or is dropped (`goblin-doctor`), the directory and its
+    continuation are both invisible — the first fragment stops before the name the grammar needs, the
+    second is not preceded by `bin/`, so neither is a token and neither is asserted. Measured
+    2026-09-26 (AB7): a plant of that form in `docs/CI.md` is reported **`PASS`, rc 0**, mentioning
+    the plant **zero** times, and a line that ends on the bare directory with nothing after it is
+    silent too, because the `dangling()` guard needs the trailing slash as well. **0 live instances**
+    — measured: `grep -rnE '\.goblin/bin$|bin/$' $(git ls-files)` → **no output, exit 1**. **What it
+    costs:** a false path written in that form — the exact defect this file's whole species is named
+    for — passes the watch silently, so a future document could hand a reader a command that does not
+    exist and nothing in the walk would say so. **Ticketed, not gated:** reading the form is a change
+    to the tokeniser inside `tests/t-doc-promises.sh`, not to a document, and it is a separate card;
+    this entry records the boundary so a green run cannot imply a coverage it does not have. The
+    control's own header now names the form as uncovered instead of claiming a sensitivity it does
+    not have, and the slash's load-bearing role is stated where the dangling rule is.
+
 ## Verdicts recorded, not built (the note-8 questions)
 
 Two library questions were investigated to a verdict and **deliberately built nothing here**, so a
