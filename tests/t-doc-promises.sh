@@ -61,16 +61,30 @@
 #         `.goblin/bin/goblin-bans` and is then asserted like any other path.
 #       * a count phrase whose NUMBER ends a line (`this ships 13`) takes the next line's leading
 #         token WITH a space, so `This ships 13` + `playbooks today.` reads as one sentence.
-#     A logical line that ends on a command directory with nothing after it - the promise the join
-#     could not repair - is a FAIL, never a quiet pass. That is the sensitivity the count family
-#     already had (`doc none` is a FAIL) applied to paths, and both are stated in this header.
+#     A logical line that ends on a command directory WITH its trailing slash (`.goblin/bin/`,
+#     `bin/`) and that the join could not repair is a FAIL, never a quiet pass. That is the
+#     sensitivity the count family already had (`doc none` is a FAIL) applied to paths, and both
+#     are stated in this header. The slash is load-bearing: the SAME directory written without it
+#     is not that promise at all - it is the unread form named under STILL NOT REJOINED, where no
+#     fragment is a token.
 #
 #     STILL NOT REJOINED, named here rather than implied away:
 #       * a path broken BETWEEN its own directories (`.goblin/` + `bin/x`) or in the MIDDLE of a
-#         name (`.goblin/bin/gob` + `lin-bans`). The fragments are asserted as ordinary tokens, so
-#         a fragment that is not a shipped command still FAILs; a break that leaves both fragments
-#         resolvable is not seen as one path. Neither the checkout nor any class-A install prints
-#         such a break today.
+#         name (`.goblin/bin/gob` + `lin-bans`). One fragment still carries a NAME, so it is
+#         asserted as an ordinary token and a fragment that is not a shipped command still FAILs -
+#         `bin/x` is read as a checkout path, `.goblin/bin/gob` as an installed one. A break that
+#         leaves both fragments resolvable is not seen as one path. Neither the checkout nor any
+#         class-A install prints such a break today.
+#       * a path broken AT its own directory/name boundary - a line that ends on the command
+#         directory WITHOUT its trailing slash (`.goblin/bin`, `bin`) with the slash leading the
+#         next line (`/x`) or dropped (`x`). This one is NOT rejoined and NOT asserted: the first
+#         fragment stops at the directory, with no NAME for the grammar to read, and the second is
+#         not preceded by `bin/`, so NEITHER is a token, both are dropped, and a false path in that
+#         form PASSes rc 0 with no mention of it. Nothing path-like after the break is no better:
+#         the line is not dangling either, because `dangling()` needs the trailing slash too, so a
+#         line ending on the bare directory is silent with or without a continuation. Measured
+#         (AB7): 0 such lines in this tree, and a plant of that form in `docs/CI.md` PASSes rc 0,
+#         plant unmentioned.
 #       * a bare command name with no directory, and a `.goblin/`-rooted non-command path, as
 #         above. Wrap tolerance changes how a claim is READ, never which claims are in scope.
 #
