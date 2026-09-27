@@ -2052,7 +2052,11 @@ check_rc_01() {
     return 1
   fi
   local n_entries; n_entries=$(printf '%s\n' "$entries" | grep -c . || true)
-  local bad=0 out_n=0 f h hit
+  local bad=0 out_n=0 f h hit mh
+  mh=$(g_sha256_file "$mf")
+  # clause 4, both halves of "the manifest is not itself shippable": the declared path must not
+  # live inside the build output, and no COPY of the manifest may sit there either - the manifest
+  # is a listing of every corpus hash, so shipping it ships the corpus's shape.
   if rc_in_build_output "$mf"; then
     printf 'the reference manifest itself sits inside the declared build output: %s\n' "${mf#"$ROOT"/}"
     bad=1
@@ -2061,6 +2065,11 @@ check_rc_01() {
     [ -n "$f" ] || continue
     out_n=$((out_n + 1))
     h=$(g_sha256_file "$f")
+    if [ "$h" = "$mh" ]; then
+      printf 'a copy of the reference manifest is in the build output: %s\n' "${f#"$ROOT"/}"
+      bad=1
+      continue
+    fi
     hit=$(printf '%s\n' "$entries" | awk -F'\t' -v h="$h" '$1 == h { print $2; exit }')
     if [ -n "$hit" ]; then
       printf 'a reference-corpus payload is in the build output: %s (entry %s)\n' "${f#"$ROOT"/}" "$hit"
@@ -2122,6 +2131,10 @@ check_rc_03() {
     n=$((n + 1))
     case "$p" in
       scripts/*|notes/*|manifests/*) continue ;;
+      # The harness's own directories and the .gitignore block it appends are the install, not the
+      # lab's content - the same exclusion FM-02 makes for the same reason (W5-4). A payload
+      # hidden there is still caught by clause 2.
+      .goblin/*|.hermes/*|.gitignore) continue ;;
     esac
     case "$p" in
       */*) bad=1; printf 'a tracked path outside the lab allowlist (scripts/, notes/, manifests/, root docs): %s\n' "$p" ;;
