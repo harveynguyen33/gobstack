@@ -23,7 +23,9 @@ extracted byte and never enters a repo.
 
 The sandbox exists and is the one the fences describe: a disposable LXC or VM, never the
 host. Confirm it before touching a binary. **Produces:** a live sandbox with a quarantine
-root and a lab repo inside it. **Enforced by:** S0 itself - no `RC-` row inspects the host.
+root. The **lab repo itself lives outside the sandbox** - it is a host repo; what sits inside
+the sandbox is the un-versioned working copy and the quarantine (no `.git` there). **Enforced
+by:** S0 itself - no `RC-` row inspects the host.
 
 ### S1 - acquire
 
@@ -36,7 +38,9 @@ APK file inside the sandbox. **Enforced by:** `RC-04`, the acquisition record.
 Verify the download against the store's published md5/sha256 **before anything else touches
 it**. **Produces:** the measured digest, written into the acquisition record with the
 target slug + version and the source store. **Enforced by:** `RC-04` - a header naming
-target + version + store + checksum, and a 64-hex token equal to the apk row's sha256.
+target slug + version + store + checksum, and a 64-hex token which, **if present**, must
+equal the apk row's sha256 (a header carrying only the md5 passes - the comparison is
+conditional in the engine).
 
 ### S3 - triage
 
@@ -69,11 +73,18 @@ not.
 ### S6 - manifest the corpus
 
 sha256 of **every** extracted payload into `manifests/*.sha256`, with a header naming
-target + version + source store + anchor, and the **apk row itself** - this is what
-`RC-04` reads, and what `RC-01`'s build-time gate consumes as `reference_manifest:`.
-**Produces:** the manifest. **Enforced by:** `RC-04` (the header + the apk row), `RC-02`
-(the `reference-manifest/1` schema so `RC-01` cannot pass vacuously - `entries` non-empty,
-`entry_count` honest, 64-hex digests, byte counts).
+target + version + source store + anchor, and the **apk row itself**. This `.sha256`
+manifest is the sha256sum-format artifact: it is what `sha256sum -c` verifies and what
+`RC-03`/`RC-04` read. It is **not** what `RC-01`/`RC-02` consume - those rows parse a
+separate `reference-manifest/1` **JSON** (`generated_from`, `reference_app`, `entries[]`,
+`entry_count`), declared via `reference_manifest:` in `.goblin/goblin.yaml`. That JSON is an
+**optional** artifact, produced only if this lab ever ships a build output that could carry
+corpus bytes; a study-only lab never ships, so none is produced here - a deliberate
+omission, not a gap. Near-duplicate manifest rows are not linted - a known limitation.
+**Produces:** the manifest. **Enforced by:** `RC-04` (the header + the apk row) and `RC-03`
+(the payload-hash clause); `RC-02` exists for the *optional* JSON (the `reference-manifest/1`
+schema so `RC-01` cannot pass vacuously - `entries` non-empty, `entry_count` honest, 64-hex
+digests, byte counts).
 
 ### S7 - dossier
 
@@ -94,9 +105,27 @@ S8 is **not** cut - it is deferred, and a future pass may pick it up with its ow
 ### S9 - retention / teardown
 
 The corpus lives only in the sandbox quarantine; the lab repo keeps scripts, notes and
-hashes only. **Delete or keep is a recorded decision** - recorded where the dossier is,
-with the date. **Enforced by:** `RC-03`, re-run after any teardown: the tracked tree must
+hashes only. **Delete or keep is a recorded decision** - recorded in the **lab repo** (a
+note under `notes/`, or the HANDOFF NEXT section), with the date. **Enforced by:** `RC-03`,
+re-run after any teardown: the tracked tree must
 still be scripts/notes/manifests/docs only, and no tracked file may hash to a manifest row.
+
+## Verifying the lab repo - the harness must be installed there first
+
+`goblin-verify` requires an **installed harness** in the repo it points at: against a bare
+lab repo it exits 2 with `not installed: <root>/.goblin/goblin.yaml is absent`. `--source`
+relocates the enforcement manifest, not the target's config requirement, so the bridge is a
+one-time install **into the lab repo itself**:
+
+    goblin-install --target <lab-repo> --class A
+
+A class-A install is sufficient and violates nothing - the lab's own files are not touched;
+it only adds the harness scaffolding: `.goblin/` (config + the verifier), `checks/`,
+`reviews/`, `.github/workflows/`, and the `HANDOFF.md` scaffolding. Note: `HANDOFF.md`'s
+placeholder commit gives `HP-05`'s one expected day-one red until a real commit is named.
+After that one-time install, `goblin-verify --only RC-03` / `RC-04` run against the lab repo
+(`RC-03`/`RC-04` need the installed harness; `RC-01`/`RC-02` additionally need a declared
+`reference_manifest:`, which a study-only lab deliberately leaves empty).
 
 ## What the `RC-` rows bite
 
@@ -127,7 +156,10 @@ still be scripts/notes/manifests/docs only, and no tracked file may hash to a ma
 
 - The corpus manifest verifies `sha256sum -c` **where the corpus lives** (in the sandbox,
   against the anchor the manifest header names).
-- `goblin-verify --only RC-01` / `RC-02` / `RC-03` / `RC-04` return the exits their rows
+- `goblin-verify` against the **lab repo needs the harness installed there first** (see
+  "Verifying the lab repo" above): one `goblin-install --target <lab-repo> --class A`, after
+  which `--only RC-03` / `RC-04` are runnable. `goblin-verify --only RC-01` / `RC-02` /
+  `RC-03` / `RC-04` return the exits their rows
   define - an exact hash inside the build output, a weak manifest and a tracked payload
   each fail the build.
 - Every negative control NC-1..NC-6 was shown RED and then restored: NC-1/NC-2 under

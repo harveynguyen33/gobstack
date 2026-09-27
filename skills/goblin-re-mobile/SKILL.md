@@ -35,6 +35,9 @@ steps:
 ## Verification
 
 - The corpus manifest verifies `sha256sum -c` where the corpus lives.
+- `goblin-verify` against the lab repo needs the harness installed there first: one
+  `goblin-install --target <lab-repo> --class A`, after which `--only RC-03` / `RC-04` run
+  (without the install, goblin-verify exits 2 `not installed`).
 - `goblin-verify --only RC-01` / `RC-02` / `RC-03` / `RC-04` return the exits their rows
   define - an exact hash inside the build output, a weak manifest and a tracked payload
   each fail the build.
