@@ -94,7 +94,7 @@ something you care about.
 
 Expected output (this is a real transcript, trimmed):
 
-    created 49 · updated 0 · unchanged 0 · skipped 0
+    created 50 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
@@ -102,8 +102,8 @@ Expected output (this is a real transcript, trimmed):
       3. edit .goblin/goblin.yaml: replace the default gate with your real commands (P8 step 3)
       4. hermes skills trust /tmp/gs-try   # one-time, so the project-tier skills load
 
-**`created 49`** is the installer's count of the files it **tracks** — the 40 in its `files` map,
-the 8 it `owns`, and `.gitignore`. It writes **50**: the 50th is `.goblin/installed.json`, the
+**`created 50`** is the installer's count of the files it **tracks** — the 41 in its `files` map,
+the 8 it `owns`, and `.gitignore`. It writes **51**: the 51st is `.goblin/installed.json`, the
 record it keeps for itself, which it writes but does not count. It has written nothing outside this
 directory.
 
@@ -293,9 +293,9 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the **40 files it
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the **41 files it
 tracks** — not the 8 it `owns` (including `.goblin/goblin.yaml`, which §5 has you editing) and not
-`.goblin/installed.json`; edit one of the 40 — the exercise below uses `.goblin/bans/README.md`.
+`.goblin/installed.json`; edit one of the 41 — the exercise below uses `.goblin/bans/README.md`.
 
     # REPLAY-BEGIN (this exact block is run by tests/t-doc-guide.sh - keep the two copies identical)
     .goblin/bin/goblin-verify --only IN-02                 # expect PASS
@@ -533,7 +533,7 @@ with *"prove it was broken first"* — it is the one practice that survives cont
     # 1. try it somewhere disposable
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
     git init -b main
-    bash "$GS/bin/goblin-install" --target . --class A      # expect: created 49
+    bash "$GS/bin/goblin-install" --target . --class A      # expect: created 50
 
     # 2. commit and check
     git add -A && git commit -m "chore: install goblin-stack"
