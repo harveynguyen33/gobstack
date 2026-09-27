@@ -2132,9 +2132,12 @@ check_rc_03() {
     case "$p" in
       scripts/*|notes/*|manifests/*) continue ;;
       # The harness's own directories and the .gitignore block it appends are the install, not the
-      # lab's content - the same exclusion FM-02 makes for the same reason (W5-4). A payload
-      # hidden there is still caught by clause 2.
-      .goblin/*|.hermes/*|.gitignore) continue ;;
+      # lab's content - the same exclusion FM-02 makes for the same reason (W5-4). That set is the
+      # one the class-A install contract creates: .goblin/, .hermes/, the .gitignore block, the
+      # declared harness_dir (checks/ by default), reviews/, and the CI scaffold .github/. A payload
+      # hidden in any of them is still caught by clause 2 (the sha256 sweep below).
+      .goblin/*|.hermes/*|.gitignore|.github/*|reviews/*) continue ;;
+      "${GOBLIN_HARNESS_REL:-checks}"/*) continue ;;
     esac
     case "$p" in
       */*) bad=1; printf 'a tracked path outside the lab allowlist (scripts/, notes/, manifests/, root docs): %s\n' "$p" ;;
