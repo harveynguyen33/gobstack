@@ -82,8 +82,8 @@ check "  and SK-02 is opt-out rather than FAIL (the pre-fix defect)" "$?"
 # LP-01..LP-05 skip, all six because no loop has run). Pin the
 # line so the next silent shift is caught here. The number is measured, not copied: see the note
 # line the run prints above.
-printf '%s' "$NS_OUT" | grep -q '39 passed, 0 failed, 11 advisory, 28 skipped'
-check "  and the --skills no numbers are pinned (V3-3: 38/0/11/24)" "$?"
+printf '%s' "$NS_OUT" | grep -q '39 passed, 0 failed, 11 advisory, 32 skipped'
+check "  and the --skills no numbers are pinned (V3-3: 39/0/11/32)" "$?"
 
 if [ "$fail" -eq 0 ]; then note "t-install-off-switch: PASS"; else note "t-install-off-switch: FAIL"; fi
 exit "$fail"

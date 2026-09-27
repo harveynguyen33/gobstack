@@ -18,9 +18,10 @@
 #   D5  §1's network claim must be scoped the way every other copy of it is (GUARDRAILS: "No
 #       network at verify time"; README/CONTRACTS: under "Dependencies").
 #   §3/§9  the guide's own reproducible numbers, re-measured here on a fresh class-A install: the
-#       `created 49` line, the day-one line (`42 passed, 1 failed, 11 advisory, 24 skipped`) and the
-#       green-path line (`43 passed, 0 failed, 11 advisory, 24 skipped`). A number no run prints is
-#       the defect this half exists to catch.
+#       `created 49` line, the day-one line (`42 passed, 1 failed, 11 advisory, 28 skipped`) and the
+#       green-path line (`43 passed, 0 failed, 11 advisory, 28 skipped`). A number no run prints is
+#       the defect this half exists to catch. The skipped count moved 24 -> 28 when the four P15
+#       rows (`RC-01`..`RC-04`) landed: on a fresh install with no declared corpus they all SKIP.
 #   AB3 §8's rule sentence names HOW MANY files `IN-02` covers, and §11 states a review score. The
 #       sentence said "hashes every file the installer wrote" - measured false (the installer writes
 #       50, the row's `files` map is 40), so the reader's counterexample file drifted nothing. The
@@ -212,14 +213,14 @@ check "  and the same paragraph now scopes it to verify time" "$?"
 
 # ---- §3/§9: the guide's own numbers, re-measured ------------------------------------------------
 DAYONE=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$DAYONE" | grep -qE '^42 passed, 1 failed, 11 advisory, 24 skipped$'
+printf '%s\n' "$DAYONE" | grep -qE '^42 passed, 1 failed, 11 advisory, 28 skipped$'
 check "the day-one run prints the shape the guide documents ($DAYONE)" "$?"
 
 HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$GREEN" | grep -qE '^43 passed, 0 failed, 11 advisory, 24 skipped$'
+printf '%s\n' "$GREEN" | grep -qE '^43 passed, 0 failed, 11 advisory, 28 skipped$'
 check "naming a real commit makes it green ($GREEN)" "$?"
 
 # EVERY summary-shaped line in the guide must be one of the two a real run printed. The loose form

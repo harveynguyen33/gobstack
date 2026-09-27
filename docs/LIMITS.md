@@ -15,7 +15,7 @@ deliberate trade or an unfilled gap.
 3. **No agent graph and no verdict-ledger daemon.** The board replaces both at a lower
    resolution: `parents` expresses ordering, not data flow, and sibling cards cannot see each
    other.
-4. **Fourteen playbooks against twenty-three.** The cuts in `docs/FLOWS.md` are deliberate and each
+4. **Fifteen playbooks against twenty-three.** The cuts in `docs/FLOWS.md` are deliberate and each
    is argued, but real coverage is lost: performance hillclimbing, pixel parity, trace
    forensics, stack landing, worktree hygiene.
 5. **No swarm or arena fan-out.** The read-versus-write axis says that is correct for this work

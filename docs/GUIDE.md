@@ -136,7 +136,7 @@ You will see one line per rule. The shape:
 
 and a summary line at the bottom:
 
-    42 passed, 1 failed, 11 advisory, 24 skipped     # the one FAIL is HP-05, below
+    42 passed, 1 failed, 11 advisory, 28 skipped     # the one FAIL is HP-05, below
 
 ### How to read that output
 
@@ -381,13 +381,13 @@ the next session.
 A class-A install lands on a specific shape. The scaffold ships one deliberate red — `HP-05`, the
 `0000000` placeholder in `HANDOFF.md` (§4) — so a literal first run prints:
 
-    42 passed, 1 failed, 11 advisory, 24 skipped     (the one FAIL is HP-05)
+    42 passed, 1 failed, 11 advisory, 28 skipped     (the one FAIL is HP-05)
 
 Name a real commit in `HANDOFF.md` and commit, and it is green:
 
-    43 passed, 0 failed, 11 advisory, 24 skipped     (on a real project; your numbers will differ)
+    43 passed, 0 failed, 11 advisory, 28 skipped     (on a real project; your numbers will differ)
 
-**Twenty-four rows skipping is correct**, and each skip prints its reason. In plain terms: the
+**Twenty-eight rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
 scolding.
 
@@ -446,7 +446,7 @@ cost of that edit, on a real 2450-line handoff, was **15 lines added, none remov
     .goblin/bin/goblin-bans         # run the ban list
     bin/goblin-model <role>        # checkout-only; resolve a role to a profile (docs/ROLES.md)
 
-### The 14 playbooks
+### The 15 playbooks
 
 Named procedures, installed as project-local skills. Each has a measurable verification step.
 
@@ -466,6 +466,7 @@ Named procedures, installed as project-local skills. Each has a measurable verif
 | P12 | `goblin-eval` | a skill or prompt changed — did it do anything? |
 | P13 | `goblin-bugreporter` | an event delivered a report |
 | P14 | `goblin-drift-audit` | a recorded claim disagrees with the artifact |
+| P15 | `goblin-re-mobile` | one shipped Android build must be understood as facts for study |
 
 ### Where the real documentation lives
 

@@ -1,4 +1,4 @@
-# The flow catalogue - 14 playbooks
+# The flow catalogue - 15 playbooks
 
 `manifest/playbooks.tsv` is the machine-readable form; this is the prose. Every playbook has
 the same six fields, and `verification` is always a *measurable* step that also names what it
@@ -124,7 +124,22 @@ stretching P9 would lose the reproduce-first gate. The producer half is
 `automations/drift-audit.sh` (no agent at all) and `automations/bugreporter-intake.sh`; the
 three-part model is in `automations/README.md`.
 
-## The cuts - pstack ships 23, this ships 14 (the two automations included)
+## P15 - `goblin-re-mobile`
+
+- **When:** one shipped Android build must be understood as facts for study, with a reproducible, hash-manifested corpus
+- **Steps:** 1 S0 preflight: the sandbox exists and is the one the fences describe<br>- 2 S1 acquire, S2 verify provenance against the published hash<br>- 3 S3 triage: the engine verdict, cheapest test first<br>- 4 S4 static decompile, S5 carve the containers, S6 manifest the corpus<br>- 5 S7 dossier: facts and numbers, never expression<br>- 6 S8 is deferred by design; S9 retention/teardown
+- **Verification:** the corpus manifest verifies `sha256sum -c` where the corpus lives; `RC-01`, `RC-02` and `RC-03` return the exits their rows define (an exact hash inside the build output, a weak manifest and a tracked payload each fail the build); every negative control NC-1..NC-6 was shown RED and then restored
+- **Profiles:** coder
+- **Role:** code
+
+**The step list above is the summary, not the procedure**, and the four `RC-` rows are what make
+its verification column measurable rather than aspirational: `RC-01` is the build-time gate over
+the declared `security: build_output:`, `RC-02` is the vacuous-pass guard on the manifest's own
+shape, `RC-03` is the quarantine rule over the lab repo's tracked tree, and `RC-04` is the
+acquisition record. The procedure's non-negotiable fences (an owned build only, one dedicated
+sandbox, the quarantine, nothing extracted entering a repo) are stated with what enforces each.
+
+## The cuts - pstack ships 23, this ships 15 (the two automations included)
 
 Each cut has a reason, and a cut is recorded rather than deleted silently.
 
