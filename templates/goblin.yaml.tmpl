@@ -15,6 +15,14 @@ branch: {{BRANCH}}
 # never writes it. Absent on another machine: every model-dependent check reports advisory.
 models_file: {{MODELS_FILE}}
 
+# The global engine (optional, W1). Where the ENGINE tier lives on this machine — an
+# absolute path or ~/-prefixed. Absent by default: a fresh per-repo install is
+# byte-compatible with today, and verify resolves its engine exactly as it always did.
+# Declared but unusable (relative path, missing directory, no manifest inside) is
+# verify exit 2 with NO fallback — a repo must not be judged by an engine it did not
+# declare. Authored by hand (or by `goblin upgrade`, W3); goblin-install never writes it.
+# engine_dir: ~/.goblin/engine
+
 # The referenced standard (optional). goblin-stack carries no copy of it; it pins its hash.
 practice: {{PRACTICE}}
 practice_sha256: {{PRACTICE_SHA}}
