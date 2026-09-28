@@ -105,9 +105,11 @@ engine_yaml_raw() {
 # no fallback, no SKIP.
 ENGINE_DECLARED=""
 ENGINE_FAIL=""
+ENGINE_DIR_DECLARED=""   # the declared value as written (for the §2.4 refusal message)
 resolve_engine_dir() {
   ENGINE_DECLARED=""
   ENGINE_FAIL=""
+  ENGINE_DIR_DECLARED=""
   [ -f "$CONFIG" ] || return 0
   grep -q '^engine_dir:' "$CONFIG" || return 0
   local dir
@@ -117,12 +119,16 @@ resolve_engine_dir() {
     return 1
   fi
   dir=$(g_unquote "$dir")
+  ENGINE_DIR_DECLARED="$dir"
   # Stage 1: a non-string value (number, list, mapping, bare null/bool) is not a path.
+  # Anything that is not a usable path shape fails closed here and `got <value>` names
+  # what was declared; valid strings fall through to the shape check below.
+  ENGINE_FAIL="engine_dir: must be a string path, got $dir"
   case "$dir" in
-    '~'|'null'|'true'|'false'|'['*|'{'*)
-      ENGINE_FAIL="engine_dir: must be a string path, got $dir"
+    '~'|'null'|'true'|'false'|'['*|'{'*|''|*[!0-9A-Za-z_./~-]*|[0-9]*)
       return 1 ;;
   esac
+  ENGINE_FAIL=""
   # Stage 2: the shape — absolute, or ~/ (expanded once, at read time, via $HOME).
   case "$dir" in
     /*) ;;
@@ -162,8 +168,8 @@ elif [ -n "$ENGINE_FAIL" ]; then
   # §2.4: an explicit engine_dir: that does not resolve is exit 2, and nothing falls
   # back. The refusal names the declared value and every path the chain tried.
   g_err "$ENGINE_FAIL"
-  g_err "no manifest at any of: \$SOURCE (unset), $ROOT/.goblin/manifest/enforcement.tsv (absent),"
-  g_err "  ${ENGINE_DECLARED:-declared engine_dir}/manifest/enforcement.tsv (unusable - see above)"
+  g_err "no manifest at any of: \$SOURCE (${SOURCE:-unset}), $ROOT/.goblin/manifest/enforcement.tsv (absent),"
+  g_err "  $ENGINE_DIR_DECLARED/manifest/enforcement.tsv (unusable - see above)"
   exit 2
 else
   # No vendored engine and no declaration: the CLI default (§3.3), env first, then
@@ -440,13 +446,52 @@ check_in_01() {
   return 1
 }
 
+# g_installed_files_strict <installed.json> — only the entries of the `files:` MAP. The
+# line-oriented engine-block reader (g_json_object) also matches the `engine:` block's
+# "key": "value" pairs (W1 §2.2), which IN-04 must never read as pre-existing files.
+g_installed_files_strict() {
+  awk '
+    /^  "files": \{/ { f = 1; next }
+    f && /^  \},$/ { f = 0 }
+    f && /^    "/ {
+      line = $0
+      sub(/^    "/, "", line)
+      p = line; sub(/".*/, "", p)
+      h = line; sub(/^[^"]*"[[:space:]]*:[[:space:]]*"/, "", h); sub(/".*/, "", h)
+      print p "\t" h
+    }
+  ' "$1"
+}
+
+# g_json_object_strict <installed.json> <object-name> — g_json_object, hardened for the
+# engine-block record (W1 §2.2): an EMPTY object (`"refused": {}`) opens and closes on
+# the same line, so the reader must not treat the NEXT block's `"key": "value"` pairs
+# as this object's (IN-04 read the engine block's `mode`/`engine_dir` as vanished
+# pre-existing files).
+g_json_object_strict() {
+  awk -v name="$2" '
+    index($0, "\"" name "\"") && /:[[:space:]]*\{/ {
+      if ($0 ~ /\{[[:space:]]*\}/) next          # empty object: nothing inside
+      inf = 1; next
+    }
+    inf && /^[[:space:]]*\}/ { inf = 0 }
+    inf && /"/ {
+      line = $0
+      sub(/^[[:space:]]*"/, "", line)
+      p = line; sub(/".*/, "", p)
+      h = line; sub(/^[^"]*"[[:space:]]*:[[:space:]]*"/, "", h); sub(/".*/, "", h)
+      if (p != "") print p "\t" h
+    }
+  ' "$1"
+}
+
 check_in_04() {
   if [ "$ENGINE_MODE" = "global" ] && [ ! -s "$INSTALLED" ]; then
     printf 'global engine mode — no per-repo install record\n'
     return 3
   fi
   local p h n=0 bad=0 files
-  files=$(g_installed_files "$INSTALLED" | cut -f1)
+  files=$(g_installed_files_strict "$INSTALLED" | cut -f1)
   while IFS=$'\t' read -r p h; do
     [ -n "$p" ] || continue
     n=$((n + 1))
@@ -454,7 +499,7 @@ check_in_04() {
     if printf '%s\n' "$files" | grep -qxF "$p"; then
       printf 'pre-existing file was taken over by the install: %s\n' "$p"; bad=1
     fi
-  done < <(g_json_object "$INSTALLED" refused)
+  done < <(g_json_object_strict "$INSTALLED" refused)
   printf '%d pre-existing file(s) left untouched\n' "$n"
   [ "$bad" -eq 0 ]
 }
