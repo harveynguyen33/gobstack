@@ -85,5 +85,21 @@ check "a nested target with its own .git verifies (exit 0)" "$([ "$RC2" -eq 0 ] 
 printf '%s' "$OUT2" | grep -qE '^ *43 passed, 0 failed, 11 advisory, 28 skipped'
 check "  and it is the class-A green path (43/0/11/28)" "$?"
 
+# ---- W1 §5.1: an engine_dir declaration must not leak across the boundary ----------------
+# The OUTER repo declares engine_dir; the inner repo (sub2) must resolve its own engine and
+# must not inherit the outer declaration - the resolution chain reads $ROOT/.goblin/goblin.yaml,
+# never the enclosing repo's, so the outer declaration is invisible to the inner verify.
+mkdir -p "$WORK/engine/manifest" "$WORK/engine/bin"
+cp "$SRC/manifest/enforcement.tsv" "$SRC/manifest/classes.tsv" "$SRC/manifest/bans.tsv" "$WORK/engine/manifest/"
+cp "$SRC/bin/goblin-bans" "$SRC/bin/goblin-lib.sh" "$WORK/engine/bin/"
+sed -i "s|^models_file:|engine_dir: $WORK/engine\nmodels_file:|" "$WORK/outer/.goblin/goblin.yaml"
+git -C "$WORK/outer" add -A && git -C "$WORK/outer" commit -q -m "declare engine_dir in the outer repo"
+OUT3=$(bash .goblin/bin/goblin-verify 2>&1); RC3=$?
+check "an inner repo verify is unaffected by the OUTER repo's engine_dir (exit 0)" "$([ "$RC3" -eq 0 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3" | grep -qE '^ *43 passed, 0 failed'
+check "  and the inner run is still the class-A green path" "$?"
+printf '%s' "$OUT3" | grep -q 'mode=vendored'
+check "  and the inner footer still says mode=vendored (no inherited global mode)" "$?"
+
 if [ "$fail" -eq 0 ]; then note "t-verify-nested: PASS"; else note "t-verify-nested: FAIL"; fi
 exit "$fail"

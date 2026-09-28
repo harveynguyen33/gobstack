@@ -3,7 +3,7 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 131 `expect_red` call sites and 34 `expect_green` - 165 calls over
+# One control per target-scope row: 133 `expect_red` call sites and 34 `expect_green` - 167 calls over
 # all 82 of the matrix's 82 target rows (the other five rows are source-scope and carry controls of
 # their own). Measured at this revision: 82 distinct ids, 0 phantom ids (every id used here is a row
 # in the matrix) and 0 target row left without a control. Nine of the 82 - `HP-04`, `HS-03`,
@@ -169,13 +169,20 @@ cp -a .gitignore "$BK/gitignore"
 # true by construction and so is GREEN on the pre-change tree, which would make HS-02 FAIL for a
 # reason unrelated to the declared command. The scaffold comes back byte-for-byte.
 cp -a checks/assert.mjs "$BK/assert.mjs"
+# W1: the IN-02 clause-2 control deletes .goblin/bin and .goblin/manifest wholesale, so
+# the whole engine payload is backed up (once, here) and rebuilt by restore_all.
+cp -a .goblin/bin "$BK/bin"
+cp -a .goblin/manifest "$BK/manifest"
 
 restore_all() {
   cp -a "$BK/HANDOFF.md" HANDOFF.md
   cp -a "$BK/goblin.yaml" .goblin/goblin.yaml
   cp -a "$BK/installed.json" .goblin/installed.json
-  cp -a "$BK/enforcement.tsv" .goblin/manifest/enforcement.tsv
-  cp -a "$BK/bans.tsv" .goblin/manifest/bans.tsv
+  # W1: the IN-02 clause-2 control deletes .goblin/bin and .goblin/manifest wholesale,
+  # so the restore rebuilds them from the backup before the per-file copies below.
+  rm -rf .goblin/bin .goblin/manifest
+  cp -a "$BK/bin" .goblin/bin
+  cp -a "$BK/manifest" .goblin/manifest
   cp -a "$BK/roles.yaml" .goblin/roles.yaml
   cp -a "$BK/models.yaml" "$WORK/models.yaml"
   cp -a "$BK/SKILL.md" .hermes/skills/goblin-mode/SKILL.md
@@ -1160,6 +1167,141 @@ out=$(bash .goblin/bin/goblin-verify --only SK-03 2>&1)
 printf '%s' "$out" | grep -qE "advisory $ADV_N of ceiling $ADV_N \(0 free slots: the next advisory row FAILs\)"
 check "  at the ceiling it says so, and names what the next row does" "$?"
 sed -i "s/^advisory_ceiling: .*/advisory_ceiling: $ADV_C/" .goblin/goblin.yaml
+
+
+# ---- W1: the engine split, the chain, and the global-mode clauses -------------
+# Controls for the engine_path re-point (W1-SPEC §2.5), each shown RED then restored.
+# The declaration-only probe itself lives in tests/t-engine-dir.sh; these stay on the
+# class-A fixture, where the engine is vendored and the install record is full.
+
+# The W1 footer: EVERY run names its judge - the running verifier and the manifest that
+# judged this run (LIMITS #43: the statement is unsigned, and that hole is recorded).
+W1_FOOTER=$(bash .goblin/bin/goblin-verify --only SK-03 2>&1 | grep -c 'cli_sha256=.*enforcement_tsv_sha256=')
+[ "$W1_FOOTER" -ge 1 ]
+check "W1: every run's footer names cli_sha256 and enforcement_tsv_sha256" "$?"
+
+# IN-02 clause 2/3 (§2.2): with engine.mode=global in the record, a MISSING engine file
+# is not drift (W3 removes them by design), and a repo-local recorded file that drifts
+# still FAILs. The engine: block is planted by hand (the migration that writes it is
+# W3). Both runs go through the CHECKOUT's verifier with --source: the control deletes
+# the repo's own .goblin/bin + .goblin/manifest, so the installed interpreter and the
+# vendored fallback must not be the thing being tested here.
+w1_plant_engine_record() {
+  python3 -c '
+import json
+rec = json.load(open(".goblin/installed.json"))
+rec["engine"] = {"mode": "global", "engine_dir": "/tmp/w1-engine-gmode",
+                 "cli_version": "0.4.4", "cli_sha256": "a", "enforcement_tsv_sha256": "b"}
+json.dump(rec, open(".goblin/installed.json", "w"), indent=2)
+'
+}
+m_in_02_global_local_drift() {
+  w1_plant_engine_record
+  printf '# an edited byte\n' >> "$WORK/standard.md"
+}
+m_in_02_global_engine_gone() {
+  w1_plant_engine_record
+  rm -rf .goblin/bin .goblin/manifest
+}
+# Clause 3 (§2.2): a global repo whose files map is EMPTY hashes nothing and passes - the
+# lenient reader (g_installed_files) leaks the engine: block's key/value pairs as phantom
+# file entries and reports drift on keys that were never files (measured pre-fix: '8
+# installed files hashed' with rc 1). The strict reader must keep clause 3 at 0 files, rc 0.
+m_in_02_global_files_empty() {
+  w1_plant_engine_record
+  python3 -c '
+import json
+rec = json.load(open(".goblin/installed.json"))
+rec["files"] = {}
+rec["owned"] = {}
+json.dump(rec, open(".goblin/installed.json", "w"), indent=2)
+'
+}
+m_in_02_global_files_empty
+out=$(bash "$SRC/bin/goblin-verify" --source "$SRC" --only IN-02 2>&1); rc=$?
+if [ "$rc" = "0" ] && printf '%s' "$out" | grep -qE '0 repo-local files hashed \(global engine mode\)'; then
+  note "ok   W1: an empty files map under mode=global hashes nothing and passes (clause 3)"
+else
+  note "FAIL W1: an empty files map under mode=global hashes nothing and passes (clause 3) (rc=$rc)"
+  printf '%s\n' "$out" | sed 's/^/        /'
+  fail=1
+fi
+restore_all
+m_in_02_global_engine_gone
+out=$(bash "$SRC/bin/goblin-verify" --source "$SRC" --only IN-02 2>&1); rc=$?
+if [ "$rc" = "0" ] && printf '%s' "$out" | grep -qE '[0-9]+ installed files hashed'; then
+  note "ok   W1: in global mode the engine payload's absence is NOT drift (clause 2)"
+else
+  note "FAIL W1: in global mode the engine payload's absence is NOT drift (clause 2) (rc=$rc)"
+  printf '%s\n' "$out" | sed 's/^/        /'
+  fail=1
+fi
+restore_all
+m_in_02_global_local_drift
+out=$(bash "$SRC/bin/goblin-verify" --source "$SRC" --only IN-02 2>&1); rc=$?
+if [ "$rc" = "1" ]; then
+  note "ok   W1: in global mode a repo-local recorded file that drifts still FAILs"
+else
+  note "FAIL W1: in global mode a repo-local recorded file that drifts still FAILs (rc=$rc)"
+  printf '%s\n' "$out" | sed 's/^/        /'
+  fail=1
+fi
+restore_all
+
+# AU-01's new clause (§2.5, Q2's narrow form): a repo that DECLARES its own automations
+# (a root automations/ the engine never wrote) is judged like any producer - a network
+# verb FAILs it, and when the declared producer disappears the row FAILs too. The SKIP
+# half at the bottom proves the fixture's default state (no producer anywhere) is a
+# SKIP with the reason, not the born-RED FAIL the pre-W1 glob produced (M9).
+m_au_01_declared_network() { mkdir -p automations; printf 'curl https://x\n' > automations/mine.sh; }
+# The producer-gone mutation builds the SAME tree the network control leaves: a declared
+# automations/ directory whose .sh producer is renamed away. `mv` on a file the mutation
+# never created failed with exit 1 and the control ran on the untouched fixture - the
+# false GREEN an undefined mutate function produces, in the skill's own words.
+m_au_01_declared_gone()    { mkdir -p automations; printf '# a producer\n' > automations/mine.sh; mv automations/mine.sh automations/mine.sh.gone; }
+r_au_01_declared() { rm -rf automations; }
+expect_red   "W1: the repo's OWN automation producer with a network verb" AU-01 1 m_au_01_declared_network "" r_au_01_declared
+expect_red   "W1: automations declared but the producer is gone"          AU-01 1 m_au_01_declared_gone    "" r_au_01_declared
+# The SKIP half cannot run on this fixture: its VENDORED engine payload
+# (.goblin/automations/*.sh) supplies producers, so AU-01 PASSES here by design. The SKIP
+# fires only when NO producer exists in either place - the global-mode probe below (the
+# SC-07 block, which strips the engine payload) is the repo that proves it.
+
+# SC-07 in global mode names the CLI verb, not the vendored path (§2.5). The probe must
+# actually resolve GLOBAL: a class-B install vendored its own engine payload, and the
+# chain's vendored step would win over the declared engine_dir:, so the mode stayed
+# vendored and the old remedy text was printed. The engine payload is removed and the
+# record it leaves behind is rewritten with the W3-shaped engine: block (§2.2) - the
+# same state a migrated repo is in mid-sequence. The same probe carries AU-01's SKIP
+# half: no producer in the engine dir, none in the repo.
+W1_GMODE="$WORK/w1-gmode"
+rm -rf "$W1_GMODE" /tmp/w1-engine-gmode
+mkdir -p "$W1_GMODE" /tmp/w1-engine-gmode
+cp -r "$SRC/manifest" /tmp/w1-engine-gmode/manifest
+( cd "$W1_GMODE" \
+  && git init -q -b main \
+  && git config user.name "Test Runner" && git config user.email "runner@example.com" \
+  && printf '# gmode\n' > README.md \
+  && bash "$SRC/bin/goblin-install" --target . --class B --models "$WORK/models.yaml" >/dev/null 2>&1 \
+  && sed -i "/^models_file:/a engine_dir: /tmp/w1-engine-gmode" .goblin/goblin.yaml \
+  && python3 -c '
+import json
+rec = json.load(open(".goblin/installed.json"))
+rec["engine"] = {"mode": "global", "engine_dir": "/tmp/w1-engine-gmode", "cli_version": "0.4.4", "cli_sha256": "a", "enforcement_tsv_sha256": "b"}
+json.dump(rec, open(".goblin/installed.json", "w"), indent=2)' \
+  && rm -rf .goblin/bin .goblin/manifest .goblin/bans .goblin/automations .goblin/roles.yaml )
+# The probe is the repo the SC-07 block builds below; the AU-01 SKIP half runs there
+# because that is the only producer-less repo in this file. Kept as a plain block: the
+# two checks below share the probe's one build.
+out=$( cd "$W1_GMODE" && bash "$SRC/bin/goblin-verify" --only AU-01 2>&1 )
+printf '%s' "$out" | grep -q 'SKIP  AU-01.*no automation producer found'
+check "W1: no producer anywhere -> AU-01 SKIPs with the reason (the born-RED FIX)" "$?"
+out=$( cd "$W1_GMODE" && bash "$SRC/bin/goblin-verify" --only SC-07 2>&1 )
+printf '%s' "$out" | grep -q 'goblin audit'
+check "W1: a global-mode SC-07 SKIP names the CLI verb (goblin audit)" "$?"
+printf '%s' "$out" | grep -q '.goblin/audit.tsv'
+check "  and the record it names is still the repo-local one" "$?"
+rm -rf /tmp/w1-engine-gmode
 
 # ---- F2-6: --only must refuse a selection that runs no target row -------------
 # A valid SOURCE-scope id selects nothing in an installed repo, so the run printed

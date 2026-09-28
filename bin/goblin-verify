@@ -75,20 +75,151 @@ if [ -z "$ROOT" ]; then
   [ -n "$ROOT" ] || ROOT="$PWD"
 fi
 
+# ---- engine resolution (W1, §2.3): one chain, stated once --------------------
+# Every engine-path lookup (enforcement.tsv, classes.tsv, bans.tsv, bans/*.sh, the ban
+# engine) resolves through this chain, first hit wins:
+#   1. --source <path>            (existing flag; highest, for tests and pinned CI)
+#   2. $ROOT/.goblin/...          (vendored per-repo engine — today's default)
+#   3. engine_dir: from $ROOT/.goblin/goblin.yaml
+#   4. GOBLIN_ENGINE_DIR env, then ~/.goblin/engine
+#   5. nothing found -> exit 2, naming every path tried (the pre-W1 message when the
+#      vendored chain is the only one tried; the §2.4 message when engine_dir: fails).
+# Ordering is deliberate: a vendored engine still wins over the global one, because an
+# explicit per-repo choice must not be silently overridden by a machine-level upgrade.
+# An explicit engine_dir: that cannot be used is exit 2 with NO fallback (§1.2): falling
+# back to a vendored engine would judge the repo with a different rule table than the one
+# it declared. Absent key => the chain degrades to exactly today's behaviour (§1.3).
+
+CONFIG="$ROOT/.goblin/goblin.yaml"
+
+# engine_yaml_raw — the raw top-level engine_dir: value (the line-oriented parser reads
+# the line, so a non-string scalar is visible here as something that is not a path).
+engine_yaml_raw() {
+  sed -n "s/^engine_dir:[[:space:]]*//p" "$CONFIG" | head -n 1
+}
+
+# resolve_engine_dir — validate the declared key (§1.2, fail closed at use time, stages
+# 1-4) and print the absolute engine directory. Stages 3/4 (existence, payload) do NOT
+# exit here: the failure is reported through ENGINE_FAIL so the refusal can name BOTH the
+# declared value and the chain tried (§2.4's message), then the run stops with exit 2 —
+# no fallback, no SKIP.
+ENGINE_DECLARED=""
+ENGINE_FAIL=""
+ENGINE_DIR_DECLARED=""   # the declared value as written (for the §2.4 refusal message)
+resolve_engine_dir() {
+  ENGINE_DECLARED=""
+  ENGINE_FAIL=""
+  ENGINE_DIR_DECLARED=""
+  [ -f "$CONFIG" ] || return 0
+  grep -q '^engine_dir:' "$CONFIG" || return 0
+  local dir
+  dir=$(engine_yaml_raw)
+  if [ -z "$dir" ]; then
+    ENGINE_FAIL="engine_dir: must be a string path, got empty"
+    return 1
+  fi
+  dir=$(g_unquote "$dir")
+  ENGINE_DIR_DECLARED="$dir"
+  # Stage 1: a non-string value (number, list, mapping, bare null/bool) is not a path.
+  # Anything that is not a usable path shape fails closed here and `got <value>` names
+  # what was declared; valid strings fall through to the shape check below.
+  ENGINE_FAIL="engine_dir: must be a string path, got $dir"
+  case "$dir" in
+    '~'|'null'|'true'|'false'|'['*|'{'*|''|*[!0-9A-Za-z_./~-]*|[0-9]*)
+      return 1 ;;
+  esac
+  ENGINE_FAIL=""
+  # Stage 2: the shape — absolute, or ~/ (expanded once, at read time, via $HOME).
+  case "$dir" in
+    /*) ;;
+    "~/"*) dir="$HOME/${dir#\~/}" ;;
+    *)
+      ENGINE_FAIL="engine_dir: must be absolute or ~/-prefixed: $dir"
+      return 1 ;;
+  esac
+  # Stage 3: existence.
+  if [ ! -d "$dir" ]; then
+    ENGINE_FAIL="engine_dir: $dir does not exist (declared in .goblin/goblin.yaml)"
+    return 1
+  fi
+  # Stage 4: the payload — a directory without the rule table is not an engine.
+  if [ ! -f "$dir/manifest/enforcement.tsv" ]; then
+    ENGINE_FAIL="engine_dir: no manifest/enforcement.tsv under $dir - this is not an engine directory"
+    return 1
+  fi
+  ENGINE_DECLARED="$dir"
+  return 0
+}
+
+resolve_engine_dir
+ENGINE_CHAIN_VENDORED="\$ROOT/.goblin/manifest/enforcement.tsv"
+GOBLIN_ENGINE=""                       # the resolved engine root, when NOT vendored/--source
 if [ -n "$SOURCE" ]; then
   MANIFEST="$SOURCE/manifest/enforcement.tsv"
   CLASSES="$SOURCE/manifest/classes.tsv"
 elif [ -f "$ROOT/.goblin/manifest/enforcement.tsv" ]; then
   MANIFEST="$ROOT/.goblin/manifest/enforcement.tsv"
   CLASSES="$ROOT/.goblin/manifest/classes.tsv"
+elif [ -n "$ENGINE_DECLARED" ]; then
+  GOBLIN_ENGINE="$ENGINE_DECLARED"
+  MANIFEST="$GOBLIN_ENGINE/manifest/enforcement.tsv"
+  CLASSES="$GOBLIN_ENGINE/manifest/classes.tsv"
+elif [ -n "$ENGINE_FAIL" ]; then
+  # §2.4: an explicit engine_dir: that does not resolve is exit 2, and nothing falls
+  # back. The refusal names the declared value and every path the chain tried.
+  g_err "$ENGINE_FAIL"
+  g_err "no manifest at any of: \$SOURCE (${SOURCE:-unset}), $ROOT/.goblin/manifest/enforcement.tsv (absent),"
+  g_err "  $ENGINE_DIR_DECLARED/manifest/enforcement.tsv (unusable - see above)"
+  exit 2
 else
-  MANIFEST="$SELF_DIR/../manifest/enforcement.tsv"
-  CLASSES="$SELF_DIR/../manifest/classes.tsv"
+  # No vendored engine and no declaration: the CLI default (§3.3), env first, then
+  # ~/.goblin/engine. Both are consulted AFTER --source, vendored and the declaration:
+  # the most specific declaration wins; the machine default is the fallback, never an
+  # override (A9).
+  _cli_default=""
+  if [ -n "${GOBLIN_ENGINE_DIR:-}" ]; then
+    _cli_default="$GOBLIN_ENGINE_DIR"
+  elif [ -d "$HOME/.goblin/engine" ]; then
+    _cli_default="$HOME/.goblin/engine"
+  fi
+  if [ -n "$_cli_default" ] && [ -f "$_cli_default/manifest/enforcement.tsv" ]; then
+    GOBLIN_ENGINE="$_cli_default"
+    MANIFEST="$GOBLIN_ENGINE/manifest/enforcement.tsv"
+    CLASSES="$GOBLIN_ENGINE/manifest/classes.tsv"
+  else
+    MANIFEST="$SELF_DIR/../manifest/enforcement.tsv"
+    CLASSES="$SELF_DIR/../manifest/classes.tsv"
+  fi
 fi
-[ -f "$MANIFEST" ] || { g_err "no manifest at $MANIFEST"; exit 2; }
+[ -f "$MANIFEST" ] || {
+  g_err "no manifest at $MANIFEST"
+  g_err "no manifest at any of: \$SOURCE (${SOURCE:-unset}), $ENGINE_CHAIN_VENDORED (absent), $SELF_DIR/../manifest/enforcement.tsv"
+  exit 2
+}
 
-CONFIG="$ROOT/.goblin/goblin.yaml"
 INSTALLED="$ROOT/.goblin/installed.json"
+
+# engine_block_field <key> — one field of installed.json's engine: block (empty if absent).
+engine_block_field() {
+  [ -f "$INSTALLED" ] || return 0
+  g_json_object "$INSTALLED" engine | awk -F'\t' -v k="$1" '$1==k {print $2; exit}'
+}
+
+# ---- the engine mode (W1 §2.2) ----------------------------------------------
+#   vendored (the default): the engine resolved inside the repo (or --source pinned it)
+#     and installed.json records the payload. The install-record and procedure rows
+#     behave exactly as before W1.
+#   global: the engine resolved OUTSIDE the repo (engine_dir:, GOBLIN_ENGINE_DIR or
+#     ~/.goblin/engine), or installed.json's own engine: block says mode=global - a repo
+#     whose engine: block says global is global even if a vendored payload is still on
+#     disk mid-migration (W3's three-verify sequence). The repo-local clauses keep
+#     hashing what IS recorded; absence of engine files is not drift; a repo with no
+#     install record at all is not born RED.
+ENGINE_MODE="vendored"
+[ -n "$GOBLIN_ENGINE" ] && ENGINE_MODE="global"
+_em=$(engine_block_field mode)
+[ "$_em" = "global" ] && ENGINE_MODE="global"
+export ENGINE_MODE
 
 # ---- manifest integrity (exit 3 before any check runs) ----------------------
 manifest_check() {
@@ -287,6 +418,10 @@ row_part() {
     # prefix returns "" and the row can never honour an opt-out (G3 section 4.3).
     AU-*) echo playbooks ;;
     SK-04) echo playbooks ;;
+    # SK-01 rides the same part (W1 made it a builtin for the global-mode clause): with
+    # --skills no there is no shipped skill to frontmatter-check, and a vacuous pass proves
+    # nothing - the row honours the opt-out like its SK-02/SK-04 siblings.
+    SK-01) echo playbooks ;;
     # SK-02 keys off the same part: with --skills no there are no installed skills to hash, and
     # the row used to FAIL there (measured at v0.2.0-dev: "32 passed, 1 failed ... SK-02 0
     # installed skill file(s) hashed"). An opt-out is the honest report; a FAIL on a repo that
@@ -299,18 +434,114 @@ row_part() {
 # ============================================================== builtins ======
 # Each builtin prints its detail and returns 0 pass | 1 fail | 2 advisory | 3 skip.
 
-check_in_02() {
-  local p h cur n=0 bad=0
+# The install-record rows (W1 §2.5). IN-01 and IN-04 were shell one-liners over
+# .goblin/installed.json; the engine.mode=global clause needs engine logic (a global,
+# declaration-only repo has NO install record and must SKIP with the reason, never be
+# born RED - the D8/FM-01 shape), so the one-liners move into builtins that keep the
+# same clauses and gain the mode check. In vendored mode they are exactly the old cells.
+check_in_01() {
+  if [ "$ENGINE_MODE" = "global" ] && [ ! -s "$INSTALLED" ]; then
+    printf 'global engine mode — no per-repo install record\n'
+    return 3
+  fi
+  [ -s "$INSTALLED" ] && grep -q '"version"' "$INSTALLED" \
+    && { printf 'the install record exists and names its version\n'; return 0; }
+  printf 'installed.json is absent or records no version\n'
+  return 1
+}
+
+# g_installed_files_strict <installed.json> — only the entries of the `files:` MAP. The
+# line-oriented engine-block reader (g_json_object) also matches the `engine:` block's
+# "key": "value" pairs (W1 §2.2), which IN-04 must never read as pre-existing files.
+g_installed_files_strict() {
+  awk '
+    /^  "files": \{[[:space:]]*\},?$/ { next }
+    /^  "files": \{/ { f = 1; next }
+    f && /^  \},$/ { f = 0 }
+    f && /^    "/ {
+      line = $0
+      sub(/^    "/, "", line)
+      p = line; sub(/".*/, "", p)
+      h = line; sub(/[^"]*"[[:space:]]*:[[:space:]]*"/, "", h); sub(/".*/, "", h)
+      print p "\t" h
+    }
+  ' "$1"
+}
+
+# g_json_object_strict <installed.json> <object-name> — g_json_object, hardened for the
+# engine-block record (W1 §2.2): an EMPTY object (`"refused": {}`) opens and closes on
+# the same line, so the reader must not treat the NEXT block's `"key": "value"` pairs
+# as this object's (IN-04 read the engine block's `mode`/`engine_dir` as vanished
+# pre-existing files).
+g_json_object_strict() {
+  awk -v name="$2" '
+    index($0, "\"" name "\"") && /:[[:space:]]*\{/ {
+      if ($0 ~ /\{[[:space:]]*\}/) next          # empty object: nothing inside
+      inf = 1; next
+    }
+    inf && /^[[:space:]]*\}/ { inf = 0 }
+    inf && /"/ {
+      line = $0
+      sub(/^[[:space:]]*"/, "", line)
+      p = line; sub(/".*/, "", p)
+      h = line; sub(/^[^"]*"[[:space:]]*:[[:space:]]*"/, "", h); sub(/".*/, "", h)
+      if (p != "") print p "\t" h
+    }
+  ' "$1"
+}
+
+check_in_04() {
+  if [ "$ENGINE_MODE" = "global" ] && [ ! -s "$INSTALLED" ]; then
+    printf 'global engine mode — no per-repo install record\n'
+    return 3
+  fi
+  local p h n=0 bad=0 files
+  files=$(g_installed_files_strict "$INSTALLED" | cut -f1)
   while IFS=$'\t' read -r p h; do
     [ -n "$p" ] || continue
+    n=$((n + 1))
+    if [ ! -e "$ROOT/$p" ]; then printf 'pre-existing file vanished: %s\n' "$p"; bad=1; continue; fi
+    if printf '%s\n' "$files" | grep -qxF "$p"; then
+      printf 'pre-existing file was taken over by the install: %s\n' "$p"; bad=1
+    fi
+  done < <(g_json_object_strict "$INSTALLED" refused)
+  printf '%d pre-existing file(s) left untouched\n' "$n"
+  [ "$bad" -eq 0 ]
+}
+
+check_in_02() {
+  # The W1 semantic split (§2.2). Clause 1 - the per-repo mode: hash every recorded file,
+  # the practice pin rides along - is byte-for-byte what this row has always done, and a
+  # fresh install of any class keeps it (installed.json carries no engine: block).
+  # Clause 2 - engine.mode=global with file entries remaining: hash what IS recorded;
+  # an entry under the engine paths (.goblin/bin, .goblin/manifest, .goblin/bans,
+  # .goblin/automations, .goblin/roles.yaml) that is still present is hashed too
+  # (harmless), and one that is MISSING is not drift - the engine is no longer the repo's.
+  # Clause 3 - global with no file entries: the declaration + practice pin only; never
+  # FAIL for absence of install artifacts (a declaration-only repo is not born RED).
+  # The engine hash itself is printed in the footer on every run (see the footer, below);
+  # this row proves the REPO-LOCAL bytes, and a global engine answers elsewhere.
+  local p h cur n=0 bad=0 pin="" detail=""
+  while IFS=$'\t' read -r p h; do
+    [ -n "$p" ] || continue
+    if [ "$ENGINE_MODE" = "global" ]; then
+      case "$p" in
+        .goblin/bin/*|.goblin/manifest/*|.goblin/bans/*|.goblin/automations/*|.goblin/roles.yaml)
+          [ -e "$ROOT/$p" ] || continue ;;   # engine removed by design: not drift
+      esac
+    fi
     n=$((n + 1))
     cur=$(g_sha256_file "$ROOT/$p")
     if [ "$cur" != "$h" ]; then
       printf 'drift: %s recorded %s now %s\n' "$p" "$h" "$cur"
       bad=1
     fi
-  done < <(g_installed_files "$INSTALLED")
-  [ "$n" -gt 0 ] || { printf 'installed.json lists no files\n'; return 1; }
+  done < <(g_installed_files_strict "$INSTALLED")
+  if [ "$ENGINE_MODE" = "global" ] && [ "$n" -eq 0 ]; then
+    detail="0 repo-local files hashed (global engine mode)"
+  else
+    [ "$n" -gt 0 ] || { printf 'installed.json lists no files\n'; return 1; }
+  fi
   # The practice pin rides on this row (R6 section 2.1 requires the pin; section 5 has no row of
   # its own for it). Both are the same statement: a recorded hash still matches the file on disk.
   local pin=""
@@ -332,22 +563,12 @@ check_in_02() {
       fi
     fi
   fi
+  if [ "$ENGINE_MODE" = "global" ] && [ "$n" -eq 0 ]; then
+    printf '%s%s\n' "$detail" "${pin:+ | ${pin# | }}"
+    [ "$bad" -eq 0 ]
+    return
+  fi
   printf '%d installed files hashed%s\n' "$n" "$pin"
-  [ "$bad" -eq 0 ]
-}
-
-check_in_04() {
-  local p h n=0 bad=0 files
-  files=$(g_installed_files "$INSTALLED" | cut -f1)
-  while IFS=$'\t' read -r p h; do
-    [ -n "$p" ] || continue
-    n=$((n + 1))
-    if [ ! -e "$ROOT/$p" ]; then printf 'pre-existing file vanished: %s\n' "$p"; bad=1; continue; fi
-    if printf '%s\n' "$files" | grep -qxF "$p"; then
-      printf 'pre-existing file was taken over by the install: %s\n' "$p"; bad=1
-    fi
-  done < <(g_json_object "$INSTALLED" refused)
-  printf '%d pre-existing file(s) left untouched\n' "$n"
   [ "$bad" -eq 0 ]
 }
 
@@ -1114,14 +1335,33 @@ check_sc_06() {
   return 0
 }
 
+# check_in_03 — the manifest self-check, run against whichever manifest the engine
+# actually resolved (W1 §2.5: the row's meaning is untouched, the hardcoded per-repo
+# path input follows the chain §2.3). Same three clauses as the row always carried.
+check_in_03() {
+  local bad=0
+  awk -F'\t' 'NR>1 && $6=="" {print "row " $1 " has no check and no advisory label"; bad=1} END{exit bad}' "$MANIFEST" || bad=1
+  awk -F'\t' 'NR>1 && ($6=="advisory" && $4!="advisory") {print "row " $1 " is advisory-labelled but its check column claims enforcement"; bad=1} END{exit bad}' "$MANIFEST" || bad=1
+  awk -F'\t' 'NR>1 && $4 !~ /^(script|lint|gate|advisory|test)$/ {print "row " $1 " has an enforced_by outside the closed enum: " $4; bad=1} END{exit bad}' "$MANIFEST" || bad=1
+  [ "$bad" -eq 0 ] && { printf 'the manifest is complete: every rule carries a check or is advisory, inside the enum\n'; return 0; }
+  return 1
+}
+
 check_sc_07() {
   # Offline by construction: the record is written by .goblin/bin/goblin-audit, run ONCE,
   # deliberately. A verify-time network call would break the offline dependency contract
-  # (docs/RISKS.md K4).
+  # (docs/RISKS.md K4). The record and the waiver table are repo-local by design (W1 §2.5);
+  # only the SKIP remedy names the runner, and global mode names the CLI verb - the record
+  # is the repo's, the tool that produced it is wherever the engine resolves (chain §2.3).
   [ -n "$SEC_AUDIT_CMD" ] || { printf 'this class declares no audit command (security.audit_cmd is empty)\n'; return 3; }
   local rec="$ROOT/.goblin/audit.tsv" wfile="$ROOT/.goblin/audit-waiver.tsv"
   if [ ! -f "$rec" ]; then
-    printf 'no audit record yet. Run .goblin/bin/goblin-audit once, deliberately, then commit\n.goblin/audit.tsv: SC-07 reads the record and never the network\n'; return 3
+    if [ "$ENGINE_MODE" = "global" ]; then
+      printf 'no audit record yet. Run `goblin audit` once, deliberately, then commit\n.goblin/audit.tsv: SC-07 reads the record and never the network\n'
+    else
+      printf 'no audit record yet. Run .goblin/bin/goblin-audit once, deliberately, then commit\n.goblin/audit.tsv: SC-07 reads the record and never the network\n'
+    fi
+    return 3
   fi
   local d age lines=0 waivers=0 pkg sev id bad=0 wl wd
   d=$(sed -n 's/^measured[[:space:]]*//p' "$rec" | head -n 1)
@@ -1199,12 +1439,79 @@ check_sc_08() {
   [ "$bad" -eq 0 ]
 }
 
+# ---- W1 §2.5, the SK/automation split ----------------------------------------
+# In global mode the procedure tier (skills, the automation producers) is served from the
+# engine, not emitted in the repo - emission is W4's. Hashing a global copy from a repo's
+# verify would make one machine's skill set answer for every repo, so the per-repo rows
+# SKIP with that reason instead of FAILing on the absent copies. SK-03 runs unchanged:
+# it reads the manifest, which resolves via the chain either way.
+
+# au01_producer_count — the producers an AU-01 run can see, engine-first in global mode.
+# In global mode the first glob resolves under the engine dir (chain §2.3); the repo-local
+# globs stay. In vendored mode this is exactly today's three globs.
+au01_globs() {
+  if [ "$ENGINE_MODE" = "global" ]; then
+    printf '%s\n' "$GOBLIN_ENGINE/automations/*.sh" "$ROOT/automations/*.sh" "$ROOT/automations/*/*.sh"
+  else
+    printf '%s\n' "$ROOT/.goblin/automations/*.sh" "$ROOT/automations/*.sh" "$ROOT/automations/*/*.sh"
+  fi
+}
+
+check_au_01() {
+  # One control loop over the producer globs. The new clause (W1 §2.5, Q2's narrow form):
+  # a repo that declares NO automations and has no producer anywhere SKIPs with the reason
+  # - the measured M9 FAIL was a born-RED artifact of the glob, and a repo that never
+  # adopted automations must not be failed for it. A repo that DECLARES automations (its
+  # own, repo-local) but has no producer still FAILs: the SKIP is only for repos that
+  # declare none.
+  local f n=0 own=0 glob
+  # The repo's OWN producers: anything under a root automations/ directory (the engine's
+  # payload lives under .goblin/automations/ in vendored mode, engine_dir in global mode;
+  # neither is a declaration by this repo).
+  for f in "$ROOT"/automations/*.sh "$ROOT"/automations/*/*.sh; do
+    [ -e "$f" ] || continue
+    own=$((own + 1))
+  done
+  while IFS= read -r glob; do
+    for f in $glob; do
+      [ -e "$f" ] || continue
+      n=$((n + 1))
+      if grep -nE "^[[:space:]]*(curl|wget|gh[[:space:]]|npm[[:space:]]|npx[[:space:]])" "$f" >/dev/null 2>&1; then
+        printf 'a network or forge verb opens a line of the producer:\n'
+        grep -nE "^[[:space:]]*(curl|wget|gh[[:space:]]|npm[[:space:]]|npx[[:space:]])" "$f"
+        return 1
+      fi
+    done
+  done < <(au01_globs)
+  # The declaration clause: a root automations/ directory that holds NO .sh producer is
+  # a declaration whose producer is gone (the files were deleted, not never written).
+  local declared=0
+  for f in "$ROOT"/automations/* "$ROOT"/automations/*/; do
+    [ -e "$f" ] || continue
+    declared=1
+  done
+  if [ "$declared" -eq 1 ] && [ "$own" -eq 0 ]; then
+    printf 'automations are declared but no producer exists - the producer is gone\n'
+    return 1
+  fi
+  if [ "$n" -eq 0 ]; then
+    printf 'no automation producer found (repo or engine)\n'
+    return 3
+  fi
+  printf '%d automation producer(s) scanned, none opens with a network or forge verb\n' "$n"
+  return 0
+}
+
 check_bn_00() {
   # The coherence row: the ban table and the matrix must agree in BOTH directions, every ban
   # must name a replacement, and the table must not be empty. IN-03's shape applied to
   # bans.tsv - a rule that lives only in a data file would otherwise be invisible to SK-03.
   local bans ban_ids row_ids id n bad=0
+  # The ban table resolves through the engine chain (W1 §2.3): vendored first, then the
+  # declared/global engine - the fallback slots into chain steps 2/3/4 where it used to
+  # hardcode two of them.
   bans="$ROOT/.goblin/manifest/bans.tsv"
+  [ -f "$bans" ] || bans="${GOBLIN_ENGINE:-$SELF_DIR/../..}/manifest/bans.tsv"
   [ -f "$bans" ] || bans="$SELF_DIR/../manifest/bans.tsv"
   [ -f "$bans" ] || { printf 'no ban table found (manifest/bans.tsv)\n'; return 1; }
   n=$(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$bans")
@@ -1231,10 +1538,16 @@ EOF
 }
 
 check_bn_run() {
-  # One ban, through the installed engine. rc: 0 pass | 1 fail | 3 skip | anything else fail
+  # One ban, through the resolved engine. rc: 0 pass | 1 fail | 3 skip | anything else fail
   # closed (the engine's own exit 2 = the table is missing/empty, which is not a pass).
+  # W1 §2.5: the engine is <resolved engine>/bin/goblin-bans (chain §2.3). The hard-FAIL
+  # stays for the vendored mode; in global mode the engine's own existence was already
+  # checked at resolution (§1.2 item 4), so an absent ban engine is exit-2-class, but it
+  # is still reported FAIL-closed here rather than silently skipped - the ban lane must
+  # never read clean because a binary went missing.
   local id="$1" engine out rc detail
   engine="$ROOT/.goblin/bin/goblin-bans"
+  if [ ! -f "$engine" ] && [ -n "$GOBLIN_ENGINE" ]; then engine="$GOBLIN_ENGINE/bin/goblin-bans"; fi
   [ -f "$engine" ] || { printf 'the ban engine is not installed: .goblin/bin/goblin-bans\n'; return 1; }
   out=$( cd "$ROOT" && bash "$engine" --only "$id" 2>&1 ); rc=$?
   detail=$(printf '%s\n' "$out" | grep -vE '^      [0-9]+ passed' \
@@ -1311,7 +1624,55 @@ check_pf_01() {
   return 0
 }
 
+# check_sk_proc_skip — the shared global-mode clause for SK-01/SK-02/SK-04 (§2.5): in
+# global mode the procedure tier is served from engine_dir and is not emitted here
+# (emission is W4's), so the row SKIPs with that reason instead of FAILing on the absent
+# copies. Vendored mode returns 1: the caller's own logic runs.
+sk_proc_skip() {
+  if [ "$ENGINE_MODE" = "global" ]; then
+    printf 'procedure tier served from engine_dir (not emitted here)\n'
+    return 0
+  fi
+  return 1
+}
+
+# sk01_cell — SK-01's original check cell (name + description frontmatter), kept verbatim;
+# the builtin only adds the mode clause (the spec's §2.5 names SK-01 alongside SK-02/SK-04:
+# without it, a global repo with no skills passes the loop vacuously — a green that proves
+# nothing, exactly the shape §2.5 exists to kill).
+sk01_cell() {
+  n=0; for f in .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); head -n 1 "$f" | grep -qx -- '---' || exit 1; awk 'NR==1{next} /^---/{exit} /^name:/{a=1} /^description:/{b=1} END{exit !(a&&b)}' "$f" || exit 1; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
+}
+
+check_sk_01() {
+  sk_proc_skip && return 3
+  ( cd "$ROOT" && sk01_cell )
+}
+
+# sk04_cell — SK-04's original check cell. Kept verbatim so the row's declared text and
+# its executed behaviour stay the same thing; the builtin only adds the mode clause.
+sk04_cell() {
+  n=0; for f in .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); grep -q "^## What this cannot see" "$f" || { echo "missing cannot-see section: $f"; exit 1; }; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
+}
+
+check_sk_04() {
+  sk_proc_skip && return 3
+  ( cd "$ROOT" && sk04_cell )
+}
+
+# au04_cell — AU-04's original check cell (the installed automation skills carry a
+# `## Write surface` section); the builtin only adds the mode clause.
+au04_cell() {
+  n=0; for f in .hermes/skills/goblin-bugreporter/SKILL.md .hermes/skills/goblin-drift-audit/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); grep -q "^## Write surface" "$f" || { echo "missing write surface: $f"; exit 1; }; done; [ "$n" -gt 0 ] || { echo "no automation skill found"; exit 1; }; exit 0
+}
+
+check_au_04() {
+  sk_proc_skip && return 3
+  ( cd "$ROOT" && au04_cell )
+}
+
 check_sk_02() {
+  sk_proc_skip && return 3
   local p h cur n=0 bad=0
   while IFS=$'\t' read -r p h; do
     case "$p" in .hermes/skills/*) ;; *) continue ;; esac
@@ -2347,6 +2708,16 @@ else
       acquisition record EXISTS, never that the number beside it came from the store (HP-03's
       defect, one artifact over). No row here reaches a reference asset in CONTEXT either.
 SEE
+  # ---- the engine footer (W1 §2.2, R-1's residue -> docs/LIMITS.md #43) --------
+  # Every run states WHICH engine judged it: the sha256 of the running verifier and of
+  # the manifest that judged this run, so a repo can name its judge. The statement is
+  # UNSIGNED and forgeable - one forgery now covers N repos - which is the hole LIMITS
+  # #43 records, deliberately not fixed in W1 (G6).
+  printf '      engine: mode=%s' "$ENGINE_MODE"
+  if [ -n "$GOBLIN_ENGINE" ]; then printf ' engine_dir=%s' "$GOBLIN_ENGINE"; fi
+  printf ' cli_sha256=%s enforcement_tsv_sha256=%s\n' \
+    "$(g_sha256_file "$SELF_DIR/goblin-verify")" \
+    "$(g_sha256_file "$MANIFEST")"
 fi
 
 if [ "$FAIL" -gt 0 ] || [ "$BAD" -eq 1 ]; then exit 1; fi

@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# goblin — the global CLI dispatcher (W1, PLAN-V1 §2.3 / W1-SPEC §3).
+#
+#   goblin verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
+#   goblin bans   [--only <id[,id...]>] [--list]
+#   goblin audit  [--target <dir>] [--print]
+#   goblin doctor [--platform <p>]      # W4a
+#   goblin emit   --platform <p> [...]  # W4a/W4b
+#   goblin upgrade [--target .] [...]   # W3
+#   goblin --version
+#
+# Identity: the package is goblin-stack, the command is `goblin`. W1 ships the DISPATCH
+# SHELL only — the node shim and npm packaging are W2, doctor/emit are W4a (exit-2
+# placeholders naming their workstream), upgrade is W3 (same). G3 forbids a runtime
+# rewrite: the engine stays bash, this file only routes and propagates.
+#
+# The four-value verify contract is unchanged and non-negotiable (bin/goblin-verify:5-9):
+#   0  every executed check passed
+#   1  at least one check failed
+#   2  could not run
+#   3  the manifest itself is broken
+# Every subcommand propagates the engine's exit code verbatim; no wrapper translates a
+# 1 into a 0. A placeholder that silently exited 0 would be a green build doing nothing.
+#
+# Root resolution: find_installed_root() at bin/goblin-verify:64-77 is preserved
+# BYTE-FOR-BYTE (walk up from $PWD to .goblin/goblin.yaml; fall back to git toplevel,
+# then $PWD — the D20 nested-repo fix). W1 changes nothing about its logic.
+#
+# No npm, no jq, no yq, no network. bash/awk/sed/grep only.
+
+set -uo pipefail
+
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SRC=$(cd "$SELF_DIR/.." && pwd)
+VERSION=$(cat "$SRC/VERSION" 2>/dev/null || printf 'unknown')
+
+g_err() { printf 'error: %s\n' "$*" >&2; }
+
+usage() {
+  cat <<'USAGE'
+goblin — the goblin-stack command line.
+
+  goblin verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
+  goblin bans   [--only <id[,id...]>] [--list]
+  goblin audit  [--target <dir>] [--print]
+  goblin doctor [--platform <p>]            (not implemented until W4a)
+  goblin emit   --platform <p> [...]        (not implemented until W4a/W4b)
+  goblin upgrade [--target .] [--dry-run]   (not implemented until W3)
+  goblin --version
+
+Exit codes (verify): 0 pass | 1 a check failed | 2 could not run | 3 the manifest is
+broken. Every subcommand propagates the engine's exit code verbatim.
+USAGE
+}
+
+# ---- the repo-root locator, preserved byte-for-byte from bin/goblin-verify:64-77 ----
+find_installed_root() {
+  local d="$PWD"
+  while :; do
+    if [ -f "$d/.goblin/goblin.yaml" ]; then printf '%s\n' "$d"; return 0; fi
+    [ "$d" = "/" ] && return 1
+    d=$(dirname "$d")
+  done
+}
+
+# ---- subcommand dispatch ------------------------------------------------------
+CMD="${1:-}"
+[ -n "$CMD" ] || { usage; exit 2; }
+shift
+
+case "$CMD" in
+  verify)
+    # The engine is whatever the per-repo chain resolves (W1 §2.3): --source, vendored,
+    # engine_dir:, GOBLIN_ENGINE_DIR, ~/.goblin/engine — all inside goblin-verify. The
+    # CLI is a pass-through, not a second root-resolution opinion (§3.4).
+    exec bash "$SRC/bin/goblin-verify" "$@"
+    ;;
+  bans)
+    exec bash "$SRC/bin/goblin-bans" "$@"
+    ;;
+  audit)
+    exec bash "$SRC/bin/goblin-audit" "$@"
+    ;;
+  doctor)
+    # W4a's command. A silent exit 0 would be a green build doing nothing: the
+    # placeholder refuses with exit 2 and names the workstream that owns it.
+    g_err "goblin doctor: not implemented until W4a"
+    exit 2
+    ;;
+  emit)
+    g_err "goblin emit: not implemented until W4a (platform detection) / W4b (emission)"
+    exit 2
+    ;;
+  upgrade)
+    g_err "goblin upgrade: not implemented until W3"
+    exit 2
+    ;;
+  --version|-V|-v)
+    printf '%s\n' "$VERSION"
+    exit 0
+    ;;
+  -h|--help|help)
+    usage
+    exit 0
+    ;;
+  *)
+    g_err "unknown subcommand: $CMD"
+    usage >&2
+    exit 2
+    ;;
+esac
