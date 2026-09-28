@@ -90,7 +90,7 @@ fi
 
 # ---- the test scripts --------------------------------------------------------
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
-         t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
+         t-verify-nested t-engine-dir t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
          t-audit t-render-tokens t-gt03-freshness t-doc-guide t-doc-replay; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
