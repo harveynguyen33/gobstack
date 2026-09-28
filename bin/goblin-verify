@@ -1459,14 +1459,13 @@ check_au_01() {
   # adopted automations must not be failed for it. A repo that DECLARES automations (its
   # own, repo-local) but has no producer still FAILs: the SKIP is only for repos that
   # declare none.
-  local f n=0 glob
-  local declared_own=0
-  # "declares automations" = the repo carries its own automation files outside the engine
-  # payload: anything under automations/ at the root. The engine's own producers (vendored
-  # or global) are the toolkit's, not a declaration by this repo.
+  local f n=0 own=0 glob
+  # The repo's OWN producers: anything under a root automations/ directory (the engine's
+  # payload lives under .goblin/automations/ in vendored mode, engine_dir in global mode;
+  # neither is a declaration by this repo).
   for f in "$ROOT"/automations/*.sh "$ROOT"/automations/*/*.sh; do
     [ -e "$f" ] || continue
-    declared_own=1
+    own=$((own + 1))
   done
   while IFS= read -r glob; do
     for f in $glob; do
@@ -1479,11 +1478,18 @@ check_au_01() {
       fi
     done
   done < <(au01_globs)
+  # The declaration clause: a root automations/ directory that holds NO .sh producer is
+  # a declaration whose producer is gone (the files were deleted, not never written).
+  local declared=0
+  for f in "$ROOT"/automations/* "$ROOT"/automations/*/; do
+    [ -e "$f" ] || continue
+    declared=1
+  done
+  if [ "$declared" -eq 1 ] && [ "$own" -eq 0 ]; then
+    printf 'automations are declared but no producer exists - the producer is gone\n'
+    return 1
+  fi
   if [ "$n" -eq 0 ]; then
-    if [ "$declared_own" -eq 1 ]; then
-      printf 'automations are declared but no producer exists - the producer is gone\n'
-      return 1
-    fi
     printf 'no automation producer found (repo or engine)\n'
     return 3
   fi
