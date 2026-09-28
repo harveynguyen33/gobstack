@@ -114,7 +114,7 @@ Output is one line per executed row, in manifest order, plus a summary line at t
 
 Those four lines are one row of each marking. The summary line of a green class-A run is:
 
-          43 passed, 0 failed, 11 advisory, 24 skipped
+          43 passed, 0 failed, 11 advisory, 28 skipped
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -136,7 +136,7 @@ settings that make a workflow a **gate** are written down.
 ### A fresh install verifies green
 
 Measured on a fresh class-A install, committed with no hand edit: **`43 passed, 0 failed,
-11 advisory, 24 skipped`, exit 0.** Twenty-four rows skip with a reason: `HS-02` — no pre-change commit
+11 advisory, 28 skipped`, exit 0.** Twenty-eight rows skip with a reason: `HS-02` — no pre-change commit
 is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `AU-02` and `AU-03`, which
 have no report to audit in a repo where no reporter has run — `SC-06`, `SC-07` and `SC-08`, which
 have no dependency manifest, no lockfile and no audit record to read yet — `PF-01`, which has
@@ -145,7 +145,10 @@ and `BN-03` with the four electron bans
 `BN-06`..`BN-09`, which this class does not enable (`bans: [BN-01, BN-02, BN-05]`), so they skip as
 *not enabled* rather than as *unread* — `FM-01`/`FM-02`/`VA-01`, which have no feature map and no declared
 `verify_doctor:` yet (`feature_map:` and `verify_doctor:` ship empty on purpose: a fresh install
-must not be born RED — G1, `docs/LIMITS.md` #30) — and `JG-01` with `LP-01`..`LP-05`, which have
+must not be born RED — G1, `docs/LIMITS.md` #30) — `RC-01`..`RC-04`, which read a declared
+reference corpus and a lab `manifests/` directory a fresh install has neither of
+(`reference_manifest:` and `quarantine_root:` ship empty on purpose: a repo with no corpus must
+not be born RED) — and `JG-01` with `LP-01`..`LP-05`, which have
 no `.goblin/loop/` record because no loop has run in this repo: the six judge/loop rows are
 **absent-state** rows, and a fresh install must not be born RED either. **Two** rows do
 **not** skip, both of them the CI lane's: `PG-05` and `PG-06` read the workflow this class installs.

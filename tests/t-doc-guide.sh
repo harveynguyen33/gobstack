@@ -12,18 +12,19 @@
 #       `# expect PASS|FAIL` annotation promises - verdict AND exit code. At d5424be the exercise
 #       promised a FAIL from `--only GT-02` that the shipped configuration cannot produce
 #       (measured: PASS rc 0), i.e. the guide taught the lesson backwards.
-#   D4  `created 49` is the installer's count of the files it TRACKS; it writes 50, because
+#   D4  `created 50` is the installer's count of the files it TRACKS; it writes 51, because
 #       `.goblin/installed.json` is written but not counted. The number in the guide is checked
 #       against a real install and the gloss must say which file the counter omits.
 #   D5  §1's network claim must be scoped the way every other copy of it is (GUARDRAILS: "No
 #       network at verify time"; README/CONTRACTS: under "Dependencies").
 #   §3/§9  the guide's own reproducible numbers, re-measured here on a fresh class-A install: the
-#       `created 49` line, the day-one line (`42 passed, 1 failed, 11 advisory, 24 skipped`) and the
-#       green-path line (`43 passed, 0 failed, 11 advisory, 24 skipped`). A number no run prints is
-#       the defect this half exists to catch.
+#       `created 50` line, the day-one line (`42 passed, 1 failed, 11 advisory, 28 skipped`) and the
+#       green-path line (`43 passed, 0 failed, 11 advisory, 28 skipped`). A number no run prints is
+#       the defect this half exists to catch. The skipped count moved 24 -> 28 when the four P15
+#       rows (`RC-01`..`RC-04`) landed: on a fresh install with no declared corpus they all SKIP.
 #   AB3 §8's rule sentence names HOW MANY files `IN-02` covers, and §11 states a review score. The
 #       sentence said "hashes every file the installer wrote" - measured false (the installer writes
-#       50, the row's `files` map is 40), so the reader's counterexample file drifted nothing. The
+#       51, the row's `files` map is 41), so the reader's counterexample file drifted nothing. The
 #       count the guide quotes is asserted against the map a real install writes, the universal is
 #       asserted gone, and the 9/10 is asserted to name the revision it was measured at. A control
 #       that RUNS a guide's commands does not read its sentences - this half reads two of them.
@@ -36,7 +37,7 @@
 #       emphasis, so it tolerates a re-wrapped or `**bold**` stamp; it does NOT tolerate the label
 #       and the number separated by more than one line, or a missing label.
 #
-# RED on d5424be / GREEN at the tip: the REPLAY block does not exist there at all, the `created 49`
+# RED on d5424be / GREEN at the tip: the REPLAY block does not exist there at all, the `created 50`
 # gloss is the false one, and §1 carries the unscoped claim. RED at 58a6fe6: the AB3 assertions
 # below (the guide quotes no files-map length there, and the 9/10 carries no revision). RED at
 # 67a0872: the guide's own `Version:` stamp still says `0.4.3` while `VERSION` is `0.4.4` - the AB4
@@ -133,14 +134,14 @@ fi
 
 # ---- D4: the file count, and the gloss the guide puts on it ------------------------------------
 ONDISK=$(find . -path ./.git -prune -o -type f -print | wc -l)
-[ "$ONDISK" = "50" ]
-check "a class-A install writes 50 files (measured here: $ONDISK; the installer reports created $CREATED)" "$?"
+[ "$ONDISK" = "51" ]
+check "a class-A install writes 51 files (measured here: $ONDISK; the installer reports created $CREATED)" "$?"
 check "  and the guide quotes the installer's own count ($CREATED)" \
-  "$(printf '%s' "$CREATED" | grep -qE '^49$' && echo 0 || echo 1)"
+  "$(printf '%s' "$CREATED" | grep -qE '^50$' && echo 0 || echo 1)"
 grep -qF "created $CREATED · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
 check "  and the guide's transcript of it is the line the installer printed" "$?"
-! grep -q 'means it wrote 49 files' "$GUIDE"
-check "  and the false gloss ('created 49 means it wrote 49 files') is gone (D4)" "$?"
+! grep -q 'means it wrote 50 files' "$GUIDE"
+check "  and the false gloss ('created 50 means it wrote 50 files') is gone (D4)" "$?"
 GLOSS_LINE=$(grep -n "created $CREATED" "$GUIDE" | head -1 | cut -d: -f1)
 if [ -n "$GLOSS_LINE" ] && sed -n "${GLOSS_LINE},$((GLOSS_LINE + 12))p" "$GUIDE" | grep -q 'installed\.json'; then
   note "ok   the gloss names the file the counter does not count (.goblin/installed.json)"
@@ -151,7 +152,7 @@ fi
 
 # ---- AB3: the guide's own file-count claim must equal the map a real install writes -------------
 # §8's rule tells the reader which row to break, and until AB3 it said `IN-02` "hashes every file the
-# installer wrote" - measured false: the installer writes 50 files into an empty repo and the row's
+# installer wrote" - measured false: the installer writes 51 files into an empty repo and the row's
 # `files` map is 40, so the ten it does not hash (including `.goblin/goblin.yaml`, the file §5 step 3
 # has the reader edit) drift nothing and the exercise "confirms" a check that never moved. The count
 # the sentence quotes is compared with the map THIS install wrote, and the universal is compared with
@@ -212,14 +213,14 @@ check "  and the same paragraph now scopes it to verify time" "$?"
 
 # ---- §3/§9: the guide's own numbers, re-measured ------------------------------------------------
 DAYONE=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$DAYONE" | grep -qE '^42 passed, 1 failed, 11 advisory, 24 skipped$'
+printf '%s\n' "$DAYONE" | grep -qE '^42 passed, 1 failed, 11 advisory, 28 skipped$'
 check "the day-one run prints the shape the guide documents ($DAYONE)" "$?"
 
 HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$GREEN" | grep -qE '^43 passed, 0 failed, 11 advisory, 24 skipped$'
+printf '%s\n' "$GREEN" | grep -qE '^43 passed, 0 failed, 11 advisory, 28 skipped$'
 check "naming a real commit makes it green ($GREEN)" "$?"
 
 # EVERY summary-shaped line in the guide must be one of the two a real run printed. The loose form

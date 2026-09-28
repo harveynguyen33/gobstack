@@ -489,6 +489,8 @@ render_config() {
     FEATURE_MAP "" \
     SOURCE_ROOT "." \
     VERIFY_DOCTOR "" \
+    REFERENCE_MANIFEST "" \
+    QUARANTINE_ROOT "" \
     LOOP_MAX_TURNS "$LOOP_MAX_TURNS" \
     GATES "$gates" \
     RATCHET_NAME "$RAT_NAME" \

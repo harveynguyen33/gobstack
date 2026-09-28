@@ -105,17 +105,19 @@ Then, in order:
     .goblin/bin/goblin-verify         # 42 passed, 1 failed - HP-05, until HANDOFF names a commit
     hermes skills trust <target>      # one-time, so the project-tier skills load
 
-A class-A install is **green** — `43 passed, 0 failed, 11 advisory, 24 skipped`, exit 0 — once
+A class-A install is **green** — `43 passed, 0 failed, 11 advisory, 28 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
 the one expected red (`42 passed, 1 failed`). Both numbers are measured, not assumed
-(`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Twenty-four rows skip with a reason: `HS-02` (no
+(`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Twenty-eight rows skip with a reason: `HS-02` (no
 pinned pre-change commit yet), `AU-02`/`AU-03` (no report has been filed, so there is nothing to
 dedup and no reporter run to audit), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile,
 no audit record), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-05` (no `src/` for a ban
 to read) and `BN-03` with the four
 electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` (not in this class's `bans: [BN-01, BN-02, BN-05]`, so
 they skip as *not enabled* rather than as *unread*), `FM-01`/`FM-02`/`VA-01`
-(no feature map and no declared `verify_doctor:` yet) and `JG-01` with `LP-01`..`LP-05` (no
+(no feature map and no declared `verify_doctor:` yet), `RC-01`..`RC-04` (no reference corpus
+declared: `reference_manifest:` ships empty and a fresh repo has no lab `manifests/`) and `JG-01`
+with `LP-01`..`LP-05` (no
 `.goblin/loop/` record, because no loop has run here yet). The class's required parts that only a
 round can produce pass *vacuously* (zero `reviews/*.md` to check; the declared gate is still the
 shipped floor), so the first-step list is a list of work, not a list of FAILs.
@@ -158,7 +160,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .goblin/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the class's full green path (`43 passed, 0 failed, 11 advisory, 24 skipped`, exit 0 for
+   Success is the class's full green path (`43 passed, 0 failed, 11 advisory, 28 skipped`, exit 0 for
    class A) with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three

@@ -70,6 +70,19 @@ feature_map: {{FEATURE_MAP}}
 source_root: {{SOURCE_ROOT}}
 verify_doctor: {{VERIFY_DOCTOR}}
 
+# The reference corpus (P15). `reference_manifest:` names the manifest RC-01/RC-02/RC-04 read: a
+# hash-only record of the quarantined corpus, never the corpus itself. EMPTY means "no reference
+# corpus is declared" and makes RC-01, RC-02 and RC-04 SKIP with that reason - a repo with no
+# corpus must not be born RED. A key that IS set but names a missing or unparseable file is a
+# FAIL, never a skip, so losing the manifest cannot read as "no corpus". RC-01 also reads the
+# `security: build_output:` list above: a file there whose sha256 appears in an entry fails the
+# build.
+# `quarantine_root:` is the quarantine directory the procedure extracts into (outside this repo).
+# No row reads it; it is declared so the procedure has a machine-readable anchor instead of a path
+# in prose.
+reference_manifest: {{REFERENCE_MANIFEST}}
+quarantine_root: {{QUARANTINE_ROOT}}
+
 # The loop ceiling (G2, LP-03). The most turns ONE loop record may declare in its budget, so a
 # runaway loop cannot buy itself unlimited iterations. 20 is the engine's own default for a
 # kanban goal loop, measured; a ceiling that does not match the engine's default is a number

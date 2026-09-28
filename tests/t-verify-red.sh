@@ -3,10 +3,10 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 121 `expect_red` call sites and 28 `expect_green` - 149 calls over
-# all 78 of the matrix's 78 target rows (the other five rows are source-scope and carry controls of
-# their own). Measured at this revision: 78 distinct ids, 0 phantom ids (every id used here is a row
-# in the matrix) and 0 target row left without a control. Nine of the 78 - `HP-04`, `HS-03`,
+# One control per target-scope row: 131 `expect_red` call sites and 34 `expect_green` - 165 calls over
+# all 82 of the matrix's 82 target rows (the other five rows are source-scope and carry controls of
+# their own). Measured at this revision: 82 distinct ids, 0 phantom ids (every id used here is a row
+# in the matrix) and 0 target row left without a control. Nine of the 82 - `HP-04`, `HS-03`,
 # `CM-02`, `MD-03`, `PG-04`, `DOC-01`, `DOC-02`, `SC-09` and `JG-03`, the rows whose check column is
 # literally `advisory` (docs/LIMITS.md and docs/RISKS.md name them and say why) - carry no
 # executable check at all, and ten carry the wire control below (those nine plus `MD-02`, whose
@@ -53,7 +53,7 @@
 # limitation Z1 chose to record rather than fix, and the GREEN half of the `HS-02` pair is the same
 # kind of half - it proves the row is not always-red, not that a fix bites.)
 # The judge-lane family comparison is two text assertions rather than `expect_*` calls, because
-# `MD-02` is advisory and exits 0 either way; its control reads the line it prints. Twenty-eight of
+# `MD-02` is advisory and exits 0 either way; its control reads the line it prints. Thirty-four of
 # the controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, two that seed a feature
 # map and require it to PASS, seven that seed a loop record or a judge lane and require
 # `JG-01`, `JG-02` and `LP-01`..`LP-05` to PASS, five that pin a new row's non-failing half -
@@ -187,7 +187,10 @@ restore_all() {
   cp -a "$BK/gitignore" .gitignore
   rm -f checks/green.mjs checks/red.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
         .goblin/state.json .goblin/last-gate-line .goblin/.ds-report .goblin/ratchet-last \
-        .envrc .goblin/audit.tsv package.json package-lock.json
+        .envrc .goblin/audit.tsv package.json package-lock.json reference-manifest.json
+  # P15: the four RC- controls declare a corpus in directories a class-A install does not have, so
+  # the last thing each leaves behind is removed here (the r_rc03_git hook only handles the index).
+  rm -rf manifests refs notes
   # Z2-3's harness carries shell metacharacters in its NAME, so it needs its own rm: `checks/*.mjs`
   # would expand to it, but an unquoted glob in a restore path is exactly the habit that control
   # exists to break.
@@ -570,7 +573,7 @@ restore_b()  { rm -f .goblin/tokens.yaml; rm -rf .github; }
 # carry CI of its own - which is why this control plants goblin-stack's own filename.
 m_b_workflow() { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    steps:\n      - run: echo hi\n' > .github/workflows/goblin-gate.yml; }
 
-# ---- the 78 target-scope rows, in manifest order ------------------------------
+# ---- the 82 target-scope rows, in manifest order ------------------------------
 expect_red "a manifest with no version"            IN-01 1 m_in_01
 expect_red "one edited byte of the standard"       IN-02 1 m_edit_practice
 expect_red "a manifest row with no check"          IN-03 3 m_blank_row
@@ -1051,6 +1054,93 @@ m_a_nowf()  { mv .github/workflows/goblin-gate.yml "$WORK/gg.bak"; }
 restore_a() { mkdir -p .github/workflows; mv "$WORK/gg.bak" .github/workflows/goblin-gate.yml; }
 expect_red "a class-A repo with the CI lane its class REQUIRES removed" CL-01 1 m_a_nowf "$TARGET" restore_a
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip
+
+# ---- P15: the reference-corpus rows, RC-01..RC-04 ------------------------------------------------
+# Four rows over two DECLARED values (`reference_manifest:`, and the `security: build_output:` key
+# SC-03 already owns - reused, never duplicated) and a lab repo's `manifests/`. The corpus payload
+# lives OUTSIDE the fixture ($RP, under $WORK): a control that dropped a payload into the tree
+# would dirty it for every control after it. The one control that DOES track a payload (NC-5)
+# takes it back out of the index in r_rc03_git, because a staged file is exactly what it tests.
+RP="$WORK/rcpayload.raw"
+printf 'the reference corpus payload, byte-identical\n' > "$RP"
+RP_HASH=$(sha256sum "$RP" | awk '{print $1}')
+# rc_manifest <file>: a well-shaped `reference-manifest/1`, naming the corpus payload's real hash.
+rc_manifest() {
+  printf '{"schema":"reference-manifest/1","generated_from":"sha256sum over the quarantine","reference_app":{"package":"com.example.app","version":"1.0.9","apk_sha256":"%s"},"entries":[{"path":"refs/1.0.9/payloads/a/payload.raw","sha256":"%s","bytes":42}],"entry_count":1}\n' "$RP_HASH" "$RP_HASH" > "$1"
+}
+# Declare the corpus, and a build output this fixture does not otherwise have.
+rc_declare() {
+  sed -i 's|^  build_output: .*|  build_output: dist|' .goblin/goblin.yaml
+  sed -i 's|^reference_manifest: .*|reference_manifest: reference-manifest.json|' .goblin/goblin.yaml
+  rc_manifest reference-manifest.json
+}
+m_rc_key_empty() { sed -i 's|^reference_manifest: .*|reference_manifest:|' .goblin/goblin.yaml; }
+# The declared-but-empty control: the corpus is declared and its manifest is well-shaped, but the
+# fixture has no build output for RC-01 to scan - RC-01 must still exit 0 (nothing to check), and
+# RC-02 must pass the well-shaped manifest. Declared as a function because expect_green invokes it.
+m_rc_declare() { rc_declare; }
+# RC-01 clause 3 (NC-1) and clause 4 (NC-2): a corpus payload inside the build output, then the
+# manifest itself there. Same exit, two different clauses - the second is the corpus's own shape
+# shipping, not one payload of it.
+m_rc01_payload()       { rc_declare; mkdir -p dist; cp "$RP" dist/payload.raw; }
+m_rc01_manifest_copy() { rc_declare; mkdir -p dist; cp reference-manifest.json dist/reference-manifest.json; }
+# RC-01 clause 2 (NC-4): declared but gone, then declared but unreadable. FAIL, never a SKIP.
+m_rc01_absent()        { rc_declare; rm -f reference-manifest.json; }
+m_rc01_unparseable()   { rc_declare; printf 'not json at all\n' > reference-manifest.json; }
+# RC-02 (NC-3), the vacuous-pass control: `entries` truncated to [] is what a "it parsed, ship it"
+# check would pass. RC-02 must reject it AND RC-01 must still accept it - that pair is what makes
+# these two rows rather than one check wearing two ids.
+m_rc02_empty_entries() {
+  rc_declare
+  printf '{"schema":"reference-manifest/1","generated_from":"x","reference_app":{"package":"com.example.app","version":"1.0.9","apk_sha256":"%s"},"entries":[],"entry_count":0}\n' "$RP_HASH" > reference-manifest.json
+}
+m_rc02_count_mismatch() { rc_declare; sed -i 's/"entry_count":1/"entry_count":7/' reference-manifest.json; }
+# RC-03 (NC-5) and RC-04: the lab tree, and the acquisition record's header. `manifests/` is what
+# makes RC-03 and RC-04 applicable at all - a class-A install has neither it nor `refs/`.
+m_rc03_clean() { mkdir -p manifests; printf '# lab corpus\n%s  apk/x.apk\n' "$RP_HASH" > manifests/lab.sha256; }
+m_rc03_tracked_payload() {  # NC-5: a payload git-added under an ALLOWED path (clause 2, not clause 1)
+  m_rc03_clean
+  mkdir -p notes; cp "$RP" notes/payload.raw
+  git add notes/payload.raw >/dev/null 2>&1
+}
+m_rc03_outside() {          # clause 1: a tracked path no allowlist entry covers
+  m_rc03_clean
+  mkdir -p refs; printf 'some bytes\n' > refs/payload.bin
+  git add refs/payload.bin >/dev/null 2>&1
+}
+rc04_header() {
+  printf '# lab reference corpus manifest\n# target : edotownsL-1.0.9.apk (com.example v1.0.9 vercode 10)\n# source : Aptoide pool.apk.aptoide.com ; md5 23974f8582359aa32eac30ad42a7744e\n# anchor : relative to the quarantine root\n%s  apk/edotownsL-1.0.9.apk\n' "$RP_HASH" > manifests/lab.sha256
+}
+m_rc04_valid()     { mkdir -p manifests; rc04_header; }
+m_rc04_no_source() { m_rc04_valid; sed -i '/^# source :/d' manifests/lab.sha256; }
+m_rc04_no_apk()    { m_rc04_valid; sed -i 's|apk/edotownsL-1.0.9.apk|payloads/a/payload.raw|' manifests/lab.sha256; }
+# The index is the one part of the tree restore_all cannot put back by copying a file, so the two
+# staged-file controls carry their own undo.
+r_rc03_git() {
+  git rm -q --cached notes/payload.raw >/dev/null 2>&1
+  git rm -q --cached refs/payload.bin >/dev/null 2>&1
+  rm -f reference-manifest.json
+  rm -rf manifests refs notes
+  git add -A >/dev/null 2>&1
+  git commit -q -m "test: restore fixture" >/dev/null 2>&1 || true
+}
+
+expect_red   "a reference-corpus payload in the build output (NC-1)"         RC-01 1 m_rc01_payload
+expect_red   "a copy of the manifest itself in the build output (NC-2)"      RC-01 1 m_rc01_manifest_copy
+expect_red   "the file reference_manifest: names has been deleted (NC-4)"    RC-01 1 m_rc01_absent
+expect_red   "a declared manifest that is not parseable"                     RC-01 1 m_rc01_unparseable
+expect_green "reference_manifest: empty -> RC-01 SKIPs with a reason"        RC-01 m_rc_key_empty
+expect_green "a declared corpus with no build output to scan"                RC-01 m_rc_declare
+expect_red   "entries truncated to [] (NC-3: RC-02 RED)"                     RC-02 1 m_rc02_empty_entries
+expect_green "entries truncated to [] leaves RC-01 GREEN (NC-3: the pair)"   RC-01 m_rc02_empty_entries
+expect_red   "an entry_count that disagrees with entries"                    RC-02 1 m_rc02_count_mismatch
+expect_green "a well-shaped reference manifest"                              RC-02 m_rc_declare
+expect_red   "a corpus payload git-added under an allowed path (NC-5)"       RC-03 1 m_rc03_tracked_payload "" r_rc03_git
+expect_red   "a tracked path outside the lab allowlist"                      RC-03 1 m_rc03_outside "" r_rc03_git
+expect_green "a manifests/ tree with no tracked payload in it"               RC-03 m_rc03_clean
+expect_red   "an acquisition record whose header names no source store"      RC-04 1 m_rc04_no_source
+expect_red   "an acquisition record with no apk row"                         RC-04 1 m_rc04_no_apk
+expect_green "a well-formed acquisition record"                              RC-04 m_rc04_valid
 
 # ---- V1/G8-5: the advisory budget is reported, not left to arithmetic --------------------------
 # The ceiling is the one scarce resource a rule author spends, and two cards (G1's FM-03, G2's

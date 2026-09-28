@@ -26,7 +26,7 @@ below is the reference material the guide points into, so the two do not compete
 |---|---|
 | `docs/GUIDE.md` | **read this first**: the first week, in order — install, the first verify, the REPLAY habit |
 | `docs/DESIGN.md` | the thesis, the three load-bearing decisions, and every rejected alternative |
-| `docs/FLOWS.md` | the 14 playbooks, with the 11 cuts and a reason for each |
+| `docs/FLOWS.md` | the 15 playbooks, with the 11 cuts and a reason for each |
 | `docs/GUARDRAILS.md` | the security and perf rows (`SC-01`..`SC-09`, `PF-01`), the rung ladder, and what they cannot see |
 | `docs/ROLES.md` | roles versus profiles, the model-mapping contract, the fan-out rule |
 | `docs/ENFORCEMENT.md` | the matrix rendered for a human, and how a rule is added |
@@ -61,17 +61,18 @@ After installing, in this order:
     hermes skills trust <target>              # one-time, so the project-tier skills load
     .goblin/bin/goblin-audit                  # once, deliberately: the ONLY network step (SC-07)
 
-**A class-A install verifies green — `43 passed, 0 failed, 11 advisory, 24 skipped`, exit 0 — once
+**A class-A install verifies green — `43 passed, 0 failed, 11 advisory, 28 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists. Before that edit the scaffold's `0000000` placeholder is
 the one expected red: `42 passed, 1 failed`, `HP-05`. Both numbers measured 2026-09-25; the run and
 the fix are step 2 of `docs/GUIDE.md`.**
-Twenty-four rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
+Twenty-eight rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
 `AU-02` and `AU-03` have no report to audit; `SC-06`, `SC-07` and `SC-08` have no dependency
 manifest, no lockfile and no audit record to read; `PF-01` has no measured perf baseline;
 `BN-01`/`BN-02`/`BN-05` have no `src/` for a ban to read, and `BN-03` plus the four electron bans
 `BN-06`/`BN-07`/`BN-08`/`BN-09` are not in this class's `bans:` list (`bans: [BN-01, BN-02, BN-05]`),
 so they skip as *not enabled* rather than as *unread*; `FM-01`/`FM-02`/`VA-01`
-have no feature map and no declared `verify_doctor:` yet; and `JG-01` with `LP-01`..`LP-05`
+have no feature map and no declared `verify_doctor:` yet; `RC-01`..`RC-04` have no reference corpus
+declared and no lab `manifests/` to read; and `JG-01` with `LP-01`..`LP-05`
 have no loop record, because no loop has run in this repo yet). **Two** rows do **not** skip: `PG-05`
 and `PG-06`, the CI lane's. This class installs `.github/workflows/goblin-gate.yml`, so the two of
 them read it and pass. Two, not four — the four electron bans named above are among the skips. Two of
@@ -95,7 +96,7 @@ Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-05) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (149 over 78 target rows), each required to go RED and then
+one control per target-scope row (165 over 82 target rows), each required to go RED and then
 restored, plus `t-audit.sh` for the SC-07 producer. **A verifier that only ever prints GREEN is a
 failure**, so that file is the one that matters most.
 

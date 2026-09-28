@@ -182,6 +182,19 @@ SOURCE_ROOT=$(g_unquote "$(g_yaml_scalar "$CONFIG" source_root)")
 VERIFY_DOCTOR=$(g_unquote "$(g_yaml_scalar "$CONFIG" verify_doctor)")
 export FEATURE_MAP SOURCE_ROOT VERIFY_DOCTOR
 
+# The reference corpus (P15, RC-01..RC-04). `reference_manifest:` is the ONE state that may SKIP
+# with a reason: a repo with no reference corpus must not be born RED (the feature_map: shape),
+# and RC-01/RC-02/RC-04 skip for exactly that reason. A key that IS declared but whose file is
+# missing or unparseable is a FAIL, deliberately, so losing the manifest cannot read as "no
+# corpus" (the FM-01 declared-map-absent shape). These rows are builtins and not shell one-liners
+# for this reason alone: the runner gives only a builtin exit 2/3 (see the dispatch below), so a
+# one-liner could never report "not applicable yet" without failing the run.
+# `quarantine_root:` is the quarantine directory of the playbook's S5 - outside the repo by
+# design - and no row reads it; it is declared so the procedure has a machine-readable anchor
+# instead of a path in prose (it ships empty here, the way feature_map: does).
+REFERENCE_MANIFEST=$(g_unquote "$(g_yaml_scalar "$CONFIG" reference_manifest)")
+export REFERENCE_MANIFEST
+
 # The loop ceiling (G2, LP-03). The most turns ONE loop record may declare in its budget; 20 is
 # the engine's own default for a kanban goal loop, so a ceiling that disagreed with the engine
 # would be a number someone made up. A config written before this key existed keeps the default
@@ -1926,6 +1939,286 @@ check_lp_05() {
   return 0
 }
 
+# ---- the reference corpus (P15): RC-01..RC-04 ------------------------------------------------
+# P15's machine half. All four read DECLARED values - `reference_manifest:` and the
+# `security: build_output:` block SC-03 clause 2 already reads - and never infer a path from the
+# stack. They are builtins because a shell one-liner cannot SKIP: the runner turns any non-zero
+# shell exit into a FAIL, so a repo with no corpus would be born RED (see the dispatch below).
+
+rc_path() {  # the declared manifest, as an absolute path
+  case "$REFERENCE_MANIFEST" in
+    /*) printf '%s' "$REFERENCE_MANIFEST" ;;
+    *)  printf '%s' "$ROOT/$REFERENCE_MANIFEST" ;;
+  esac
+}
+
+# rc_parse <mode> <manifest> — mode `entries` prints one "sha256<TAB>path" line per entry; mode
+# `validate` prints one line per schema violation. Both exit 1 when the file cannot be read or is
+# not the shape they expect, and both print to stdout so the caller can show the reason.
+rc_parse() {
+  python3 -c '
+import json, re, sys
+mode, path = sys.argv[1], sys.argv[2]
+hex64 = re.compile(r"^[0-9a-fA-F]{64}$")
+try:
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        doc = json.load(fh)
+except Exception as exc:
+    sys.stdout.write("unparseable JSON: %s\n" % exc)
+    sys.exit(1)
+if not isinstance(doc, dict):
+    sys.stdout.write("the manifest is not a JSON object\n")
+    sys.exit(1)
+entries = doc.get("entries")
+if mode == "entries":
+    if not isinstance(entries, list):
+        sys.stdout.write("entries is not a list\n")
+        sys.exit(1)
+    for e in entries:
+        if isinstance(e, dict):
+            sys.stdout.write("%s\t%s\n" % (e.get("sha256", ""), e.get("path", "")))
+    sys.exit(0)
+bad = []
+def want(cond, msg):
+    if not cond:
+        bad.append(msg)
+want(doc.get("schema") == "reference-manifest/1", "schema is not reference-manifest/1")
+gf = doc.get("generated_from")
+want(isinstance(gf, str) and gf.strip() != "", "generated_from is empty")
+app = doc.get("reference_app")
+want(isinstance(app, dict), "reference_app is missing")
+if isinstance(app, dict):
+    for key in ("package", "version"):
+        v = app.get(key)
+        want(isinstance(v, str) and v.strip() != "", "reference_app.%s is empty" % key)
+    want(bool(hex64.match(str(app.get("apk_sha256", "")))), "reference_app.apk_sha256 is not 64 hex")
+want(isinstance(entries, list) and len(entries) > 0, "entries is empty")
+if isinstance(entries, list):
+    for i, e in enumerate(entries):
+        if not isinstance(e, dict):
+            bad.append("entry %d is not an object" % i)
+            continue
+        p = e.get("path")
+        want(isinstance(p, str) and p.strip() != "", "entry %d: path is empty" % i)
+        want(bool(hex64.match(str(e.get("sha256", "")))), "entry %d: sha256 is not 64 hex" % i)
+        want(isinstance(e.get("bytes"), int) and not isinstance(e.get("bytes"), bool),
+             "entry %d: bytes is not a number" % i)
+    ec = doc.get("entry_count")
+    want(isinstance(ec, int) and not isinstance(ec, bool) and ec == len(entries),
+         "entry_count does not equal len(entries)")
+for m in bad:
+    sys.stdout.write("%s\n" % m)
+sys.exit(1 if bad else 0)
+' "$1" "$2"
+}
+
+# rc_build_output_files — every regular file under each declared build-output dir. The key is
+# space-separated and a directory that does not exist is skipped, exactly as SC-03 clause 2 does.
+rc_build_output_files() {
+  local d
+  for d in $SEC_BUILD_OUTPUT; do
+    [ -d "$ROOT/$d" ] || continue
+    find "$ROOT/$d" -type f 2>/dev/null
+  done
+}
+
+# rc_in_build_output <abs path> — is that path inside one of the declared build-output dirs?
+rc_in_build_output() {
+  local p="$1" d
+  for d in $SEC_BUILD_OUTPUT; do
+    case "$p" in "$ROOT/$d"/*) return 0 ;; esac
+  done
+  return 1
+}
+
+check_rc_01() {
+  # Four clauses. (1) `reference_manifest:` empty is the ONE skip, and it carries its reason.
+  # (2) declared but missing or unparseable is a FAIL - losing the manifest must not read as "no
+  # corpus". (3) any file under the declared build output whose sha256 appears in an entry's
+  # sha256 fails, naming the path and the entry. (4) the manifest itself is not shippable.
+  if [ -z "$REFERENCE_MANIFEST" ]; then
+    printf 'reference_manifest: is empty - no reference corpus is declared, so there is nothing for a build to match against\n'
+    return 3
+  fi
+  local mf; mf=$(rc_path)
+  if [ ! -f "$mf" ]; then
+    printf 'reference_manifest: %s does not exist - a declared corpus that is absent is a hole, not a skip\n' "$REFERENCE_MANIFEST"
+    return 1
+  fi
+  local entries
+  if ! entries=$(rc_parse entries "$mf"); then
+    printf 'reference_manifest: %s is not parseable - a declared corpus that cannot be read is a FAIL\n' "$REFERENCE_MANIFEST"
+    printf '%s\n' "$entries" | sed 's/^/  /'
+    return 1
+  fi
+  local n_entries; n_entries=$(printf '%s\n' "$entries" | grep -c . || true)
+  local bad=0 out_n=0 f h hit mh
+  mh=$(g_sha256_file "$mf")
+  # clause 4, both halves of "the manifest is not itself shippable": the declared path must not
+  # live inside the build output, and no COPY of the manifest may sit there either - the manifest
+  # is a listing of every corpus hash, so shipping it ships the corpus's shape.
+  if rc_in_build_output "$mf"; then
+    printf 'the reference manifest itself sits inside the declared build output: %s\n' "${mf#"$ROOT"/}"
+    bad=1
+  fi
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    out_n=$((out_n + 1))
+    h=$(g_sha256_file "$f")
+    if [ "$h" = "$mh" ]; then
+      printf 'a copy of the reference manifest is in the build output: %s\n' "${f#"$ROOT"/}"
+      bad=1
+      continue
+    fi
+    hit=$(printf '%s\n' "$entries" | awk -F'\t' -v h="$h" '$1 == h { print $2; exit }')
+    if [ -n "$hit" ]; then
+      printf 'a reference-corpus payload is in the build output: %s (entry %s)\n' "${f#"$ROOT"/}" "$hit"
+      bad=1
+    fi
+  done < <(rc_build_output_files)
+  [ "$bad" -eq 0 ] || return 1
+  if [ "$out_n" -eq 0 ]; then
+    printf '%s entry/entries; no build output to scan (security: build_output: names no directory that exists)\n' "$n_entries"
+  else
+    printf '%s entry/entries; %s build-output file(s) hashed, none matches\n' "$n_entries" "$out_n"
+  fi
+  return 0
+}
+
+check_rc_02() {
+  # The vacuous-pass guard: RC-01 cannot pass on a manifest that was authored weak. SKIPs with
+  # RC-01's reason when the key is empty; a declared manifest that is absent or ill-shaped is a
+  # FAIL, never a skip.
+  if [ -z "$REFERENCE_MANIFEST" ]; then
+    printf 'reference_manifest: is empty - there is no manifest to shape-check (RC-01 skips for the same reason)\n'
+    return 3
+  fi
+  local mf; mf=$(rc_path)
+  if [ ! -f "$mf" ]; then
+    printf 'reference_manifest: %s does not exist - a declared manifest that is absent is a hole, not a skip\n' "$REFERENCE_MANIFEST"
+    return 1
+  fi
+  local errs=""
+  errs=$(rc_parse validate "$mf") && {
+    printf '%s is shaped so RC-01 cannot pass vacuously (schema, provenance, non-empty entries, entry_count)\n' "$REFERENCE_MANIFEST"
+    return 0
+  }
+  printf '%s is not a usable reference manifest:\n' "$REFERENCE_MANIFEST"
+  printf '%s\n' "$errs" | sed 's/^/  /'
+  return 1
+}
+
+check_rc_03() {
+  # Two clauses over the LAB repo: every tracked path is inside the declared allowlist, and no
+  # tracked file's sha256 equals a hash in a manifests/*.sha256. The manifest lists paths and
+  # hashes, which the lab's own README permits - the check is about BYTES, so the manifest is
+  # never read as a violation (its rows name files under the quarantine anchor, outside the repo).
+  if [ ! -d "$ROOT/manifests" ]; then
+    printf 'no manifests/ directory - this is not a lab repo with a reference corpus, so there are no tracked bytes to check\n'
+    return 3
+  fi
+  local mfs; mfs=$(ls "$ROOT"/manifests/*.sha256 2>/dev/null || true)
+  if [ -z "$mfs" ]; then
+    printf 'manifests/ exists but holds no *.sha256 - a corpus manifest directory that cannot be read is a FAIL, not a skip\n'
+    return 1
+  fi
+  local bad=0 p h m hashes="" n=0
+  for m in $mfs; do
+    hashes="$hashes$(awk '!/^#/ && NF >= 2 { print $1 }' "$m")"$'\n'
+  done
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    n=$((n + 1))
+    case "$p" in
+      scripts/*|notes/*|manifests/*) continue ;;
+      # The harness's own directories and the .gitignore block it appends are the install, not the
+      # lab's content - the same exclusion FM-02 makes for the same reason (W5-4). That set is the
+      # one the class-A install contract creates: .goblin/, .hermes/, the .gitignore block, the
+      # declared harness_dir (checks/ by default), reviews/, and the CI scaffold .github/. A payload
+      # hidden in any of them is still caught by clause 2 (the sha256 sweep below).
+      .goblin/*|.hermes/*|.gitignore|.github/*|reviews/*) continue ;;
+      "${GOBLIN_HARNESS_REL:-checks}"/*) continue ;;
+    esac
+    case "$p" in
+      */*) bad=1; printf 'a tracked path outside the lab allowlist (scripts/, notes/, manifests/, root docs): %s\n' "$p" ;;
+      *.md) ;;  # a root-level doc
+      *)   bad=1; printf 'a tracked path outside the lab allowlist (scripts/, notes/, manifests/, root docs): %s\n' "$p" ;;
+    esac
+  done < <( cd "$ROOT" && git ls-files )
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    h=$(g_sha256_file "$ROOT/$p")
+    if printf '%s' "$hashes" | grep -qxF "$h"; then
+      printf 'a reference-corpus payload is TRACKED in the lab repo: %s\n' "$p"
+      bad=1
+    fi
+  done < <( cd "$ROOT" && git ls-files )
+  [ "$bad" -eq 0 ] || return 1
+  printf '%s tracked file(s): all inside the lab allowlist, none matching a corpus hash\n' "$n"
+  return 0
+}
+
+check_rc_04() {
+  # The acquisition record, and the weakest of the four: it proves a record EXISTS, never that
+  # the number beside it came from the store. SKIPs when no manifest is declared; a manifest with
+  # no header block is a FAIL.
+  local mfs; mfs=$(ls "$ROOT"/manifests/*.sha256 2>/dev/null || true)
+  if [ -z "$mfs" ]; then
+    printf 'no manifests/*.sha256 - no acquisition record is declared, so there is none to read\n'
+    return 3
+  fi
+  local bad=0 m hdr tgt src c64 apk apkh n=0
+  for m in $mfs; do
+    n=$((n + 1))
+    hdr=$(awk '/^#/ { print; next } { exit }' "$m")
+    if [ -z "$hdr" ]; then
+      printf '%s: no header block - the acquisition record is absent\n' "${m#"$ROOT"/}"
+      bad=1; continue
+    fi
+    tgt=$(rc_hdr_field "$hdr" target)
+    src=$(rc_hdr_field "$hdr" source)
+    c64=$(printf '%s\n' "$hdr" | grep -oiE '[0-9a-f]{64}' | head -n 1)
+    # the header's own apk path
+    apk=$(printf '%s' "$tgt" | grep -oiE '[A-Za-z0-9._-]+\.apk' | head -n 1)
+    apkh=$(awk '!/^#/ && NF >= 2 { print $1 "\t" $2 }' "$m" | awk -F'\t' 'tolower($2) ~ /\.apk$/ { print; exit }')
+    if [ -z "$tgt" ] || ! printf '%s' "$tgt" | grep -qE '[0-9]+\.[0-9]+'; then
+      printf '%s: the header names no target slug + version (target: <file> <version>)\n' "${m#"$ROOT"/}"; bad=1
+    fi
+    if [ -z "$src" ] || ! printf '%s' "$src" | grep -qE '[A-Za-z0-9.-]+\.[A-Za-z]{2,}'; then
+      printf '%s: the header names no source store (source: <store> [; <checksum>])\n' "${m#"$ROOT"/}"; bad=1
+    fi
+    if ! printf '%s\n' "$hdr" | grep -qoiE '[0-9a-f]{32}([^0-9a-f]|$)'; then
+      printf '%s: the header carries no checksum (md5 or sha256 hex)\n' "${m#"$ROOT"/}"; bad=1
+    fi
+    if [ -z "$apkh" ]; then
+      printf '%s: the manifest holds no *.apk row\n' "${m#"$ROOT"/}"; bad=1
+    elif [ -n "$apk" ] && [ "${apkh#*$'\t'}" != "" ]; then
+      local rowbase; rowbase=${apkh#*$'\t'}; rowbase=${rowbase##*/}
+      if [ "$apk" != "$rowbase" ]; then
+        printf '%s: the header names %s but the manifest rows %s\n' "${m#"$ROOT"/}" "$apk" "$rowbase"; bad=1
+      fi
+    fi
+    if [ -n "$c64" ] && [ -n "$apkh" ]; then
+      local rowhash; rowhash=${apkh%%$'\t'*}
+      [ "$c64" = "$rowhash" ] || { printf '%s: the header sha256 %s disagrees with the apk row %s\n' "${m#"$ROOT"/}" "$c64" "$rowhash"; bad=1; }
+    fi
+  done
+  [ "$bad" -eq 0 ] || return 1
+  printf '%s acquisition record(s): target + version, source store, checksum, apk row\n' "$n"
+  return 0
+}
+
+# rc_hdr_field <header text> <key> — the value of a `# key : value` header line, case-insensitive.
+rc_hdr_field() {
+  printf '%s\n' "$1" | awk -v k="$2" '
+    /^#[[:space:]]*[A-Za-z_]+[[:space:]]*:/ {
+      line = $0; sub(/^#[[:space:]]*/, "", line)
+      key = line; sub(/:.*/, "", key); gsub(/[[:space:]]/, "", key)
+      if (tolower(key) == tolower(k)) { v = line; sub(/^[^:]*:[[:space:]]*/, "", v); print v; exit }
+    }
+  '
+}
+
 # ================================================================ runner ======
 
 PASS=0; FAIL=0; ADV=0; SKIP=0; BAD=0
@@ -2046,7 +2339,13 @@ else
       .github/workflows/ — never that the forge marks that job required, never that it is the job
       the forge waits on, and never that the workflow can fail (that is PG-05). A required check
       that reports Success after skipping its gate is a green light for a commit whose gate never
-      ran (docs/CI.md).
+      ran (docs/CI.md). The reference-corpus lane adds its own: RC-01 matches EXACT sha256 only,
+      so a resized, recoloured or re-encoded reference asset, or copied text inside a shipped
+      string, passes it unseen; RC-02 proves the manifest is well-shaped, never that its entries
+      are the right hashes (as strong as tamper hashing, and installed.json is unsigned); RC-03
+      reads the tracked tree and cannot see a payload renamed and re-encoded; and RC-04 proves an
+      acquisition record EXISTS, never that the number beside it came from the store (HP-03's
+      defect, one artifact over). No row here reaches a reference asset in CONTEXT either.
 SEE
 fi
 

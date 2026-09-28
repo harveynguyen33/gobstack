@@ -11,16 +11,18 @@ Use when adopting goblin-stack in a repo, or starting one.
    it is not a stringency level. F is a desktop shell: it adds the electron bans and a host gate.
 2. **`goblin-install --target <dir> --class <x>`**
 3. **`goblin-verify`** — a class-A install verifies green: `43 passed, 0 failed, 11
-   advisory, 24 skipped`, exit 0, once `HANDOFF.md` names a commit that exists; before that edit the
+   advisory, 28 skipped`, exit 0, once `HANDOFF.md` names a commit that exists; before that edit the
    scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`42 passed, 1 failed`).
-   Twenty-four rows skip with a reason, and the reason matters: `HS-02`
+   Twenty-eight rows skip with a reason, and the reason matters: `HS-02`
    (no pinned pre-change commit yet, so the REPLAY is not provable), `AU-02`/`AU-03` (no report
    has been filed in this repo), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile, no
    audit record), `PF-01` (no perf baseline measured yet), `BN-01`/`BN-02`/`BN-05` (the ban table is
    installed but this fresh repo has no `src/` for a ban to read) and `BN-03` with the four electron
    bans `BN-06`..`BN-09` (not in this class's `bans: [BN-01, BN-02, BN-05]`, so they skip as
    *not enabled* rather than as *unread*),
-   `FM-01`/`FM-02`/`VA-01` (no feature map and no declared `verify_doctor:` yet), and `JG-01` with
+   `FM-01`/`FM-02`/`VA-01` (no feature map and no declared `verify_doctor:` yet), `RC-01`..`RC-04`
+   (no reference corpus declared: `reference_manifest:` ships empty and there is no lab
+   `manifests/`), and `JG-01` with
    `LP-01`..`LP-05` (no `.goblin/loop/` record, because no loop has run in this repo yet). Each is
    a *not yet*, not a pass.
    The class's required parts

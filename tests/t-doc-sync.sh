@@ -8,7 +8,7 @@
 #   F2-8  docs/ROLES.md must say bin/goblin-model is checkout-only, because the installer does
 #         not install it (measured in t-uninstall.sh) and it has no enforcement.tsv row.
 #   F2-9  "A fresh install is not automatically green" is false as measured - a fresh class-A
-#         install verifies 43 passed, 0 failed, 11 advisory, 24 skipped, exit 0. The claim was
+#         install verifies 43 passed, 0 failed, 11 advisory, 28 skipped, exit 0. The claim was
 #         written in FOUR places, not three: README.md, docs/CONTRACTS.md, docs/ADOPTION.md and
 #         skills/goblin-bootstrap/SKILL.md - the last one being the copy the installer writes
 #         into every target (bin/goblin-install:357-360), so a green target shipped the claim
@@ -126,7 +126,7 @@ check "no shipped doc or skill claims a fresh install is not automatically green
 # shipped skills do not discuss a verify run and are not required to.
 GREEN_CLAIM=""
 for f in README.md docs/CONTRACTS.md docs/ADOPTION.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '43 passed, 0 failed, 11 advisory, 24 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '43 passed, 0 failed, 11 advisory, 28 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, CONTRACTS, ADOPTION and the shipped bootstrap skill state the measured green path" \
