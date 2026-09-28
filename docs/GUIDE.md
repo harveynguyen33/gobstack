@@ -421,12 +421,26 @@ replaces your project's own record with a blank scaffold — the exact act the r
 prevent. Reconcile instead: keep your file, and add the five sections it is missing. The measured
 cost of that edit, on a real 2450-line handoff, was **15 lines added, none removed**.
 
+**One engine, many repos (W1):** the rule table does not have to live in every repo. A repo can
+point at a shared engine with one line in `.goblin/goblin.yaml`:
+
+    engine_dir: ~/.goblin/engine          # absolute or ~/-prefixed; absent = per-repo engine
+
+Declared but unusable (relative path, missing directory, no manifest inside) is verify **exit 2
+with no fallback** — a repo is never judged by an engine it did not declare. A repo whose record
+says `mode=global` keeps hashing whatever files it still holds; the engine's own identity prints in
+every run's footer (`engine: mode=… cli_sha256=… enforcement_tsv_sha256=…`). For machines that want
+the engine without any per-repo payload, `bin/goblin` in the goblin-stack checkout dispatches the
+same commands from outside any repo: `goblin verify` / `goblin bans` / `goblin audit` / `goblin
+--version` (doctor/emit/upgrade arrive with W3/W4 and exit 2 naming their workstream until then).
+
 **Two exit-code contracts worth knowing:**
 
 | Command | Exit codes |
 |---|---|
 | `goblin-install` | `0` ok · `1` a refusal (with the path and the fix) · `2` bad input |
 | `goblin-verify` | `0` all checks passed · `1` a check failed · `2` could not run · `3` the manifest itself is broken |
+| `bin/goblin` (global CLI) | propagates the subcommand's codes verbatim — `verify`/`bans`/`audit`/`--version`; `doctor`/`emit`/`upgrade` are W3/W4 placeholders that exit `2` |
 
 `3` is the one to notice: it means goblin-stack's own rule table is malformed, not your project.
 

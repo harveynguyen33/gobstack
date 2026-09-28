@@ -408,6 +408,22 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     control's own header now names the form as uncovered instead of claiming a sensitivity it does
     not have, and the slash's load-bearing role is stated where the dangling rule is.
 
+43. **The engine footer names its judge, and the statement is unsigned — one forgery covers N
+    repos.** W1's engine split prints `cli_sha256` and `enforcement_tsv_sha256` on every run
+    (and `installed.json` gains an optional `engine:` block recording the same pair), so a repo
+    can state WHICH engine judged it. Nothing signs either hash: the footer is printf output of
+    the very binary it names, and the `engine:` block is a JSON stanza inside the same unsigned
+    record `docs/LIMITS.md` #18 already covers. An edited engine, or a hand-written block
+    claiming a mode that was never resolved, prints whatever it likes — and because the
+    statement now rides in every repo's run, one forgery propagates to every repo that trusts
+    it, which is strictly worse than #18's per-repo record. The old defences still hold and are
+    what the footer must not be read to replace: `--source` pins the engine by flag, a vendored
+    engine keeps beating the global one in the resolution chain, and IN-02 still hashes the
+    repo-local bytes. What is NOT fixed (G6, the no-signing non-goal): no trust root, no
+    detached signature, no third-party attestation. Measured with W1: tamper one byte of the
+    vendored manifest and the footer's `enforcement_tsv_sha256` moves — the footer is a real
+    fingerprint of what ran, it is just not PROOF of it.
+
 ## Verdicts recorded, not built (the note-8 questions)
 
 Two library questions were investigated to a verdict and **deliberately built nothing here**, so a

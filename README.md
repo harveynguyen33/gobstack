@@ -96,7 +96,7 @@ Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-05) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (165 over 82 target rows), each required to go RED and then
+one control per target-scope row (167 over 82 target rows), each required to go RED and then
 restored, plus `t-audit.sh` for the SC-07 producer. **A verifier that only ever prints GREEN is a
 failure**, so that file is the one that matters most.
 
