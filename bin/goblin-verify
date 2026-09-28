@@ -418,6 +418,10 @@ row_part() {
     # prefix returns "" and the row can never honour an opt-out (G3 section 4.3).
     AU-*) echo playbooks ;;
     SK-04) echo playbooks ;;
+    # SK-01 rides the same part (W1 made it a builtin for the global-mode clause): with
+    # --skills no there is no shipped skill to frontmatter-check, and a vacuous pass proves
+    # nothing - the row honours the opt-out like its SK-02/SK-04 siblings.
+    SK-01) echo playbooks ;;
     # SK-02 keys off the same part: with --skills no there are no installed skills to hash, and
     # the row used to FAIL there (measured at v0.2.0-dev: "32 passed, 1 failed ... SK-02 0
     # installed skill file(s) hashed"). An opt-out is the honest report; a FAIL on a repo that
@@ -451,13 +455,14 @@ check_in_01() {
 # "key": "value" pairs (W1 §2.2), which IN-04 must never read as pre-existing files.
 g_installed_files_strict() {
   awk '
+    /^  "files": \{[[:space:]]*\},?$/ { next }
     /^  "files": \{/ { f = 1; next }
     f && /^  \},$/ { f = 0 }
     f && /^    "/ {
       line = $0
       sub(/^    "/, "", line)
       p = line; sub(/".*/, "", p)
-      h = line; sub(/^[^"]*"[[:space:]]*:[[:space:]]*"/, "", h); sub(/".*/, "", h)
+      h = line; sub(/[^"]*"[[:space:]]*:[[:space:]]*"/, "", h); sub(/".*/, "", h)
       print p "\t" h
     }
   ' "$1"
@@ -531,7 +536,7 @@ check_in_02() {
       printf 'drift: %s recorded %s now %s\n' "$p" "$h" "$cur"
       bad=1
     fi
-  done < <(g_installed_files "$INSTALLED")
+  done < <(g_installed_files_strict "$INSTALLED")
   if [ "$ENGINE_MODE" = "global" ] && [ "$n" -eq 0 ]; then
     detail="0 repo-local files hashed (global engine mode)"
   else
@@ -1629,6 +1634,19 @@ sk_proc_skip() {
     return 0
   fi
   return 1
+}
+
+# sk01_cell — SK-01's original check cell (name + description frontmatter), kept verbatim;
+# the builtin only adds the mode clause (the spec's §2.5 names SK-01 alongside SK-02/SK-04:
+# without it, a global repo with no skills passes the loop vacuously — a green that proves
+# nothing, exactly the shape §2.5 exists to kill).
+sk01_cell() {
+  n=0; for f in .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); head -n 1 "$f" | grep -qx -- '---' || exit 1; awk 'NR==1{next} /^---/{exit} /^name:/{a=1} /^description:/{b=1} END{exit !(a&&b)}' "$f" || exit 1; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
+}
+
+check_sk_01() {
+  sk_proc_skip && return 3
+  ( cd "$ROOT" && sk01_cell )
 }
 
 # sk04_cell — SK-04's original check cell. Kept verbatim so the row's declared text and

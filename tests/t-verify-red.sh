@@ -1203,6 +1203,30 @@ m_in_02_global_engine_gone() {
   w1_plant_engine_record
   rm -rf .goblin/bin .goblin/manifest
 }
+# Clause 3 (§2.2): a global repo whose files map is EMPTY hashes nothing and passes - the
+# lenient reader (g_installed_files) leaks the engine: block's key/value pairs as phantom
+# file entries and reports drift on keys that were never files (measured pre-fix: '8
+# installed files hashed' with rc 1). The strict reader must keep clause 3 at 0 files, rc 0.
+m_in_02_global_files_empty() {
+  w1_plant_engine_record
+  python3 -c '
+import json
+rec = json.load(open(".goblin/installed.json"))
+rec["files"] = {}
+rec["owned"] = {}
+json.dump(rec, open(".goblin/installed.json", "w"), indent=2)
+'
+}
+m_in_02_global_files_empty
+out=$(bash "$SRC/bin/goblin-verify" --source "$SRC" --only IN-02 2>&1); rc=$?
+if [ "$rc" = "0" ] && printf '%s' "$out" | grep -qE '0 repo-local files hashed \(global engine mode\)'; then
+  note "ok   W1: an empty files map under mode=global hashes nothing and passes (clause 3)"
+else
+  note "FAIL W1: an empty files map under mode=global hashes nothing and passes (clause 3) (rc=$rc)"
+  printf '%s\n' "$out" | sed 's/^/        /'
+  fail=1
+fi
+restore_all
 m_in_02_global_engine_gone
 out=$(bash "$SRC/bin/goblin-verify" --source "$SRC" --only IN-02 2>&1); rc=$?
 if [ "$rc" = "0" ] && printf '%s' "$out" | grep -qE '[0-9]+ installed files hashed'; then
