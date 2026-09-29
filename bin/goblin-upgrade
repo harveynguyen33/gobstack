@@ -446,12 +446,12 @@ if [ -f "$GATE" ] && grep -q '\.goblin/bin/goblin-lib.sh' "$GATE"; then
       print "# shellcheck source=/dev/null"
       print "# The engine went global (goblin upgrade): resolve it exactly as"
       print "# goblin-verify does - engine_dir:, then the machine default."
+      print "CONFIG=\"$ROOT/.goblin/goblin.yaml\""
       print "ENGINE_DIR=$(sed -n \"s/^engine_dir:[[:space:]]*//p\" \"$CONFIG\" | head -n 1)"
       print "case \"$ENGINE_DIR\" in \"~\") ENGINE_DIR=\"$HOME\" ;; \"~\"/*) ENGINE_DIR=\"$HOME/${ENGINE_DIR#\\~/}\" ;; esac"
-      print "if [ -z \"$ENGINE_DIR\" ] && [ -n \"$GOBLIN_ENGINE_DIR\" ]; then ENGINE_DIR=$GOBLIN_ENGINE_DIR; fi"
+      print "if [ -z \"$ENGINE_DIR\" ] && [ -n \"${GOBLIN_ENGINE_DIR:-}\" ]; then ENGINE_DIR=$GOBLIN_ENGINE_DIR; fi"
       print "if [ -z \"$ENGINE_DIR\" ] && [ -d \"$HOME/.goblin/engine\" ]; then ENGINE_DIR=$HOME/.goblin/engine; fi"
       print ". \"$ENGINE_DIR/bin/goblin-lib.sh\""
-      print "CONFIG=\"$ROOT/.goblin/goblin.yaml\""
       done=1; next
     }
     /^CONFIG="/ { next }
