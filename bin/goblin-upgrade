@@ -228,14 +228,17 @@ if [ "${RECORD_OK:-0}" -eq 1 ] && [ -z "${MODE:-}" ]; then
   elif [ "$BLOCK_MODE" = "global" ] && [ "$PAYLOAD_N" -gt 0 ]; then
     MODE="refuse-R8"                    # crash between commits A and B
     R8_MSG="upgrade: partial migration detected - the record says global but $PAYLOAD_N engine files are still here. fix: resume by removing them (the engine lives at ${BLOCK_DIR:-$ED}), or roll back: git revert <commit A>"
-  elif [ "$BLOCK_MODE" != "global" ] && [ "$RECORD_ENGINE_N" -eq 0 ] && [ "$PAYLOAD_N" -eq 0 ]; then
-    MODE="refuse-R9"                    # hand-migration: entries dropped, no block
-    R9_MSG="upgrade: $REPO's record dropped $RECORD_ENGINE_N engine entries but carries no engine: block - this is not a state goblin upgrade produced. fix: restore the record (git checkout .goblin/installed.json) and re-run"
+  elif [ "$BLOCK_MODE" != "global" ] && [ "$RECORD_ENGINE_N" -lt 18 ]; then
+    MODE="refuse-R9"                    # hand-migration: entries PARTIALLY or fully dropped, no block
+    R9_MSG="upgrade: $REPO's record is missing its engine: block and carries only $RECORD_ENGINE_N of the 18 engine entries - dropped $((18 - RECORD_ENGINE_N)) by hand, a state goblin upgrade did not produce. fix: restore the record (git checkout .goblin/installed.json) and re-run"
   elif [ "$PAYLOAD_N" -eq 0 ]; then
     MODE="refuse-R5"                    # fresh-shape record but no payload to lift
     R5_MSG="upgrade: no engine at $ED and no vendored payload to lift it from - install the engine first (goblin-install a fresh repo, or set --engine-dir)"
+  elif [ "$RECORD_ENGINE_N" -eq 18 ]; then
+    MODE="migrate"                      # I1: the migration runs (record intact, payload intact)
   else
-    MODE="migrate"                      # I1: the migration runs
+    MODE="refuse-R9"                    # record count off in any unnamed combination: refuse, do not guess
+    R9_MSG="upgrade: $REPO's record carries $RECORD_ENGINE_N engine entries where a 0.4.4 install records 18 - an unnamed state. fix: restore the record (git checkout .goblin/installed.json) and re-run"
   fi
 fi
 

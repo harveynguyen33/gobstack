@@ -231,6 +231,27 @@ check "U12 checks/gate.sh prints a non-empty gate line" "$?"
 grep -q 'npx goblin-stack@' "$P/.github/workflows/goblin-gate.yml"
 check "U12 the workflow run line is re-pointed to the pinned global form" "$?"
 )
+(# ============================================================ U12b: the partial-drop hand-migration --
+# The reviewer's S2 finding: a hand-edited record with the engine: block removed and only PART
+# of the 18 entries dropped used to walk the migrate path and complete SILENTLY. The
+# discriminator now refuses any block-missing record below the full 18, and the migrate path
+# itself requires exactly 18. Measured on the reviewer's probe shape (4 bin entries dropped).
+new_i1 "$WORK/u12c"
+( cd "$WORK/u12c" && python3 -c '
+import json
+rec = json.load(open(".goblin/installed.json"))
+dropped = [k for k in list(rec["files"]) if k.startswith(".goblin/bin/")][:4]
+for k in dropped: rec["files"].pop(k)
+json.dump(rec, open(".goblin/installed.json", "w"), indent=2)' )
+git -C "$WORK/u12c" add -A && git -C "$WORK/u12c" commit -q -m "hand: partial engine-entry drop, no engine block"
+OUT_U12C=$(up "$WORK/u12c" --engine-dir "$HOMEDIR/engine" --yes 2>&1); RC_U12C=$?
+check "U12b a PARTIAL engine-entry drop with no engine block refuses (the silent-migrate hole)" \
+  "$([ "$RC_U12C" -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$OUT_U12C" | grep -q 'missing its engine: block'
+check "U12b the refusal names the shape and the count" "$?"
+[ "$(git -C "$WORK/u12c" rev-list --count HEAD)" -eq 4 ]
+check "U12b the refusal wrote no commits" "$?"
+)
 (# ============================================================ U3: R1/R2/R3 --
 # R1 dirty tree
 new_i1 "$WORK/u3a"
@@ -313,7 +334,7 @@ json.dump(rec, open(p, 'w'), indent=2)
 git -C "$WORK/u6b" add -A && git -C "$WORK/u6b" commit -q -m "hand migration"
 OUT_R9=$(up "$WORK/u6b" --engine-dir "$HOMEDIR/engine" --yes 2>&1)
 check "U6 R9 the hand-migration shape refuses with exit 1" "$([ $? -eq 1 ] && echo 0 || echo 1)"
-printf '%s' "$OUT_R9" | grep -q 'carries no engine: block'
+printf '%s' "$OUT_R9" | grep -q 'missing its engine: block'
 check "U6 R9 the refusal names the state" "$?"
 printf '%s' "$OUT_R9" | grep -q 'restore the record'
 check "U6 R9 the refusal gives the restore fix" "$?"
