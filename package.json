@@ -1,0 +1,22 @@
+{
+  "name": "goblin-stack",
+  "version": "0.4.4",
+  "description": "Agent-discipline toolkit: one verify command, an enforcement matrix, and LIMITS. bash engine, npm shim.",
+  "bin": {
+    "goblin": "bin/goblin.js"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harveynguyen33/goblin-stack.git"
+  },
+  "keywords": [
+    "agent-discipline",
+    "enforcement",
+    "verification"
+  ]
+}
