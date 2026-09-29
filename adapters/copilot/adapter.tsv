@@ -1,0 +1,10 @@
+# adapters/copilot/adapter.tsv - W4A-SPEC SS2/SS8 P2. Shapes from GitHub Copilot CLI's own docs
+# (docs.github.com/en/copilot, read 2026-09-29): agent skills at <name>/SKILL.md under
+# .github/skills/ (project - of the two candidate roots, this one is the documented Copilot CLI
+# location; .agents/skills is the cross-tool convention, not the documented Copilot location)
+# and ~/.copilot/skills/ (personal); repository-wide custom instructions are
+# .github/copilot-instructions.md. Prompt hooks fire at sessionStart only, new interactive
+# sessions - not on resume, not headless (hooks reference, same date): the plan's caveat,
+# recorded in cap_post_compaction=no and printed by the doctor.
+id	display	detect_any	skills_path_project	skills_path_global	context_path	docs_url	docs_read	cap_skills	cap_context_injection	cap_command_blocking	cap_marketplace	cap_post_compaction
+copilot	GitHub Copilot CLI	~/.copilot:copilot	.github/skills/<name>/SKILL.md	~/.copilot/skills/<name>/SKILL.md	.github/copilot-instructions.md	https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills	2026-09-29	yes	full	yes	no	no

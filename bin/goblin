@@ -43,8 +43,8 @@ goblin — the goblin-stack command line.
   goblin verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
   goblin bans   [--only <id[,id...]>] [--list]
   goblin audit  [--target <dir>] [--print]
-  goblin doctor [--platform <p>]            (not implemented until W4a)
-  goblin emit   --platform <p> [...]        (not implemented until W4a/W4b)
+  goblin doctor [--platform <p>] [--target <dir>]
+  goblin emit   --platform <p> --scope project|global [...]
   goblin upgrade [--target .] [--dry-run] [--yes] [--engine-dir <path>]
   goblin --version
 
@@ -82,14 +82,14 @@ case "$CMD" in
     exec bash "$SRC/bin/goblin-audit" "$@"
     ;;
   doctor)
-    # W4a's command. A silent exit 0 would be a green build doing nothing: the
-    # placeholder refuses with exit 2 and names the workstream that owns it.
-    g_err "goblin doctor: not implemented until W4a"
-    exit 2
+    # W4a: one run, three platforms (the §7 report); the dispatcher routes and
+    # propagates the doctor's 0/1/2 verbatim, like every other subcommand.
+    exec bash "$SRC/bin/goblin-doctor" "$@"
     ;;
   emit)
-    g_err "goblin emit: not implemented until W4a (platform detection) / W4b (emission)"
-    exit 2
+    # W4a: per-platform emission (the §4 contract); the 0/1/2 exit contract is the
+    # same three values verify's wrapper states, propagated verbatim.
+    exec bash "$SRC/bin/goblin-emit" "$@"
     ;;
   upgrade)
     # W3: the migration lives in its own checkout-level script (W3-SPEC §1.1);

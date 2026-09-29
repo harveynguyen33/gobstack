@@ -1,0 +1,16 @@
+# adapters/<id>/adapter.tsv — W4A-SPEC §2. One row per adapter, tab-separated, header first.
+# Columns:
+#   1  id                     ^[a-z]+$, matches the directory name and --platform spelling
+#   2  display                human name in doctor output
+#   3  detect_any             ':'-separated paths (~ ok) and bare binary names; ANY hit => DETECTED
+#   4  skills_path_project    project-scope skill path pattern, relative to the repo (<name> slot)
+#   5  skills_path_global     global-scope skill path pattern (<name> slot)
+#   6  context_path           the context-injection file emit manages with a marker block ("-" = none)
+#   7  docs_url               the platform doc page the shapes came from
+#   8  docs_read              ISO date the URL was last verified (LIMITS #15 practice; an absent
+#                             or empty cell is an unfilled PROBE-REQUIRED value => doctor DRIFT)
+#   9-13 cap_skills cap_context_injection cap_command_blocking cap_marketplace cap_post_compaction
+#                             yes|no|partial — the plan §3.3 capability matrix, as data.
+# A malformed row (wrong column count, bad enum, id != directory, missing docs_read) is DRIFT
+# by definition (R3): a capability table that cannot parse cannot be trusted.
+id	display	detect_any	skills_path_project	skills_path_global	context_path	docs_url	docs_read	cap_skills	cap_context_injection	cap_command_blocking	cap_marketplace	cap_post_compaction
