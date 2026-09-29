@@ -493,3 +493,18 @@ the Node the gates ran under.
     migration-day hash pin in the record compared per-run is the real fix and is a row-shaped
     change (a new IN clause), not a W3 patch. Measured: R6 refuses the wrong-engine reuse, R8/R9
     catch the two crash shapes they name, and the between-steps engine write is unwatched.
+
+46. **The emitted platform config is unsigned and hand-editable — DRIFT is detected per run,
+    never prevented.** `goblin emit` writes skills byte-copies and one delimited block in the
+    platform's context file, recorded in `~/.goblin-stack/emissions.tsv` with pre-image hashes
+    (so `--uninstall` restores byte-exactly), but nothing signs what it writes: an edit to an
+    emitted `SKILL.md` or to the bytes inside the `goblin-stack:begin/end` block makes the
+    platform's `verify.sh` oracle report DRIFT on the next `goblin doctor` run — and that is
+    all it does. There is no lock, no signature, and no write protection on any emitted file;
+    a platform (or the user) can change them between two doctor runs and nothing notices
+    until someone runs one. The same holds for `--unshadow`: it removes only project copies
+    whose hash equals the source payload and refuses-and-names any that differ, so a real
+    local edit survives, but nothing reconciles it either. Measured: a one-byte tamper in an
+    emitted `SKILL.md` and a stale marker VERSION in the context block each report DRIFT (exit
+    1) on the next run, and uninstall refuses to delete a recorded file whose bytes no longer
+    match its post-image (R6).

@@ -41,7 +41,10 @@ recorded as `MD-03`).
 
 The answer to a lost bootstrap is the same as the answer to compaction: the mode skill is
 loadable on demand and `AGENTS.md` names it, so recovery is reading one file rather than
-depending on a hook that does not exist.
+depending on a hook. On this runtime `on_session_start` exists and cannot inject (its
+return is discarded — it is an observer), and `pre_llm_call` can inject into the user
+message; goblin-stack uses neither as its bootstrap, because recovery-by-reading-one-file
+is strictly more robust than a hook that six of the seven platforms do not have.
 
 ## Skills, and the precedence that decides which copy wins
 

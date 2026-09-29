@@ -34,6 +34,9 @@ line() { printf '%-34s %s\n' "$1" "$2"; }
 # ---- syntax ------------------------------------------------------------------
 SYNTAX_OK=0
 for f in bin/goblin-install bin/goblin-verify bin/goblin-model bin/goblin-lib.sh \
+         bin/goblin-emit bin/goblin-doctor \
+         adapters/claude/detect.sh adapters/hermes/detect.sh adapters/copilot/detect.sh \
+         adapters/claude/verify.sh adapters/hermes/verify.sh adapters/copilot/verify.sh \
          tests/run-tests.sh tests/t-*.sh templates/checks/gate.sh.tmpl; do
   bash -n "$f" 2>/dev/null || { SYNTAX_OK=1; printf 'syntax error: %s\n' "$f"; }
 done
@@ -91,7 +94,8 @@ fi
 # ---- the test scripts --------------------------------------------------------
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
          t-verify-nested t-engine-dir t-upgrade t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
-         t-audit t-render-tokens t-gt03-freshness t-doc-guide t-doc-replay t-version-sync; do
+         t-audit t-render-tokens t-gt03-freshness t-doc-guide t-doc-replay t-version-sync \
+         t-emit t-doctor; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi

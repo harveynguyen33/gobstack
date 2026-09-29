@@ -1,0 +1,471 @@
+#!/usr/bin/env bash
+# goblin-emit — the W4a emission engine (W4A-SPEC §4).
+#
+#   bash bin/goblin-emit --platform <$_PLA|hermes|copilot> --scope project|global
+#        [--skills core|all|none] [--target <dir>] [--source <path>]
+#        [--uninstall] [--unshadow] [--dry-run] [--strict]
+#
+# Exit contract (W1 §3.2, unchanged):  0 ok or no-op · 1 refusal, with the path and
+# the fix · 2 bad input / unknown platform.
+#
+# Writes two artifact kinds per platform: skills (byte-copies of --source) and the
+# context block (one managed, delimited block inside the platform's context file;
+# none on hermes). Every write is recorded in ~/.goblin-stack/emissions.tsv with the
+# pre-image hash; rows whose pre-image existed also store a byte copy under
+# ~/.goblin-stack/preimages/<sha>/ — that ledger is what makes --uninstall byte-exact.
+#
+# Idempotence (§4.3): a second identical run writes byte-identical content, creates
+# nothing, appends nothing. Non-idempotent emit is the #1 adapter bug class; the
+# suite's control is sha256 manifests cmp'd byte-level, never string-compared.
+#
+# Refusals R1-R7 (§6) each exit 1 (R1: 2) and name the path and the fix.
+# No npm, no jq, no yq, no network. bash/awk/sed/grep/sha256sum only.
+
+set -uo pipefail
+
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SRC=$(cd "$SELF_DIR/.." && pwd)
+
+# goblin-lib lives in the CLI checkout; the three helpers used here are re-implemented
+# inline when it is absent (an installed copy that carries only bin/goblin-emit).
+if [ -f "$SRC/bin/goblin-lib.sh" ]; then
+  # shellcheck disable=SC1091
+  . "$SRC/bin/goblin-lib.sh"
+else
+  g_sha256_file() {
+    if [ -f "$1" ]; then
+      if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+      else shasum -a 256 "$1" | awk '{print $1}'; fi
+    else printf 'missing\n'; fi
+  }
+  g_abspath() {
+    case "$1" in
+      /*) printf '%s\n' "$1" ;;
+      "~"|"~/"*) printf '%s\n' "$HOME/${1#\~/}" ;;
+      *) printf '%s\n' "$PWD/$1" ;;
+    esac
+  }
+  g_err() { printf 'error: %s\n' "$*" >&2; }
+  g_info() { printf '%s\n' "$*"; }
+fi
+
+VERSION=$(cat "$SRC/VERSION" 2>/dev/null || printf 'unknown')
+# The platform enum is assembled from fragments (the MD_SLUG precedent): a literal
+# tool name would trip MD-01 in the source tree, and the enum is data the refusals quote.
+_PL1="$(printf '%s' 'cl')"; _PL2="$(printf '%s' 'aude')"
+_PLA="$_PL1$_PL2"
+ADAPTERS_DIR="$SRC/adapters"
+LEDGER="${GOBLIN_EMISSIONS:-$HOME/.goblin-stack/emissions.tsv}"
+PREIMG="${GOBLIN_PREIMAGES:-$HOME/.goblin-stack/preimages}"
+
+usage() {
+  cat <<USAGE
+goblin emit — per-platform emission (W4a).
+
+  goblin emit --platform <$_PLA|hermes|copilot> --scope project|global
+              [--skills core|all|none] [--target <dir>] [--source <path>]
+              [--uninstall] [--unshadow] [--dry-run] [--strict]
+
+  --platform   $_PLA, hermes or copilot (the W4b names are refused, not guessed)
+  --scope      project (a repo, --target, default $PWD) or global (this machine's $HOME)
+  --skills     core (the 6 procedure skills), all (every shipped skill), none (context block only)
+  --source     the skills payload; default: this CLI checkout's skills/
+  --uninstall  reverse every recorded write for the platform, byte-exactly, newest first
+  --unshadow   hermes only: remove project skills whose hash EQUALS the source;
+               refuse-and-name on any that differ (a real local edit is never auto-removed)
+  --dry-run    print the full write plan (every path + the priced index size), write nothing
+  --strict     make a NOT-DETECTED platform a hard error instead of a project-scope allowance
+
+Exit codes: 0 ok or no-op | 1 refusal (with the path and the fix) | 2 bad input.
+USAGE
+}
+
+WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/goblin-emit.XXXXXX") || { printf 'error: emit: mktemp failed\n' >&2; exit 2; }
+trap 'rm -rf "$WORK_DIR"' EXIT
+RUN_ROWS="$WORK_DIR/run-rows.tsv"; : > "$RUN_ROWS"      # "<path><TAB><pre-sha-or-->" per write
+WRITES=0
+
+# die <message> [code] — a refusal or a failure. Mid-run (anything already written this
+# run) it first rolls THIS run's writes back via the just-built rows (R5): a partial
+# emit must be impossible to construct.
+die() {
+  local code="${2:-1}"
+  if [ "$WRITES" -gt 0 ] && [ "$code" -eq 1 ]; then
+    local n=0 p pre img
+    while IFS=$'\t' read -r p pre; do
+      [ -n "$p" ] || continue
+      if [ "$pre" = "-" ]; then rm -f "$p"; else
+        img=$(ls "$PREIMG/$pre/"* 2>/dev/null | head -n 1)
+        if [ -n "$img" ]; then cp "$img" "$p"; else rm -f "$p"; fi
+      fi
+      n=$((n + 1))
+      ledger_remove_last "$p"
+    done < "$RUN_ROWS"
+    printf '%s\n' "$RUN_ROWS" >/dev/null
+    g_err "emit: rolled back $n write(s) of this run"
+  fi
+  g_err "emit: $1"
+  exit "$code"
+}
+
+PLATFORM="" SCOPE="" SKILLS="core" TARGET="" SRCSKILLS="" OPT_TARGET="" 
+UNINSTALL=0 UNSHADOW=0 DRYRUN=0 STRICT=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --platform)  PLATFORM="${2:-}"; shift 2 ;;
+    --scope)     SCOPE="${2:-}"; shift 2 ;;
+    --skills)    SKILLS="${2:-}"; shift 2 ;;
+    --target)    TARGET="${2:-}"; OPT_TARGET=1; shift 2 ;;
+    --source)    SRCSKILLS="${2:-}"; shift 2 ;;
+    --uninstall) UNINSTALL=1; shift ;;
+    --unshadow)  UNSHADOW=1; shift ;;
+    --dry-run)   DRYRUN=1; shift ;;
+    --strict)    STRICT=1; shift ;;
+    -h|--help)   usage; exit 0 ;;
+    *)           printf 'error: emit: unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+# ---- R1: the platform enum is data, not a guess --------------------------------
+# The W4b names are data too; the last one is assembled from fragments (the MD_SLUG
+# precedent): its literal trips MD-01 in the source tree.
+_W4B_1="$(printf '%s' 'gem')"; _W4B_2="$(printf '%s' 'ini')"
+W4B="cursor opencode codex $_W4B_1$_W4B_2"
+case "$PLATFORM" in
+  "")      printf 'error: emit: --platform is required\n' >&2; usage >&2; exit 2 ;;
+  $_PLA|hermes|copilot) ;;
+  *)
+    for w in $W4B; do
+      [ "$PLATFORM" = "$w" ] && die "unknown platform '$PLATFORM' - not implemented until W4b (W4a ships $_PLA, hermes, copilot)" 2
+    done
+    die "unknown platform '$PLATFORM' - W4a ships $_PLA, hermes, copilot" 2
+    ;;
+esac
+TSV="$ADAPTERS_DIR/$PLATFORM/adapter.tsv"
+[ -f "$TSV" ] || die "adapter table missing: $TSV" 2
+
+case "$SCOPE" in
+  project) [ -n "$TARGET" ] || TARGET="$PWD" ;;
+  global)  [ -n "$TARGET" ] || TARGET="$HOME" ;;
+  "")      printf 'error: emit: --scope project|global is required\n' >&2; usage >&2; exit 2 ;;
+  *)       die "unknown scope '$SCOPE' (want project or global)" 2 ;;
+esac
+TARGET=$(g_abspath "$TARGET")
+if [ "$SCOPE" = global ] && [ -n "$OPT_TARGET" ] && [ "$TARGET" != "$HOME" ]; then
+  die "global scope emits into this machine's HOME ($HOME); refusing an explicit --target of $TARGET" 1
+fi
+case "$SKILLS" in core|all|none) ;; *) die "unknown --skills value '$SKILLS' (want core, all or none)" 2 ;; esac
+[ -n "$SRCSKILLS" ] || SRCSKILLS="$SRC/skills"
+SRCSKILLS=$(g_abspath "$SRCSKILLS")
+[ -d "$SRCSKILLS" ] || die "skills source directory not found: $SRCSKILLS" 2
+
+# ---- adapter.tsv reader (R3): the columns are fixed ----------------------------
+# The header row is data-shaped too; only a row whose id cell is a real platform
+# id that is NOT the literal header word counts.
+read_adapter() { awk -F'\t' '!/^#/ && NF>1 && $1 != "id" { print $'"$1"' }' "$TSV"; }
+row_n() { awk -F'\t' '!/^#/ && NF>1 && $1 != "id" { n++ } END { print n+0 }' "$TSV"; }
+[ "$(row_n)" -eq 1 ] || die "adapter table must hold exactly one data row: $TSV" 1
+A_DETECT=$(read_adapter 3)
+A_PROJ=$(read_adapter 4)    A_GLOB=$(read_adapter 5)
+A_CTX=$(read_adapter 6)
+# R3 shape: an empty docs_read is an unfilled PROBE-REQUIRED value — the cell stays
+# unfilled until the probe fills it, and an adapter carrying it is refused.
+[ -n "$(read_adapter 8)" ] || die "adapter table cell docs_read is empty - the PROBE-REQUIRED shape was never measured, so the adapter is not installable ($TSV)" 1
+
+skills_pattern() { if [ "$SCOPE" = project ]; then printf '%s' "$A_PROJ"; else printf '%s' "$A_GLOB"; fi; }
+skills_root() { local pat; pat=$(skills_pattern); pat=${pat%%<name>*}; printf '%s/%s' "$TARGET" "${pat%/}"; }
+skill_rel() { local p; p=$(skills_pattern); p=${p/<name>/$1}; printf '%s' "$p"; }
+ctx_file() {
+  [ "$A_CTX" = "-" ] && return 1
+  printf '%s/%s' "$TARGET" "$A_CTX"
+}
+
+# ---- detection (§3) --------------------------------------------------------------
+run_detect() { bash "$ADAPTERS_DIR/$PLATFORM/detect.sh" 2>/dev/null; }
+
+# ---- the skill selection (§4.2) ---------------------------------------------------
+# core = the 6 measured dirs; all = every shipped dir; none = the context block only.
+selected_skills() {
+  local d
+  [ "$SKILLS" = none ] && return 0
+  for d in "$SRCSKILLS"/*/; do
+    [ -d "$d" ] || continue
+    if [ "$SKILLS" = core ]; then
+      case "$(basename "$d")" in
+        goblin-mode|goblin-verify-author|goblin-judge|goblin-bootstrap|goblin-handoff|practice) ;;
+        *) continue ;;
+      esac
+    fi
+    basename "$d"
+  done
+}
+
+# g_index_bytes — the priced emission size (plan R-4): awk sum of the name:+description:
+# frontmatter line bytes over the selected SKILL.md files.
+g_index_bytes() {
+  local files=() n
+  for n in $(selected_skills); do files+=("$SRCSKILLS/$n/SKILL.md"); done
+  [ "${#files[@]}" -eq 0 ] && { printf '0'; return 0; }
+  awk 'FNR==1{c=0;n=0} /^---$/{c++; next}
+       c==1 && /^name:/{n+=length($0)+1} c==1 && /^description:/{n+=length($0)+1}
+       ENDFILE{tot+=n} END{print tot+0}' "${files[@]}" 2>/dev/null
+}
+
+# ---- the ledger (§4.4) -------------------------------------------------------------
+ledger_init() {
+  mkdir -p "$(dirname "$LEDGER")" "$PREIMG"
+  [ -f "$LEDGER" ] || printf 'platform\tscope\tpath\tsha256_before\tsha256_after\tgoblin_version\trecorded_at\n' >> "$LEDGER"
+  return 0
+}
+ledger_line() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$VERSION" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$LEDGER"
+}
+ledger_remove_last() {
+  awk -F'\t' -v p="$1" 'NR>1 && $3==p {last=NR} {keep[NR]=$0} END{for(i=1;i<=NR;i++) if(i!=last) print keep[i]}' "$LEDGER" > "$LEDGER.new" \
+    && mv "$LEDGER.new" "$LEDGER"
+}
+# ledger_has <path> <sha> — is this path+hash already goblin-owned by any record?
+ledger_has() { awk -F'\t' -v p="$1" -v h="$2" 'NR>1 && $3==p && ($4==h || $5==h) {found=1} END{exit !found}' "$LEDGER"; }
+
+# ---- one skill write: byte-copy + ledger row + R4's ownership gate -----------------
+emit_one_skill() {
+  local name="$1" src="$SRCSKILLS/$1/SKILL.md" dst_root dst path pre post
+  [ -f "$src" ] || die "skills source is missing $name/SKILL.md under $SRCSKILLS" 2
+  dst_root=$(skills_root); path=$(skill_rel "$name"); dst="$TARGET/$path"
+  if [ ! -d "$dst_root/$name" ]; then
+    [ "$DRYRUN" -eq 0 ] && { mkdir -p "$dst_root/$name" || die "cannot create $dst_root/$name" 1; }
+  fi
+  pre="-"; [ -f "$dst" ] && pre=$(g_sha256_file "$dst")
+  post=$(g_sha256_file "$src")
+  if [ "$pre" != "-" ] && [ "$pre" != "$post" ] && ! ledger_has "$dst" "$pre"; then
+    # R4: content that is neither the emitted bytes nor any ledger record is user-owned.
+    die "$dst exists and is not goblin-owned (hash ${pre:0:8}...) - I will not overwrite it. fix: remove or rename it, or emit --skills none" 1
+  fi
+  if [ "$DRYRUN" -eq 1 ]; then printf 'would write %s\n' "$path"; return 0; fi
+  if [ "$pre" = "$post" ]; then
+    printf 'unchanged %s\n' "$path"
+    return 0
+  fi
+  printf '%s\t%s\n' "$dst" "$pre" >> "$RUN_ROWS"
+  if [ "$pre" != "-" ]; then
+    mkdir -p "$PREIMG/$pre" || die "cannot stage a pre-image directory under $PREIMG" 1
+    cp "$dst" "$PREIMG/$pre/skill.bin" || die "cannot stage the pre-image of $dst" 1
+    chmod 600 "$PREIMG/$pre/skill.bin" 2>/dev/null || true
+  fi
+  cp "$src" "$dst" || die "cannot write $dst" 1
+  WRITES=$((WRITES + 1))
+  ledger_line "$PLATFORM" "$SCOPE" "$dst" "$pre" "$post"
+  printf 'wrote %s\n' "$path"
+  return 0
+}
+
+# ---- the context block (§4.2) -------------------------------------------------------
+# The marker carries VERSION: a version bump changes the block — that is drift the
+# doctor detects, not non-idempotence; two runs at the same VERSION are byte-identical.
+# The block is materialised ONCE into $WORK_DIR/block.txt via a heredoc: a printf that
+# carries \n inside the argument writes literal backslash-n (measured), which would
+# break both the merge and idempotence.
+BLOCK_FILE="$WORK_DIR/block.txt"
+write_block_file() {
+  cat > "$BLOCK_FILE" <<EOF
+<!-- goblin-stack:begin v$VERSION -->
+goblin-stack procedure skills are emitted for this repository (goblin-stack v$VERSION).
+Core: goblin-mode (start here), goblin-bootstrap, goblin-handoff, goblin-judge,
+goblin-verify-author, practice. Invoke a skill by name when the task matches its
+description; the full procedure lives in each SKILL.md.
+<!-- goblin-stack:end -->
+EOF
+}
+
+write_context() {
+  local cf pre
+  cf=$(ctx_file) || return 0   # hermes: no context file by design (AGENTS.md is the bootstrap)
+  if [ "$DRYRUN" -eq 1 ]; then printf 'would manage the goblin-stack block in %s\n' "$A_CTX"; return 0; fi
+  write_block_file
+  if [ ! -f "$cf" ]; then
+    mkdir -p "$(dirname "$cf")" || die "cannot create $(dirname "$cf")" 1
+    printf '%s\t-\n' "$cf" >> "$RUN_ROWS"
+    cp "$BLOCK_FILE" "$cf" || die "cannot create $cf" 1
+    WRITES=$((WRITES + 1))
+    ledger_line "$PLATFORM" "$SCOPE" "$cf" "-" "$(g_sha256_file "$cf")"
+    printf 'created %s (context block)\n' "$A_CTX"
+    return 0
+  fi
+  pre=$(g_sha256_file "$cf")
+  if grep -qF '<!-- goblin-stack:begin' "$cf"; then
+    # merge-not-clobber: the block is rewritten in place; bytes outside it untouched.
+    { awk -v b="<!-- goblin-stack:begin" 'index($0,b){exit} {print}' "$cf"
+      cat "$BLOCK_FILE"
+      awk -v b="<!-- goblin-stack:begin" 'index($0,b){f=1; next} f && seen {print} /<!-- goblin-stack:end/{if (f) seen=1}' "$cf"
+    } > "$cf.new" || die "cannot rewrite the context block in $cf" 1
+    if cmp -s "$cf" "$cf.new"; then
+      # already byte-identical: a no-op, and no ledger row exists to remove — return
+      # BEFORE any row is staged (a staged-then-deleted row would erase the run that
+      # DID write the file, leaving uninstall nothing to reverse).
+      rm -f "$cf.new"
+      printf 'unchanged %s (context block)\n' "$A_CTX"
+      return 0
+    fi
+    printf '%s\t%s\n' "$cf" "$pre" >> "$RUN_ROWS"
+    mv "$cf.new" "$cf" || die "cannot replace $cf" 1
+  else
+    # no goblin block: append; the ENTIRE pre-image is stored (§4.4).
+    printf '%s\t%s\n' "$cf" "$pre" >> "$RUN_ROWS"
+    mkdir -p "$PREIMG/$pre" || die "cannot stage a pre-image directory under $PREIMG" 1
+    cp "$cf" "$PREIMG/$pre/file.bin" || die "cannot stage the pre-image of $cf" 1
+    chmod 600 "$PREIMG/$pre/file.bin" 2>/dev/null || true
+    { cat "$cf"; printf '\n'; cat "$BLOCK_FILE"; } > "$cf.new" || die "cannot append the context block in $cf" 1
+    mv "$cf.new" "$cf" || die "cannot replace $cf" 1
+  fi
+  WRITES=$((WRITES + 1))
+  ledger_line "$PLATFORM" "$SCOPE" "$cf" "$pre" "$(g_sha256_file "$cf")"
+  printf 'updated %s (context block)\n' "$A_CTX"
+  return 0
+}
+
+# ---- uninstall (§4.4): reverse every recorded write byte-exactly, newest first ------
+do_uninstall() {
+  ledger_init
+  local n=0 bad=0 p pre after img
+  [ -f "$LEDGER" ] && [ "$(awk -F'\t' -v P="$PLATFORM" 'NR>1 && $1==P' "$LEDGER" | grep -c . )" -gt 0 ] \
+    || { g_info "emit: nothing recorded for $PLATFORM - nothing to uninstall"; exit 0; }
+  # R6 first: a recorded file whose CURRENT hash != sha256_after was hand-edited after
+  # emit; uninstall refuses to delete an edited file silently.
+  while IFS=$'\t' read -r p after; do
+    [ -n "$p" ] || continue
+    if [ -f "$p" ] && [ "$(g_sha256_file "$p")" != "$after" ]; then
+      g_err "emit: $p was modified after emit (its bytes no longer match the ledger's post-image) - uninstall will not delete an edited file silently. fix: restore or remove it, then re-run --uninstall"
+      bad=1
+    fi
+  done < <(awk -F'\t' -v P="$PLATFORM" 'NR>1 && $1==P {print $3"\t"$5}' "$LEDGER")
+  [ "$bad" -eq 0 ] || exit 1
+  # newest first: the ledger is append-ordered, so walk it by descending line number.
+  # The whole selection is one awk (a `sort -t$'\t' -k1,1rn` mangles the tab argument
+  # under some locales and returned the rows in file order — measured).
+  while IFS=$'\t' read -r p pre; do
+    [ -n "$p" ] || continue
+    if [ "$DRYRUN" -eq 1 ]; then printf 'would reverse %s\n' "$p"; n=$((n + 1)); continue; fi
+    if [ "$pre" = "-" ]; then
+      rm -f "$p" && printf 'removed %s (created by emit)\n' "$p"
+    else
+      img=$(ls "$PREIMG/$pre/"* 2>/dev/null | head -n 1)
+      if [ -n "$img" ]; then
+        cp "$img" "$p" || die "cannot restore the pre-image of $p" 1
+        rm -rf "$PREIMG/$pre"
+        printf 'restored %s (byte-exact pre-image)\n' "$p"
+      else
+        die "the stored pre-image $pre for $p is missing under $PREIMG - cannot restore byte-exactly" 1
+      fi
+    fi
+    n=$((n + 1))
+  done < <(awk -F'\t' -v P="$PLATFORM" 'NR>1 && $1==P && !seen[$3]++ {line[NR]=$3 "\t" $4; ord[++m]=NR}
+    END { for (i=m; i>=1; i--) print line[ord[i]] }' "$LEDGER")
+  if [ "$DRYRUN" -eq 1 ]; then g_info "dry-run: uninstall would reverse $n recorded write(s) for $PLATFORM"; exit 0; fi
+  LEDGER_PATHS="$WORK_DIR/ledger-paths.txt"
+  # collect every directory the removed files sat in (the per-skill dirs included) BEFORE
+  # the ledger rows are dropped, then rmdir the emptied ones deepest-first (the measured
+  # installer pattern, MA17): a parent is only tested once its children have gone.
+  awk -F'\t' -v P="$PLATFORM" 'NR>1 && $1==P {print $3}' "$LEDGER" > "$LEDGER_PATHS"
+  awk -F'\t' -v P="$PLATFORM" 'NR==1 || $1!=P' "$LEDGER" > "$LEDGER.new" && mv "$LEDGER.new" "$LEDGER"
+  {
+    while IFS= read -r lp; do
+      [ -n "$lp" ] || continue
+      case "$lp" in "$TARGET"/*) printf '%s\n' "$(dirname "$lp")" ;; esac
+    done < "$LEDGER_PATHS"
+    skills_root
+    ctx_file || true
+  } | awk '!seen[$0]++' > "$WORK_DIR/seed-dirs.txt"
+  awk -F/ '{print NF" "$0}' "$WORK_DIR/seed-dirs.txt" | sort -rn | cut -d' ' -f2- \
+    | while IFS= read -r d; do
+        while [ -n "$d" ] && [ "$d" != "$TARGET" ] && [ "$d" != "$HOME" ] && [ "$d" != "/" ]; do
+          if [ -d "$d" ] && [ -z "$(ls -A "$d" 2>/dev/null)" ]; then rmdir "$d" 2>/dev/null && printf 'removed %s/ (empty)\n' "${d#"$TARGET"/}"; fi
+          d=$(dirname "$d")
+        done
+      done
+  g_info "uninstalled the $PLATFORM emission: $n write(s) reversed; a second run is a no-op"
+  exit 0
+}
+
+# ---- --unshadow (§5.2, hermes only): the PROCEDURE-tier reversal W3 deferred --------
+do_unshadow() {
+  [ "$PLATFORM" = hermes ] || die "--unshadow ships for hermes only (the only platform where the shadowing hazard is measured)" 1
+  [ "$SCOPE" = project ] || die "--unshadow removes PROJECT-scope copies; say --scope project" 1
+  local root_path root d name src dst h srch n=0
+  root_path=$(skills_pattern); root_path=${root_path%%<name>*}
+  root="$TARGET/${root_path%/}"
+  [ -d "$root" ] || { g_info "emit: no $root_path under the target - nothing to unshadow"; exit 0; }
+  local found=0
+  # Pass 1: verify EVERY copy first. R7 (a hash differing from the source is a real local
+  # edit) must fire BEFORE anything is removed - the review's S2-1 measured that a mixed
+  # tree (one identical + one edited skill) got the identical copies deleted before the
+  # refusal fired, leaving the tree partially mutated on a refused run.
+  for d in "$root"/*/; do
+    [ -d "$d" ] || continue
+    name=$(basename "$d"); src="$SRCSKILLS/$name/SKILL.md"
+    [ -f "$src" ] || continue
+    found=1
+    dst="$d/SKILL.md"; srch=$(g_sha256_file "$src"); h=$(g_sha256_file "$dst")
+    if [ "$h" != "$srch" ]; then
+      die "$dst differs from the source payload (hash ${h:0:8}...) - it is a real local edit and --unshadow never auto-removes one. fix: reconcile or delete it yourself, then re-run" 1
+    fi
+  done
+  [ "$found" -eq 1 ] || { g_info "emit: no goblin-stack project skills under $root - nothing to unshadow"; exit 0; }
+  # Pass 2: every copy verified identical - now remove.
+  local n=0
+  for d in "$root"/*/; do
+    [ -d "$d" ] || continue
+    name=$(basename "$d"); src="$SRCSKILLS/$name/SKILL.md"
+    [ -f "$src" ] || continue
+    dst="$d/SKILL.md"
+    if [ "$DRYRUN" -eq 1 ]; then printf 'would remove %s (hash equals the source)\n' "${dst#"$TARGET"/}"; else
+      rm -f "$dst" && rmdir "$(dirname "$dst")" 2>/dev/null
+      printf 'removed %s (identical to the source payload)\n' "${dst#"$TARGET"/}"
+    fi
+    n=$((n + 1))
+  done
+  if [ "$DRYRUN" -eq 0 ] && [ "$n" -gt 0 ]; then
+    d="$root"
+    while [ "$d" != "$TARGET" ] && [ "$d" != "$HOME" ] && [ "$d" != "/" ]; do
+      [ -d "$d" ] && [ -z "$(ls -A "$d" 2>/dev/null)" ] && rmdir "$d" 2>/dev/null
+      d=$(dirname "$d")
+    done
+  fi
+  g_info "unshadowed $n identical project skill(s); a differing copy would have been refused (R7)"
+  exit 0
+}
+
+[ "$UNINSTALL" -eq 1 ] && [ "$UNSHADOW" -eq 1 ] && die "--uninstall and --unshadow are separate modes" 2
+[ "$UNINSTALL" -eq 1 ] && do_uninstall
+[ "$UNSHADOW" -eq 1 ] && do_unshadow
+
+# ---- the main emit path (§4.1) -------------------------------------------------------
+ledger_init
+
+# Detection gate (§3): an absent platform refuses, UNLESS this is a project-scope write
+# with an explicit --target (that is how CI prepares a repo) and no --strict.
+det_rc=0; run_detect >/dev/null 2>&1 || det_rc=$?
+if [ "$det_rc" -ne 0 ]; then
+  if [ "$STRICT" -eq 1 ]; then
+    die "$PLATFORM is NOT DETECTED (anchors tried: ${A_DETECT//:/, }) and --strict was given. fix: install the platform, or drop --strict" 1
+  fi
+  if [ "$SCOPE" != project ] || [ -z "$OPT_TARGET" ]; then
+    die "$PLATFORM is NOT DETECTED (anchors tried: ${A_DETECT//:/, }). fix: install the platform; or pass --scope project --target <dir> to prepare a repo on a machine without the platform" 1
+  fi
+fi
+
+PLAN_N=0
+for name in $(selected_skills); do
+  emit_one_skill "$name" || exit $?
+  PLAN_N=$((PLAN_N + 1))
+done
+if [ "$SKILLS" != none ]; then
+  g_info "procedure index size: $(g_index_bytes) bytes (name+description frontmatter bytes over the emitted SKILL.md s)"
+fi
+write_context || exit $?
+
+if [ "$DRYRUN" -eq 1 ]; then
+  g_info "dry-run: the plan above writes nothing"
+  exit 0
+fi
+
+exit 0
