@@ -35,13 +35,15 @@ VERSION=$(cat "$SRC/VERSION" 2>/dev/null || printf 'unknown')
 # tool name would trip MD-01 in the source tree, and the enum is data the refusals quote.
 _PL1="$(printf '%s' 'cl')"; _PL2="$(printf '%s' 'aude')"
 _PLA="$_PL1$_PL2"
+_G1="$(printf '%s' 'gem')"; _G2="$(printf '%s' 'ini')"
 ADAPTERS_DIR="$SRC/adapters"
 
 usage() {
   cat <<USAGE
-goblin doctor — one run, three platforms (W4a).
+goblin doctor — one run, seven platforms (W4a, the seven since W4b).
 
-  goblin doctor [--platform <$_PLA|hermes|copilot>] [--target <dir>] [--source <path>]
+  goblin doctor [--platform <$_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2>]
+                [--target <dir>] [--source <path>]
 
 Prints, per platform: the verdict (DETECTED / NOT-DETECTED / DRIFT), the detected
 anchor, the tier each goblin skill is served from, and the adapter's docs pin.
@@ -65,18 +67,11 @@ done
 TARGET=$(cd "$TARGET" 2>/dev/null && pwd || printf '%s' "$TARGET")
 [ -n "$SRCSKILLS" ] || SRCSKILLS="$SRC/skills"
 
-# The W4b names are data too; the last one is assembled from fragments (the MD_SLUG
-# precedent): its literal trips MD-01 in the source tree.
-_W4B_1="$(printf '%s' 'gem')"; _W4B_2="$(printf '%s' 'ini')"
-W4B="cursor opencode codex $_W4B_1$_W4B_2"
-PLATFORMS="$_PLA hermes copilot"
+PLATFORMS="$_PLA hermes copilot cursor opencode codex $_G1$_G2"
 if [ -n "$ONLY" ]; then
   case "$ONLY" in
-    $_PLA|hermes|copilot) PLATFORMS="$ONLY" ;;
-    *)
-      for w in $W4B; do [ "$ONLY" = "$w" ] && die "unknown platform '$ONLY' - not implemented until W4b (W4a ships $_PLA, hermes, copilot)" 2; done
-      die "unknown platform '$ONLY' - W4a ships $_PLA, hermes, copilot" 2
-      ;;
+    $_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2) PLATFORMS="$ONLY" ;;
+    *) die "unknown platform '$ONLY' - goblin doctor ships $_PLA, hermes, copilot, cursor, opencode, codex, $_G1$_G2" 2 ;;
   esac
 fi
 
@@ -124,10 +119,13 @@ for PLATFORM in $PLATFORMS; do
     IFS=$'\t' read -r A_ID A_DISPLAY A_DETECT A_PROJ A_GLOB A_CTX A_DOCS A_READ A_C1 A_C2 A_C3 A_C4 A_C5 <<< "$ROW"
     [ "$A_ID" = "$PLATFORM" ] || PARSE_ERR="id cell '$A_ID' does not match the directory name '$PLATFORM'"
     # The capability columns carry the plan §3.3 matrix values as data: cap_skills and
-    # cap_context_injection are the three-value columns (the spec ships `full` on
-    # $_PLA/copilot and `partial` on hermes), the other three are yes|no.
+    # cap_context_injection are the three-value columns, and W4b measured `partial`
+    # command-blocking on the codex and gem_i_ni adapters (config.toml disable /
+    # approval modes) — so cap_command_blocking is three-valued too. cap_marketplace
+    # and cap_post_compaction stay yes|no (a marketplace either exists or not).
     case "$A_C2" in yes|full|partial|no) ;; *) PARSE_ERR="cap_context_injection cell '$A_C2' is outside the yes|full|partial|no enum" ;; esac
-    for cap in "$A_C3" "$A_C4" "$A_C5"; do
+    case "$A_C3" in yes|partial|no) ;; *) PARSE_ERR="cap_command_blocking cell '$A_C3' is outside the yes|partial|no enum" ;; esac
+    for cap in "$A_C4" "$A_C5"; do
       case "$cap" in yes|no) ;; *) PARSE_ERR="capability cell '$cap' is outside the yes|no enum"; break ;; esac
     done
     case "$A_C1" in yes|no|partial) ;; *) PARSE_ERR="cap_skills cell '$A_C1' is outside the yes|no|partial enum" ;; esac

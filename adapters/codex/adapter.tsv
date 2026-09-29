@@ -1,0 +1,12 @@
+# adapters/codex/adapter.tsv - W4B. Shapes from OpenAI Codex's own docs
+# (developers.openai.com/codex/skills, read 2026-09-29): skills are <name>/SKILL.md under
+# .agents/skills/ (repo - scanned from $CWD up to $REPO_ROOT) and ~/.agents/skills/ (USER);
+# the docs name no .codex/skills/ directory for skills (the .codex/codex compatibility root is
+# Cursor's fallback, not Codex's own docs). Context: AGENTS.md in the project root is Codex's
+# instruction file (the agents.md convention Codex originated; the docs' skills page contrasts
+# persistent context with on-demand skills). Capabilities: [[skills.config]] in
+# ~/.codex/config.toml can disable a skill (docs, same date) - command-level blocking is
+# approvals, recorded partial; distribution is the plugin directory (marketplace yes, the
+# docs' own channel); no post-compaction hook is documented.
+id	display	detect_any	skills_path_project	skills_path_global	context_path	docs_url	docs_read	cap_skills	cap_context_injection	cap_command_blocking	cap_marketplace	cap_post_compaction
+codex	OpenAI Codex CLI	~/.codex:codex	.agents/skills/<name>/SKILL.md	~/.agents/skills/<name>/SKILL.md	AGENTS.md	https://developers.openai.com/codex/skills	2026-09-29	yes	full	partial	yes	no

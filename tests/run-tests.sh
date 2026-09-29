@@ -36,7 +36,11 @@ SYNTAX_OK=0
 for f in bin/goblin-install bin/goblin-verify bin/goblin-model bin/goblin-lib.sh \
          bin/goblin-emit bin/goblin-doctor \
          adapters/claude/detect.sh adapters/hermes/detect.sh adapters/copilot/detect.sh \
+         adapters/cursor/detect.sh adapters/opencode/detect.sh adapters/codex/detect.sh \
+         adapters/gemini/detect.sh \
          adapters/claude/verify.sh adapters/hermes/verify.sh adapters/copilot/verify.sh \
+         adapters/cursor/verify.sh adapters/opencode/verify.sh adapters/codex/verify.sh \
+         adapters/gemini/verify.sh \
          tests/run-tests.sh tests/t-*.sh templates/checks/gate.sh.tmpl; do
   bash -n "$f" 2>/dev/null || { SYNTAX_OK=1; printf 'syntax error: %s\n' "$f"; }
 done

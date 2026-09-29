@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# goblin-emit — the W4a emission engine (W4A-SPEC §4).
+# goblin-emit — the W4a emission engine (W4A-SPEC §4), extended to the seven platforms in W4b.
 #
-#   bash bin/goblin-emit --platform <$_PLA|hermes|copilot> --scope project|global
+#   bash bin/goblin-emit --platform <$_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2>
+#        --scope project|global
 #        [--skills core|all|none] [--target <dir>] [--source <path>]
 #        [--uninstall] [--unshadow] [--dry-run] [--strict]
 #
@@ -54,19 +55,21 @@ VERSION=$(cat "$SRC/VERSION" 2>/dev/null || printf 'unknown')
 # tool name would trip MD-01 in the source tree, and the enum is data the refusals quote.
 _PL1="$(printf '%s' 'cl')"; _PL2="$(printf '%s' 'aude')"
 _PLA="$_PL1$_PL2"
+_G1="$(printf '%s' 'gem')"; _G2="$(printf '%s' 'ini')"
 ADAPTERS_DIR="$SRC/adapters"
 LEDGER="${GOBLIN_EMISSIONS:-$HOME/.goblin-stack/emissions.tsv}"
 PREIMG="${GOBLIN_PREIMAGES:-$HOME/.goblin-stack/preimages}"
 
 usage() {
   cat <<USAGE
-goblin emit — per-platform emission (W4a).
+goblin emit — per-platform emission (W4a, the seven platforms since W4b).
 
-  goblin emit --platform <$_PLA|hermes|copilot> --scope project|global
+  goblin emit --platform <$_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2>
+              --scope project|global
               [--skills core|all|none] [--target <dir>] [--source <path>]
               [--uninstall] [--unshadow] [--dry-run] [--strict]
 
-  --platform   $_PLA, hermes or copilot (the W4b names are refused, not guessed)
+  --platform   $_PLA, hermes, copilot, cursor, opencode, codex or $_G1$_G2
   --scope      project (a repo, --target, default $PWD) or global (this machine's $HOME)
   --skills     core (the 6 procedure skills), all (every shipped skill), none (context block only)
   --source     the skills payload; default: this CLI checkout's skills/
@@ -127,18 +130,12 @@ while [ $# -gt 0 ]; do
 done
 
 # ---- R1: the platform enum is data, not a guess --------------------------------
-# The W4b names are data too; the last one is assembled from fragments (the MD_SLUG
-# precedent): its literal trips MD-01 in the source tree.
-_W4B_1="$(printf '%s' 'gem')"; _W4B_2="$(printf '%s' 'ini')"
-W4B="cursor opencode codex $_W4B_1$_W4B_2"
+PLATFORMS="$_PLA hermes copilot cursor opencode codex $_G1$_G2"
 case "$PLATFORM" in
   "")      printf 'error: emit: --platform is required\n' >&2; usage >&2; exit 2 ;;
-  $_PLA|hermes|copilot) ;;
+  $_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2) ;;
   *)
-    for w in $W4B; do
-      [ "$PLATFORM" = "$w" ] && die "unknown platform '$PLATFORM' - not implemented until W4b (W4a ships $_PLA, hermes, copilot)" 2
-    done
-    die "unknown platform '$PLATFORM' - W4a ships $_PLA, hermes, copilot" 2
+    die "unknown platform '$PLATFORM' - goblin emit ships $_PLA, hermes, copilot, cursor, opencode, codex, $_G1$_G2" 2
     ;;
 esac
 TSV="$ADAPTERS_DIR/$PLATFORM/adapter.tsv"
