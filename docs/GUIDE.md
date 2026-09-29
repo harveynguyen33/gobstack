@@ -460,7 +460,7 @@ engine and silently de-migrate the record).
 |---|---|
 | `goblin-install` | `0` ok · `1` a refusal (with the path and the fix) · `2` bad input |
 | `goblin-verify` | `0` all checks passed · `1` a check failed · `2` could not run · `3` the manifest itself is broken |
-| `bin/goblin` (global CLI) | propagates the subcommand's codes verbatim — `verify`/`bans`/`audit`/`--version`; `upgrade` migrates to the global engine (`0` ok · `1` refusal · `2` bad input); `doctor`/`emit` remain W4 placeholders that exit `2` |
+| `bin/goblin` (global CLI) | propagates the subcommand's codes verbatim — `verify`/`bans`/`audit`/`--version`; `upgrade` migrates to the global engine (`0` ok · `1` refusal · `2` bad input); `doctor`/`emit` carry the same contract: `doctor` exits `0` every probed platform DETECTED and clean · `1` any DRIFT · `2` nothing to probe, and `emit` exits `0` ok or no-op · `1` refusal (with the path and the fix) · `2` bad input or unknown platform |
 
 `3` is the one to notice: it means goblin-stack's own rule table is malformed, not your project.
 
