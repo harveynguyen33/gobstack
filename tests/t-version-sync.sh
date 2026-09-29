@@ -80,13 +80,19 @@ else
 fi
 
 # ---- V6: goblin --version prints VERSION byte-for-byte, through BOTH CLIs -------------------
-BASH_OUT=$(bash bin/goblin --version 2>/dev/null)
+# The comparison is BYTE-level (cmp on files), not command substitution: $(...) strips
+# trailing newlines, which would let a newline-count drift pass a check labelled
+# byte-for-byte (round-2 review, LOW-1). Each CLI's stdout goes to a file untouched;
+# the expectation is VERSION's own bytes copied verbatim, no re-formatting.
+cp VERSION /tmp/v6-want
+bash bin/goblin --version 2>/dev/null > /tmp/v6-bash.out
 check "V6 bash bin/goblin --version prints VERSION byte-for-byte" \
-  "$([ "$BASH_OUT" = "$VERSION" ] && echo 0 || echo 1)"
+  "$(cmp -s /tmp/v6-bash.out /tmp/v6-want && echo 0 || echo 1)"
 
-NODE_OUT=$(node bin/goblin.js --version 2>/dev/null)
+node bin/goblin.js --version 2>/dev/null > /tmp/v6-node.out
 check "V6 node bin/goblin.js --version prints VERSION byte-for-byte" \
-  "$([ "$NODE_OUT" = "$VERSION" ] && echo 0 || echo 1)"
+  "$(cmp -s /tmp/v6-node.out /tmp/v6-want && echo 0 || echo 1)"
+rm -f /tmp/v6-want /tmp/v6-bash.out /tmp/v6-node.out
 
 if [ "$FAIL" -eq 0 ]; then
   printf 't-version-sync: all checks passed\n'

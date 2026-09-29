@@ -469,8 +469,9 @@ the Node the gates ran under.
     now pins the count of those constants at 5, asserts every constant and
     `package.json.version` equals `VERSION`, and asserts `goblin --version` — through both the
     bash CLI and the node shim — prints `VERSION` byte-for-byte. What remains open: the sync
-    lives only in this repo's test suite, which a target repo never runs (the tarball ships no
-    `tests/`, deliberately), so a published package's `goblin.js` and its bash payload could
+    lives only in this repo's test suite, which a target repo never runs — and when the npm
+    tarball exists (W3/W5 packaging, planned to ship no `tests/`, deliberately), a published
+    package's `goblin.js` and its bash payload could
     drift apart with nothing in the shipped artifact noticing. The engine has no self-check row
     that reads its own `--version` against a manifest record, and adding one would make the
     version a rule — which is a real option, not done here. Until then the guarantee is
