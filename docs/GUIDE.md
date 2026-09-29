@@ -432,7 +432,27 @@ says `mode=global` keeps hashing whatever files it still holds; the engine's own
 every run's footer (`engine: mode=… cli_sha256=… enforcement_tsv_sha256=…`). For machines that want
 the engine without any per-repo payload, `bin/goblin` in the goblin-stack checkout dispatches the
 same commands from outside any repo: `goblin verify` / `goblin bans` / `goblin audit` / `goblin
---version` (doctor/emit/upgrade arrive with W3/W4 and exit 2 naming their workstream until then).
+--version` (upgrade is W3's: it migrates this repo to the global engine.
+
+**Migrating a repo to the global engine (W3):**
+
+    goblin upgrade            # 8 steps, two commits, one report
+
+It refuses on a dirty tree, a detached HEAD, a red repo, or a global engine holding different
+bytes — each refusal names the fix. What it does: verifies every recorded hash, lands the engine
+at `~/.goblin/engine` (or `--engine-dir <dir>`) from this repo's own verified bytes, commits the
+declaration + record rewrite + `checks/gate.sh` + CI re-point (commit A), proves the repo green
+with both engines present, then `git rm`s exactly the 18 engine files (commit B) and proves green
+again. Nothing is deleted before the engine is safely landed and the tree is green mid-sequence.
+
+**Rolling back a migration** — the two commits are pure git operations:
+
+    git revert <commit-A-sha> <commit-B-sha>
+
+reverses byte-for-byte: the vendored payload returns, the record drops its `engine:` block, and
+`goblin verify` is the 43-green it was before. A second `goblin upgrade` on a migrated repo is a
+no-op; `goblin-install` onto one refuses with the revert remedy (re-installing would re-shadow the
+engine and silently de-migrate the record).
 
 **Two exit-code contracts worth knowing:**
 
@@ -440,7 +460,7 @@ same commands from outside any repo: `goblin verify` / `goblin bans` / `goblin a
 |---|---|
 | `goblin-install` | `0` ok · `1` a refusal (with the path and the fix) · `2` bad input |
 | `goblin-verify` | `0` all checks passed · `1` a check failed · `2` could not run · `3` the manifest itself is broken |
-| `bin/goblin` (global CLI) | propagates the subcommand's codes verbatim — `verify`/`bans`/`audit`/`--version`; `doctor`/`emit`/`upgrade` are W3/W4 placeholders that exit `2` |
+| `bin/goblin` (global CLI) | propagates the subcommand's codes verbatim — `verify`/`bans`/`audit`/`--version`; `upgrade` migrates to the global engine (`0` ok · `1` refusal · `2` bad input); `doctor`/`emit` remain W4 placeholders that exit `2` |
 
 `3` is the one to notice: it means goblin-stack's own rule table is malformed, not your project.
 

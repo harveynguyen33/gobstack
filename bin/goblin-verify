@@ -2718,6 +2718,29 @@ SEE
   printf ' cli_sha256=%s enforcement_tsv_sha256=%s\n' \
     "$(g_sha256_file "$SELF_DIR/goblin-verify")" \
     "$(g_sha256_file "$MANIFEST")"
+  # ---- the shadow advisory (W3 §3.2) -------------------------------------------
+  # A vendored payload under .goblin/ while the record says mode=global: the chain's
+  # vendored step (2) beats the declared engine_dir (3) — W1's ordering, kept
+  # deliberately — so a STALE vendored table judged this run while the footer above
+  # still prints mode=global. This line names that split. It is deliberately a footer
+  # ADVISORY, not a manifest row: the advisory ceiling is `advisory 10 of ceiling 10`
+  # on every migrated repo (SK-03 measured at W3-SPEC MA5, 0 free slots), so a new row
+  # would fail every migrated repo — and adding a row is a G2 rule change W3 has no
+  # mandate for. Detector, not prevention: the residue is LIMITS #45.
+  if [ "$ENGINE_MODE" = "global" ]; then
+    _shadow_n=0
+    for _f in "$ROOT"/.goblin/bin/goblin-verify "$ROOT"/.goblin/bin/goblin-lib.sh \
+              "$ROOT"/.goblin/bin/goblin-audit "$ROOT"/.goblin/bin/goblin-bans \
+              "$ROOT"/.goblin/manifest/* "$ROOT"/.goblin/bans/* \
+              "$ROOT"/.goblin/automations/* "$ROOT"/.goblin/roles.yaml; do
+      [ -e "$_f" ] || continue
+      _shadow_n=$((_shadow_n + 1))
+    done
+    if [ "$_shadow_n" -gt 0 ]; then
+      printf '      shadow: vendored engine payload present (%d file(s)) - the vendored table judged this run, not the declared engine_dir\n' "$_shadow_n"
+    fi
+    unset _shadow_n _f
+  fi
 fi
 
 if [ "$FAIL" -gt 0 ] || [ "$BAD" -eq 1 ]; then exit 1; fi

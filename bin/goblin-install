@@ -506,6 +506,40 @@ render_config() {
 }
 
 render_config
+# The re-shadow refusal (W3 §5.3): a record with engine.mode=global is a MIGRATED repo.
+# Re-installing would recreate the 18-file payload (the vendored step of the resolution
+# chain then beats the declared engine_dir — the shadowing hazard, W3-SPEC §3.1) AND
+# rewrite the record from scratch, silently de-migrating it. The writer below has no
+# engine:-block support, so the rewrite is not a migration-aware update — it is a
+# regression. The exits out of a migrated repo are `git revert` of the migration's two
+# commits, or a hand edit of the engine_dir line (docs/GUIDE.md "Rolling back a
+# migration"). DRY_RUN reports the refusal too: the plan it prints is not shippable.
+# The guard sits BEFORE the put-loop: a refusal that fires after the payload phase has
+# already re-created the 18 files is a refusal that itself shadows (measured: U11's
+# 'the refused install wrote nothing' failed on exactly that).
+g_install_engine_mode() {
+  awk -v q='"' -v k="mode" '
+    index($0, q "engine" q) && /:[[:space:]]*\{/ { inf = 1; next }
+    inf && /^[[:space:]]*\}/ { inf = 0 }
+    inf && index($0, q k q) {
+      v = $0; sub(/^[^:]*:[[:space:]]*/, "", v); sub(/,?[[:space:]]*$/, "", v)
+      gsub(q, "", v); print v; exit
+    }
+  ' "$1" 2>/dev/null
+}
+if [ -f "$INSTALLED" ] && [ "$(g_install_engine_mode "$INSTALLED")" = "global" ]; then
+  g_rec_engine_dir=$(awk -v q='"' '
+    index($0, q "engine" q) && /:[[:space:]]*\{/ { inf = 1; next }
+    inf && /^[[:space:]]*\}/ { inf = 0 }
+    inf && index($0, q "engine_dir" q) {
+      v = $0; sub(/^[^:]*:[[:space:]]*/, "", v); sub(/,?[[:space:]]*$/, "", v)
+      gsub(q, "", v); print v; exit
+    }
+  ' "$INSTALLED")
+  g_err "goblin-install: $TARGET is migrated to the global engine at ${g_rec_engine_dir:-<unknown>}. Re-installing would re-shadow it and rewrite its migration record. To return to a vendored engine: git revert the two W3 commits (see docs/GUIDE.md \"Rolling back a migration\"). To re-point at a different engine: edit .goblin/goblin.yaml's engine_dir line."
+  exit 1
+fi
+
 put ".goblin/bin/goblin-verify" "$SRC/bin/goblin-verify"
 put ".goblin/bin/goblin-lib.sh" "$SRC/bin/goblin-lib.sh"
 # The audit record is produced by a DELIBERATE, separate command - SC-07 reads the record and
@@ -634,6 +668,7 @@ fi
 
 PREV_VERSION=""
 if [ -f "$INSTALLED" ]; then PREV_VERSION=$(g_installed_scalar "$INSTALLED" version); fi
+
 
 if [ "$DRY_RUN" -eq 0 ]; then
   mkdir -p "$TARGET/.goblin"

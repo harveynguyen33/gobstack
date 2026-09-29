@@ -476,3 +476,20 @@ the Node the gates ran under.
     that reads its own `--version` against a manifest record, and adding one would make the
     version a rule — which is a real option, not done here. Until then the guarantee is
     development-time only: green in this checkout, unverifiable in the wild.
+
+45. **The migration is crash-safe by sequence, not by journal — a kill mid-upgrade leaves a shape
+    only three of which are detected.** `goblin upgrade` runs eight steps across two commits, and
+    the spec's refusal conditions name the shapes a crashed run can leave: record says global but
+    the 18 files are still here (R8 catches it), the record lost its engine: block entirely (R9
+    catches it), commits half-landed (the preflight's own state resolution). What is NOT caught:
+    a crash between the engine landing (step 3) and commit A (step 4) leaves `~/.goblin/engine`
+    written but the repo untouched — harmless, invisible, and never re-verified (the next upgrade
+    run compares hashes and refuses R6 if the payload has since changed, so the stale engine can
+    sit there being wrong until someone looks). And the shadowing footer (W3 §3) reads only the
+    vendored-payload shape; a repo whose engine_dir points at an engine that no longer exists
+    FAILs the resolution chain loudly (exit 2), but a repo pointing at an engine whose bytes have
+    silently changed since migration day runs green on the drifted table — the footer's hashes
+    name what ran, nothing compares them to migration day's. **Ticketed, not gated:** a
+    migration-day hash pin in the record compared per-run is the real fix and is a row-shaped
+    change (a new IN clause), not a W3 patch. Measured: R6 refuses the wrong-engine reuse, R8/R9
+    catch the two crash shapes they name, and the between-steps engine write is unwatched.
