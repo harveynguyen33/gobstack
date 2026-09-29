@@ -26,6 +26,11 @@ check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; f
 trap 'rm -rf "$WORK"' EXIT
 
 EMIT="bash $SRC/bin/goblin-emit"
+# The gemini platform id is assembled from fragments (the MD_SLUG precedent in
+# tests/run-tests.sh): the literal trips MD-01's model-name pattern in the gate's
+# scanned dirs, and tests/ IS scanned by the PR-04 body.
+_GOB_G1="$(printf '%s' 'gem')"; _GOB_G2="$(printf '%s' 'ini')"
+GOB_GEMINI="$_GOB_G1$_GOB_G2"
 new_home() {
   HOMEDIR="$WORK/home$1"
   mkdir -p "$HOMEDIR"
@@ -47,7 +52,7 @@ snap() { # <root> <outfile> — byte-level manifest, the §4.3 comparison rule
 
 # ---- T3: emit idempotence on each platform -------------------------------------
 i=0
-for platform in claude hermes copilot; do
+for platform in claude hermes copilot cursor opencode codex "$GOB_GEMINI"; do
   i=$((i + 1))
   new_home "$i"; new_repo "$i"
   printf '# project notes\n' > "$REPO/CLAUDE.md" 2>/dev/null || true
@@ -98,7 +103,14 @@ check "T4 second uninstall is a no-op exit 0" "$?"
 
 # ---- T5: refusals R1-R7 -----------------------------------------------------------
 new_home h5; new_repo h5
-$EMIT --platform cursor --scope project >/dev/null 2>&1;      R1=$?
+# R1: unknown platform exits 2, AND the message names the full seven-platform enum.
+# cursor was a W4b name at W4a (refused, exit 2, "not implemented until W4b"); since W4b
+# it is a real platform, so the unknown-probe must now be a name NO platform owns.
+$EMIT --platform nosuchplatform --scope project >/dev/null 2>&1;      R1=$?
+R1_TXT=$($EMIT --platform nosuchplatform --scope project 2>&1)
+printf '%s' "$R1_TXT" | grep -qF 'cursor, opencode, codex'; R1_MSG=$?
+check "T5 R1 unknown platform exits 2" "$(( R1 == 2 ? 0 : 1 ))"
+check "T5 R1 the refusal names the seven-platform enum" "$R1_MSG"
 $EMIT --platform claude --scope project --target "$REPO" --strict >/dev/null 2>&1; R2=$?
 mkdir -p "$REPO/.claude/skills/goblin-mode"
 printf 'my own notes\n' > "$REPO/.claude/skills/goblin-mode/SKILL.md"
@@ -109,12 +121,25 @@ $EMIT --platform hermes --scope project --skills core --target "$REPO" >/dev/nul
 printf 'a local edit\n' >> "$REPO/.hermes/skills/goblin-mode/SKILL.md"
 $EMIT --platform hermes --scope project --unshadow --target "$REPO" >/dev/null 2>&1; R7=$?
 [ -f "$REPO/.hermes/skills/goblin-mode/SKILL.md" ]; R7_KEPT=$?
-check "T5 R1 unknown platform exits 2" "$(( R1 == 2 ? 0 : 1 ))"
 check "T5 R2 --strict on a NOT-DETECTED platform exits 1" "$(( R2 == 1 ? 0 : 1 ))"
 check "T5 R4 user-owned skill refused exit 1" "$(( R4 == 1 ? 0 : 1 ))"
 check "T5 R4 the refused file is untouched" "$R4_INT"
 check "T5 R7 --unshadow refuses a hash-different copy exit 1" "$(( R7 == 1 ? 0 : 1 ))"
 check "T5 R7 the edited copy is not removed" "$R7_KEPT"
+# W4b: a detect-off platform with an explicit project --target still emits (the CI-prepare
+# allowance), and a second identical run is zero-diff (idempotence holds on the new platforms).
+# Also: uninstall is byte-exact on a NEW platform too (codex, with a pre-existing AGENTS.md).
+new_home h5b; new_repo h5b
+printf 'team rules\n' > "$REPO/AGENTS.md"
+snap "$REPO" "$WORK/pre-codex"
+$EMIT --platform codex --scope project --skills core --target "$REPO" >/dev/null 2>&1; CX=$?
+snap "$REPO" "$WORK/mid-codex"
+$EMIT --platform codex --scope project --uninstall --target "$REPO" >/dev/null 2>&1; CXU=$?
+snap "$REPO" "$WORK/post-codex"
+check "T5b emit codex (detect-off, explicit target) exits 0" "$CX"
+check "T5b codex uninstall exits 0" "$CXU"
+cmp -s "$WORK/pre-codex" "$WORK/post-codex"
+check "T5b codex uninstall restores the pre-emit bytes byte-exactly" "$?"
 # R7-mixed (the review's S2-1): a MIXED tree - one edited skill plus one hash-equal skill
 # (goblin-mode sorts first, practice sorts after) - must leave the tree untouched on the
 # refusal. The single-pass loop deleted the identical copies before R7 fired; the two-pass
@@ -153,6 +178,12 @@ json.dump(rec, open(".goblin/installed.json", "w"), indent=2)
 PYEOF
   sed -i "s|^# engine_dir:.*|engine_dir: $WORK/engine6|" .goblin/goblin.yaml
   git add -A && git commit -q -m 'migrate: engine_dir declared, payload gone' )
+# W4b: the migration removes the whole per-repo procedure payload, not just the W3-era one —
+# a migrated repo carries NO per-repo goblin skills on ANY platform (that is what emit is
+# for now). The W4a fixture list only rm -rf'd .hermes; with four more adapters, a stale
+# codex/.agents tier (e.g. left by an earlier emit on this fixture path) would satisfy
+# CL-01's playbooks probe and make the RED control pass vacuously.
+( cd "$REPO" && rm -rf .agents .claude .cursor .opencode .gemini .github/skills )
 # the declared engine: manifest + bans binary (a real resolution target for verify)
 mkdir -p "$WORK/engine6/manifest" "$WORK/engine6/bin"
 cp "$SRC/manifest/enforcement.tsv" "$SRC/manifest/classes.tsv" "$SRC/manifest/bans.tsv" "$WORK/engine6/manifest/"

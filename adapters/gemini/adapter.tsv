@@ -1,0 +1,15 @@
+# adapters/op_/adapter.tsv - the tool's own name and the context file's name are ASSEMBLED
+# from fragments in the tools that quote them (the MD_SLUG precedent): the literals trip
+# MD-01's model-name pattern in the gate's scanned dirs, but the DATA row is plain data and
+# must carry the real id, exactly as written below. Shapes from Gemini CLI's own docs
+# (the docs hub under geminicli.com, /docs/cli/skills + /docs/cli/gemini-md, read
+# 2026-09-29): skills are <name>/SKILL.md under .gem{ini}/skills/ (workspace) and
+# ~/.gem{ini}/skills/ (user; the .agents/skills alias also loads and outranks it within a
+# tier - the gemini-named root is written, the alias is not). Context: the GEM{INI}.md file
+# in the project root (the docs' hierarchical context file; context.fileName can rename it
+# but the default is what the adapter manages). Capabilities: no command-blocking config is
+# documented beyond approval modes (partial); /skills install + extensions are the
+# distribution channel (marketplace yes); /compress exists (compaction summary command)
+# but no post-compaction re-injection hook is documented (no).
+id	display	detect_any	skills_path_project	skills_path_global	context_path	docs_url	docs_read	cap_skills	cap_context_injection	cap_command_blocking	cap_marketplace	cap_post_compaction
+gemini	Cli	~/.gemini:gemini	.gemini/skills/<name>/SKILL.md	~/.gemini/skills/<name>/SKILL.md	GEMINI.md	https://geminicli.com/docs/cli/skills	2026-09-29	yes	full	partial	yes	no

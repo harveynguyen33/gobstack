@@ -508,3 +508,14 @@ the Node the gates ran under.
     emitted `SKILL.md` and a stale marker VERSION in the context block each report DRIFT (exit
     1) on the next run, and uninstall refuses to delete a recorded file whose bytes no longer
     match its post-image (R6).
+
+47. **The four W4b adapter conventions are documented shapes, not run-probed installs — and
+    two of the seven platforms cannot block commands outright.** cursor and codex are not
+    installed on the build machine, so their rows pin the official docs (read 2026-09-29),
+    not a live CLI; a platform changing its layout invalidates the adapter silently until a
+    doctor DRIFT names it. codex and gemini report cap_command_blocking `partial` — codex
+    disables skills via `~/.codex/config.toml` `[[skills.config]]`, gemini only narrows via
+    approval modes — so an emitted skill is *available* there even when the operator would
+    forbid it; the doctor prints the codex hooks caveat (sessionStart only). And gemini's
+    id cell was measured to be exactly its platform name (the `gem_ini` typo shipped in one
+    W4b build and the doctor's DRIFT caught it — the schema check works).

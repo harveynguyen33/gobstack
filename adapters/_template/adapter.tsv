@@ -1,4 +1,4 @@
-# adapters/<id>/adapter.tsv — W4A-SPEC §2. One row per adapter, tab-separated, header first.
+# adapters/_template/adapter.tsv — W4A-SPEC §2. One row per adapter, tab-separated, header first.
 # Columns:
 #   1  id                     ^[a-z]+$, matches the directory name and --platform spelling
 #   2  display                human name in doctor output
