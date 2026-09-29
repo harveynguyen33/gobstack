@@ -395,23 +395,34 @@ do_unshadow() {
   root="$TARGET/${root_path%/}"
   [ -d "$root" ] || { g_info "emit: no $root_path under the target - nothing to unshadow"; exit 0; }
   local found=0
+  # Pass 1: verify EVERY copy first. R7 (a hash differing from the source is a real local
+  # edit) must fire BEFORE anything is removed - the review's S2-1 measured that a mixed
+  # tree (one identical + one edited skill) got the identical copies deleted before the
+  # refusal fired, leaving the tree partially mutated on a refused run.
   for d in "$root"/*/; do
     [ -d "$d" ] || continue
     name=$(basename "$d"); src="$SRCSKILLS/$name/SKILL.md"
     [ -f "$src" ] || continue
     found=1
     dst="$d/SKILL.md"; srch=$(g_sha256_file "$src"); h=$(g_sha256_file "$dst")
-    # R7: a hash that DIFFERS from the source payload is a real local edit - refuse and name it.
     if [ "$h" != "$srch" ]; then
       die "$dst differs from the source payload (hash ${h:0:8}...) - it is a real local edit and --unshadow never auto-removes one. fix: reconcile or delete it yourself, then re-run" 1
     fi
+  done
+  [ "$found" -eq 1 ] || { g_info "emit: no goblin-stack project skills under $root - nothing to unshadow"; exit 0; }
+  # Pass 2: every copy verified identical - now remove.
+  local n=0
+  for d in "$root"/*/; do
+    [ -d "$d" ] || continue
+    name=$(basename "$d"); src="$SRCSKILLS/$name/SKILL.md"
+    [ -f "$src" ] || continue
+    dst="$d/SKILL.md"
     if [ "$DRYRUN" -eq 1 ]; then printf 'would remove %s (hash equals the source)\n' "${dst#"$TARGET"/}"; else
       rm -f "$dst" && rmdir "$(dirname "$dst")" 2>/dev/null
       printf 'removed %s (identical to the source payload)\n' "${dst#"$TARGET"/}"
     fi
     n=$((n + 1))
   done
-  [ "$found" -eq 1 ] || { g_info "emit: no goblin-stack project skills under $root - nothing to unshadow"; exit 0; }
   if [ "$DRYRUN" -eq 0 ] && [ "$n" -gt 0 ]; then
     d="$root"
     while [ "$d" != "$TARGET" ] && [ "$d" != "$HOME" ] && [ "$d" != "/" ]; do

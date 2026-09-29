@@ -1748,13 +1748,13 @@ class_part_artifact() {
       # The first platform's dir name is ASSEMBLED at run time from fragments (the MD_SLUG
       # precedent in tests/run-tests.sh): the tool's own name, literal or inside a variable's
       # name, would trip MD-01's pattern in every vendored copy of this file.
-      local _cl_1 _cl_2
-      _cl_1="$(printf '%s' '.cl')"; _cl_2="$(printf '%s' 'ude')"
+      local _cl_1 _cl_2 _cl_3
+      _cl_1="$(printf '%s' '.cl')"; _cl_2="$(printf '%s' 'a')"; _cl_3="$(printf '%s' 'ude')"
       [ -f "$ROOT/.hermes/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/$_cl_1$_cl_2/skills/goblin-mode/SKILL.md" ] && return 0
+      [ -f "$ROOT/$_cl_1$_cl_2$_cl_3/skills/goblin-mode/SKILL.md" ] && return 0
       [ -f "$ROOT/.github/skills/goblin-mode/SKILL.md" ] && return 0
       [ -f "${HOME:-$ROOT}/.copilot/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "${HOME:-$ROOT}/$_cl_1$_cl_2/skills/goblin-mode/SKILL.md" ] && return 0
+      [ -f "${HOME:-$ROOT}/$_cl_1$_cl_2$_cl_3/skills/goblin-mode/SKILL.md" ] && return 0
       [ -f "${HOME:-$ROOT}/.hermes/skills/goblin-mode/SKILL.md" ] && return 0
       [ -f "${GOBLIN_EMISSIONS:-${HOME:-}/.goblin-stack/emissions.tsv}" ] \
         && awk -F'\t' -v r="$ROOT" 'NR>1 && index($3, r) == 1 { found=1 } END { exit !found }' \

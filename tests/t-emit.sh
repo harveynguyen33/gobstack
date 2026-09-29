@@ -115,6 +115,17 @@ check "T5 R4 user-owned skill refused exit 1" "$(( R4 == 1 ? 0 : 1 ))"
 check "T5 R4 the refused file is untouched" "$R4_INT"
 check "T5 R7 --unshadow refuses a hash-different copy exit 1" "$(( R7 == 1 ? 0 : 1 ))"
 check "T5 R7 the edited copy is not removed" "$R7_KEPT"
+# R7-mixed (the review's S2-1): a MIXED tree - one edited skill plus one hash-equal skill
+# (goblin-mode sorts first, practice sorts after) - must leave the tree untouched on the
+# refusal. The single-pass loop deleted the identical copies before R7 fired; the two-pass
+# fix verifies every copy first. The count proves no removal happened.
+$EMIT --platform hermes --scope project --skills core --target "$REPO" >/dev/null 2>&1
+printf 'a local edit\n' >> "$REPO/.hermes/skills/practice/SKILL.md"
+BEFORE_MIXED=$(find "$REPO/.hermes/skills" -name SKILL.md | wc -l)
+$EMIT --platform hermes --scope project --unshadow --target "$REPO" >/dev/null 2>&1; R7M=$?
+AFTER_MIXED=$(find "$REPO/.hermes/skills" -name SKILL.md | wc -l)
+check "T5 R7-mixed a mixed tree refuses exit 1" "$(( R7M == 1 ? 0 : 1 ))"
+check "T5 R7-mixed the refusal removes NOTHING (tree untouched)" "$(( BEFORE_MIXED == AFTER_MIXED ? 0 : 1 ))"
 # R6: hand-edit a recorded file after emit -> uninstall refuses
 mkdir -p "$REPO/.github" && printf 'rules\n' > "$REPO/.github/copilot-instructions.md"
 $EMIT --platform copilot --scope project --skills core --target "$REPO" >/dev/null 2>&1
