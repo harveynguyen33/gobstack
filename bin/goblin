@@ -45,7 +45,7 @@ goblin — the goblin-stack command line.
   goblin audit  [--target <dir>] [--print]
   goblin doctor [--platform <p>]            (not implemented until W4a)
   goblin emit   --platform <p> [...]        (not implemented until W4a/W4b)
-  goblin upgrade [--target .] [--dry-run]   (not implemented until W3)
+  goblin upgrade [--target .] [--dry-run] [--yes] [--engine-dir <path>]
   goblin --version
 
 Exit codes (verify): 0 pass | 1 a check failed | 2 could not run | 3 the manifest is
@@ -92,8 +92,9 @@ case "$CMD" in
     exit 2
     ;;
   upgrade)
-    g_err "goblin upgrade: not implemented until W3"
-    exit 2
+    # W3: the migration lives in its own checkout-level script (W3-SPEC §1.1);
+    # the dispatcher routes and propagates the four-value contract verbatim.
+    exec bash "$SRC/bin/goblin-upgrade" "$@"
     ;;
   --version|-V|-v)
     printf '%s\n' "$VERSION"
