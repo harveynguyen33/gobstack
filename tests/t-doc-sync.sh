@@ -219,5 +219,35 @@ else
   note "ok   docs/LIMITS.md #26 no longer claims the stale arithmetic is what the run reports (AB3)"
 fi
 
+# ---- W4-C: the INTEGRATION hook claim states the measured mechanism ---------------------------
+# docs/INTEGRATION.md's recovery paragraph is the project's bootstrap position. The W4a probe
+# measured the mechanism on the real docs (hooks reference + the platform hooks pages): on this
+# runtime on_session_start EXISTS and cannot inject (an observer's return is discarded), and
+# pre_llm_call CAN inject into the user message. The old sentence claimed recovery was needed
+# "rather than depending on a hook that does not exist" - false as measured (the hook exists;
+# its return is what is discarded). The assertion pins the SHAPE on normalised text - it names
+# pre_llm_call as able to inject and never lets a hook claim ride on "does not exist" - NOT a
+# file:line (line numbers in prose drift; the repo has learned not to pin them). The mutation
+# control below restores the old sentence and must go RED, or this asserts nothing.
+# Normalisation strips emphasis and ticks but KEEPS underscores (the hook names are
+# snake_case identifiers; a matcher that spaced them out could not see them at all).
+INT_FLAT=$(sed 's/[*`]//g' docs/INTEGRATION.md | tr -s '[:space:]' ' ' | tr 'A-Z' 'a-z')
+printf '%s' "$INT_FLAT" | grep -q 'pre_llm_call can inject into the user message'
+check "docs/INTEGRATION.md names pre_llm_call as the hook that can inject (W4-C)" "$?"
+if printf '%s' "$INT_FLAT" | grep -q 'hook that does not exist'; then
+  note "FAIL docs/INTEGRATION.md still claims a hook does not exist (W4-C)"
+  fail=1
+else
+  note "ok   no hook claim in docs/INTEGRATION.md rests on 'does not exist' (W4-C)"
+fi
+# the mutation control: the OLD sentence must be caught by the matcher above
+OLD_INT='the mode skill is loadable on demand and AGENTS.md names it, so recovery is reading one file rather than depending on a hook that does not exist.'
+if printf '%s' "$OLD_INT" | tr -s '[:space:]' ' ' | grep -q 'hook that does not exist'; then
+  note "ok   the W4-C matcher catches the reverted (pre-W4a) sentence - the control is real"
+else
+  note "FAIL the W4-C matcher no longer catches the reverted sentence"
+  fail=1
+fi
+
 if [ "$fail" -eq 0 ]; then note "t-doc-sync: PASS"; else note "t-doc-sync: FAIL"; fi
 exit "$fail"
