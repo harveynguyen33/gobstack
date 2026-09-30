@@ -5,32 +5,17 @@ installs an **executable rule manifest**, a set of **project-local skills**, and
 **installer/verifier pair** into any project — so that an AI coding session never re-improvises,
 and a rule that cannot be checked is counted rather than asserted.
 
-Two install paths, the same engine:
+Install it from npm — the one documented install path:
 
-    npm i -g @techgoblin/gobstack        # path A — npm, gives you the `goblin` CLI
-    git clone https://github.com/harveynguyen33/goblin-stack.git   # path B — source users
+    npm i -g @techgoblin/gobstack        # gives you the `goblin` CLI
 
 ## Install
-
-**Path A — npm (recommended).** Installs the `goblin` CLI globally:
 
     npm i -g @techgoblin/gobstack
 
 Then, from any project:
 
     goblin install --target /path/to/repo --class A
-
-(The npm binary is a node shim over the same bash engine; any subcommand it does not route
-named-ly — `install` among them — lands in the installer. The same is NOT true of the checkout's
-`bash bin/goblin` dispatcher, which routes only the six subcommands in its usage line: `bash
-bin/goblin install` prints `unknown subcommand: install` and exits 2. Source users: run
-`bash bin/goblin-install` directly.)
-
-**Path B — git clone (source users).** No npm involved:
-
-    git clone https://github.com/harveynguyen33/goblin-stack.git
-    export GS="$PWD/goblin-stack"
-    bash "$GS/bin/goblin-install" --target <dir> --class A|B|C|D|E|F [options]
 
 The installer writes only paths it records, hash-compares before writing, and prints `no-op` on a
 second run with the same arguments. It never overwrites `HANDOFF.md`, `AGENTS.md`, a `*-SPEC.md`,
@@ -43,7 +28,7 @@ failure: reconcile the file rather than forcing over it — `docs/ADOPTION.md`.
 After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other
-    goblin verify                             # path A; or `.goblin/bin/goblin-verify` on either path
+    goblin verify                             # or .goblin/bin/goblin-verify, inside the target
     hermes skills trust <target>              # one-time, Hermes users, so project-tier skills load
     goblin audit                              # once, deliberately: the ONLY network step (SC-07)
 
@@ -77,16 +62,11 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 | `goblin verify` | run the rule matrix against the current repo — `PASS`/`FAIL`/`SKIP` per row, exit 0 pass · 1 a check failed · 2 could not run · 3 the manifest is broken |
 | `goblin bans` | run the ban list (per-pattern red lines over the source tree) |
 | `goblin audit` | check recorded dependency claims against live advisory feeds — the only command that touches the network |
-| `goblin install` | install the manifest, skills and verifier into a target repo (npm shim; source users run `bash bin/goblin-install`) |
+| `goblin install` | install the manifest, skills and verifier into a target repo |
 | `goblin uninstall` | remove everything an install wrote (npm shim `goblin install --target <dir> --uninstall`) |
 | `goblin upgrade` | migrate a repo to the shared global engine at `~/.goblin/engine` — 8 steps, two commits, one report |
 | `goblin doctor` | one run across the platforms below: DETECTED / NOT-DETECTED / DRIFT per platform |
 | `goblin emit` | write the skills + context block for one platform (`--scope project` or `global`); `--unshadow` removes a hermes project skill whose hash equals the source |
-
-Measured on this tree: the checkout's bash dispatcher (`bash bin/goblin`) routes
-`verify`/`bans`/`audit`/`doctor`/`emit`/`upgrade` and exits 2 on anything else — `install` and
-`uninstall` are reached through the npm shim's binary (`goblin install …`, `goblin install …
---uninstall`), which passes every argument to the same bash scripts.
 
 ## Platforms
 
@@ -141,9 +121,9 @@ vocabulary.
 
 ## Verify
 
-    .goblin/bin/goblin-verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
+    goblin verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
 
-(or `goblin verify` with the npm CLI). Exit codes: `0` pass · `1` a check failed · `2` could not
+Exit codes: `0` pass · `1` a check failed · `2` could not
 run · `3` the manifest is broken. Every run prints what it cannot see.
 
 ## Develop
@@ -157,8 +137,7 @@ failure**, so that file is the one that matters most.
 
 ## Uninstall
 
-    goblin install --target <dir> --uninstall     # npm CLI
-    bash bin/goblin-install --target <dir> --uninstall   # source checkout
+    goblin install --target <dir> --uninstall
 
 Removes the installed artifacts, `.goblin/goblin.yaml` and every directory that leaves empty, and
 leaves `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md`, `reviews/` and the `.gitignore` block —
@@ -166,8 +145,7 @@ the project's record is not the harness's to delete.
 
 ## Re-pin the referenced standard
 
-    goblin install --target <dir> --re-pin        # npm CLI
-    bash bin/goblin-install --target <dir> --re-pin      # source checkout
+    goblin install --target <dir> --re-pin
 
 `practice_sha256:` pins the referenced standard and `IN-02` re-checks it, so editing that standard
 — a legitimate, intended edit — reds `IN-02` in every installed repo. `--re-pin` re-records that
