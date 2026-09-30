@@ -5,7 +5,9 @@
   "bin": {
     "goblin": "bin/goblin.js"
   },
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=18"
   },
