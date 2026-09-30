@@ -1,4 +1,4 @@
-# Getting started with goblin-stack
+# Getting started with gobstack
 
 A step-by-step guide for your first week. **Read this before the README.** The README tells you
 what the pieces are; this tells you what to *do*, in order, and what you should see when it works.
@@ -31,7 +31,9 @@ design on day one.
 
 ## 1. What this actually is, in plain language
 
-goblin-stack is **a folder of files you copy into a project**. Once copied, three things change:
+goblin-stack (published as the npm package **`@techgoblin/gobstack`**, product name **gobstack**)
+is **a folder of files you install into a project** — from npm or from a clone, same engine. Once
+installed, three things change:
 
 - A file called `HANDOFF.md` sits at the root. It is the note from the last session to the next one.
   Any agent — or you, a month later — reads it first.
@@ -67,9 +69,21 @@ ships a file of things it *cannot* check (`docs/LIMITS.md`).
 | a project that is a **git repository** | `git status` must work; the harness reads commit identity |
 | a branch named the same as the one you declare | see step 3 — a `master`/`main` mismatch is the most common first failure |
 
-**You do *not* need:** npm, a package manager, network access, or an agent running.
+Route A needs node ≥ 18 (for the npm shim only); route B needs nothing beyond the row above.
 
-**Get the repo:**
+**You do *not* need:** network access at verify time, or an agent running.
+
+**Get gobstack — two routes, the same engine:**
+
+*Route A — npm (recommended):*
+
+    npm i -g @techgoblin/gobstack
+
+This puts a single command, `goblin`, on your PATH — the node shim over the bash engine. From
+here on the guide writes `goblin install …` for route A and `bash "$GS/bin/goblin-install" …`
+for route B; the arguments are identical.
+
+*Route B — git clone (source users, or no npm):*
 
     git clone https://github.com/harveynguyen33/goblin-stack.git
     cd goblin-stack
@@ -77,6 +91,10 @@ ships a file of things it *cannot* check (`docs/LIMITS.md`).
 Set a shell variable to wherever you cloned it — the guide uses `$GS` from here on:
 
     export GS="$PWD"
+
+(Measured on this tree, and worth knowing: the checkout's `bash bin/goblin` dispatcher routes
+only `verify`/`bans`/`audit`/`doctor`/`emit`/`upgrade` and exits 2 on `install` — the npm shim is
+what routes `goblin install` into `goblin-install`. Route B runs `bin/goblin-install` directly.)
 
 ---
 
@@ -89,6 +107,12 @@ something you care about.
     git init -b main
     git config user.email "you@example.com"
     git config user.name "you"
+
+Route A (npm CLI):
+
+    goblin install --target . --class A
+
+Route B (from the clone):
 
     bash "$GS/bin/goblin-install" --target . --class A
 
@@ -413,6 +437,7 @@ Two readings that are easy to get wrong:
 | `refused to overwrite: HANDOFF.md`, exit 1 | your repo already had a HANDOFF | **do not `--force`** — reconcile it (below) |
 | `PT-02 declared main, actual master` | branch mismatch | set `branch:` in the config |
 | `IN-02 ... practice EDITED` | someone changed the pinned standard | re-pin deliberately: `--re-pin` |
+| `goblin install: unknown subcommand` (exit 2) | you ran the checkout's `bash bin/goblin` dispatcher, which does not route `install` | route A: the npm shim's `goblin install` handles it; route B: run `bash bin/goblin-install` directly |
 | `IN-03` fails, "manifest is broken" | a row has a broken check column | fix the row; this is a source defect, not yours |
 | a `FAIL` you believe is wrong | the check may be weak, or your belief may be | run `--only <id>` and read the command it prints |
 
@@ -432,7 +457,8 @@ says `mode=global` keeps hashing whatever files it still holds; the engine's own
 every run's footer (`engine: mode=… cli_sha256=… enforcement_tsv_sha256=…`). For machines that want
 the engine without any per-repo payload, `bin/goblin` in the goblin-stack checkout dispatches the
 same commands from outside any repo: `goblin verify` / `goblin bans` / `goblin audit` / `goblin
---version` (upgrade is W3's: it migrates this repo to the global engine.
+doctor` / `goblin emit` / `goblin upgrade` / `goblin --version` (it does not route `install` —
+see §2's measured note).
 
 **Migrating a repo to the global engine (W3):**
 
@@ -561,14 +587,18 @@ with *"prove it was broken first"* — it is the one practice that survives cont
 
 ## Appendix — a 45-minute first run, on one page
 
-    # 0. get it
+    # 0. get it - route A (npm, gives you the goblin CLI)
+    npm i -g @techgoblin/gobstack
+
+    # 0. get it - route B (source users)
     git clone https://github.com/harveynguyen33/goblin-stack.git
     export GS="$PWD/goblin-stack"
 
     # 1. try it somewhere disposable
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
     git init -b main
-    bash "$GS/bin/goblin-install" --target . --class A      # expect: created 50
+    goblin install --target . --class A                    # route A      # expect: created 50
+    # route B instead: bash "$GS/bin/goblin-install" --target . --class A
 
     # 2. commit and check
     git add -A && git commit -m "chore: install goblin-stack"
@@ -589,7 +619,7 @@ with *"prove it was broken first"* — it is the one practice that survives cont
 
     # 5. do it for real, in a repo you care about
     cd ~/projects/your-project
-    bash "$GS/bin/goblin-install" --target . --class A
+    goblin install --target . --class A                    # route A; route B: bash "$GS/bin/goblin-install" --target . --class A
     git add -A && git commit -m "chore: adopt goblin-stack"
     .goblin/bin/goblin-verify
     $EDITOR HANDOFF.md              # state / gates (dated!) / next / NOT verified
