@@ -71,7 +71,7 @@ ships a file of things it *cannot* check (`docs/LIMITS.md`).
 
 **Get the repo:**
 
-    git clone git@github.com:harveynguyen33/goblin-stack.git
+    git clone https://github.com/harveynguyen33/goblin-stack.git
     cd goblin-stack
 
 Set a shell variable to wherever you cloned it — the guide uses `$GS` from here on:
@@ -562,7 +562,7 @@ with *"prove it was broken first"* — it is the one practice that survives cont
 ## Appendix — a 45-minute first run, on one page
 
     # 0. get it
-    git clone git@github.com:harveynguyen33/goblin-stack.git
+    git clone https://github.com/harveynguyen33/goblin-stack.git
     export GS="$PWD/goblin-stack"
 
     # 1. try it somewhere disposable

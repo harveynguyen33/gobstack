@@ -21,7 +21,7 @@ A panel is **N opinions**; a judge is **one decision**. That is why the judge is
 
 ## 2. What Hermes actually does today — read, not assumed
 
-Every claim below was read in this box's Hermes tree (`/home/harvey/.hermes/hermes-agent/`) on
+Every claim below was read in this box's Hermes tree (`~/.hermes/hermes-agent/`) on
 2026-09-25. Anything not read there is marked `[inferred]`.
 
 | mechanism | measured behaviour | where it was read |

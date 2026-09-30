@@ -148,7 +148,7 @@ After that one-time install, `goblin-verify --only RC-03` / `RC-04` run against 
   records the measurement, not the hope).
 - **S5 precedent:** the carver (`scripts/karve-dat.py`) written from the decompiled
   loader, not guessed; 312 payloads extracted, 16/16 containers parse-consistent.
-- **Lab repo:** `/home/harvey/projects/re-lab` - `scripts/triage-apk.sh`,
+- **Lab repo:** `~/projects/re-lab` - `scripts/triage-apk.sh`,
   `scripts/karve-dat.py`, `manifests/edotownsL-1.0.9.sha256`,
   `notes/2026-09-27-edotowns-lite-triage.md`.
 

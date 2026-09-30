@@ -10,6 +10,20 @@
     "node": ">=18"
   },
   "license": "MIT",
+  "files": [
+    "bin/",
+    "adapters/",
+    "manifest/",
+    "presets/",
+    "templates/",
+    "skills/",
+    "automations/",
+    "bans/",
+    "docs/",
+    "roles.yaml",
+    "VERSION",
+    "CHANGELOG.md"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/harveynguyen33/goblin-stack.git"
