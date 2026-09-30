@@ -1,5 +1,5 @@
 {
-  "name": "goblin-stack",
+  "name": "@techgoblin/gobstack",
   "version": "0.4.4",
   "description": "Agent-discipline toolkit: one verify command, an enforcement matrix, and LIMITS. bash engine, npm shim.",
   "bin": {

@@ -383,7 +383,7 @@ fi
 #   installed.json gains the engine: block; exactly the 18 engine entries drop
 #                  (skills stay — MA5 shows SK-01/02/04/AU-04 SKIP by mode)
 #   checks/gate.sh the source line re-pointed to the engine-resolution idiom
-#   .github/workflows/goblin-gate.yml  run line re-pointed to npx goblin-stack@<v>
+#   .github/workflows/goblin-gate.yml  run line re-pointed to npx @techgoblin/gobstack@<v>
 # The record rewrite happens BEFORE any deletion (the plan's order is measured
 # wrong: deleting with the record untouched is IN-02 FAIL, W3-SPEC MA3).
 step_line 4 "commit A — the declaration-and-record commit"
@@ -476,7 +476,7 @@ if [ -f "$WF" ] && grep -q 'run: bash .goblin/bin/goblin-verify' "$WF"; then
   # a files-RECORDED artifact, so this rewrite re-hashes its record entry here,
   # in the same commit (IN-02 hashes every recorded file; a rewritten artifact
   # with a stale recorded hash would fail verify #2 — measured this session).
-  sed -i "s|run: bash .goblin/bin/goblin-verify|run: npx goblin-stack@$CLI_VERSION run goblin-verify|" "$WF"
+  sed -i "s|run: bash .goblin/bin/goblin-verify|run: npx @techgoblin/gobstack@$CLI_VERSION run goblin-verify|" "$WF"
   WF_NEW=$(sha256 "$WF")
   python3 "$PYJ/rehash_record.py" "$INSTALLED" ".github/workflows/goblin-gate.yml" "$WF_NEW" || {
     g_err "upgrade: re-hashing the rewritten workflow in $INSTALLED failed - the tree is uncommitted; fix: git checkout ."
@@ -493,7 +493,7 @@ wrong: deleting with the record untouched is IN-02 FAIL, W3-SPEC MA3).
 goblin.yaml gains the active engine_dir line; installed.json gains the
 engine block and drops exactly the engine entries (skills stay); gate.sh
 and the CI run line are re-pointed. The CI run line names
-npx goblin-stack@$CLI_VERSION verify — a package W5 publishes; until then
+npx @techgoblin/gobstack@$CLI_VERSION verify — a package W5 publishes; until then
 CI on a migrated repo is expected red-by-absence."
 COMMIT_A=$(git -C "$REPO" rev-parse --short HEAD)
 printf '  commit A: %s (record %s → %s entries)\n' "$COMMIT_A" "$REC_BEFORE" "$REC_AFTER"

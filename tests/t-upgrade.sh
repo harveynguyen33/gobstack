@@ -228,7 +228,7 @@ check "U12 checks/gate.sh exits 0 on the migrated repo (MA9's silent-green hole 
   "$([ "$RC_GATE" -eq 0 ] && echo 0 || echo 1)"
 [ -n "$(printf '%s' "$GATE_OUT" | grep -E '[a-z_-]+=[0-9]')" ]
 check "U12 checks/gate.sh prints a non-empty gate line" "$?"
-grep -q 'npx goblin-stack@' "$P/.github/workflows/goblin-gate.yml"
+grep -q 'npx @techgoblin/gobstack@' "$P/.github/workflows/goblin-gate.yml"
 check "U12 the workflow run line is re-pointed to the pinned global form" "$?"
 )
 (# ============================================================ U12b: the partial-drop hand-migration --
