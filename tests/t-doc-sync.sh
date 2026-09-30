@@ -251,12 +251,15 @@ fi
 
 # ---- W5-D: the README is written for the npm package --------------------------
 # The package landed as @techgoblin/gobstack (6cd75b7) and the README was rewritten
-# for a public audience. Three claims are pinned so the docs cannot drift back to the
-# clone-only world:
+# for a public audience. npm is THE install path, and the clone is not a path at all:
 #   1. the npm identity is present (a reader arriving from npmjs.com must find it);
-#   2. BOTH install paths are named - the npm install AND the source clone - because
-#      the README dropped either one and a reader of the dropped path has no install;
-#   3. the `goblin` CLI is named as what the npm install yields.
+#   2. the npm install command is stated verbatim;
+#   3. the `goblin` CLI is named as what the npm install yields, `goblin install`
+#      as its install command;
+#   4. NO user-facing clone/install instruction survives: the checkout's
+#      `bin/goblin-install` and the clone URL must not appear in the README as an
+#      instruction (W5 chunk 4 removed the two-path split; a reader of the old
+#      path B text would follow an install the npm package does not document).
 # The npm scope is written hyphenless (techgoblin) deliberately: the PR-04 portability
 # pattern catches the hyphenated house name, and the package name is the one place
 # the identity must literally appear. The clone URL is assembled at run time for the
@@ -266,48 +269,36 @@ grep -q '@techgoblin/gobstack' README.md
 check "README names the npm package @techgoblin/gobstack (W5-D)" "$?"
 grep -q 'npm i -g @techgoblin/gobstack' README.md
 check "  and states the npm install path (npm i -g @techgoblin/gobstack)" "$?"
-CLONE_URL="https://github.com/$(printf '%s%s%s' 'harv' 'eyngu' 'yen33')/goblin-stack.git"
-grep -qF "$CLONE_URL" README.md
-check "  and states the source clone path (W5-D)" "$?"
 grep -q 'goblin install' README.md
 check "  and names goblin install as the npm CLI's install command (W5-D)" "$?"
-grep -q 'bin/goblin-install' README.md
-check "  and keeps bin/goblin-install for the source path (W5-D)" "$?"
-
-# ---- W5-D: the dispatch claim in the docs is the measured one -------------------
-# README and GUIDE both state that the checkout's `bash bin/goblin` dispatcher does
-# NOT route `install` while the npm shim does. Both halves are measured here, so the
-# docs' claim is a claim a run backs:
-#   * the bash dispatcher: a live run, expected to exit 2 with "unknown subcommand";
-#   * the npm shim: the SCRIPT map's fallback is read out of bin/goblin.js - an
-#     unmapped subcommand lands in goblin-install, which is why `goblin install`
-#     works from the npm layout.
-if out=$(bash bin/goblin install --target /nonexistent --class A 2>&1); then
-  note "FAIL bash bin/goblin install unexpectedly exited 0 - the docs' dispatch claim is stale"
+if grep -q 'bin/goblin-install' README.md; then
+  note "FAIL README still presents bin/goblin-install as an install instruction (W5-D)"
   fail=1
 else
-  rc=$?
-  if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'unknown subcommand: install'; then
-    note "ok   measured: bash bin/goblin install exits 2 (unknown subcommand: install)"
-  else
-    note "FAIL bash bin/goblin install exits $rc with unexpected output: $(printf '%s' "$out" | head -1)"
-    fail=1
-  fi
+  note "ok   README presents no bin/goblin-install install instruction (W5-D)"
 fi
-grep -q 'goblin-install" ' bin/goblin.js || grep -q '?? "goblin-install"' bin/goblin.js
-check "  and bin/goblin.js falls back to goblin-install (the shim's install route)" "$?"
-for f in README.md docs/GUIDE.md; do
-  grep -q 'exits 2' "$f" && grep -q 'unknown subcommand' "$f"
-  check "  and $f states the measured dispatch behavior (W5-D)" "$?"
-done
+CLONE_URL="https://github.com/$(printf '%s%s%s' 'harv' 'eyngu' 'yen33')/goblin-stack.git"
+if grep -qF "$CLONE_URL" README.md; then
+  note "FAIL README still presents the source clone as an install path (W5-D)"
+  fail=1
+else
+  note "ok   README presents no source clone install path (W5-D)"
+fi
 
-# ---- W5-D: the GUIDE carries both routes at Step 1 -----------------------------
+# ---- W5-D: the GUIDE reads as one linear npm path -------------------------------
+# The guide's two-route split (route A npm / route B clone, $GS, bin/goblin-install)
+# is gone: npm is the only route it gives, in §2, §3, §10 and the appendix.
 grep -q 'npm i -g @techgoblin/gobstack' docs/GUIDE.md
 check "docs/GUIDE.md names the npm route (W5-D)" "$?"
 grep -q 'goblin install --target . --class A' docs/GUIDE.md
 check "  and gives the npm CLI's Step-1 command (W5-D)" "$?"
-grep -q 'bash "$GS/bin/goblin-install" --target . --class A' docs/GUIDE.md
-check "  and keeps the clone route's Step-1 command (W5-D)" "$?"
+if grep -q 'bin/goblin-install' docs/GUIDE.md || grep -qi 'route b' docs/GUIDE.md \
+   || grep -qF '"$GS' docs/GUIDE.md; then
+  note "FAIL docs/GUIDE.md still carries route-B / clone-install text (W5-D)"
+  fail=1
+else
+  note "ok   docs/GUIDE.md carries no route-B / clone-install text (W5-D)"
+fi
 
 if [ "$fail" -eq 0 ]; then note "t-doc-sync: PASS"; else note "t-doc-sync: FAIL"; fi
 exit "$fail"
