@@ -146,9 +146,9 @@ TARGET=$(g_expand_tilde "$TARGET")
 TARGET=$(cd "$TARGET" && pwd)
 
 # ------------------------------------------------------------ screen 1: welcome
-printf '%s\n' "${C_ACCENT}  ▄▄ ▄▄▄ ▄ ▄ ▄▄▄ ▄▄▄   ▄▄▄  ▄ ▄ ▄▄▄ ▄▄${C_RESET}"
-printf '%s\n' "${C_ACCENT}  ▀▄▀ ▄▄▀ ▄ ▀ ▄▄▀ █ █   █▄▄  ▀▄█ █ █ █▄▄${C_RESET}"
-printf '%s\n' "${C_ACCENT}  ▄▄█ █▄▄ █ ▄ █▄▄ █▄█   █▄▄   ██ █▄█ █ █${C_RESET}"
+printf '%s\n' "${C_ACCENT}███ ██ ██▄ █  ██ █ █   ██▄ ███ ▄█▄ ██▄ █ █${C_RESET}"
+printf '%s\n' "${C_ACCENT}█ █ █ █ ██▄ █   █ █▄█   █    █  █ █ █   ██${C_RESET}"
+printf '%s\n' "${C_ACCENT}██▄ ██▄ ██▄ █▄▄ ██ █ █   ▄██  █  █ █ ██▄ █ █${C_RESET}"
 printf '%s\n' "${C_DIM}     discipline around whatever executes${C_RESET}"
 printf '\n'
 printf '%s\n' "${C_TEXT}  gob init${C_RESET} ${C_MUTED}— first-run setup (goblin-stack v$VERSION)${C_RESET}"
