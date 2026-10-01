@@ -6,15 +6,15 @@
 // and a marketplace packager stripping the executable bit breaks the symlink, not
 // the spawnSync path below.
 //
-//   goblin verify [--only <id,...>] ...   -> bin/goblin-verify
-//   goblin bans   [...]                   -> bin/goblin-bans
-//   goblin audit  [...]                   -> bin/goblin-audit
-//   goblin upgrade [...]                  -> bin/goblin-upgrade (W3)
-//   goblin doctor [...]                   -> bin/goblin-doctor (W4a)
-//   goblin emit   [...]                   -> bin/goblin-emit (W4a)
-//   goblin init   [...]                   -> bin/goblin-init (W6, the first-run wizard)
-//   goblin uninstall [--target <dir>]     -> bin/goblin-install --uninstall
-//   goblin install [...]                  -> bin/goblin-install (the one legacy fallback)
+//   gob verify [--only <id,...>] ...      -> bin/goblin-verify
+//   gob bans   [...]                      -> bin/goblin-bans
+//   gob audit  [...]                      -> bin/goblin-audit
+//   gob upgrade [...]                     -> bin/goblin-upgrade (W3)
+//   gob doctor [...]                      -> bin/goblin-doctor (W4a)
+//   gob emit   [...]                      -> bin/goblin-emit (W4a)
+//   gob init   [...]                      -> bin/goblin-init (W6, the first-run wizard)
+//   gob uninstall [--target <dir>]        -> bin/goblin-install --uninstall
+//   gob install [...]                     -> bin/goblin-install (the one legacy fallback)
 //   no args | -h/--help | any other unrecognized first arg
 //                                         -> this file's short usage, exit 2. A bare `goblin`
 //                                            used to fall through into the installer; a typo
@@ -50,7 +50,7 @@ const [cmd, ...rest] = process.argv.slice(2);
 // No args, a help flag, or an unrecognized first arg: short usage, exit 2. The one survivor of
 // the old catch-all fallback is the literal `install` first arg — bare `goblin` mapped to the
 // installer through npm's bin default, and a typo (`goblin inti`) silently installed into
-// whatever directory the shell sat in. A bare subcommand-less `goblin install ...` keeps the
+// whatever directory the shell sat in. A bare subcommand-less `gob install ...` keeps the
 // installer; everything else stops here and names the word it did not know.
 function usage() {
   process.stderr.write(
@@ -87,7 +87,7 @@ let extra = [];
 if (cmd === "install") {
   target = "goblin-install"; // the one legacy fallback, kept verbatim
 } else if (cmd === "uninstall") {
-  // `goblin uninstall --target <dir>` routes into the installer's uninstall job — the shape
+  // `gob uninstall --target <dir>` routes into the installer's uninstall job — the shape
   // docs/GUIDE.md and README already promise. `--uninstall` is appended FIRST so the user's
   // own `--target <dir>` and options still parse, and a stray literal `--uninstall` cannot
   // appear twice.
