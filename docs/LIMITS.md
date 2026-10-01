@@ -520,20 +520,23 @@ the Node the gates ran under.
     id cell was measured to be exactly its platform name (the `gem_ini` typo shipped in one
     W4b build and the doctor's DRIFT caught it — the schema check works).
 
-48. **`SP-01` proves a SPEC file exists, never that the current round has one — the rule text
-    overclaims what the check reads.** The text says "The current round has a SPEC"; the check is
+48. **`SP-01`'s rule text once overclaimed; it now states the check's actual scope.** The text
+    used to read "The current round has a SPEC" while the check is
     `ls ./*-SPEC.md >/dev/null 2>&1`, which passes on ANY spec-shaped file at the repo root. The
     measured consequence: a fresh class-A install ships the scaffold's `ROUND-000-SPEC.md`, and
     `SP-01` PASSes on that scaffold alone — no round is open, and the row is green anyway. A stale
     spec from a finished round keeps satisfying the row exactly as well as a live one, because the
-    check has no notion of "current". What it costs: the SPEC-exists signal in a run summary is
-    weaker than its wording — read it as "a `*-SPEC.md` file is present", not "this round's spec is
+    check has no notion of "current". **Fixed in W6 (text, not check):** the row now reads
+    "A *-SPEC.md file exists at the repo root (any round, not the current one - round-scoping
+    arrives with the W6 staged chain)" — manifest and `docs/ENFORCEMENT.md` re-rendered in the
+    same commit, the check cell untouched. What it costs: the SPEC-exists signal in a run summary is
+    weaker than a round-scoped claim would suggest — read it as "a `*-SPEC.md` file is present", not "this round's spec is
     here". Measured: `goblin-verify` on a fresh probe install reports `PASS SP-01 (ls
-    ./*-SPEC.md >/dev/null 2>&1)` with `ROUND-000-SPEC.md` the only file the glob sees. **Ticketed,
-    not gated:** "current round" is a stage-order notion, and the W6 staged workflow chain (SC-01:
-    a SPEC committed before the changes it governs) is what gives the word meaning; a quick reword
-    of the text cell would desync the doc-rendered row from the manifest for no behavioural gain,
-    so the gap is recorded here until that chain lands.
+    ./*-SPEC.md >/dev/null 2>&1)` with `ROUND-000-SPEC.md` the only file the glob sees, and the
+    same PASS after renaming it to a non-round name. **Ticketed, not gated:** "current round" is a stage-order notion, and the W6 staged workflow chain (SC-01:
+    a SPEC committed before the changes it governs) is what gives the word meaning; the staged
+    chain's stage-order rows are what will make round-scoping REAL — the reword names the
+    boundary until then.
 
 49. **The engine footer prints to captured stdout, and a script parsing `goblin-verify` output
     must expect it.** The two-line footer (`engine: mode=… cli_sha256=… enforcement_tsv_sha256=…`)
@@ -549,7 +552,9 @@ the Node the gates ran under.
     this file; no change to the engine is implied or wanted.
 
 50. **`CM-01` reads only the most recent commit — historical commits with a wrong identity pass
-    unseen.** The check is `test "$(git log -1 --format='%ae')"` against the configured
+    unseen. Current stated scope: the row gates the identity of HEAD at the moment of the run,
+    and nothing older; that is the row's whole claim, by design.** The check is
+    `test "$(git log -1 --format='%ae')"` against the configured
     `owner_email`, so it gates the identity of HEAD at the moment of the run and nothing older.
     Measured: a probe history `owner → wrong@old.co → owner` reports `--only CM-01` clean (exit 0)
     with the wrong-identity commit sitting one below HEAD. That is consistent with the
@@ -558,7 +563,8 @@ the Node the gates ran under.
     fix — but it should be named: the row's green means "the latest commit carries the owner
     identity", never "no commit in this repo's history carries an ambient one". A wrong-identity
     commit that has since been followed by correct ones is invisible to every run. Recorded as a
-    boundary; no row change implied.
+    boundary; no row change implied. `docs/ENFORCEMENT.md`'s CM-01 row carries the same one-line
+    scope statement.
 
 51. **`gob init` writes its three added values into `goblin.yaml` itself, not through a
     template.** Install renders `.goblin/goblin.yaml` from `templates/goblin.yaml.tmpl` and
@@ -573,3 +579,13 @@ the Node the gates ran under.
     keys, and a re-run after a hand edit of another line leaves that line alone. Recorded as
     a boundary; the alternative — teaching install three wizard-only flags — would put wizard
     vocabulary into the installer's contract for no gain.
+
+52. **`scope:source` and `scope:target` name WHOSE burden a row carries — the framework's or
+    the adopting repo's.** `scope:source` is goblin-stack's own proof burden: those rows
+    (`PR-01`..`PR-05`) are the framework testing ITSELF while it is being developed — they run
+    in this repo, under `tests/run-tests.sh`, and a dev of goblin-stack is the one who owes the
+    run. `scope:target` is the adopting repo's proof burden: those rows run in an installed
+    repo via `goblin-verify`, and the repo's owner owes the run. Same matrix, two creditors:
+    a source row can never fail a user's repo, and a target row can never substitute for the
+    framework's own suite. Recorded as a definition; `docs/ENFORCEMENT.md`'s scope paragraph
+    carries the same sentence for the reader who arrives there first.

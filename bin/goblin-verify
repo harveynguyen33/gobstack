@@ -2757,11 +2757,18 @@ SEE
   # the manifest that judged this run, so a repo can name its judge. The statement is
   # UNSIGNED and forgeable - one forgery now covers N repos - which is the hole LIMITS
   # #43 records, deliberately not fixed in W1 (G6).
-  printf '      engine: mode=%s' "$ENGINE_MODE"
-  if [ -n "$GOBLIN_ENGINE" ]; then printf ' engine_dir=%s' "$GOBLIN_ENGINE"; fi
+  # W6: the banner goes to STDERR, not stdout (LIM-51). A consumer capturing verify's
+  # output parses check lines; a footer line interleaved with them is parser friction
+  # (docs/LIMITS.md #49 recorded the cost before the fix). The banner is a STATEMENT,
+  # not a verdict line - diagnostics belong on the error stream. Captured stdout after
+  # the move carries PASS/FAIL/ADV/SKIP lines and the summary only; the banner stays
+  # visible in a terminal and in any `2>&1` merge (every suite that asserts the
+  # footer merges the streams).
+  printf '      engine: mode=%s' "$ENGINE_MODE" >&2
+  if [ -n "$GOBLIN_ENGINE" ]; then printf ' engine_dir=%s' "$GOBLIN_ENGINE" >&2; fi
   printf ' cli_sha256=%s enforcement_tsv_sha256=%s\n' \
     "$(g_sha256_file "$SELF_DIR/goblin-verify")" \
-    "$(g_sha256_file "$MANIFEST")"
+    "$(g_sha256_file "$MANIFEST")" >&2
   # ---- the shadow advisory (W3 §3.2) -------------------------------------------
   # A vendored payload under .goblin/ while the record says mode=global: the chain's
   # vendored step (2) beats the declared engine_dir (3) — W1's ordering, kept
