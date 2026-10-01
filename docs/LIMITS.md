@@ -576,3 +576,13 @@ the Node the gates ran under.
     keys, and a re-run after a hand edit of another line leaves that line alone. Recorded as
     a boundary; the alternative — teaching install three wizard-only flags — would put wizard
     vocabulary into the installer's contract for no gain.
+
+52. **`scope:source` and `scope:target` name WHOSE burden a row carries — the framework's or
+    the adopting repo's.** `scope:source` is goblin-stack's own proof burden: those rows
+    (`PR-01`..`PR-05`) are the framework testing ITSELF while it is being developed — they run
+    in this repo, under `tests/run-tests.sh`, and a dev of goblin-stack is the one who owes the
+    run. `scope:target` is the adopting repo's proof burden: those rows run in an installed
+    repo via `goblin-verify`, and the repo's owner owes the run. Same matrix, two creditors:
+    a source row can never fail a user's repo, and a target row can never substitute for the
+    framework's own suite. Recorded as a definition; `docs/ENFORCEMENT.md`'s scope paragraph
+    carries the same sentence for the reader who arrives there first.
