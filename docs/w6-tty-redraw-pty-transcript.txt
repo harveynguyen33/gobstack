@@ -1,0 +1,334 @@
+Script started on 2026-10-02 00:53:48+07:00 [COMMAND="bash /home/harvey/projects/goblin-stack/bin/goblin-init --target /tmp/ptyfinal/repo --yes" <not executed on terminal>]
+
+
+
+
+
+
+
+
+[2K[91m▄███▄ ▄██▄ ██▄  █    ▄█▄ █  █   ▄██▀ █████ ▄███▄ ▄███ █  █[0m
+[2K[91m█   █ █  █ █▄▀█ █     █  █▄ █   ▀██▄   █   █   █ █    █ █[0m
+[2K[91m█ ▄██ █  █ █▄▀█ █     █  █ ▄█   ▄█▀    █   █████ █    ██[0m
+[2K[91m▀██▀▀ ▀██▀ ██▀  ▀▀▀▀ ▀█▀ █  █   ██▀▀   ▀   █   █ ▀██▀ █ █[0m
+[2K     [90mdiscipline around whatever executes[0m
+[2K
+[2K[97m  gob init[0m [90m— first-run setup (gobstack v0.4.4)[0m
+[2K  [90m6 steps · every step has a flag · nothing is written until the plan is confirmed[0m
+[2K
+[2K  [91m◆[0m 1. platforms    [97m[0m
+[2K  [90m○[0m 2. class        [97m[0m
+[2K  [90m○[0m 3. branch/email [97m[0m
+[2K  [90m○[0m 4. first gate   [97m[0m
+[2K  [90m○[0m 5. emit         [97m[0m
+[2K  [90m○[0m 6. done         [97m[0m
+[9A[J[2K[91m▄███▄ ▄██▄ ██▄  █    ▄█▄ █  █   ▄██▀ █████ ▄███▄ ▄███ █  █[0m
+[2K[91m█   █ █  █ █▄▀█ █     █  █▄ █   ▀██▄   █   █   █ █    █ █[0m
+[2K[91m█ ▄██ █  █ █▄▀█ █     █  █ ▄█   ▄█▀    █   █████ █    ██[0m
+[2K[91m▀██▀▀ ▀██▀ ██▀  ▀▀▀▀ ▀█▀ █  █   ██▀▀   ▀   █   █ ▀██▀ █ █[0m
+[2K     [90mdiscipline around whatever executes[0m
+[2K
+[2K[97m  gob init[0m [90m— first-run setup (gobstack v0.4.4)[0m
+[2K  [90m6 steps · every step has a flag · nothing is written until the plan is confirmed[0m
+[2K
+[2K  [92m✔[0m 1. platforms    [97m[0m
+[2K  [91m◆[0m 2. class        [97m[0m
+[2K  [90m○[0m 3. branch/email [97m[0m
+[2K  [90m○[0m 4. first gate   [97m[0m
+[2K  [90m○[0m 5. emit         [97m[0m
+[2K  [90m○[0m 6. done         [97m[0m
+[2K
+[2K  ✔ 1. platforms      [97m0 detected[0m
+[2K      [93mno platform detected here — the wizard will still install the harness; emit later with gob emit[0m
+[12A[J[2K[91m▄███▄ ▄██▄ ██▄  █    ▄█▄ █  █   ▄██▀ █████ ▄███▄ ▄███ █  █[0m
+[2K[91m█   █ █  █ █▄▀█ █     █  █▄ █   ▀██▄   █   █   █ █    █ █[0m
+[2K[91m█ ▄██ █  █ █▄▀█ █     █  █ ▄█   ▄█▀    █   █████ █    ██[0m
+[2K[91m▀██▀▀ ▀██▀ ██▀  ▀▀▀▀ ▀█▀ █  █   ██▀▀   ▀   █   █ ▀██▀ █ █[0m
+[2K     [90mdiscipline around whatever executes[0m
+[2K
+[2K[97m  gob init[0m [90m— first-run setup (gobstack v0.4.4)[0m
+[2K  [90m6 steps · every step has a flag · nothing is written until the plan is confirmed[0m
+[2K
+[2K
+[2K  ✔ 1. platforms      [97m0 detected[0m
+[2K      [93mno platform detected here — the wizard will still install the harness; emit later with gob emit[0m
+[2K  [92m✔[0m 1. platforms    [97m[90m0 detected[0m[0m
+[2K  [92m✔[0m 2. class        [97m[0m
+[2K  [91m◆[0m 3. branch/email [97m[0m
+[2K  [90m○[0m 4. first gate   [97m[0m
+[2K  [90m○[0m 5. emit         [97m[0m
+[2K  [90m○[0m 6. done         [97m[0m
+[2K
+[2K      [90mwhat kind of work does this repo do?[0m
+[2K      [97m  1 ▸ app        shipped features, PRs, review gates        [90m(class A)[0m
+[2K      [97m  2   service    backend jobs, config, unattended runs      [90m(class B)[0m
+[2K      [97m  3   game       playable builds, perf budgets              [90m(class C)[0m
+[2K      [97m  4   research   specs, replays, reference corpora          [90m(class D)[0m
+[2K      [97m  5   agent      fleets, loops, unattended automation       [90m(class E)[0m
+[2K      [97m  6   desktop    the shell you live in, perf budget         [90m(class F)[0m
+[2K      [90m↑ number + Enter · Enter = app · the class letter works too (A-F)[0m
+      [2K
+[2K  ✔ 2. class            [97mA — shipped-software[0m
+[23A[J[2K[91m▄███▄ ▄██▄ ██▄  █    ▄█▄ █  █   ▄██▀ █████ ▄███▄ ▄███ █  █[0m
+[2K[91m█   █ █  █ █▄▀█ █     █  █▄ █   ▀██▄   █   █   █ █    █ █[0m
+[2K[91m█ ▄██ █  █ █▄▀█ █     █  █ ▄█   ▄█▀    █   █████ █    ██[0m
+[2K[91m▀██▀▀ ▀██▀ ██▀  ▀▀▀▀ ▀█▀ █  █   ██▀▀   ▀   █   █ ▀██▀ █ █[0m
+[2K     [90mdiscipline around whatever executes[0m
+[2K
+[2K[97m  gob init[0m [90m— first-run setup (gobstack v0.4.4)[0m
+[2K  [90m6 steps · every step has a flag · nothing is written until the plan is confirmed[0m
+[2K
+[2K
+[2K  ✔ 1. platforms      [97m0 detected[0m
+[2K      [93mno platform detected here — the wizard will still install the harness; emit later with gob emit[0m
+[2K
+[2K      [90mwhat kind of work does this repo do?[0m
+[2K      [97m  1 ▸ app        shipped features, PRs, review gates        [90m(class A)[0m
+[2K      [97m  2   service    backend jobs, config, unattended runs      [90m(class B)[0m
+[2K      [97m  3   game       playable builds, perf budgets              [90m(class C)[0m
+[2K      [97m  4   research   specs, replays, reference corpora          [90m(class D)[0m
+[2K      [97m  5   agent      fleets, loops, unattended automation       [90m(class E)[0m
+[2K      [97m  6   desktop    the shell you live in, perf budget         [90m(class F)[0m
+[2K      [90m↑ number + Enter · Enter = app · the class letter works too (A-F)[0m
+[2K
+[2K  ✔ 2. class            [97mA — shipped-software[0m
+[2K  [92m✔[0m 1. platforms    [97m[90m0 detected[0m[0m
+[2K  [92m✔[0m 2. class        [97m[97mA (shipped-software)[0m[0m
+[2K  [92m✔[0m 3. branch/email [97m[0m
+[2K  [91m◆[0m 4. first gate   [97m[0m
+[2K  [90m○[0m 5. emit         [97m[0m
+[2K  [90m○[0m 6. done         [97m[0m
+[2K
+[2K      [90mthe forge contract — the identity this repo commits with (CM-01)[0m
+      [97mdefault branch[0m [90m─ main[2K
+      [97mowner email[0m [90m─ t@t.co[2K
+[2K  ✔ 3. branch/email   [97mmain · t@t.co[0m
+[28A[J[2K[91m▄███▄ ▄██▄ ██▄  █    ▄█▄ █  █   ▄██▀ █████ ▄███▄ ▄███ █  █[0m
+[2K[91m█   █ █  █ █▄▀█ █     █  █▄ █   ▀██▄   █   █   █ █    █ █[0m
+[2K[91m█ ▄██ █  █ █▄▀█ █     █  █ ▄█   ▄█▀    █   █████ █    ██[0m
+[2K[91m▀██▀▀ ▀██▀ ██▀  ▀▀▀▀ ▀█▀ █  █   ██▀▀   ▀   █   █ ▀██▀ █ █[0m
+[2K     [90mdiscipline around whatever executes[0m
+[2K
+[2K[97m  gob init[0m [90m— first-run setup (gobstack v0.4.4)[0m
+[2K  [90m6 steps · every step has a flag · nothing is written until the plan is confirmed[0m
+[2K
+[2K
+[2K  ✔ 1. platforms      [97m0 detected[0m
+[2K      [93mno platform detected here — the wizard will still install the harness; emit later with gob emit[0m
+[2K
+[2K      [90mwhat kind of work does this repo do?[0m
+[2K      [97m  1 ▸ app        shipped features, PRs, review gates        [90m(class A)[0m
+[2K      [97m  2   service    backend jobs, config, unattended runs      [90m(class B)[0m
+[2K      [97m  3   game       playable builds, perf budgets              [90m(class C)[0m
+[2K      [97m  4   research   specs, replays, reference corpora          [90m(class D)[0m
+[2K      [97m  5   agent      fleets, loops, unattended automation       [90m(class E)[0m
+[2K      [97m  6   desktop    the shell you live in, perf budget         [90m(class F)[0m
+[2K      [90m↑ number + Enter · Enter = app · the class letter works too (A-F)[0m
+[2K
+[2K  ✔ 2. class            [97mA — shipped-software[0m
+[2K
+[2K      [90mthe forge contract — the identity this repo commits with (CM-01)[0m
+[2K
+[2K
+[2K  ✔ 3. branch/email   [97mmain · t@t.co[0m
+[2K  [92m✔[0m 1. platforms    [97m[90m0 detected[0m[0m
+[2K  [92m✔[0m 2. class        [97m[97mA (shipped-software)[0m[0m
+[2K  [92m✔[0m 3. branch/email [97m[97mmain · t@t.co[0m[0m
+[2K  [92m✔[0m 4. first gate   [97m[0m
+[2K  [91m◆[0m 5. emit         [97m[0m
+[2K  [90m○[0m 6. done         [97m[0m
+[2K
+[2K      [90mone real command that must stay green — suggested for a bash suite:[0m
+[2K      [90mbash tests/run-tests.sh[0m
+      [97mgate command[0m [90m─ bash tests/run-tests.sh[2K
+[2K  ✔ 4. first gate      [97mbash tests/run-tests.sh[0m
+[33A[J[2K[91m▄███▄ ▄██▄ ██▄  █    ▄█▄ █  █   ▄██▀ █████ ▄███▄ ▄███ █  █[0m
+[2K[91m█   █ █  █ █▄▀█ █     █  █▄ █   ▀██▄   █   █   █ █    █ █[0m
+[2K[91m█ ▄██ █  █ █▄▀█ █     █  █ ▄█   ▄█▀    █   █████ █    ██[0m
+[2K[91m▀██▀▀ ▀██▀ ██▀  ▀▀▀▀ ▀█▀ █  █   ██▀▀   ▀   █   █ ▀██▀ █ █[0m
+[2K     [90mdiscipline around whatever executes[0m
+[2K
+[2K[97m  gob init[0m [90m— first-run setup (gobstack v0.4.4)[0m
+[2K  [90m6 steps · every step has a flag · nothing is written until the plan is confirmed[0m
+[2K
+[2K
+[2K  ✔ 1. platforms      [97m0 detected[0m
+[2K      [93mno platform detected here — the wizard will still install the harness; emit later with gob emit[0m
+[2K
+[2K      [90mwhat kind of work does this repo do?[0m
+[2K      [97m  1 ▸ app        shipped features, PRs, review gates        [90m(class A)[0m
+[2K      [97m  2   service    backend jobs, config, unattended runs      [90m(class B)[0m
+[2K      [97m  3   game       playable builds, perf budgets              [90m(class C)[0m
+[2K      [97m  4   research   specs, replays, reference corpora          [90m(class D)[0m
+[2K      [97m  5   agent      fleets, loops, unattended automation       [90m(class E)[0m
+[2K      [97m  6   desktop    the shell you live in, perf budget         [90m(class F)[0m
+[2K      [90m↑ number + Enter · Enter = app · the class letter works too (A-F)[0m
+[2K
+[2K  ✔ 2. class            [97mA — shipped-software[0m
+[2K
+[2K      [90mthe forge contract — the identity this repo commits with (CM-01)[0m
+[2K
+[2K
+[2K  ✔ 3. branch/email   [97mmain · t@t.co[0m
+[2K
+[2K      [90mone real command that must stay green — suggested for a bash suite:[0m
+[2K      [90mbash tests/run-tests.sh[0m
+[2K
+[2K  ✔ 4. first gate      [97mbash tests/run-tests.sh[0m
+[2K  [92m✔[0m 1. platforms    [97m[90m0 detected[0m[0m
+[2K  [92m✔[0m 2. class        [97m[97mA (shipped-software)[0m[0m
+[2K  [92m✔[0m 3. branch/email [97m[97mmain · t@t.co[0m[0m
+[2K  [92m✔[0m 4. first gate   [97m[97mbash tests/run-tests.sh[0m[0m
+[2K  [92m✔[0m 5. emit         [97m[0m
+[2K  [91m◆[0m 6. done         [97m[0m
+[2K  ✔ 5. emit             [97m0 platform(s) · scope project[0m
+
+  [90mrunning: goblin-install --target /tmp/ptyfinal/repo --class A[0m
+created 50 · updated 0 · unchanged 0 · skipped 0
+
+next:
+  1. cd /tmp/ptyfinal/repo && git add -A && git commit   # the install is a change like any other
+  2. .goblin/bin/goblin-verify   # or add .goblin/bin to PATH
+  3. edit .goblin/goblin.yaml: replace the default gate with your real commands (P8 step 3)
+  4. hermes skills trust /tmp/ptyfinal/repo   # one-time, so the project-tier skills load
+
+automations (optional; neither writes outside this repo, and A-02 has no agent in it):
+  bash /tmp/ptyfinal/repo/.goblin/automations/drift-audit.sh --dry-run        # read the record first
+  cp /tmp/ptyfinal/repo/.goblin/automations/drift-audit.sh ~/.hermes/scripts/
+  hermes cron create "0 9 * * 1" --name "Drift audit - weekly" --no-agent \
+      --script drift-audit.sh --deliver <channel>
+  P13/P14 in docs/FLOWS.md; the whole model in automations/README.md
+      [92mPASS  IN-01  the install record exists and names its version[0m
+      [92mPASS  IN-02  41 installed files hashed[0m
+      [92mPASS  IN-03  the manifest is complete: every rule carries a check or is advisory, inside the enum[0m
+      [92mPASS  IN-04  0 pre-existing file(s) left untouched[0m
+      [92mPASS  HP-01  (test -f HANDOFF.md)[0m
+      [92mPASS  HP-02  (for h in 'START HERE' 'STATE|STATUS' 'GATES?' 'NEXT STEPS|NEXT' 'NOT VERIFIED|UNVERIFIED|NOT PROVEN|UNPROVEN|PENDING[^.]*DEVICE TEST'; do grep -qiE "^#{2,3}[[:space:]]+[^[:alpha:]]*($h)\b" HANDOFF.md || { echo "missing section: $h"; exit 1; }; done)[0m
+      [92mPASS  HP-03  1 gate line(s) inside the Gates section, each with a measured date (anchored on the declared gate name(s): commit todo_ceiling)[0m
+      [93mADV   HP-04  A stale sentence is corrected in place with a dated parenthetical, never deleted. (advisory)[0m
+      [92mPASS  HP-05  names 3c96403 (ancestor of HEAD 3c96403)[0m
+      [92mPASS  SP-01  (ls ./*-SPEC.md >/dev/null 2>&1)[0m
+      [91mFAIL  SP-02  (test -z "$(git ls-files --others --exclude-standard -- '*-SPEC.md')" -> exit 1)[0m
+      [92mPASS  SP-03  (awk '/^[[:space:]]*[-*][[:space:]]/ && /AC[0-9]*:/ && !/`|==|===|exit|<|>/ {print; bad=1} END{exit bad}' ./*-SPEC.md)[0m
+      [92mPASS  GT-01  2 declared gate(s), each with a cmd[0m
+      [92mPASS  GT-02  commit=0 todo_ceiling=0 · client_js_bytes 0 (ceiling 0) · measured 2026-10-02[0m
+      [92mPASS  GT-03  (test -f .goblin/last-gate-line && [ .goblin/last-gate-line -nt "$(git rev-parse --git-dir)/logs/HEAD" ])[0m
+      [92mPASS  GT-04  ratchet client_js_bytes ceiling 0[0m
+      [92mPASS  GT-05  client_js_bytes 0 (ceiling 0)[0m
+      [92mPASS  HS-01  not an asserting harness (report utility): gate.sh[0m
+1 asserting harness(es), 1 report utility(ies)
+      [90mSKIP  HS-02  no pinned pre-change commit yet (replay.commit empty or unknown) - REPLAY not provable[0m
+      [93mADV   HS-03  Source probes read text with comments blanked first. (advisory)[0m
+      [92mPASS  CM-01  (test "$(git log -1 --format='%ae')" = "$(grep '^owner_email:' .goblin/goblin.yaml | cut -d' ' -f2)")[0m
+      [93mADV   CM-02  The commit message was written to a file, not passed with -m. (advisory)[0m
+      [91mFAIL  CM-03  9 dirty entr(y|ies), max_dirty 0[0m
+      [92mPASS  MD-01  (for d in skills manifest bin templates presets .goblin .hermes; do [ -d "$d" ] || continue; grep -rniE '(d[e]epseek|cl[a]ude|g[p]t-[0-9]|gr[o]k|g[e]mini|g[l]m-[0-9]|k[i]mi)[a-z0-9.:_-]*' "$d" && exit 1; done; exit 0)[0m
+      [93mADV   MD-02  no model mapping configured (/tmp/ptyfinal/home/projects/fleet-model.yaml absent) - advisory[0m
+      [93mADV   MD-03  Role-pinned fan-out goes through kanban, not a model-less subagent spawn. (advisory)[0m
+      [92mPASS  PG-01  0 review note(s)[0m
+      [92mPASS  PG-02  0 review note(s) classified[0m
+      [92mPASS  PG-03  0 review note(s) patch-id checked[0m
+      [93mADV   PG-04  Never bypass what the forge enforces. (advisory)[0m
+      [92mPASS  PG-05  1 workflow file(s) checked for a self-skipping required check[0m
+      [92mPASS  PG-06  goblin-gate.yml: runs the verifier, which executes every declared gate[0m
+1 workflow file(s) compared with the 2 declared gate(s)
+      [92mPASS  DS-01  unchanged: .goblin/state.json=missing[0m
+      [92mPASS  DS-02  snapshot .goblin/state.json=missing[0m
+      [93mADV   DOC-01 A significant change updates the docs that teach it. (advisory)[0m
+      [93mADV   DOC-02 System-level changes are recorded wherever the project's standard says they live. (advisory)[0m
+      [92mPASS  SK-01  [0m
+      [92mPASS  SK-02  20 installed skill file(s) hashed[0m
+      [92mPASS  SK-03  advisory 10 of ceiling 10 (0 free slots: the next advisory row FAILs)[0m
+      [92mPASS  SK-04  [0m
+      [92mPASS  PT-01  (for d in skills manifest bin templates presets .goblin .hermes; do [ -d "$d" ] || continue; grep -rniE --exclude=goblin.yaml --exclude=installed.json '(h[a]rvey|tech-g[o]blin|/h[o]me/[a-z]+|g[o]blin-ui|op[e]n-door|sup[r]eme|bb[t]ech|c[l]v)' "$d" && exit 1; done; exit 0)[0m
+      [92mPASS  PT-02  declared main, actual main[0m
+      [92mPASS  CL-01  part pr-gate: optional, present[0m
+part review-panel: optional, present
+part tokens: optional, absent
+      [92mPASS  CL-02  archive: false - the full class requirement applies[0m
+      [92mPASS  SC-01  0 tracked secret file(s)[0m
+      [92mPASS  SC-02  the whole secret family is ignored (.env, .env.local, .env.production proved by git)[0m
+      [92mPASS  SC-03  0 client-visible secret-shaped name(s); no build output to scan for clause 2[0m
+      [92mPASS  SC-04  0 cookie write(s) checked; a JS-written cookie is readable by any script - reported, not failed[0m
+      [92mPASS  SC-05  0 write handler(s), 0 waived; 11 dir(s) declared[0m
+      [90mSKIP  SC-06  no package.json - there is no dependency manifest to lock[0m
+      [90mSKIP  SC-07  no audit record yet. Run .goblin/bin/goblin-audit once, deliberately, then commit[0m
+.goblin/audit.tsv: SC-07 reads the record and never the network
+      [90mSKIP  SC-08  no package-lock.json - there is no install-hook surface to enumerate[0m
+      [93mADV   SC-09  Auth is applied consistently across sibling routes. (advisory)[0m
+      [90mSKIP  PF-01  no perf baseline recorded yet: run `find .next/static dist/assets dist -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c` on a pinned commit, then write[0m
+perf.baseline_commit, perf.baseline_value, perf.measured and the matching ratchet ceiling
+      [92mPASS  AU-01  2 automation producer(s) scanned, none opens with a network or forge verb[0m
+      [90mSKIP  AU-02  no reports/*/report.yaml - nothing to dedup[0m
+      [90mSKIP  AU-03  no reports/ - no reporter run in this repo to audit[0m
+      [92mPASS  AU-04  [0m
+      [92mPASS  BN-00  8 ban(s), each with an enforcement row and a named replacement[0m
+      [90mSKIP  BN-01  No `any` in application TypeScript. (no matching files: src) [0m
+      [90mSKIP  BN-02  No `@ts-ignore` / `@ts-expect-error` suppressions. (no matching files: src) [0m
+      [90mSKIP  BN-03  No direct network call from a component. (not enabled in bans: - add BN-03 to .goblin/goblin.yaml to turn it on) [0m
+      [90mSKIP  BN-05  No import across a declared layer boundary. (no matching files: src) [0m
+      [90mSKIP  BN-06  No renderer with Node access (`nodeIntegration: true`). (not enabled in bans: - add BN-06 to .goblin/goblin.yaml to turn it on) [0m
+      [90mSKIP  BN-07  No renderer with context isolation or the process sandbox turned off. (not enabled in bans: - add BN-07 to .goblin/goblin.yaml to turn it on) [0m
+      [90mSKIP  BN-08  No dangerous webPreferences. (not enabled in bans: - add BN-08 to .goblin/goblin.yaml to turn it on) [0m
+      [90mSKIP  BN-09  No synchronous IPC and no `@electron/remote`. (not enabled in bans: - add BN-09 to .goblin/goblin.yaml to turn it on) [0m
+      [90mSKIP  FM-01  feature_map: is empty - no map is declared, so there is nothing to index[0m
+      [90mSKIP  FM-02  feature_map: is empty - no map is declared, so there are no entry paths to resolve[0m
+      [90mSKIP  VA-01  verify_doctor: is empty - no doctor is declared, so "the generated skill was executed once" is not provable here[0m
+      [90mSKIP  JG-01  no loop record in this repo - no judge verdict to check[0m
+      [93mADV   JG-02  no model mapping configured (/tmp/ptyfinal/home/projects/fleet-model.yaml absent) - advisory[0m
+remedy: add a `judge:` entry beside the code lane in the file declared as models_file: in /tmp/ptyfinal/repo/.goblin/goblin.yaml
+      [93mADV   JG-03  A judge lane that has never returned a non-`done` verdict is escalated. (advisory)[0m
+      [90mSKIP  LP-01  no loop has run in this repo[0m
+      [90mSKIP  LP-02  no loop has run in this repo[0m
+      [90mSKIP  LP-03  no loop has run in this repo[0m
+      [90mSKIP  LP-04  no loop has run in this repo[0m
+      [90mSKIP  LP-05  no loop has run in this repo[0m
+      [90mSKIP  RC-01  reference_manifest: is empty - no reference corpus is declared, so there is nothing for a build to match against[0m
+      [90mSKIP  RC-02  reference_manifest: is empty - there is no manifest to shape-check (RC-01 skips for the same reason)[0m
+      [90mSKIP  RC-03  no manifests/ directory - this is not a lab repo with a reference corpus, so there are no tracked bytes to check[0m
+      [90mSKIP  RC-04  no manifests/*.sha256 - no acquisition record is declared, so there is none to read[0m
+      41 passed, 2 failed, 11 advisory, 28 skipped
+      of those 11 advisory: the matrix labels 10 row(s) advisory; the difference is the non-advisory row(s) reporting ADV by design (an unresolved lane) and any labelled row skipped by an opt-out
+      cannot see: whether a check in the harness dir tests the right path rather than
+      merely passing; whether the forge is bound by the workflow CL-01 found; whether a human
+      read the diff;
+      whether the model mapping names a family that actually differs (MD-02 reports it
+      and cannot change it); and whether .goblin/installed.json — the record every drift
+      check trusts — was itself rewritten. It is not signed, so one edit to it (with the
+      matching edit to the file it protects) defeats IN-02, SK-02 and HS-01 at once
+      (docs/LIMITS.md #18). The ban lane carries the same blind spot and two of its own:
+      the ban table is a manifest file under the same unsigned record, so a defanged ban
+      passes BN-00 (docs/LIMITS.md #28); a ban probe is a TEXT probe with no AST, so a
+      `Record<string, any>` is missed and a `: any` inside a string is reported
+      (docs/LIMITS.md #27); and no check here can reach a ban IN CONTEXT — the row proves
+      the forbidden path fails mechanically, never that the ban reached the agent that
+      wrote the line. The judge/loop lane adds its own: every JG-/LP- row reads a RECORD, so
+      it proves a handle, a pin, a budget and a pointer exist — never that the loop made
+      progress (a changed pointer is a proxy, docs/LIMITS.md #33), never which lane returned
+      a verdict, and never that the predicate was the right one or was really run. The CI lane
+      adds its own: PG-05 and PG-06 read a workflow's TEXT, so PG-05 sees a job whose gate step is
+      conditional and cannot see branch protection, the required-check list, or a forge that never
+      ran the job at all, and PG-06 proves a declared gate is INVOKED in a file under
+      .github/workflows/ — never that the forge marks that job required, never that it is the job
+      the forge waits on, and never that the workflow can fail (that is PG-05). A required check
+      that reports Success after skipping its gate is a green light for a commit whose gate never
+      ran (docs/CI.md). The reference-corpus lane adds its own: RC-01 matches EXACT sha256 only,
+      so a resized, recoloured or re-encoded reference asset, or copied text inside a shipped
+      string, passes it unseen; RC-02 proves the manifest is well-shaped, never that its entries
+      are the right hashes (as strong as tamper hashing, and installed.json is unsigned); RC-03
+      reads the tracked tree and cannot see a payload renamed and re-encoded; and RC-04 proves an
+      acquisition record EXISTS, never that the number beside it came from the store (HP-03's
+      defect, one artifact over). No row here reaches a reference asset in CONTEXT either.
+      engine: mode=vendored cli_sha256=2d37cf1c9f38a582ad60f3f75d2fcd53d10b743905dc3274eab6511c5c5ea008 enforcement_tsv_sha256=fd474c268b0852587c632910c503144fbcfe5e211ed2182902949a79fc5282b1
+
+  [91mgob verify: 41 passed, 2 failed, 28 skipped · exit 1[0m
+
+  [90mnext:[0m
+    1. [97mthe 28 skipped checks ARE your checklist — gob verify names each one[0m
+    2. [97mreplace the placeholder gate in .goblin/goblin.yaml with your real commands (P8 step 3)[0m
+    3. [97mnot emitted here: gob emit --platform <p> --scope global[0m
+    4. [97mhermes skills trust /tmp/ptyfinal/repo   # one-time, so the project-tier skills load[0m
+
+  [91m▙ the goblin sees you. the gate is RED — start there.[0m
+
+Script done on 2026-10-02 00:53:50+07:00 [COMMAND_EXIT_CODE="0"]
