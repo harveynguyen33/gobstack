@@ -300,5 +300,34 @@ else
   note "ok   docs/GUIDE.md carries no route-B / clone-install text (W5-D)"
 fi
 
+# ---- W6: the command surface is `gob` --------------------------------------------
+# 2026-10-01 product decision: `gob` is THE CLI name. The docs must teach gob
+# exclusively — the legacy `goblin <cmd>` invocation is allowed only where a line
+# deliberately names the alias as an alias (README's legacy-alias note). A bare
+# product wordmark 'goblin-stack' is likewise gone from user-facing docs: the
+# product is gobstack (the npm scope's stem); the forge repo URL is the one
+# sanctioned carrier of that string, and it is assembled at run time below.
+GOB_VERBS='init|verify|install|emit|doctor|audit|upgrade|bans|uninstall'
+for f in README.md docs/GUIDE.md; do
+  n=$(grep -cE "\bgoblin ($GOB_VERBS)\b" "$f")
+  if [ "$n" -eq 0 ]; then
+    note "ok   $f carries no 'goblin <verb>' command invocation (W6 gob rename)"
+  else
+    note "FAIL $f still invokes 'goblin <verb>' $n time(s) (W6 gob rename)"
+    grep -nE "\bgoblin ($GOB_VERBS)\b" "$f" | head -3
+    fail=1
+  fi
+done
+for f in README.md docs/GUIDE.md; do
+  n=$(grep -c 'goblin-stack' "$f")
+  if [ "$n" -eq 0 ]; then
+    note "ok   $f carries no 'goblin-stack' product wordmark (W6 gobstack rename)"
+  else
+    note "FAIL $f still carries the 'goblin-stack' wordmark $n time(s) (W6 gobstack rename)"
+    grep -n 'goblin-stack' "$f" | head -3
+    fail=1
+  fi
+done
+
 if [ "$fail" -eq 0 ]; then note "t-doc-sync: PASS"; else note "t-doc-sync: FAIL"; fi
 exit "$fail"
