@@ -46,7 +46,7 @@ git config user.email "runner@example.com"
 printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1
-git add -A && git commit -q -m "chore: install goblin-stack"
+git add -A && git commit -q -m "chore: install gobstack"
 
 # ---- the reference the clause reads ---------------------------------------------------------
 # Not a text pin on the cell, but the reason the behavioural half below can be RED at all: a

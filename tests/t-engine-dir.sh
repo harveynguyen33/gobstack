@@ -62,7 +62,7 @@ new_probe() {
   git add -A && git commit -q -m "seed the probe"
   bash "$SRC/bin/goblin-install" --target . --class A --models "$WORK/models.yaml" \
     --practice "$WORK/standard.md" >/dev/null 2>&1
-  git add -A && git commit -q -m "install goblin-stack"
+  git add -A && git commit -q -m "install gobstack"
   sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
   git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
   # The migrated-to-global state: engine payload gone, the record says so, the

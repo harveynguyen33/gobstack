@@ -68,7 +68,7 @@ mkfixture() { # <dir> <class>
   printf '# target\n' > README.md
   git add -A && git commit -q -m "chore: seed"
   bash "$SRC/bin/goblin-install" --target "$1" --class "$2" --models "$WORK/models.yaml" >/dev/null 2>&1
-  git add -A && git commit -q -m "chore: install goblin-stack"
+  git add -A && git commit -q -m "chore: install gobstack"
   sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
   git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 }

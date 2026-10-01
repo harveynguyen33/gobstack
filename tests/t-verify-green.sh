@@ -21,7 +21,7 @@ git add -A && git commit -q -m "chore: seed"
 
 bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install exits 0" "$?"
-git add -A && git commit -q -m "chore: install goblin-stack"
+git add -A && git commit -q -m "chore: install gobstack"
 
 # P9: the HANDOFF names the HEAD it describes. Committing the HANDOFF moves HEAD, so the
 # check accepts any commit that exists in the repo and is an ancestor of HEAD.
@@ -59,7 +59,7 @@ printf '# desktop shell\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target "$WORK/f" --class F --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
 check "class F install exits 0" "$?"
-git add -A && git commit -q -m "chore: install goblin-stack"
+git add -A && git commit -q -m "chore: install gobstack"
 F_HEAD=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$F_HEAD\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"

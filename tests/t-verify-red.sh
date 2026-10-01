@@ -122,7 +122,7 @@ git add -A && git commit -q -m "chore: seed"
 PRE_CHANGE=$(git rev-parse --short HEAD)
 
 bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
-git add -A && git commit -q -m "chore: install goblin-stack"
+git add -A && git commit -q -m "chore: install gobstack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 
@@ -571,7 +571,7 @@ git config user.email "runner@example.com"
 printf '# targetB\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target "$TARGET_B" --class B --models "$WORK/models.yaml" >/dev/null 2>&1
-git add -A && git commit -q -m "chore: install goblin-stack (class B)"
+git add -A && git commit -q -m "chore: install gobstack (class B)"
 cd "$TARGET"
 m_b_tokens() { printf 'a_part_class_B_turns_off: true\n' > .goblin/tokens.yaml; }
 restore_b()  { rm -f .goblin/tokens.yaml; rm -rf .github; }

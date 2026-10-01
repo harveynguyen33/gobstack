@@ -72,7 +72,7 @@ git add -A && git commit -q -m "chore: seed"
 
 bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --models "$WORK/models.yaml" \
   --practice "$WORK/standard.md" >/dev/null 2>&1
-git add -A && git commit -q -m "chore: install goblin-stack"
+git add -A && git commit -q -m "chore: install gobstack"
 
 PIN_BEFORE=$(grep '^practice_sha256:' .goblin/goblin.yaml | awk '{print $2}')
 INSTALLED_BEFORE=$(sha .goblin/installed.json)

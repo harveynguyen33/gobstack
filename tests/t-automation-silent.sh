@@ -36,7 +36,7 @@ git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target "$WORK/projects/installed" --class A \
   --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
 check "the fixture installs" "$?"
-git add -A && git commit -q -m "chore: install goblin-stack"
+git add -A && git commit -q -m "chore: install gobstack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 bash .goblin/bin/goblin-verify >/dev/null 2>&1

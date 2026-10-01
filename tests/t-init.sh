@@ -90,7 +90,7 @@ check "hermes project emission exists under the target" "$?"
 [ -f "$REPO/.goblin/installed.json" ]
 check "the install record exists (the wizard wrote nothing it did not route)" "$?"
 # commit, then GREEN: the measured fresh path (43 passed, 0 failed)
-( cd "$REPO" && git add -A && git commit -q -m "chore: install goblin-stack via gob init" )
+( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack via gob init" )
 VOUT=$( cd "$REPO" && env PATH="$BARE_PATH" bash .goblin/bin/goblin-verify 2>&1 ); VRC=$?
 check "verify exits 0 after the commit" "$VRC"
 printf '%s' "$VOUT" | grep -qE '[0-9]+ passed, 0 failed'

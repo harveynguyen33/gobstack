@@ -75,7 +75,7 @@ git add -A && git commit -q -m "chore: seed sub2"
 bash "$SRC/bin/goblin-install" --target "$WORK/outer/sub2" --class A \
   --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install into a nested target that is its own repo succeeds" "$?"
-git add -A && git commit -q -m "chore: install goblin-stack"
+git add -A && git commit -q -m "chore: install gobstack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: the handoff names the head"
 

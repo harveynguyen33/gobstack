@@ -90,7 +90,7 @@ printf '%s\n' "$INSTALL" | head -1 | grep -qE '^created [0-9]+ · updated 0 · u
 check "  and prints the created/updated/unchanged/skipped line" "$?"
 CREATED=$(printf '%s\n' "$INSTALL" | sed -n 's/^created \([0-9]*\) .*/\1/p' | head -1)
 
-git add -A && git commit -q -m "chore: install goblin-stack"
+git add -A && git commit -q -m "chore: install gobstack"
 
 # ---- D1, part 2: RUN the block the guide writes ------------------------------------------------
 run_replay() { # <block file>
@@ -248,7 +248,7 @@ git init -q -b main
 git config user.name "Test Runner"
 git config user.email "runner@example.com"
 HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1
-git add -A && git commit -q -m "chore: install goblin-stack"
+git add -A && git commit -q -m "chore: install gobstack"
 printf '  # the reader-own edit §5 step 3 leaves behind\n' >> .goblin/goblin.yaml
 # The guard is not decoration: with no block extracted there is nothing to run, the edit survives
 # for free, and the assertion would be green on BOTH trees - which is the one thing a control here

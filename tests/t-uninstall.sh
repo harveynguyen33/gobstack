@@ -39,7 +39,7 @@ check "  so bin/goblin-model is checkout-only, as docs/ROLES.md says" \
 # is removed - otherwise the removal check below passes on a repo that never had one.
 check "the CI lane was installed for this class" \
   "$([ -f .github/workflows/goblin-gate.yml ] && echo 0 || echo 1)"
-git add -A && git commit -q -m "chore: install goblin-stack"
+git add -A && git commit -q -m "chore: install gobstack"
 
 DIRS_BEFORE=$(find . -path ./.git -prune -o -type d -print | wc -l | tr -d ' ')
 

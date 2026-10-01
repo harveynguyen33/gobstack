@@ -103,7 +103,7 @@
 #     Two source tables, three families of claim, all walked from the documents:
 #       * the playbook count. `manifest/playbooks.tsv` is the source (its data rows). Every
 #         `<N> playbook(s)` claim and every `<the artifact> ships <N>` claim must equal it. The
-#         second pattern is anchored on a subject - `this` or `goblin-stack` - because the same
+#         second pattern is anchored on a subject - `this` or `gobstack` - because the same
 #         heading compares against the PREDECESSOR project, and `pstack ships 23` is not a claim
 #         about this artifact and is not measurable here.
 #       * the matrix's shape. `manifest/enforcement.tsv` is the source: total rows, scope split,
@@ -125,7 +125,7 @@
 #     `docs/GUIDE.md` and `docs/LIMITS.md:18` ("Fourteen playbooks against twenty-three") all say
 #     14 - left behind by `5e574f2`, the very commit that moved the count. It also caught a site the
 #     wave that found B2 did not list: `manifest/glossary.tsv`'s `playbook` definition said
-#     `goblin-stack ships 12.`
+#     `gobstack ships 12.`
 #
 # Run by tests/run-tests.sh. Outside the census by construction: the census parses the `expect_*`
 # call sites of `tests/t-verify-red.sh`, and this file adds none.
@@ -220,7 +220,7 @@ function cmdpref(s,  t) {
 }
 function counttail(s, i,  t, nx) {
   t = tail(s)
-  if (t ~ "(this|goblin-stack) ships [0-9]+$") return 1
+  if (t ~ "(this|gobstack) ships [0-9]+$") return 1
   if (t ~ "[0-9]+$") {
     nx = L[i + 1]; sub(/^[[:space:]]+/, "", nx)
     if (nx ~ "^playbooks?([^A-Za-z0-9_]|$)") return 1
@@ -251,7 +251,7 @@ function scan(text, ln,  s, m, tok) {
     s = substr(s, RSTART + RLENGTH)
   }
   s = text
-  while (match(s, "(this|goblin-stack) ships [0-9]+")) {
+  while (match(s, "(this|gobstack) ships [0-9]+")) {
     printf "%s\t%d\tSHIP\t%s\n", path, ln, substr(s, RSTART, RLENGTH)
     s = substr(s, RSTART + RLENGTH)
   }
@@ -343,7 +343,7 @@ BAD_SHIP=$(printf '%s\n' "$RECORDS" \
 check "every stated playbook count equals manifest/playbooks.tsv ($PLAYBOOKS data rows)" \
   "$([ -z "$BAD_PB" ] && echo 0 || echo 1)"
 [ -z "$BAD_PB" ] || note "  disagrees:$BAD_PB"
-check "every 'this ships N' / 'goblin-stack ships N' equals the playbook count ($PLAYBOOKS)" \
+check "every 'this ships N' / 'gobstack ships N' equals the playbook count ($PLAYBOOKS)" \
   "$([ -z "$BAD_SHIP" ] && echo 0 || echo 1)"
 [ -z "$BAD_SHIP" ] || note "  disagrees:$BAD_SHIP  (pstack is the predecessor project; its count is not this artifact's and is not read here)"
 

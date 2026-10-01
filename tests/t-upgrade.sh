@@ -55,7 +55,7 @@ new_i1() {
     git add -A && git commit -q -m "seed"
     bash "$INSTALL" --target . --class A --models "$WORK/models.yaml" \
       --practice "$WORK/standard.md" >/dev/null 2>&1
-    git add -A && git commit -q -m "install goblin-stack"
+    git add -A && git commit -q -m "install gobstack"
     hs=$(git rev-parse --short HEAD)
     sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$hs\`/" HANDOFF.md
     git add -A && git commit -q -m "docs: HANDOFF names HEAD"
