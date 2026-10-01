@@ -37,10 +37,17 @@ else
   check "V1 VERSION is well-formed (got: '${VERSION:-<empty>}')" 1
 fi
 
-# ---- V2: package.json.version == VERSION (python3, no jq) ----------------------------------
+# ---- V2: package.json.version shares VERSION's release core (python3, no jq) ----------------
+# The beta ladder (0.4.4-beta.1, commit 16333de) made package.json carry a prerelease suffix the
+# engine's VERSION must not: VERSION stays the ENGINE's one source (the gate line, the verify
+# footer, the bin constants — all 0.4.4), while npm needs a distinct number per beta publish.
+# The invariant that survives both ladders: the package's RELEASE CORE — everything before the
+# first '-' — equals VERSION exactly. A prerelease bump moves only the suffix; a release bump
+# (0.4.5-beta.1 off a 0.4.5 engine) still has to move BOTH files together.
 PKG_VER=$(python3 -c 'import json;print(json.load(open("package.json"))["version"])' 2>/dev/null || true)
-check "V2 package.json.version equals VERSION ($PKG_VER vs $VERSION)" \
-  "$([ -n "$PKG_VER" ] && [ "$PKG_VER" = "$VERSION" ] && echo 0 || echo 1)"
+PKG_CORE=${PKG_VER%%-*}
+check "V2 package.json.version's release core equals VERSION ($PKG_VER vs $VERSION)" \
+  "$([ -n "$PKG_VER" ] && [ "$PKG_CORE" = "$VERSION" ] && echo 0 || echo 1)"
 
 # ---- V3: every bin version constant equals VERSION -----------------------------------------
 # Match only the declaration shape, same one the plan pins:  ^GOBLIN_[A-Z_]*_VERSION="x.y.z"
