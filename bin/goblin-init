@@ -50,9 +50,11 @@ VERSION=$(cat "$SRC/VERSION" 2>/dev/null || printf 'unknown')
 # nearest 16-colour slot. NO_COLOR or a piped stdout turns colour off entirely.
 TTY_OUT=0; [ -t 1 ] && TTY_OUT=1
 TTY_IN=0;  [ -t 0 ] && TTY_IN=1
-C_ACCENT="" C_GREEN="" C_TEXT="" C_MUTED="" C_DIM="" C_RED="" C_YELLOW="" C_RESET="" C_BOLD=""
+C_ACCENT="" C_GREEN="" C_TEXT="" C_MUTED="" C_DIM="" C_RED="" C_YELLOW="" C_RESET=""
+# Single-accent discipline: one accent (#F54E00) + green + text + muted + dim. No bold
+# is ever emitted — bold was a second emphasis voice and is gone from every screen.
 if [ "$TTY_OUT" -eq 1 ] && [ -z "${NO_COLOR:-}" ]; then
-  C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'
+  C_RESET=$'\033[0m'
   case "${COLORTERM:-}" in
     truecolor|24bit)
       C_ACCENT=$'\033[38;2;245;78;0m'; C_GREEN=$'\033[38;2;74;222;128m'
@@ -429,10 +431,11 @@ if [ "$DRYRUN" -eq 1 ]; then
 fi
 # A question the wizard genuinely asked (a screen that waited on read) buys the confirm;
 # flag/non-tty runs already stated their answer as a flag — proceeding is the contract.
+# Single-accent: the confirm prompt is muted + dim, never bold, never a second accent.
 if [ "$YES" -eq 0 ] && [ "${ASKED_ANY:-0}" -eq 1 ]; then
   printf '%s\n' "$BOX"
   if [ "$TTY_IN" -eq 1 ]; then
-    printf '      %sproceed?%s %s[Enter = yes]%s ' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+    printf '      %sproceed?%s %s[Enter = yes]%s ' "$C_MUTED" "$C_RESET" "$C_DIM" "$C_RESET"
     read -r REPLY_GO
     case "$REPLY_GO" in n*|N*) g_info "aborted — nothing was written"; exit 0 ;; esac
   else
@@ -539,7 +542,7 @@ if [ "$DRYRUN" -eq 0 ]; then
   fi
 
   printf '\n'
-  printf '  %snext:%s\n' "$C_BOLD" "$C_RESET"
+  printf '  %snext:%s\n' "$C_MUTED" "$C_RESET"
   printf '    1. %sthe %s skipped checks ARE your checklist — gob verify names each one%s\n' "$C_TEXT" "$SKIPPED" "$C_RESET"
   printf '    2. %sreplace the placeholder gate in .goblin/goblin.yaml with your real commands (P8 step 3)%s\n' "$C_TEXT" "$C_RESET"
   printf '    3. %snot emitted here: gob emit --platform <p> --scope global%s\n' "$C_TEXT" "$C_RESET"
