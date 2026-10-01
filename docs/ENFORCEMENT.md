@@ -14,7 +14,9 @@ tag. `D1`..`D6` are the design decisions in `docs/DESIGN.md`; `Z1`-style identif
 independent verification pass IDs.
 
 `scope` is `target` (runs in an installed repo via `goblin-verify`) or `source` (runs in
-this repo via `tests/run-tests.sh`). `enforced_by` is one of five values, and the enum is
+this repo via `tests/run-tests.sh`). The source-scope rows (`PR-01`..`PR-05`) therefore never run
+in an installed repo — they execute only in this repo's own test suite. `enforced_by` is one of
+five values, and the enum is
 closed and now ENFORCED (`IN-03`'s third clause, Z1-5): `script`, `lint`, `gate`, `advisory`,
 plus `test` for a source-scope row, whose check is a script under `tests/` run by
 `tests/run-tests.sh`.

@@ -519,3 +519,43 @@ the Node the gates ran under.
     forbid it; the doctor prints the codex hooks caveat (sessionStart only). And gemini's
     id cell was measured to be exactly its platform name (the `gem_ini` typo shipped in one
     W4b build and the doctor's DRIFT caught it — the schema check works).
+
+48. **`SP-01` proves a SPEC file exists, never that the current round has one — the rule text
+    overclaims what the check reads.** The text says "The current round has a SPEC"; the check is
+    `ls ./*-SPEC.md >/dev/null 2>&1`, which passes on ANY spec-shaped file at the repo root. The
+    measured consequence: a fresh class-A install ships the scaffold's `ROUND-000-SPEC.md`, and
+    `SP-01` PASSes on that scaffold alone — no round is open, and the row is green anyway. A stale
+    spec from a finished round keeps satisfying the row exactly as well as a live one, because the
+    check has no notion of "current". What it costs: the SPEC-exists signal in a run summary is
+    weaker than its wording — read it as "a `*-SPEC.md` file is present", not "this round's spec is
+    here". Measured: `goblin-verify` on a fresh probe install reports `PASS SP-01 (ls
+    ./*-SPEC.md >/dev/null 2>&1)` with `ROUND-000-SPEC.md` the only file the glob sees. **Ticketed,
+    not gated:** "current round" is a stage-order notion, and the W6 staged workflow chain (SC-01:
+    a SPEC committed before the changes it governs) is what gives the word meaning; a quick reword
+    of the text cell would desync the doc-rendered row from the manifest for no behavioural gain,
+    so the gap is recorded here until that chain lands.
+
+49. **The engine footer prints to captured stdout, and a script parsing `goblin-verify` output
+    must expect it.** The two-line footer (`engine: mode=… cli_sha256=… enforcement_tsv_sha256=…`)
+    is unconditional `printf` output — there is no isatty guard, by design, so a captured run still
+    names the engine that judged it (that is the point of #43's statement). The cost is parser
+    friction: a script that treats every stdout line as a verdict line trips on the banner and
+    footer lines, which are not `PASS`/`FAIL` rows. The contract is the EXIT CODE, never the line
+    set: 0 green, 1 red, 2 refuse — parse the exit code, or filter to `^[A-Z]{2}-[0-9]{2}` before
+    reading lines. Measured: `./.goblin/bin/goblin-verify > out.txt` on a probe install puts
+    `engine: mode=vendored cli_sha256=… enforcement_tsv_sha256=…` in the captured file
+    (`tests/t-engine-dir.sh` itself asserts the footer IN captured output, so removing it or
+    tty-gating it would break the engine's own suite). Recorded so the pitfall is findable from
+    this file; no change to the engine is implied or wanted.
+
+50. **`CM-01` reads only the most recent commit — historical commits with a wrong identity pass
+    unseen.** The check is `test "$(git log -1 --format='%ae')"` against the configured
+    `owner_email`, so it gates the identity of HEAD at the moment of the run and nothing older.
+    Measured: a probe history `owner → wrong@old.co → owner` reports `--only CM-01` clean (exit 0)
+    with the wrong-identity commit sitting one below HEAD. That is consistent with the
+    gate-at-the-moment design — every row judges the tree and history as they stand when verify
+    runs, and retrofitting an identity sweep over `git log --all` is a policy change, not a bug
+    fix — but it should be named: the row's green means "the latest commit carries the owner
+    identity", never "no commit in this repo's history carries an ambient one". A wrong-identity
+    commit that has since been followed by correct ones is invisible to every run. Recorded as a
+    boundary; no row change implied.
