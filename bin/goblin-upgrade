@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# goblin-upgrade — the 0.4.4 per-repo → global migration (W3, W3-SPEC §2).
+# goblin-upgrade — the 0.4.4 per-repo → global engine migration (W3).
 #
-#   goblin upgrade [--target <dir>] [--dry-run] [--yes] [--engine-dir <path>]
+#   gob upgrade [--target <dir>] [--dry-run] [--yes] [--engine-dir <path>]
 #
 # What it does (the corrected 7-step sequence, W3-SPEC §2 — the record is rewritten
 # BEFORE the deletion, and every verify runs against a committed tree, CM-03):
@@ -230,7 +230,7 @@ if [ "${RECORD_OK:-0}" -eq 1 ] && [ -z "${MODE:-}" ]; then
     R8_MSG="upgrade: partial migration detected - the record says global but $PAYLOAD_N engine files are still here. fix: resume by removing them (the engine lives at ${BLOCK_DIR:-$ED}), or roll back: git revert <commit A>"
   elif [ "$BLOCK_MODE" != "global" ] && [ "$RECORD_ENGINE_N" -lt 18 ]; then
     MODE="refuse-R9"                    # hand-migration: entries PARTIALLY or fully dropped, no block
-    R9_MSG="upgrade: $REPO's record is missing its engine: block and carries only $RECORD_ENGINE_N of the 18 engine entries - dropped $((18 - RECORD_ENGINE_N)) by hand, a state goblin upgrade did not produce. fix: restore the record (git checkout .goblin/installed.json) and re-run"
+    R9_MSG="upgrade: $REPO's record is missing its engine: block and carries only $RECORD_ENGINE_N of the 18 engine entries - dropped $((18 - RECORD_ENGINE_N)) by hand, a state gob upgrade did not produce. fix: restore the record (git checkout .goblin/installed.json) and re-run"
   elif [ "$PAYLOAD_N" -eq 0 ]; then
     MODE="refuse-R5"                    # fresh-shape record but no payload to lift
     R5_MSG="upgrade: no engine at $ED and no vendored payload to lift it from - install the engine first (goblin-install a fresh repo, or set --engine-dir)"
@@ -244,7 +244,7 @@ fi
 
 # ---- dry-run report -------------------------------------------------------------
 if [ "$DRY_RUN" -eq 1 ]; then
-  printf 'goblin upgrade --dry-run — target %s\n' "$REPO"
+  printf 'gob upgrade --dry-run — target %s\n' "$REPO"
   printf '  engine-dir: %s\n' "$ED"
   case "$MODE" in
     migrate)
@@ -447,7 +447,7 @@ if [ -f "$GATE" ] && grep -q '\.goblin/bin/goblin-lib.sh' "$GATE"; then
   awk '
     /^# shellcheck source=\/dev\/null$/ && !done {
       print "# shellcheck source=/dev/null"
-      print "# The engine went global (goblin upgrade): resolve it exactly as"
+      print "# The engine went global (gob upgrade): resolve it exactly as"
       print "# goblin-verify does - engine_dir:, then the machine default."
       print "CONFIG=\"$ROOT/.goblin/goblin.yaml\""
       print "ENGINE_DIR=$(sed -n \"s/^engine_dir:[[:space:]]*//p\" \"$CONFIG\" | head -n 1)"

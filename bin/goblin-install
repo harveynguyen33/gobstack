@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # goblin-install — drop the harness into a target repo, idempotently.
 #
-# Usage: goblin-install --target <dir> [options]
+# Usage: gob install --target <dir> [options]   (script: bin/goblin-install)
 #   --target <dir>        required; the repo root to install into
 #   --class A|B|C|D|E|F    required unless --uninstall or --re-pin; anything else needs an explicit class
 #   --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)

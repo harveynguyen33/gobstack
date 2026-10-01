@@ -68,9 +68,9 @@ PREIMG="${GOBLIN_PREIMAGES:-$HOME/.goblin-stack/preimages}"
 
 usage() {
   cat <<USAGE
-goblin emit — per-platform emission (W4a, the seven platforms since W4b).
+gob emit — per-platform emission (W4a, the seven platforms since W4b).
 
-  goblin emit --platform <$_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2>
+  gob emit --platform <$_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2>
               --scope project|global
               [--skills core|all|none] [--target <dir>] [--source <path>]
               [--uninstall] [--unshadow] [--dry-run] [--strict]
@@ -143,7 +143,7 @@ case "$PLATFORM" in
   "")      printf 'error: emit: --platform is required\n' >&2; usage >&2; exit 2 ;;
   $_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2) ;;
   *)
-    die "unknown platform '$PLATFORM' - goblin emit ships $_PLA, hermes, copilot, cursor, opencode, codex, $_G1$_G2" 2
+    die "unknown platform '$PLATFORM' - gob emit ships $_PLA, hermes, copilot, cursor, opencode, codex, $_G1$_G2" 2
     ;;
 esac
 TSV="$ADAPTERS_DIR/$PLATFORM/adapter.tsv"

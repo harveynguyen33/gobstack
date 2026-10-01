@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # goblin — the global CLI dispatcher (W1, PLAN-V1 §2.3 / W1-SPEC §3).
 #
-#   goblin verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
-#   goblin bans   [--only <id[,id...]>] [--list]
-#   goblin audit  [--target <dir>] [--print]
-#   goblin doctor [--platform <p>]      # W4a
-#   goblin emit   --platform <p> [...]  # W4a/W4b
-#   goblin init   [...]                 # W6: the first-run wizard
-#   goblin upgrade [--target .] [...]   # W3
-#   goblin --version
+#   gob verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
+#   gob bans   [--only <id[,id...]>] [--list]
+#   gob audit  [--target <dir>] [--print]
+#   gob doctor [--platform <p>]      # W4a
+#   gob emit   --platform <p> [...]  # W4a/W4b
+#   gob init   [...]                 # W6: the first-run wizard
+#   gob upgrade [--target .] [...]   # W3
+#   gob --version
 #
-# Identity: the package is goblin-stack, the command is `goblin`. W1 ships the DISPATCH
+# Identity: the package is gobstack (npm @techgoblin/gobstack), the command is `gob`
+# (`goblin` remains as a legacy alias). W1 ships the DISPATCH
 # SHELL only — the node shim and npm packaging are W2, doctor/emit are W4a (exit-2
 # placeholders naming their workstream), upgrade is W3 (same). G3 forbids a runtime
 # rewrite: the engine stays bash, this file only routes and propagates.
@@ -39,16 +40,16 @@ g_err() { printf 'error: %s\n' "$*" >&2; }
 
 usage() {
   cat <<'USAGE'
-goblin — the goblin-stack command line.
+gob — the gobstack command line.
 
-  goblin verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
-  goblin bans   [--only <id[,id...]>] [--list]
-  goblin audit  [--target <dir>] [--print]
-  goblin doctor [--platform <p>] [--target <dir>]
-  goblin emit   --platform <p> --scope project|global [...]
-  goblin init   [--target <dir>] [--class app|A-F] [--dry-run]
-  goblin upgrade [--target .] [--dry-run] [--yes] [--engine-dir <path>]
-  goblin --version
+  gob verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
+  gob bans   [--only <id[,id...]>] [--list]
+  gob audit  [--target <dir>] [--print]
+  gob doctor [--platform <p>] [--target <dir>]
+  gob emit   --platform <p> --scope project|global [...]
+  gob init   [--target <dir>] [--class app|A-F] [--dry-run]
+  gob upgrade [--target .] [--dry-run] [--yes] [--engine-dir <path>]
+  gob --version
 
 Exit codes (verify): 0 pass | 1 a check failed | 2 could not run | 3 the manifest is
 broken. Every subcommand propagates the engine's exit code verbatim.

@@ -1363,7 +1363,7 @@ check_sc_07() {
   local rec="$ROOT/.goblin/audit.tsv" wfile="$ROOT/.goblin/audit-waiver.tsv"
   if [ ! -f "$rec" ]; then
     if [ "$ENGINE_MODE" = "global" ]; then
-      printf 'no audit record yet. Run `goblin audit` once, deliberately, then commit\n.goblin/audit.tsv: SC-07 reads the record and never the network\n'
+      printf 'no audit record yet. Run `gob audit` once, deliberately, then commit\n.goblin/audit.tsv: SC-07 reads the record and never the network\n'
     else
       printf 'no audit record yet. Run .goblin/bin/goblin-audit once, deliberately, then commit\n.goblin/audit.tsv: SC-07 reads the record and never the network\n'
     fi

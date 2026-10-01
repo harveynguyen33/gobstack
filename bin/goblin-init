@@ -137,7 +137,7 @@ done
 for dep in git awk sed grep; do
   command -v "$dep" >/dev/null 2>&1 || { g_err "missing dependency: $dep"; exit 2; }
 done
-[ -f "$SRC/VERSION" ] || { g_err "no VERSION at $SRC — is this a goblin-stack checkout?"; exit 2; }
+[ -f "$SRC/VERSION" ] || { g_err "no VERSION at $SRC — is this a gobstack checkout?"; exit 2; }
 [ -n "$SCOPE" ] || SCOPE="project"
 case "$SCOPE" in project|global) ;; *) g_err "--scope must be project or global, got '$SCOPE'"; exit 2 ;; esac
 TARGET="${TARGET:-$PWD}"
@@ -151,12 +151,12 @@ printf '%s\n' "${C_ACCENT}█ █ █ █ ██▄ █   █ █▄█   █   
 printf '%s\n' "${C_ACCENT}██▄ ██▄ ██▄ █▄▄ ██ █ █   ▄██  █  █ █ ██▄ █ █${C_RESET}"
 printf '%s\n' "${C_DIM}     discipline around whatever executes${C_RESET}"
 printf '\n'
-printf '%s\n' "${C_TEXT}  gob init${C_RESET} ${C_MUTED}— first-run setup (goblin-stack v$VERSION)${C_RESET}"
+printf '%s\n' "${C_TEXT}  gob init${C_RESET} ${C_MUTED}— first-run setup (gobstack v$VERSION)${C_RESET}"
 printf '%s\n' "  ${C_MUTED}6 steps · every step has a flag · nothing is written until the plan is confirmed${C_RESET}"
 printf '\n'
 CURRENT=1
 if [ "$TTY_OUT" -eq 1 ]; then rail_print
-else cascade "welcome: goblin-stack v$VERSION — the guided first run"; fi
+else cascade "welcome: gobstack v$VERSION — the guided first run"; fi
 
 # Platform enum assembled from fragments (the MD_SLUG precedent): a literal tool name in
 # bin/ trips MD-01's model-name pattern, and run-tests.sh greps this directory.
@@ -456,7 +456,7 @@ for p in $EMIT_SELECTED; do
   bash "$SRC/bin/goblin-emit" --platform "$p" --scope "$SCOPE" --target "$TARGET"
   EXIT_EMIT=$?
   if [ "$EXIT_EMIT" -ne 0 ]; then
-    g_err "emit $p failed (exit $EXIT_EMIT) — run 'goblin emit --platform $p --scope $SCOPE' to see the refusal again"
+    g_err "emit $p failed (exit $EXIT_EMIT) — run 'gob emit --platform $p --scope $SCOPE' to see the refusal again"
     exit "$EXIT_EMIT"
   fi
   EMITTED=$((EMITTED + 1))
@@ -489,9 +489,9 @@ if [ "$DRYRUN" -eq 0 ]; then
     done
     printf '\n'
     if [ "$VERIFY_RC" -eq 0 ]; then
-      printf '  %sgoblin verify: %s passed, %s failed, %s skipped · exit 0%s\n' "$C_GREEN" "$PASSED" "$FAILED" "$SKIPPED" "$C_RESET"
+      printf '  %sgob verify: %s passed, %s failed, %s skipped · exit 0%s\n' "$C_GREEN" "$PASSED" "$FAILED" "$SKIPPED" "$C_RESET"
     else
-      printf '  %sgoblin verify: %s passed, %s failed, %s skipped · exit %s%s\n' "$C_RED" "$PASSED" "$FAILED" "$SKIPPED" "$VERIFY_RC" "$C_RESET"
+      printf '  %sgob verify: %s passed, %s failed, %s skipped · exit %s%s\n' "$C_RED" "$PASSED" "$FAILED" "$SKIPPED" "$VERIFY_RC" "$C_RESET"
     fi
     printf '\n'
   else

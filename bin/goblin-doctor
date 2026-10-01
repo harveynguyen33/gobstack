@@ -40,9 +40,9 @@ ADAPTERS_DIR="$SRC/adapters"
 
 usage() {
   cat <<USAGE
-goblin doctor — one run, seven platforms (W4a, the seven since W4b).
+gob doctor — one run, seven platforms (W4a, the seven since W4b).
 
-  goblin doctor [--platform <$_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2>]
+  gob doctor [--platform <$_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2>]
                 [--target <dir>] [--source <path>]
 
 Prints, per platform: the verdict (DETECTED / NOT-DETECTED / DRIFT), the detected
@@ -71,7 +71,7 @@ PLATFORMS="$_PLA hermes copilot cursor opencode codex $_G1$_G2"
 if [ -n "$ONLY" ]; then
   case "$ONLY" in
     $_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2) PLATFORMS="$ONLY" ;;
-    *) die "unknown platform '$ONLY' - goblin doctor ships $_PLA, hermes, copilot, cursor, opencode, codex, $_G1$_G2" 2 ;;
+    *) die "unknown platform '$ONLY' - gob doctor ships $_PLA, hermes, copilot, cursor, opencode, codex, $_G1$_G2" 2 ;;
   esac
 fi
 
