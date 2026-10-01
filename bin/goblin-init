@@ -220,7 +220,7 @@ CLASS_DEFAULT=1
 if [ -z "$CLASS" ]; then
   if [ "$TTY_IN" -eq 1 ]; then
     q ""
-    q "      $C_MUTEDwhat kind of work does this repo do?$C_RESET"
+    q "      ${C_MUTED}what kind of work does this repo do?$C_RESET"
     q "      $C_TEXT  1 ▸ app        shipped features, PRs, review gates        ${C_DIM}(class A)$C_RESET"
     q "      $C_TEXT  2   service    backend jobs, config, unattended runs      ${C_DIM}(class B)$C_RESET"
     q "      $C_TEXT  3   game       playable builds, perf budgets              ${C_DIM}(class C)$C_RESET"
@@ -276,7 +276,7 @@ DEF_EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
 if [ -z "$BRANCH" ] || [ -z "$EMAIL" ]; then
   if [ "$TTY_IN" -eq 1 ]; then
     q ""
-    q "      $C_MUTEDthe forge contract — the identity this repo commits with (CM-01)$C_RESET"
+    q "      ${C_MUTED}the forge contract — the identity this repo commits with (CM-01)$C_RESET"
     ask_value "default branch" "$DEF_BRANCH"; BRANCH="${BRANCH:-$REPLY}"
     ask_value "owner email" "$DEF_EMAIL"; EMAIL="${EMAIL:-$REPLY}"
   else
@@ -301,14 +301,14 @@ GATE_DEFAULT="bash tests/run-tests.sh"
 if [ -z "$GATE" ]; then
   if [ "$TTY_IN" -eq 1 ]; then
     q ""
-    q "      $C_MUTEDone real command that must stay green — suggested for a bash suite:$C_RESET"
+    q "      ${C_MUTED}one real command that must stay green — suggested for a bash suite:$C_RESET"
     if [ -f "$TARGET/tests/run-tests.sh" ]; then
       q "      $C_DIM$GATE_DEFAULT$C_RESET"
       ask_value "gate command" "$GATE_DEFAULT"; GATE="$REPLY"
     else
       ask_value "gate command" "true"; GATE="$REPLY"
       if [ "$GATE" = "true" ]; then
-        q "      $C_YELLOWno tests/run-tests.sh found — a placeholder gate is allowed but it proves nothing; replace it in .goblin/goblin.yaml$C_RESET"
+        q "      ${C_YELLOW}no tests/run-tests.sh found — a placeholder gate is allowed but it proves nothing; replace it in .goblin/goblin.yaml$C_RESET"
         Q_LINES=$((Q_LINES + 1))
       fi
     fi
@@ -355,14 +355,14 @@ EMIT_N=$(printf '%s' "$EMIT_SELECTED" | awk 'NF' | wc -l | tr -d '[:space:]')
 
 if [ "$TTY_IN" -eq 1 ] && [ -z "$EMIT" ] && [ "$YES" -eq 0 ]; then
   q ""
-  q "      $C_MUTEDemit now — the skills go into:$C_RESET"
+  q "      ${C_MUTED}emit now — the skills go into:$C_RESET"
   for p in $PLATFORMS; do
     hit=""
     while IFS=$'	' read -r dp _a _b _c; do [ "$dp" = "$p" ] && hit=1; done <<< "$DET_ROWS"
     [ -n "$hit" ] || continue
     q "      $C_GREEN✔$C_RESET $C_TEXT$p$C_RESET"
   done
-  q "      $C_DIMEnter = these; or type platform names to override$C_RESET"
+  q "      ${C_DIM}Enter = these; or type platform names to override$C_RESET"
   printf '      '
   read -r REPLY_EMIT
   ASKED_ANY=1
