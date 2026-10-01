@@ -168,6 +168,52 @@ check "the npm shim routes init to goblin-init" "$RC9"
 printf '%s' "$OUT9" | grep -q -- "--class"
 check "the shim run reaches the wizard's usage" "$?"
 
+# ---- T8: the tty path, under script(1) — the pty screen a pipe cannot see ------------
+# The redraw only exists on a tty: run the wizard through `script -qec` so it owns a
+# pty, feed it Enters (every prompt defaults), then assert on the TYPESCRIPT bytes:
+#   * no literal '{C_' token — the multibyte-adjacent brace bug this file fixed twice
+#   * no 'unbound variable' — a ${C_X} that lost its braces' dollar shows up here first
+#   * the redraw frame actually carries ✔ collapsed rows and the accent ◆
+# Piped assertions cannot see this: with stdout a pipe the wizard is its cascade self.
+if command -v script >/dev/null 2>&1; then
+  new_repo t8
+  TS="$WORK/t8.pty.txt"
+  printf '\n\n\n\n\n\n\n\n' | env HOME="$WORK/home" \
+      GOBLIN_MODELS="$WORK/models.yaml" \
+      GOBLIN_PRACTICE="$WORK/standard.md" \
+      PATH="$BARE_PATH" \
+      timeout 120 script -qec "bash $SRC/bin/goblin-init --target $REPO --yes" "$TS" >/dev/null 2>&1
+  RC10=$?
+  check "the wizard finishes under a pty (script -qec), exit 0" "$RC10"
+  grep -qF "{C_" "$TS"
+  check "the pty transcript carries zero literal {C_ tokens" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+  grep -qF "unbound variable" "$TS"
+  check "the pty transcript names no unbound variable" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+  grep -qF "invalid number" "$TS"
+  check "the pty transcript has no printf arg-mismatch (invalid number)" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+  grep -q "✔ 1. platforms" "$TS"
+  check "the tty rail shows the answered platforms row collapsed with its value" "$?"
+  grep -qE "◆.+2\. class" "$TS"
+  check "the tty rail marks the current step with the accent diamond" "$?"
+  grep -q "✔ 2. class" "$TS"
+  check "the tty rail shows class answered on the next screen" "$?"
+  grep -qE "$(printf '\033')\[[0-9]+A" "$TS"
+  check "the redraw moves the cursor only on a tty (cursor-up present in the typescript)" "$?"
+else
+  note "skip T8: script(1) not available — the pty screen cannot be exercised here"
+fi
+
+# ---- T9: the source gate — bin/goblin-init carries zero unbraced {C_ -----------------
+# The class of bug this guards: a C_ colour var adjacent to a multibyte glyph must be
+# braced ${C_X}; an unbraced {C_ next to ✔/◆/○ prints the literal token on the screen.
+# The positive control proves the pattern still bites before the gate proves the tree
+# is clean (the MD-01 control precedent).
+printf 'x="{C_BAD} a planted unbraced token"\n' > "$WORK/gate-probe.txt"
+grep -qE '(^|[^$])\{C_' "$WORK/gate-probe.txt"
+check "the {C_ gate pattern catches a planted violation (positive control)" "$?"
+grep -qE '(^|[^$])\{C_' "$SRC/bin/goblin-init"
+check "bin/goblin-init carries zero {C_ not preceded by a dollar" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
 if [ "$fail" -eq 0 ]; then
   printf 't-init: ok\n'
 else
