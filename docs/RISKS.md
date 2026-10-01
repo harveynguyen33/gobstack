@@ -37,7 +37,7 @@ Nine carry **no executable check at all**:
 - **MD-03** — role-pinned fan-out goes through the kanban, not a model-less subagent spawn.
 - **PG-04** — never bypass what the forge enforces.
 - **DOC-01** — a significant change updates the docs that teach it.
-- **DOC-02** — system-level changes are recorded in the vault via the `pkm` profile.
+- **DOC-02** — system-level changes are recorded wherever the project's standard says they live.
 - **SC-09** — auth is applied consistently across sibling routes.
 - **JG-03** — a judge lane that has never returned a non-`done` verdict is escalated. The history
   that would show a bad lane lives across cards and repos, so the counter-measure is policy (one
