@@ -5,13 +5,34 @@ installs an **executable rule manifest**, a set of **project-local skills**, and
 **installer/verifier pair** into any project — so that an AI coding session never re-improvises,
 and a rule that cannot be checked is counted rather than asserted.
 
-Install it from npm — the one documented install path:
+Install it from npm — globally; it is a CLI, not a library:
 
-    npm i -g @techgoblin/gobstack        # gives you the `goblin` CLI
+    npm install -g @techgoblin/gobstack@beta   # gives you the `goblin` CLI (and `gob`)
+    npx @techgoblin/gobstack@beta init         # or the one-shot: run the wizard, install nothing globally
 
 ## Install
 
-    npm i -g @techgoblin/gobstack
+**Global, not local.** gobstack is a CLI with zero runtime dependencies. Install it once per
+machine:
+
+    npm install -g @techgoblin/gobstack@beta
+
+or run a single command without installing:
+
+    npx @techgoblin/gobstack@beta init
+
+**Do NOT add it to an app project's `package.json`.** A `npm install @techgoblin/gobstack` (or a
+`package.json` dependency) inside your app pollutes the app's lockfile with a package the app
+never imports, and can fail resolution outright with `ERESOLVE` when the app's own peer
+dependencies disagree with npm's. If you see `ERESOLVE` after a local install, remove the
+dependency from `package.json` and install globally instead.
+
+**The two-layer model.** The global install gives you the CLI only. `goblin init` (or
+`goblin install --target <dir> --class A`) then vendors a self-contained engine into the target
+repo under `.goblin/` — verifier, manifest, ban probes, skills, all of it. That second layer is
+why an initialized repo keeps working on machines with **no gobstack installed at all**: the
+engine lives in the repo, not in your `node_modules`, and `bash .goblin/bin/goblin-verify` (or a
+plain `git` + `bash` box) is the only runtime the repo's gate needs.
 
 Then, from any project:
 
@@ -63,7 +84,7 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 | `goblin bans` | run the ban list (per-pattern red lines over the source tree) |
 | `goblin audit` | check recorded dependency claims against live advisory feeds — the only command that touches the network |
 | `goblin install` | install the manifest, skills and verifier into a target repo |
-| `goblin uninstall` | remove everything an install wrote (npm shim `goblin install --target <dir> --uninstall`) |
+| `goblin uninstall` | remove everything an install wrote, byte-exactly (`goblin install --target <dir> --uninstall` is the same job) |
 | `goblin upgrade` | migrate a repo to the shared global engine at `~/.goblin/engine` — 8 steps, two commits, one report |
 | `goblin doctor` | one run across the platforms below: DETECTED / NOT-DETECTED / DRIFT per platform |
 | `goblin emit` | write the skills + context block for one platform (`--scope project` or `global`); `--unshadow` removes a hermes project skill whose hash equals the source |
@@ -138,11 +159,44 @@ failure**, so that file is the one that matters most.
 
 ## Uninstall
 
-    goblin install --target <dir> --uninstall
+gobstack lives in three layers. Each is removed by its own command, and removing one never
+touches the others.
 
-Removes the installed artifacts, `.goblin/goblin.yaml` and every directory that leaves empty, and
-leaves `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md`, `reviews/` and the `.gitignore` block —
-the project's record is not the harness's to delete.
+**(a) The global CLI** — the npm package itself:
+
+    npm uninstall -g @techgoblin/gobstack
+
+This removes the `goblin` and `gob` commands from the machine and nothing else: no project, no
+repo, no `.goblin/` directory anywhere is touched. Repos you already initialized keep working
+fully — the engine is vendored into each repo's `.goblin/`, so the CLI's absence removes no
+capability (you lose the installer/upgrade/emit entry points, not the gate; see layer (c) for
+the machine-level skills the CLI wrote).
+
+**(b) A project's harness** — the `.goblin/` tree an install created in one repo:
+
+    goblin uninstall --target .
+
+(equivalently `goblin install --target . --uninstall`; through the short alias:
+`gob uninstall --target .`). The uninstall is **byte-exact**: it removes exactly the files
+`installed.json` records — hash-compared preimages, so a file you edited after install is
+reported and kept, never clobbered — then every directory that leaves empty. After it, the repo
+has zero goblin files; only the project's own record (`HANDOFF.md`, `AGENTS.md`, `reviews/`, the
+`.gitignore` block) survives, because that is the project's, not the harness's to delete. And
+because the engine is vendored, the repo needs no gobstack installed to run this — it is
+self-contained until the moment you remove it.
+
+**(c) Global agent skills** — the machine-level skills an `emit --scope global` wrote outside any
+repo:
+
+    goblin emit --undo --platform <p> --scope global
+
+(`--undo` is the same byte-exact reversal as `--uninstall`, under its friendlier name). By hand,
+the same job is deleting the platform's anchor entries: `~/.claude/skills/goblin-*` (and the
+equivalents under `~/.hermes`, `~/.copilot`, `~/.cursor`, `~/.config/opencode`, `~/.codex`,
+`~/.gemini` — `goblin doctor` lists which platforms were detected).
+
+The short version, for a full removal from a machine and its repos: (c) first, then (b) in each
+initialized repo, then (a).
 
 ## Re-pin the referenced standard
 

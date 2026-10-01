@@ -267,8 +267,8 @@ fi
 # out of the source tree).
 grep -q '@techgoblin/gobstack' README.md
 check "README names the npm package @techgoblin/gobstack (W5-D)" "$?"
-grep -q 'npm i -g @techgoblin/gobstack' README.md
-check "  and states the npm install path (npm i -g @techgoblin/gobstack)" "$?"
+grep -q 'npm install -g @techgoblin/gobstack' README.md
+check "  and states the npm install path (npm install -g @techgoblin/gobstack)" "$?"
 grep -q 'goblin install' README.md
 check "  and names goblin install as the npm CLI's install command (W5-D)" "$?"
 if grep -q 'bin/goblin-install' README.md; then
