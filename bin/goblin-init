@@ -16,7 +16,11 @@
 #   skills + context blocks  -> bin/goblin-emit --scope project (the same code path)
 #   the verdict              -> bin/goblin-verify
 #
-# Exit codes: 0 done | 1 a refusal (named path + fix) or a red verify | 2 bad input.
+# Exit codes: 0 done | 1 a refusal (named path + fix) | 2 bad input, or verify could
+# not run. The verify VERDICT is the done screen's report, not this command's verdict:
+# a fresh install is red on CM-03 until the user commits it — the documented day-one
+# state, printed here with the counts and the next steps. install/emit refusals and a
+# verify that cannot run are propagated, never wrapped into a 0.
 #
 # Palette: the goblin-ui tokens — accent #F54E00 (logotype, active step, the ◆ rail
 # glyph), green #4ade80 (✔), text #e4e4e6, muted #9d9da3, dim #808088 (borders, idle ○),
@@ -407,14 +411,43 @@ if [ "$YES" -eq 0 ] && [ "${ASKED_ANY:-0}" -eq 1 ]; then
 fi
 
 # ----------------------------------------------------------------- execute -----
-INSTALL_ARGS=(--target "$TARGET" --class "$CLASS")
-INSTALL_ARGS+=(--branch "$BRANCH" --email "$EMAIL" --gate "$GATE" --scope "$SCOPE" --yes)
-if [ "$TTY_OUT" -eq 0 ]; then printf 'gob init [run] goblin-install --class %s ...\n' "$CLASS"; fi
-bash "$SRC/bin/goblin-install" "${INSTALL_ARGS[@]}"
+# install/emit/verify own their flag surfaces; the wizard adds only what they do not
+# carry: the declared identity (branch/owner_email) and the first gate, patched into
+# .goblin/goblin.yaml right after install renders it. The patch is fail-closed — the
+# gate must read back through the engine's own parser or the run stops here.
+if [ "$TTY_OUT" -eq 0 ]; then printf 'gob init [run] goblin-install --target %s --class %s\n' "$TARGET" "$CLASS"; fi
+bash "$SRC/bin/goblin-install" --target "$TARGET" --class "$CLASS" --yes
 EXIT_INSTALL=$?
 if [ "$EXIT_INSTALL" -ne 0 ]; then
   g_err "install failed (exit $EXIT_INSTALL) — the refusals above name the path and the fix"
   exit "$EXIT_INSTALL"
+fi
+CONFIG="$TARGET/.goblin/goblin.yaml"
+[ -f "$CONFIG" ] || { g_err "install wrote no .goblin/goblin.yaml at $TARGET"; exit 1; }
+if [ "$DRYRUN" -eq 0 ]; then
+  sed -i "s|^branch:.*|branch: $BRANCH|" "$CONFIG" || { g_err "cannot write the declared branch into $CONFIG"; exit 1; }
+  sed -i "s|^owner_email:.*|owner_email: $EMAIL|" "$CONFIG" || { g_err "cannot write the owner email into $CONFIG"; exit 1; }
+  TMP_CFG=$(mktemp) || { g_err "mktemp failed"; exit 2; }
+  GATE_SUB=$(mktemp) || { g_err "mktemp failed"; exit 2; }
+  # print the gate body once, read it as data: an & or / inside the command must not
+  # become an awk substitution metacharacter (the gates are real shell).
+  printf '%s\n' "$GATE" > "$GATE_SUB"
+  awk 'BEGIN{ing=0; done=0}
+    /^gates:/{ing=1; print; next}
+    ing && !done && /^    cmd:/{
+      getline g < genv
+      sub(/^    cmd:.*/, "    cmd: " g)
+      print; done=1; close(genv); next}
+    ing && /^[^ ]/{ing=0}
+    {print}' genv="$GATE_SUB" "$CONFIG" > "$TMP_CFG" || { rm -f "$TMP_CFG" "$GATE_SUB"; g_err "cannot rewrite the first gate in $CONFIG"; exit 1; }
+  mv "$TMP_CFG" "$CONFIG" || { rm -f "$GATE_SUB"; g_err "cannot replace $CONFIG"; exit 1; }
+  rm -f "$GATE_SUB"
+  # fail closed: the declared gate must read back through the engine's own reader
+  GOT_GATE=$(g_yaml_gates "$CONFIG" | head -n 1 | awk -F'\t' '{print $2}')
+  if [ "$GOT_GATE" != "$GATE" ]; then
+    g_err "the first gate did not land in $CONFIG (reader sees '$GOT_GATE', wanted '$GATE')"
+    exit 1
+  fi
 fi
 
 EMITTED=0
@@ -438,10 +471,10 @@ fi
 if [ "$DRYRUN" -eq 0 ]; then
   VERIFY_OUT=$( cd "$TARGET" && bash .goblin/bin/goblin-verify 2>&1 )
   VERIFY_RC=$?
-  PASSED=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ passed' | awk '{print $1}')
-  FAILED=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ failed' | awk '{print $1}')
-  ADVISORY=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ advisory' | awk '{print $1}')
-  SKIPPED=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ skipped' | awk '{print $1}')
+  PASSED=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ passed' | head -n 1 | awk '{print $1}')
+  FAILED=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ failed' | head -n 1 | awk '{print $1}')
+  ADVISORY=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ advisory' | head -n 1 | awk '{print $1}')
+  SKIPPED=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ skipped' | head -n 1 | awk '{print $1}')
   PASSED="${PASSED:-0}"; FAILED="${FAILED:-0}"; ADVISORY="${ADVISORY:-0}"; SKIPPED="${SKIPPED:-0}"
 
   if [ "$TTY_OUT" -eq 1 ]; then
@@ -478,4 +511,9 @@ if [ "$DRYRUN" -eq 0 ]; then
   fi
 fi
 
-exit "$VERIFY_RC"
+if [ "$VERIFY_RC" -eq 2 ]; then
+  # verify could not run: that is init's failure (a broken install), not the repo's day-one state
+  g_err "goblin-verify could not run (exit 2) — the install above is broken; see the output above"
+  exit 2
+fi
+exit 0
