@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # goblin-init — the W6 first-run wizard (`gob init`).
 #
-#   goblin init [--target <dir>] [--class <app|service|game|research|agent|desktop|A..F>]
+#   gob init [--target <dir>] [--class <app|service|game|research|agent|desktop|A..F>]
 #               [--branch <name>] [--email <addr>] [--gate <cmd>]
 #               [--emit <p[,p..]>] [--scope project|global] [--yes] [--dry-run]
 #
