@@ -227,7 +227,7 @@ if [ -z "$CLASS" ]; then
     q "      $C_TEXT  4   research   specs, replays, reference corpora          ${C_DIM}(class D)$C_RESET"
     q "      $C_TEXT  5   agent      fleets, loops, unattended automation       ${C_DIM}(class E)$C_RESET"
     q "      $C_TEXT  6   desktop    the shell you live in, perf budget         ${C_DIM}(class F)$C_RESET"
-    q "      $C_MUTED↑ number + Enter · Enter = app · the class letter works too (A-F)$C_RESET"
+    q "      {C_MUTED}↑ number + Enter · Enter = app · the class letter works too (A-F)$C_RESET"
     printf '      '
     read -r REPLY_CLASS
     ASKED_ANY=1
@@ -360,7 +360,7 @@ if [ "$TTY_IN" -eq 1 ] && [ -z "$EMIT" ] && [ "$YES" -eq 0 ]; then
     hit=""
     while IFS=$'	' read -r dp _a _b _c; do [ "$dp" = "$p" ] && hit=1; done <<< "$DET_ROWS"
     [ -n "$hit" ] || continue
-    q "      $C_GREEN✔$C_RESET $C_TEXT$p$C_RESET"
+    q "      {C_GREEN}✔$C_RESET $C_TEXT$p$C_RESET"
   done
   q "      ${C_DIM}Enter = these; or type platform names to override$C_RESET"
   printf '      '
@@ -388,7 +388,7 @@ add() { BOX="$BOX$1
 "; }
 add "  ${C_DIM}╭──────────────────────────────────────────────────────╮${C_RESET}"
 add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}install${C_RESET}      $C_DIM.goblin/ + the payload into$C_RESET $C_TEXT$TARGET$C_RESET"
-add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}class${C_RESET}       $C_TEXT$CLASS$C_RESET $C_DIM· branch $C_TEXT$BRANCH$C_RESET $C_DIM· email$C_RESET $C_TEXT$EMAIL$C_RESET"
+add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}class${C_RESET}       $C_TEXT$CLASS$C_RESET {C_DIM}· branch $C_TEXT$BRANCH$C_RESET {C_DIM}· email$C_RESET $C_TEXT$EMAIL$C_RESET"
 add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}gate${C_RESET}        $C_TEXT$GATE$C_RESET"
 add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}emit${C_RESET}        $C_TEXT$EMIT_N platform(s), scope $SCOPE$C_RESET$([ "$EMIT_N" -gt 0 ] && printf '%s' " $C_DIM($(printf '%s' "$EMIT_SELECTED" | awk '{$1=$1};1'))$C_RESET")"
 add "  ${C_DIM}╰──────────────────────────────────────────────────────╯${C_RESET}"
