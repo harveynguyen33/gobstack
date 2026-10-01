@@ -552,7 +552,9 @@ the Node the gates ran under.
     this file; no change to the engine is implied or wanted.
 
 50. **`CM-01` reads only the most recent commit — historical commits with a wrong identity pass
-    unseen.** The check is `test "$(git log -1 --format='%ae')"` against the configured
+    unseen. Current stated scope: the row gates the identity of HEAD at the moment of the run,
+    and nothing older; that is the row's whole claim, by design.** The check is
+    `test "$(git log -1 --format='%ae')"` against the configured
     `owner_email`, so it gates the identity of HEAD at the moment of the run and nothing older.
     Measured: a probe history `owner → wrong@old.co → owner` reports `--only CM-01` clean (exit 0)
     with the wrong-identity commit sitting one below HEAD. That is consistent with the
@@ -561,7 +563,8 @@ the Node the gates ran under.
     fix — but it should be named: the row's green means "the latest commit carries the owner
     identity", never "no commit in this repo's history carries an ambient one". A wrong-identity
     commit that has since been followed by correct ones is invisible to every run. Recorded as a
-    boundary; no row change implied.
+    boundary; no row change implied. `docs/ENFORCEMENT.md`'s CM-01 row carries the same one-line
+    scope statement.
 
 51. **`gob init` writes its three added values into `goblin.yaml` itself, not through a
     template.** Install renders `.goblin/goblin.yaml` from `templates/goblin.yaml.tmpl` and
