@@ -520,20 +520,23 @@ the Node the gates ran under.
     id cell was measured to be exactly its platform name (the `gem_ini` typo shipped in one
     W4b build and the doctor's DRIFT caught it — the schema check works).
 
-48. **`SP-01` proves a SPEC file exists, never that the current round has one — the rule text
-    overclaims what the check reads.** The text says "The current round has a SPEC"; the check is
+48. **`SP-01`'s rule text once overclaimed; it now states the check's actual scope.** The text
+    used to read "The current round has a SPEC" while the check is
     `ls ./*-SPEC.md >/dev/null 2>&1`, which passes on ANY spec-shaped file at the repo root. The
     measured consequence: a fresh class-A install ships the scaffold's `ROUND-000-SPEC.md`, and
     `SP-01` PASSes on that scaffold alone — no round is open, and the row is green anyway. A stale
     spec from a finished round keeps satisfying the row exactly as well as a live one, because the
-    check has no notion of "current". What it costs: the SPEC-exists signal in a run summary is
-    weaker than its wording — read it as "a `*-SPEC.md` file is present", not "this round's spec is
+    check has no notion of "current". **Fixed in W6 (text, not check):** the row now reads
+    "A *-SPEC.md file exists at the repo root (any round, not the current one - round-scoping
+    arrives with the W6 staged chain)" — manifest and `docs/ENFORCEMENT.md` re-rendered in the
+    same commit, the check cell untouched. What it costs: the SPEC-exists signal in a run summary is
+    weaker than a round-scoped claim would suggest — read it as "a `*-SPEC.md` file is present", not "this round's spec is
     here". Measured: `goblin-verify` on a fresh probe install reports `PASS SP-01 (ls
-    ./*-SPEC.md >/dev/null 2>&1)` with `ROUND-000-SPEC.md` the only file the glob sees. **Ticketed,
-    not gated:** "current round" is a stage-order notion, and the W6 staged workflow chain (SC-01:
-    a SPEC committed before the changes it governs) is what gives the word meaning; a quick reword
-    of the text cell would desync the doc-rendered row from the manifest for no behavioural gain,
-    so the gap is recorded here until that chain lands.
+    ./*-SPEC.md >/dev/null 2>&1)` with `ROUND-000-SPEC.md` the only file the glob sees, and the
+    same PASS after renaming it to a non-round name. **Ticketed, not gated:** "current round" is a stage-order notion, and the W6 staged workflow chain (SC-01:
+    a SPEC committed before the changes it governs) is what gives the word meaning; the staged
+    chain's stage-order rows are what will make round-scoping REAL — the reword names the
+    boundary until then.
 
 49. **The engine footer prints to captured stdout, and a script parsing `goblin-verify` output
     must expect it.** The two-line footer (`engine: mode=… cli_sha256=… enforcement_tsv_sha256=…`)
