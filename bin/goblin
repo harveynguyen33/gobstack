@@ -6,6 +6,7 @@
 #   goblin audit  [--target <dir>] [--print]
 #   goblin doctor [--platform <p>]      # W4a
 #   goblin emit   --platform <p> [...]  # W4a/W4b
+#   goblin init   [...]                 # W6: the first-run wizard
 #   goblin upgrade [--target .] [...]   # W3
 #   goblin --version
 #
@@ -45,6 +46,7 @@ goblin — the goblin-stack command line.
   goblin audit  [--target <dir>] [--print]
   goblin doctor [--platform <p>] [--target <dir>]
   goblin emit   --platform <p> --scope project|global [...]
+  goblin init   [--target <dir>] [--class app|A-F] [--dry-run]
   goblin upgrade [--target .] [--dry-run] [--yes] [--engine-dir <path>]
   goblin --version
 
@@ -90,6 +92,11 @@ case "$CMD" in
     # W4a: per-platform emission (the §4 contract); the 0/1/2 exit contract is the
     # same three values verify's wrapper states, propagated verbatim.
     exec bash "$SRC/bin/goblin-emit" "$@"
+    ;;
+  init)
+    # W6: the first-run wizard. It drives install/emit/verify and propagates their
+    # exit contract verbatim, like every other subcommand here.
+    exec bash "$SRC/bin/goblin-init" "$@"
     ;;
   upgrade)
     # W3: the migration lives in its own checkout-level script (W3-SPEC §1.1);

@@ -87,10 +87,19 @@ one way this guide installs it.
 **Do not install into a real project yet.** You want to see what it does before it touches
 something you care about.
 
+The guided path is `goblin init` — one screen per question (class, branch/email, first
+gate, which platforms to emit), every question also answerable by flag, `--dry-run` to
+see the plan first:
+
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
     git init -b main
     git config user.email "you@example.com"
     git config user.name "you"
+
+    goblin init --target . --class app --branch main --email "you@example.com" \
+        --gate "bash tests/run-tests.sh" --yes
+
+or the plain installer this wizard drives, if you prefer the one-shot shape:
 
     goblin install --target . --class A
 

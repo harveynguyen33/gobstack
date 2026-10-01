@@ -12,7 +12,8 @@
 //   goblin upgrade [...]                  -> bin/goblin-upgrade (W3)
 //   goblin doctor [...]                   -> bin/goblin-doctor (W4a)
 //   goblin emit   [...]                   -> bin/goblin-emit (W4a)
-//   anything else (init)                  -> bin/goblin-install
+//   goblin init   [...]                   -> bin/goblin-init (W6, the first-run wizard)
+//   anything else (install)               -> bin/goblin-install
 //
 // Non-negotiables (§4.3): args are passed as an ARRAY, never a shell string (no
 // injection surface); `bash` is named explicitly (a packager stripping the
@@ -37,9 +38,9 @@ if (arg0 === "--version" || arg0 === "-V" || arg0 === "-v") {
   process.exit(0);
 }
 
-const SCRIPT = { verify: "goblin-verify", bans: "goblin-bans", audit: "goblin-audit", upgrade: "goblin-upgrade", doctor: "goblin-doctor", emit: "goblin-emit" };
+const SCRIPT = { verify: "goblin-verify", bans: "goblin-bans", audit: "goblin-audit", upgrade: "goblin-upgrade", doctor: "goblin-doctor", emit: "goblin-emit", init: "goblin-init" };
 const [cmd, ...rest] = process.argv.slice(2);
-const target = SCRIPT[cmd] ?? "goblin-install"; // init → goblin-install (v1)
+const target = SCRIPT[cmd] ?? "goblin-install"; // install → goblin-install (v1); init is a real subcommand since W6
 const file = path.join(__dirname, "..", "bin", target);
 // execPath-independent: call bash explicitly so Windows-WSL/Git-Bash works and no
 // shebang resolution is needed.

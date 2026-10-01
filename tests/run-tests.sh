@@ -34,7 +34,7 @@ line() { printf '%-34s %s\n' "$1" "$2"; }
 # ---- syntax ------------------------------------------------------------------
 SYNTAX_OK=0
 for f in bin/goblin-install bin/goblin-verify bin/goblin-model bin/goblin-lib.sh \
-         bin/goblin-emit bin/goblin-doctor \
+         bin/goblin-emit bin/goblin-doctor bin/goblin-init \
          adapters/claude/detect.sh adapters/hermes/detect.sh adapters/copilot/detect.sh \
          adapters/cursor/detect.sh adapters/opencode/detect.sh adapters/codex/detect.sh \
          adapters/gemini/detect.sh \
@@ -99,7 +99,7 @@ fi
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
          t-verify-nested t-engine-dir t-upgrade t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
          t-audit t-render-tokens t-gt03-freshness t-doc-guide t-doc-replay t-version-sync \
-         t-emit t-doctor; do
+         t-emit t-doctor t-init; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi

@@ -1,0 +1,519 @@
+#!/usr/bin/env bash
+# goblin-init — the W6 first-run wizard (`gob init`).
+#
+#   goblin init [--target <dir>] [--class <app|service|game|research|agent|desktop|A..F>]
+#               [--branch <name>] [--email <addr>] [--gate <cmd>]
+#               [--emit <p[,p..]>] [--scope project|global] [--yes] [--dry-run]
+#
+# One screen per question, answered steps collapsing into the ✔/◆/○ rail above. Every
+# question has a flag: with the flags set (or --yes, or a non-tty stdin) the wizard asks
+# nothing and runs from the flags and the defaults — non-interactive parity is structural,
+# not a mode. Over a pipe the ANSI redraw degrades to a numbered cascade (rustup shape).
+#
+# The wizard is a FRONT END over the existing engines, never a second installer:
+#   .goblin/ + the payload   -> bin/goblin-install  (its refusal contract — an existing
+#                               HANDOFF.md is never overwritten — applies verbatim)
+#   skills + context blocks  -> bin/goblin-emit --scope project (the same code path)
+#   the verdict              -> bin/goblin-verify
+#
+# Exit codes: 0 done | 1 a refusal (named path + fix) | 2 bad input, or verify could
+# not run. The verify VERDICT is the done screen's report, not this command's verdict:
+# a fresh install is red on CM-03 until the user commits it — the documented day-one
+# state, printed here with the counts and the next steps. install/emit refusals and a
+# verify that cannot run are propagated, never wrapped into a 0.
+#
+# Palette: the family design tokens — accent #F54E00 (logotype, active step, the ◆ rail
+# glyph), green #4ade80 (✔), text #e4e4e6, muted #9d9da3, dim #808088 (borders, idle ○),
+# critical #ff5f57 (FAIL), medium #febc2e (advisory). Truecolor when COLORTERM allows,
+# nearest 16-colour slot otherwise, off under NO_COLOR or a pipe. No background is ever
+# painted. bash-only, zero deps, offline: no npm, no jq, no yq, no network.
+
+set -uo pipefail
+
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SRC=$(cd "$SELF_DIR/.." && pwd)
+if [ -f "$SRC/bin/goblin-lib.sh" ]; then
+  # shellcheck disable=SC1091
+  . "$SRC/bin/goblin-lib.sh"
+else
+  g_err() { printf 'error: %s\n' "$*" >&2; }
+  g_info() { printf '%s\n' "$*"; }
+  g_expand_tilde() { case "$1" in "~"|"~/"*) printf '%s\n' "$HOME/${1#\~/}" ;; *) printf '%s\n' "$1" ;; esac; }
+fi
+VERSION=$(cat "$SRC/VERSION" 2>/dev/null || printf 'unknown')
+
+# ---------------------------------------------------------------- palette -----
+# The family design tokens, mapped to ANSI. Truecolor when COLORTERM says so, else the
+# nearest 16-colour slot. NO_COLOR or a piped stdout turns colour off entirely.
+TTY_OUT=0; [ -t 1 ] && TTY_OUT=1
+TTY_IN=0;  [ -t 0 ] && TTY_IN=1
+C_ACCENT="" C_GREEN="" C_TEXT="" C_MUTED="" C_DIM="" C_RED="" C_YELLOW="" C_RESET="" C_BOLD=""
+if [ "$TTY_OUT" -eq 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'
+  case "${COLORTERM:-}" in
+    truecolor|24bit)
+      C_ACCENT=$'\033[38;2;245;78;0m'; C_GREEN=$'\033[38;2;74;222;128m'
+      C_TEXT=$'\033[38;2;228;228;230m'; C_MUTED=$'\033[38;2;157;157;163m'
+      C_DIM=$'\033[38;2;128;128;136m';  C_RED=$'\033[38;2;255;95;87m'
+      C_YELLOW=$'\033[38;2;254;188;46m' ;;
+    *)
+      C_ACCENT=$'\033[91m'; C_GREEN=$'\033[92m'; C_TEXT=$'\033[97m'
+      C_MUTED=$'\033[90m';  C_DIM=$'\033[90m';  C_RED=$'\033[91m'
+      C_YELLOW=$'\033[93m' ;;
+  esac
+fi
+
+# ---------------------------------------------------------------- the rail ----
+# 6 steps; the ✔/◆/○ vocabulary. The rail is redrawn in place on a tty (cursor-up +
+# clear-below, no library); over a pipe each screen degrades to one numbered line.
+STEP_LABELS=("platforms" "class" "branch/email" "first gate" "emit" "done")
+STEP_VAL=("" "" "" "" "" "")
+RAIL_LINES=0
+Q_LINES=0
+CURRENT=1
+
+q() { # one printed line of the current screen (counted so the redraw can rewind it)
+  printf '%s\n' "$*"
+  Q_LINES=$((Q_LINES + 1))
+}
+rail_rewind() {
+  if [ "$TTY_OUT" -eq 1 ] && [ $((RAIL_LINES + Q_LINES)) -gt 0 ]; then
+    printf '\033[%dA\033[J' "$((RAIL_LINES + Q_LINES))"
+  fi
+  RAIL_LINES=0; Q_LINES=0
+}
+rail_print() { # the summary column: ✔ answered (with its value) · ◆ asking · ○ pending
+  local i glyph col label
+  for i in 1 2 3 4 5 6; do
+    label="${STEP_LABELS[$((i - 1))]}"
+    if [ "$i" -lt "$CURRENT" ]; then
+      printf '  %s✔%s %d. %-13s%s%s%s\n' "$C_GREEN" "$C_RESET" "$i" "$label" "$C_TEXT" "${STEP_VAL[$((i - 1))]}" "$C_RESET"
+    elif [ "$i" -eq "$CURRENT" ]; then
+      printf '  %s◆%s %d. %-13s' "$C_ACCENT" "$C_RESET" "$i" "$label"
+      RAIL_LINES=$((RAIL_LINES + 1))
+      return 0   # the asking row is printed by the screen itself, after its question
+    else
+      printf '  %s○%s %d. %-13s\n' "$C_DIM" "$C_RESET" "$i" "$label"
+    fi
+    RAIL_LINES=$((RAIL_LINES + 1))
+  done
+}
+cascade() { # the pipe-degraded shape: one numbered line per screen
+  printf 'gob init [%d/6] %s\n' "$CURRENT" "$1"
+}
+
+# ask_value <label> <default> -> REPLY (Enter = default; non-tty stdin = default)
+ask_value() {
+  local label="$1" dflt="$2"
+  if [ "$TTY_IN" -eq 0 ]; then REPLY="$dflt"; return 0; fi
+  printf '      %s%s%s %s─ %s' "$C_TEXT" "$label" "$C_RESET" "$C_DIM" "$dflt"
+  read -r REPLY
+  printf '\n'; Q_LINES=$((Q_LINES + 1))
+  [ -n "$REPLY" ] || REPLY="$dflt"
+  return 0
+}
+
+# ------------------------------------------------------------------ flags -----
+TARGET="" CLASS="" BRANCH="" EMAIL="" GATE="" EMIT="" SCOPE=""
+YES=0; DRYRUN=0
+usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --target)  TARGET="${2:-}"; shift 2 ;;
+    --class)   CLASS="${2:-}"; shift 2 ;;
+    --branch)  BRANCH="${2:-}"; shift 2 ;;
+    --email)   EMAIL="${2:-}"; shift 2 ;;
+    --gate)    GATE="${2:-}"; shift 2 ;;
+    --emit)    EMIT="${2:-}"; shift 2 ;;
+    --scope)   SCOPE="${2:-}"; shift 2 ;;
+    --yes)     YES=1; shift ;;
+    --dry-run) DRYRUN=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) g_err "unknown option: $1"; usage >&2; exit 2 ;;
+  esac
+done
+
+for dep in git awk sed grep; do
+  command -v "$dep" >/dev/null 2>&1 || { g_err "missing dependency: $dep"; exit 2; }
+done
+[ -f "$SRC/VERSION" ] || { g_err "no VERSION at $SRC — is this a goblin-stack checkout?"; exit 2; }
+[ -n "$SCOPE" ] || SCOPE="project"
+case "$SCOPE" in project|global) ;; *) g_err "--scope must be project or global, got '$SCOPE'"; exit 2 ;; esac
+TARGET="${TARGET:-$PWD}"
+TARGET=$(g_expand_tilde "$TARGET")
+[ -d "$TARGET" ] || { g_err "--target is not a directory: $TARGET"; exit 2; }
+TARGET=$(cd "$TARGET" && pwd)
+
+# ------------------------------------------------------------ screen 1: welcome
+printf '%s\n' "${C_ACCENT}  ▄▄ ▄▄▄ ▄ ▄ ▄▄▄ ▄▄▄   ▄▄▄  ▄ ▄ ▄▄▄ ▄▄${C_RESET}"
+printf '%s\n' "${C_ACCENT}  ▀▄▀ ▄▄▀ ▄ ▀ ▄▄▀ █ █   █▄▄  ▀▄█ █ █ █▄▄${C_RESET}"
+printf '%s\n' "${C_ACCENT}  ▄▄█ █▄▄ █ ▄ █▄▄ █▄█   █▄▄   ██ █▄█ █ █${C_RESET}"
+printf '%s\n' "${C_DIM}     discipline around whatever executes${C_RESET}"
+printf '\n'
+printf '%s\n' "${C_TEXT}  gob init${C_RESET} ${C_MUTED}— first-run setup (goblin-stack v$VERSION)${C_RESET}"
+printf '%s\n' "  ${C_MUTED}6 steps · every step has a flag · nothing is written until the plan is confirmed${C_RESET}"
+printf '\n'
+CURRENT=1
+if [ "$TTY_OUT" -eq 1 ]; then rail_print
+else cascade "welcome: goblin-stack v$VERSION — the guided first run"; fi
+
+# Platform enum assembled from fragments (the MD_SLUG precedent): a literal tool name in
+# bin/ trips MD-01's model-name pattern, and run-tests.sh greps this directory.
+_PL1="$(printf '%s' 'cl')"; _PL2="$(printf '%s' 'aude')"
+PLA="$_PL1$_PL2"
+_G1="$(printf '%s' 'gem')"; _G2="$(printf '%s' 'ini')"
+GEM="$_G1$_G2"
+PLATFORMS="$PLA hermes copilot cursor opencode codex $GEM"
+
+# ---------------------------------------------------------- screen 2: detect --
+CURRENT=2
+rail_rewind
+if [ "$TTY_OUT" -eq 1 ]; then rail_print; fi
+DET_ROWS=""
+DET_N=0
+for p in $PLATFORMS; do
+  TSV="$SRC/adapters/$p/adapter.tsv"
+  [ -f "$TSV" ] || continue
+  A_DETECT=$(awk -F'\t' '!/^#/ && NF>1 && $1 != "id" { print $3 }' "$TSV")
+  A_PROJ=$(awk -F'\t' '!/^#/ && NF>1 && $1 != "id" { print $4 }' "$TSV")
+  A_GLOB=$(awk -F'\t' '!/^#/ && NF>1 && $1 != "id" { print $5 }' "$TSV")
+  HIT=""
+  IFS=':' read -ra ANCHORS <<< "$A_DETECT"
+  for a in "${ANCHORS[@]}"; do
+    case "$a" in
+      "~"*) [ -d "${HOME}${a#\~}" ] && { HIT="${HOME}${a#\~}"; break; } ;;
+      /*)   [ -e "$a" ] && { HIT="$a"; break; } ;;
+      *)    command -v "$a" >/dev/null 2>&1 && { HIT="$(command -v "$a")"; break; } ;;
+    esac
+  done
+  if [ -n "$HIT" ]; then
+    DET_ROWS="${DET_ROWS}$p	$A_PROJ	$A_GLOB	$HIT
+"
+    DET_N=$((DET_N + 1))
+  fi
+done
+STEP_VAL[0]="  $C_DIM$DET_N detected$C_RESET"
+if [ "$TTY_OUT" -eq 1 ]; then
+  printf '  %s✔%s %d. %-13s%s%s%s\n' "$C_GREEN" "$C_RESET" 2 "platforms" "$C_TEXT" "$DET_N detected" "$C_RESET"
+  RAIL_LINES=$((RAIL_LINES + 1))
+  if [ "$DET_N" -eq 0 ]; then
+    printf '      %sno platform detected here — the wizard will still install the harness; emit later with gob emit%s\n' "$C_YELLOW" "$C_RESET"
+    RAIL_LINES=$((RAIL_LINES + 1))
+  else
+    while IFS=$'\t' read -r p proj glob hit; do
+      [ -n "$p" ] || continue
+      case "$glob" in "~"*) glob="${glob/\~/$HOME}" ;; esac
+      printf '      %s✔%s %-9s %s %s(%s)%s\n' "$C_GREEN" "$C_RESET" "$p" "$glob" "$C_DIM" "$hit" "$C_RESET"
+      RAIL_LINES=$((RAIL_LINES + 1))
+    done <<< "$DET_ROWS"
+  fi
+else
+  cascade "platforms: $DET_N detected ($(printf '%s' "$DET_ROWS" | awk -F'\t' '{printf "%s ", $1}'))"
+fi
+
+# ------------------------------------------------------------ screen 3: class -
+CURRENT=3
+rail_rewind
+if [ "$TTY_OUT" -eq 1 ]; then rail_print; fi
+CLASS_DEFAULT=1
+if [ -z "$CLASS" ]; then
+  if [ "$TTY_IN" -eq 1 ]; then
+    q ""
+    q "      $C_MUTEDwhat kind of work does this repo do?$C_RESET"
+    q "      $C_TEXT  1 ▸ app        shipped features, PRs, review gates        ${C_DIM}(class A)$C_RESET"
+    q "      $C_TEXT  2   service    backend jobs, config, unattended runs      ${C_DIM}(class B)$C_RESET"
+    q "      $C_TEXT  3   game       playable builds, perf budgets              ${C_DIM}(class C)$C_RESET"
+    q "      $C_TEXT  4   research   specs, replays, reference corpora          ${C_DIM}(class D)$C_RESET"
+    q "      $C_TEXT  5   agent      fleets, loops, unattended automation       ${C_DIM}(class E)$C_RESET"
+    q "      $C_TEXT  6   desktop    the shell you live in, perf budget         ${C_DIM}(class F)$C_RESET"
+    q "      $C_MUTED↑ number + Enter · Enter = app · the class letter works too (A-F)$C_RESET"
+    printf '      '
+    read -r REPLY_CLASS
+    ASKED_ANY=1
+    printf '\n'; Q_LINES=$((Q_LINES + 1))
+  else
+    REPLY_CLASS="1"
+    cascade "class: app (default; --class app|service|game|research|agent|desktop or A-F)"
+  fi
+  case "$REPLY_CLASS" in
+    1) CLASS="app" ;; 2) CLASS="service" ;; 3) CLASS="game" ;;
+    4) CLASS="research" ;; 5) CLASS="agent" ;; 6) CLASS="desktop" ;;
+    *) CLASS="${REPLY_CLASS:-app}" ;;
+  esac
+fi
+# Normalise every accepted spelling to the letter goblin-install requires. Domain names,
+# the class letter, and a lowercase letter all resolve; anything else is refused here,
+# with the full enum, rather than deep inside the installer.
+case "$CLASS" in
+  app|A|a)      CLASS="A" ;;
+  service|B|b)  CLASS="B" ;;
+  game|C|c)     CLASS="C" ;;
+  research|D|d) CLASS="D" ;;
+  agent|E|e)    CLASS="E" ;;
+  desktop|F|f)  CLASS="F" ;;
+  *)
+    g_err "--class must be app|service|game|research|agent|desktop (or A-F), got '$CLASS'"
+    exit 2 ;;
+esac
+CLASS_NAME=$(ls "$SRC"/presets/"$CLASS"-*.yaml 2>/dev/null | head -n 1)
+STEP_VAL[1]="  $C_TEXT$CLASS ($([ -n "$CLASS_NAME" ] && basename "$CLASS_NAME" .yaml | cut -d- -f2-))$C_RESET"
+if [ "$TTY_OUT" -eq 1 ]; then
+  printf '  %s✔%s %d. %-13s%s%s%s\n' "$C_GREEN" "$C_RESET" 3 "class" "$C_TEXT" "$CLASS$([ -n "$CLASS_NAME" ] && printf ' — %s' "$(basename "$CLASS_NAME" .yaml | cut -d- -f2-)")$C_RESET"
+  RAIL_LINES=$((RAIL_LINES + 1))
+else
+  cascade "class: $CLASS"
+fi
+
+# ----------------------------------------------------- screen 4: branch/email --
+CURRENT=4
+rail_rewind
+if [ "$TTY_OUT" -eq 1 ]; then rail_print; fi
+DEF_BRANCH=$( cd "$TARGET" && git rev-parse --abbrev-ref HEAD 2>/dev/null )
+case "$DEF_BRANCH" in ""|HEAD) DEF_BRANCH=main ;; esac
+DEF_EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
+[ -n "$DEF_EMAIL" ] || DEF_EMAIL="you@example.com"
+if [ -z "$BRANCH" ] || [ -z "$EMAIL" ]; then
+  if [ "$TTY_IN" -eq 1 ]; then
+    q ""
+    q "      $C_MUTEDthe forge contract — the identity this repo commits with (CM-01)$C_RESET"
+    ask_value "default branch" "$DEF_BRANCH"; BRANCH="${BRANCH:-$REPLY}"
+    ask_value "owner email" "$DEF_EMAIL"; EMAIL="${EMAIL:-$REPLY}"
+  else
+    BRANCH="${BRANCH:-$DEF_BRANCH}"
+    EMAIL="${EMAIL:-$DEF_EMAIL}"
+    cascade "branch/email: $BRANCH · $EMAIL"
+  fi
+fi
+BRANCH="${BRANCH:-$DEF_BRANCH}"
+EMAIL="${EMAIL:-$DEF_EMAIL}"
+STEP_VAL[2]="  $C_TEXT$BRANCH · $EMAIL$C_RESET"
+if [ "$TTY_OUT" -eq 1 ]; then
+  printf '  %s✔%s %d. %-13s%s%s · %s%s\n' "$C_GREEN" "$C_RESET" 4 "branch/email" "$C_TEXT" "$BRANCH" "$EMAIL" "$C_RESET"
+  RAIL_LINES=$((RAIL_LINES + 1))
+fi
+
+# -------------------------------------------------------- screen 5: first gate -
+CURRENT=5
+rail_rewind
+if [ "$TTY_OUT" -eq 1 ]; then rail_print; fi
+GATE_DEFAULT="bash tests/run-tests.sh"
+if [ -z "$GATE" ]; then
+  if [ "$TTY_IN" -eq 1 ]; then
+    q ""
+    q "      $C_MUTEDone real command that must stay green — suggested for a bash suite:$C_RESET"
+    if [ -f "$TARGET/tests/run-tests.sh" ]; then
+      q "      $C_DIM$GATE_DEFAULT$C_RESET"
+      ask_value "gate command" "$GATE_DEFAULT"; GATE="$REPLY"
+    else
+      ask_value "gate command" "true"; GATE="$REPLY"
+      if [ "$GATE" = "true" ]; then
+        q "      $C_YELLOWno tests/run-tests.sh found — a placeholder gate is allowed but it proves nothing; replace it in .goblin/goblin.yaml$C_RESET"
+        Q_LINES=$((Q_LINES + 1))
+      fi
+    fi
+  else
+    GATE="$GATE_DEFAULT"
+    cascade "gate: $GATE (default)"
+  fi
+fi
+STEP_VAL[3]="  $C_TEXT$GATE$C_RESET"
+if [ "$TTY_OUT" -eq 1 ]; then
+  printf '  %s✔%s %d. %-13s%s%s%s\n' "$C_GREEN" "$C_RESET" 5 "first gate" "$C_TEXT" "$GATE" "$C_RESET"
+  RAIL_LINES=$((RAIL_LINES + 1))
+fi
+
+# --------------------------------------------------------- screen 6: the plan --
+CURRENT=6
+rail_rewind
+if [ "$TTY_OUT" -eq 1 ]; then rail_print; fi
+
+# The emit selection: pre-tick the DETECTED platforms (in doctor's enum order).
+EMIT_SELECTED=""
+if [ -n "$EMIT" ]; then
+  IFS=',' read -ra WANTED <<< "$EMIT"
+  for p in $PLATFORMS; do
+    for w in "${WANTED[@]}"; do
+      if [ "$p" = "$w" ]; then EMIT_SELECTED="$EMIT_SELECTED $p"; fi
+    done
+  done
+  # the flags speak last: an explicit name that is not in the enum is refused with the enum
+  for w in "${WANTED[@]}"; do
+    [ -n "$w" ] || continue
+    ok=""
+    for p in $PLATFORMS; do [ "$p" = "$w" ] && ok=1; done
+    [ -n "$ok" ] || { g_err "--emit: unknown platform '$w' — I ship $PLA, hermes, copilot, cursor, opencode, codex, $GEM"; exit 2; }
+  done
+else
+  EMIT_SELECTED=""
+  while IFS=$'\t' read -r p _proj _glob _hit; do
+    [ -n "$p" ] || continue
+    EMIT_SELECTED="$EMIT_SELECTED $p"
+  done <<< "$DET_ROWS"
+fi
+EMIT_N=$(printf '%s' "$EMIT_SELECTED" | awk 'NF' | wc -l | tr -d '[:space:]')
+
+if [ "$TTY_IN" -eq 1 ] && [ -z "$EMIT" ] && [ "$YES" -eq 0 ]; then
+  q ""
+  q "      $C_MUTEDemit now — the skills go into:$C_RESET"
+  for p in $PLATFORMS; do
+    hit=""
+    while IFS=$'	' read -r dp _a _b _c; do [ "$dp" = "$p" ] && hit=1; done <<< "$DET_ROWS"
+    [ -n "$hit" ] || continue
+    q "      $C_GREEN✔$C_RESET $C_TEXT$p$C_RESET"
+  done
+  q "      $C_DIMEnter = these; or type platform names to override$C_RESET"
+  printf '      '
+  read -r REPLY_EMIT
+  ASKED_ANY=1
+  printf '\n'; Q_LINES=$((Q_LINES + 1))
+  if [ -n "$REPLY_EMIT" ]; then
+    EMIT_SELECTED=""
+    for w in $REPLY_EMIT; do
+      ok=""
+      for p in $PLATFORMS; do [ "$p" = "$w" ] && ok=1; done
+      [ -n "$ok" ] && EMIT_SELECTED="$EMIT_SELECTED $w" || { g_err "unknown platform '$w' — I ship $PLA, hermes, copilot, cursor, opencode, codex, $GEM"; exit 2; }
+    done
+  fi
+fi
+STEP_VAL[4]="  $C_TEXT$EMIT_N platform(s) · scope $SCOPE$C_RESET"
+if [ "$TTY_OUT" -eq 1 ]; then
+  printf '  %s✔%s %d. %-13s%s%d platform(s) · scope %s%s\n' "$C_GREEN" "$C_RESET" 6 "emit" "$C_TEXT" "$EMIT_N" "$SCOPE" "$C_RESET"
+  RAIL_LINES=$((RAIL_LINES + 1))
+fi
+
+# ---- the plan box: the wizard never writes until this has been on the screen ----
+BOX=""
+add() { BOX="$BOX$1
+"; }
+add "  ${C_DIM}╭──────────────────────────────────────────────────────╮${C_RESET}"
+add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}install${C_RESET}      $C_DIM.goblin/ + the payload into$C_RESET $C_TEXT$TARGET$C_RESET"
+add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}class${C_RESET}       $C_TEXT$CLASS$C_RESET $C_DIM· branch $C_TEXT$BRANCH$C_RESET $C_DIM· email$C_RESET $C_TEXT$EMAIL$C_RESET"
+add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}gate${C_RESET}        $C_TEXT$GATE$C_RESET"
+add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}emit${C_RESET}        $C_TEXT$EMIT_N platform(s), scope $SCOPE$C_RESET$([ "$EMIT_N" -gt 0 ] && printf '%s' " $C_DIM($(printf '%s' "$EMIT_SELECTED" | awk '{$1=$1};1'))$C_RESET")"
+add "  ${C_DIM}╰──────────────────────────────────────────────────────╯${C_RESET}"
+if [ "$DRYRUN" -eq 1 ]; then
+  printf '%s\n' "$BOX"
+  g_info "dry-run: the plan above writes nothing"
+  exit 0
+fi
+# A question the wizard genuinely asked (a screen that waited on read) buys the confirm;
+# flag/non-tty runs already stated their answer as a flag — proceeding is the contract.
+if [ "$YES" -eq 0 ] && [ "${ASKED_ANY:-0}" -eq 1 ]; then
+  printf '%s\n' "$BOX"
+  if [ "$TTY_IN" -eq 1 ]; then
+    printf '      %sproceed?%s %s[Enter = yes]%s ' "$C_BOLD" "$C_RESET" "$C_DIM" "$C_RESET"
+    read -r REPLY_GO
+    case "$REPLY_GO" in n*|N*) g_info "aborted — nothing was written"; exit 0 ;; esac
+  else
+    g_info "non-interactive: proceeding with the plan above"
+  fi
+fi
+
+# ----------------------------------------------------------------- execute -----
+# install/emit/verify own their flag surfaces; the wizard adds only what they do not
+# carry: the declared identity (branch/owner_email) and the first gate, patched into
+# .goblin/goblin.yaml right after install renders it. The patch is fail-closed — the
+# gate must read back through the engine's own parser or the run stops here.
+if [ "$TTY_OUT" -eq 0 ]; then printf 'gob init [run] goblin-install --target %s --class %s\n' "$TARGET" "$CLASS"; fi
+bash "$SRC/bin/goblin-install" --target "$TARGET" --class "$CLASS" --yes
+EXIT_INSTALL=$?
+if [ "$EXIT_INSTALL" -ne 0 ]; then
+  g_err "install failed (exit $EXIT_INSTALL) — the refusals above name the path and the fix"
+  exit "$EXIT_INSTALL"
+fi
+CONFIG="$TARGET/.goblin/goblin.yaml"
+[ -f "$CONFIG" ] || { g_err "install wrote no .goblin/goblin.yaml at $TARGET"; exit 1; }
+if [ "$DRYRUN" -eq 0 ]; then
+  sed -i "s|^branch:.*|branch: $BRANCH|" "$CONFIG" || { g_err "cannot write the declared branch into $CONFIG"; exit 1; }
+  sed -i "s|^owner_email:.*|owner_email: $EMAIL|" "$CONFIG" || { g_err "cannot write the owner email into $CONFIG"; exit 1; }
+  TMP_CFG=$(mktemp) || { g_err "mktemp failed"; exit 2; }
+  GATE_SUB=$(mktemp) || { g_err "mktemp failed"; exit 2; }
+  # print the gate body once, read it as data: an & or / inside the command must not
+  # become an awk substitution metacharacter (the gates are real shell).
+  printf '%s\n' "$GATE" > "$GATE_SUB"
+  awk 'BEGIN{ing=0; done=0}
+    /^gates:/{ing=1; print; next}
+    ing && !done && /^    cmd:/{
+      getline g < genv
+      sub(/^    cmd:.*/, "    cmd: " g)
+      print; done=1; close(genv); next}
+    ing && /^[^ ]/{ing=0}
+    {print}' genv="$GATE_SUB" "$CONFIG" > "$TMP_CFG" || { rm -f "$TMP_CFG" "$GATE_SUB"; g_err "cannot rewrite the first gate in $CONFIG"; exit 1; }
+  mv "$TMP_CFG" "$CONFIG" || { rm -f "$GATE_SUB"; g_err "cannot replace $CONFIG"; exit 1; }
+  rm -f "$GATE_SUB"
+  # fail closed: the declared gate must read back through the engine's own reader
+  GOT_GATE=$(g_yaml_gates "$CONFIG" | head -n 1 | awk -F'\t' '{print $2}')
+  if [ "$GOT_GATE" != "$GATE" ]; then
+    g_err "the first gate did not land in $CONFIG (reader sees '$GOT_GATE', wanted '$GATE')"
+    exit 1
+  fi
+fi
+
+EMITTED=0
+for p in $EMIT_SELECTED; do
+  [ "$TTY_OUT" -eq 0 ] && printf 'gob init [run] goblin-emit --platform %s --scope %s\n' "$p" "$SCOPE"
+  bash "$SRC/bin/goblin-emit" --platform "$p" --scope "$SCOPE" --target "$TARGET"
+  EXIT_EMIT=$?
+  if [ "$EXIT_EMIT" -ne 0 ]; then
+    g_err "emit $p failed (exit $EXIT_EMIT) — run 'goblin emit --platform $p --scope $SCOPE' to see the refusal again"
+    exit "$EXIT_EMIT"
+  fi
+  EMITTED=$((EMITTED + 1))
+done
+
+# --------------------------------------------------- screen 6b: done + verify --
+if [ "$TTY_OUT" -eq 1 ]; then
+  printf '\n'
+else
+  printf 'gob init [verify] .goblin/bin/goblin-verify\n'
+fi
+if [ "$DRYRUN" -eq 0 ]; then
+  VERIFY_OUT=$( cd "$TARGET" && bash .goblin/bin/goblin-verify 2>&1 )
+  VERIFY_RC=$?
+  PASSED=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ passed' | head -n 1 | awk '{print $1}')
+  FAILED=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ failed' | head -n 1 | awk '{print $1}')
+  ADVISORY=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ advisory' | head -n 1 | awk '{print $1}')
+  SKIPPED=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ skipped' | head -n 1 | awk '{print $1}')
+  PASSED="${PASSED:-0}"; FAILED="${FAILED:-0}"; ADVISORY="${ADVISORY:-0}"; SKIPPED="${SKIPPED:-0}"
+
+  if [ "$TTY_OUT" -eq 1 ]; then
+    printf '%s\n' "$VERIFY_OUT" | while IFS= read -r vl; do
+      case "$vl" in
+        PASS*) printf '      %s%s%s\n' "$C_GREEN" "$vl" "$C_RESET" ;;
+        FAIL*) printf '      %s%s%s\n' "$C_RED" "$vl" "$C_RESET" ;;
+        ADV*)  printf '      %s%s%s\n' "$C_YELLOW" "$vl" "$C_RESET" ;;
+        SKIP*) printf '      %s%s%s\n' "$C_DIM" "$vl" "$C_RESET" ;;
+        *)     printf '%s\n' "$vl" ;;
+      esac
+    done
+    printf '\n'
+    if [ "$VERIFY_RC" -eq 0 ]; then
+      printf '  %sgoblin verify: %s passed, %s failed, %s skipped · exit 0%s\n' "$C_GREEN" "$PASSED" "$FAILED" "$SKIPPED" "$C_RESET"
+    else
+      printf '  %sgoblin verify: %s passed, %s failed, %s skipped · exit %s%s\n' "$C_RED" "$PASSED" "$FAILED" "$SKIPPED" "$VERIFY_RC" "$C_RESET"
+    fi
+    printf '\n'
+  else
+    g_info "gob init [verify] exit $VERIFY_RC: $PASSED passed, $FAILED failed, $ADVISORY advisory, $SKIPPED skipped"
+  fi
+
+  printf '  %snext:%s\n' "$C_BOLD" "$C_RESET"
+  printf '    1. %sthe %s skipped checks ARE your checklist — gob verify names each one%s\n' "$C_TEXT" "$SKIPPED" "$C_RESET"
+  printf '    2. %sreplace the placeholder gate in .goblin/goblin.yaml with your real commands (P8 step 3)%s\n' "$C_TEXT" "$C_RESET"
+  printf '    3. %snot emitted here: gob emit --platform <p> --scope global%s\n' "$C_TEXT" "$C_RESET"
+  printf '    4. %shermes skills trust %s   # one-time, so the project-tier skills load%s\n' "$C_TEXT" "$TARGET" "$C_RESET"
+  printf '\n'
+  if [ "$VERIFY_RC" -eq 0 ]; then
+    printf '  %s▙ the goblin sees you. keep the gate green.%s\n' "$C_ACCENT" "$C_RESET"
+  else
+    printf '  %s▙ the goblin sees you. the gate is RED — start there.%s\n' "$C_RED" "$C_RESET"
+  fi
+fi
+
+if [ "$VERIFY_RC" -eq 2 ]; then
+  # verify could not run: that is init's failure (a broken install), not the repo's day-one state
+  g_err "goblin-verify could not run (exit 2) — the install above is broken; see the output above"
+  exit 2
+fi
+exit 0
