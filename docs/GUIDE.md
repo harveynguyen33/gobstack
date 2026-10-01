@@ -31,7 +31,8 @@ design on day one.
 
 ## 1. What this actually is, in plain language
 
-goblin-stack (published as the npm package **`@techgoblin/gobstack`**, product name **gobstack**)
+gobstack (published on npm as **`@techgoblin/gobstack`**) — this guide, the README and the CLI
+all call it **gobstack**
 is **a folder of files you install into a project** from npm. Once
 installed, three things change:
 
@@ -53,7 +54,7 @@ deliberately, and §8 and §11 say why.
 > **A rule that cannot fail is worse than no rule**, because it takes credit for verification it
 > does not perform.
 
-Everything else in goblin-stack follows from that sentence. If you remember one thing from this
+Everything else in gobstack follows from that sentence. If you remember one thing from this
 guide, remember that one — it is also the standard the harness holds itself to, and the reason it
 ships a file of things it *cannot* check (`docs/LIMITS.md`).
 
@@ -134,7 +135,7 @@ branch** (unless you want to).
 ## 4. Step 2 — Commit, then verify (the moment it earns its keep)
 
     cd /tmp/gs-try
-    git add -A && git commit -m "chore: install goblin-stack"
+    git add -A && git commit -m "chore: install gobstack"
     .goblin/bin/goblin-verify
 
 You will see one line per rule. The shape:
@@ -219,7 +220,7 @@ without you remembering to. And the gate numbers are recorded with a date, so a 
 ### The `practice:` key — the part that makes it yours
 
 If you already have a house standard — a `CONTRIBUTING.md`, a `PROJECT-PRACTICE.md`, anything
-written down — point `practice:` at it. goblin-stack does **not** copy its text. It records a
+written down — point `practice:` at it. gobstack does **not** copy its text. It records a
 **hash** of the file and re-checks that hash on every verify.
 
 That buys you one specific, valuable thing: **if someone edits your standard, every project that
@@ -329,7 +330,7 @@ own the same way, once that gate is real: declare it in `.goblin/goblin.yaml` an
 can see.
 
 A check that is green on **both** the broken and the fixed tree proves nothing — it would have been
-green anyway. goblin-stack calls this the **REPLAY** rule, and it is the single practice that has
+green anyway. gobstack calls this the **REPLAY** rule, and it is the single practice that has
 caught every real regression in this repository's own development history.
 
 ---
@@ -474,7 +475,7 @@ engine and silently de-migrate the record).
 | `goblin` (npm CLI) | propagates the subcommand's codes verbatim — `verify`/`bans`/`audit`/`--version`; `install`/`uninstall`/`re-pin`/`upgrade` route into `goblin-install` (`upgrade` migrates to the global engine: `0` ok · `1` refusal · `2` bad input); `doctor`/`emit` carry the same contract: `doctor` exits `0` every probed platform DETECTED and clean · `1` any DRIFT · `2` nothing to probe, and `emit` exits `0` ok or no-op · `1` refusal (with the path and the fix) · `2` bad input or unknown platform |
 | platforms (W4b) | `emit`/`doctor` cover seven: `claude`, `hermes`, `copilot`, `cursor`, `opencode`, `codex`, `gemini` — each detected via its own anchor (`~/.claude`, `~/.hermes`, `~/.copilot`, `~/.cursor`, `~/.config/opencode`, `~/.codex`, `~/.gemini`); codex and gemini carry `partial` command-blocking (see LIMITS #47) |
 
-`3` is the one to notice: it means goblin-stack's own rule table is malformed, not your project.
+`3` is the one to notice: it means gobstack's own rule table is malformed, not your project.
 
 ---
 
@@ -505,7 +506,7 @@ Named procedures, installed as project-local skills. Each has a measurable verif
 | P5 | `goblin-tdd-repro` | a defect where a regression test is cheap |
 | P6 | `goblin-verify-author` | a project has no live check lane, or its gates drift |
 | P7 | `goblin-pr-gate` | anything that should be reviewed before landing |
-| P8 | `goblin-bootstrap` | adopting goblin-stack, or starting a project |
+| P8 | `goblin-bootstrap` | adopting gobstack, or starting a project |
 | P9 | `goblin-handoff` | ending a session, or picking up another's |
 | P10 | `goblin-overnight` | an unattended run over a predicate |
 | P11 | `goblin-sweep` | the same change across many projects |
@@ -581,7 +582,7 @@ with *"prove it was broken first"* — it is the one practice that survives cont
     gob install --target . --class A                     # expect: created 50
 
     # 2. commit and check
-    git add -A && git commit -m "chore: install goblin-stack"
+    git add -A && git commit -m "chore: install gobstack"
     .goblin/bin/goblin-verify                                # expect: mostly PASS, some SKIP
 
     # 3. make it yours
@@ -600,11 +601,11 @@ with *"prove it was broken first"* — it is the one practice that survives cont
     # 5. do it for real, in a repo you care about
     cd ~/projects/your-project
     gob install --target . --class A
-    git add -A && git commit -m "chore: adopt goblin-stack"
+    git add -A && git commit -m "chore: adopt gobstack"
     .goblin/bin/goblin-verify
     $EDITOR HANDOFF.md              # state / gates (dated!) / next / NOT verified
 
 ---
 
-*This guide is part of goblin-stack. If you find a step that does not work as written, that is a
+*This guide is part of gobstack. If you find a step that does not work as written, that is a
 defect in the guide — report it the same way you would report one in the code.*
