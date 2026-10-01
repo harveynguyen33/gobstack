@@ -55,18 +55,18 @@ const [cmd, ...rest] = process.argv.slice(2);
 function usage() {
   process.stderr.write(
 [
-"goblin <command>",
+"gob <command>",
 "",
-"  goblin init      start here — the guided first step (detect, class, emit, first verify)",
-"  goblin verify    run the rule matrix against the current repo",
-"  goblin bans      run the ban list (per-pattern red lines over the source tree)",
-"  goblin audit     check recorded dependency claims against live advisory feeds",
-"  goblin upgrade   migrate a repo to the shared global engine at ~/.goblin/engine",
-"  goblin doctor    one detection/drift run across the agent platforms",
-"  goblin emit      write the skills + context block for one platform",
-"  goblin uninstall --target .        remove exactly what an install wrote (preimages)",
+"  gob init      start here — the guided first step (detect, class, emit, first verify)",
+"  gob verify    run the rule matrix against the current repo",
+"  gob bans      run the ban list (per-pattern red lines over the source tree)",
+"  gob audit     check recorded dependency claims against live advisory feeds",
+"  gob upgrade   migrate a repo to the shared global engine at ~/.goblin/engine",
+"  gob doctor    one detection/drift run across the agent platforms",
+"  gob emit      write the skills + context block for one platform",
+"  gob uninstall --target .          remove exactly what an install wrote (preimages)",
 "",
-"start here: goblin init",
+"start here: gob init",
 "uninstall: npm uninstall -g @techgoblin/gobstack",
 "",
 ].join("\n"));
@@ -77,7 +77,7 @@ if (cmd === undefined || cmd.startsWith("-")) {
   process.exit(2);
 }
 if (!SCRIPT[cmd] && cmd !== "install" && cmd !== "uninstall") {
-  process.stderr.write(`goblin: unrecognized command: ${cmd}\n\n`);
+  process.stderr.write(`gob: unrecognized command: ${cmd}\n\n`);
   usage();
   process.exit(2);
 }

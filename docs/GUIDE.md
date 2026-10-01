@@ -87,7 +87,7 @@ one way this guide installs it.
 **Do not install into a real project yet.** You want to see what it does before it touches
 something you care about.
 
-The guided path is `goblin init` — one screen per question (class, branch/email, first
+The guided path is `gob init` — one screen per question (class, branch/email, first
 gate, which platforms to emit), every question also answerable by flag, `--dry-run` to
 see the plan first:
 
@@ -96,12 +96,12 @@ see the plan first:
     git config user.email "you@example.com"
     git config user.name "you"
 
-    goblin init --target . --class app --branch main --email "you@example.com" \
+    gob init --target . --class app --branch main --email "you@example.com" \
         --gate "bash tests/run-tests.sh" --yes
 
 or the plain installer this wizard drives, if you prefer the one-shot shape:
 
-    goblin install --target . --class A
+    gob install --target . --class A
 
 Expected output (this is a real transcript, trimmed):
 
@@ -228,7 +228,7 @@ repos follow an old version.
 
 When *you* legitimately edit your own standard:
 
-    goblin install --target . --re-pin
+    gob install --target . --re-pin
 
 It re-records the hash and prints the old and new value. Nothing re-pins automatically — an
 edited standard is never a silent no-op.
@@ -424,7 +424,7 @@ Two readings that are easy to get wrong:
 | `refused to overwrite: HANDOFF.md`, exit 1 | your repo already had a HANDOFF | **do not `--force`** — reconcile it (below) |
 | `PT-02 declared main, actual master` | branch mismatch | set `branch:` in the config |
 | `IN-02 ... practice EDITED` | someone changed the pinned standard | re-pin deliberately: `--re-pin` |
-| `goblin install: unknown subcommand` (exit 2) | you ran a bare `goblin install` without the npm package installed | install the npm package first: `npm i -g @techgoblin/gobstack`, then `goblin install` |
+| `gob install: unknown subcommand` (exit 2) | you ran a bare `gob install` without the npm package installed | install the npm package first: `npm i -g @techgoblin/gobstack`, then `gob install` |
 | `IN-03` fails, "manifest is broken" | a row has a broken check column | fix the row; this is a source defect, not yours |
 | a `FAIL` you believe is wrong | the check may be weak, or your belief may be | run `--only <id>` and read the command it prints |
 
@@ -442,12 +442,12 @@ Declared but unusable (relative path, missing directory, no manifest inside) is 
 with no fallback** — a repo is never judged by an engine it did not declare. A repo whose record
 says `mode=global` keeps hashing whatever files it still holds; the engine's own identity prints in
 every run's footer (`engine: mode=… cli_sha256=… enforcement_tsv_sha256=…`). The same commands are
-available outside any repo through the npm CLI: `goblin verify` / `goblin bans` / `goblin audit` /
-`goblin doctor` / `goblin emit` / `goblin upgrade` / `goblin --version`.
+available outside any repo through the npm CLI: `gob verify` / `gob bans` / `gob audit` /
+`gob doctor` / `gob emit` / `gob upgrade` / `gob --version`.
 
 **Migrating a repo to the global engine (W3):**
 
-    goblin upgrade            # 8 steps, two commits, one report
+    gob upgrade            # 8 steps, two commits, one report
 
 It refuses on a dirty tree, a detached HEAD, a red repo, or a global engine holding different
 bytes — each refusal names the fix. What it does: verifies every recorded hash, lands the engine
@@ -461,7 +461,7 @@ again. Nothing is deleted before the engine is safely landed and the tree is gre
     git revert <commit-A-sha> <commit-B-sha>
 
 reverses byte-for-byte: the vendored payload returns, the record drops its `engine:` block, and
-`goblin verify` is the 43-green it was before. A second `goblin upgrade` on a migrated repo is a
+`gob verify` is the 43-green it was before. A second `gob upgrade` on a migrated repo is a
 no-op; `goblin-install` onto one refuses with the revert remedy (re-installing would re-shadow the
 engine and silently de-migrate the record).
 
@@ -482,10 +482,10 @@ engine and silently de-migrate the record).
 
 ### Commands
 
-    goblin install --target <dir> --class A|B|C|D|E|F [options]
-    goblin install --target <dir> --uninstall
-    goblin install --target <dir> --re-pin
-    goblin install --target <dir> --upgrade
+    gob install --target <dir> --class A|B|C|D|E|F [options]
+    gob install --target <dir> --uninstall
+    gob install --target <dir> --re-pin
+    gob install --target <dir> --upgrade
 
     .goblin/bin/goblin-verify [--only <id[,id...]>] [--json] [--list]
     .goblin/bin/goblin-audit        # the only network step
@@ -578,7 +578,7 @@ with *"prove it was broken first"* — it is the one practice that survives cont
     # 1. try it somewhere disposable
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
     git init -b main
-    goblin install --target . --class A                     # expect: created 50
+    gob install --target . --class A                     # expect: created 50
 
     # 2. commit and check
     git add -A && git commit -m "chore: install goblin-stack"
@@ -599,7 +599,7 @@ with *"prove it was broken first"* — it is the one practice that survives cont
 
     # 5. do it for real, in a repo you care about
     cd ~/projects/your-project
-    goblin install --target . --class A
+    gob install --target . --class A
     git add -A && git commit -m "chore: adopt goblin-stack"
     .goblin/bin/goblin-verify
     $EDITOR HANDOFF.md              # state / gates (dated!) / next / NOT verified

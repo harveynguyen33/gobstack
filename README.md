@@ -7,7 +7,7 @@ and a rule that cannot be checked is counted rather than asserted.
 
 Install it from npm — globally; it is a CLI, not a library:
 
-    npm install -g @techgoblin/gobstack@beta   # gives you the `goblin` CLI (and `gob`)
+    npm install -g @techgoblin/gobstack@beta   # gives you the `gob` CLI (`goblin` remains as a legacy alias)
     npx @techgoblin/gobstack@beta init         # or the one-shot: run the wizard, install nothing globally
 
 ## Install
@@ -27,8 +27,8 @@ never imports, and can fail resolution outright with `ERESOLVE` when the app's o
 dependencies disagree with npm's. If you see `ERESOLVE` after a local install, remove the
 dependency from `package.json` and install globally instead.
 
-**The two-layer model.** The global install gives you the CLI only. `goblin init` (or
-`goblin install --target <dir> --class A`) then vendors a self-contained engine into the target
+**The two-layer model.** The global install gives you the CLI only. `gob init` (or
+`gob install --target <dir> --class A`) then vendors a self-contained engine into the target
 repo under `.goblin/` — verifier, manifest, ban probes, skills, all of it. That second layer is
 why an initialized repo keeps working on machines with **no gobstack installed at all**: the
 engine lives in the repo, not in your `node_modules`, and `bash .goblin/bin/goblin-verify` (or a
@@ -36,7 +36,7 @@ plain `git` + `bash` box) is the only runtime the repo's gate needs.
 
 Then, from any project:
 
-    goblin install --target /path/to/repo --class A
+    gob install --target /path/to/repo --class A
 
 The installer writes only paths it records, hash-compares before writing, and prints `no-op` on a
 second run with the same arguments. It never overwrites `HANDOFF.md`, `AGENTS.md`, a `*-SPEC.md`,
@@ -49,9 +49,9 @@ failure: reconcile the file rather than forcing over it — `docs/ADOPTION.md`.
 After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other
-    goblin verify                             # or .goblin/bin/goblin-verify, inside the target
+    gob verify                             # or .goblin/bin/goblin-verify, inside the target
     hermes skills trust <target>              # one-time, Hermes users, so project-tier skills load
-    goblin audit                              # once, deliberately: the ONLY network step (SC-07)
+    gob audit                              # once, deliberately: the ONLY network step (SC-07)
 
 **A class-A install verifies green — `43 passed, 0 failed, 11 advisory, 28 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists. Before that edit the scaffold's `0000000` placeholder is
@@ -76,23 +76,26 @@ that only a round can produce — a first review note, a gate that is not the sh
 *vacuously* rather than failing, and `P8` (`goblin-bootstrap`) still walks them as work to do.
 The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 
-## The `goblin` CLI
+## The `gob` CLI
 
 | command | what it does |
 |---|---|
-| `goblin verify` | run the rule matrix against the current repo — `PASS`/`FAIL`/`SKIP` per row, exit 0 pass · 1 a check failed · 2 could not run · 3 the manifest is broken |
-| `goblin bans` | run the ban list (per-pattern red lines over the source tree) |
-| `goblin audit` | check recorded dependency claims against live advisory feeds — the only command that touches the network |
-| `goblin install` | install the manifest, skills and verifier into a target repo |
-| `goblin uninstall` | remove everything an install wrote, byte-exactly (`goblin install --target <dir> --uninstall` is the same job) |
-| `goblin upgrade` | migrate a repo to the shared global engine at `~/.goblin/engine` — 8 steps, two commits, one report |
-| `goblin doctor` | one run across the platforms below: DETECTED / NOT-DETECTED / DRIFT per platform |
-| `goblin emit` | write the skills + context block for one platform (`--scope project` or `global`); `--unshadow` removes a hermes project skill whose hash equals the source |
-| `goblin init` | the first-run wizard: detect → class → branch/email → first gate → emit → verify, one screen per question; every question has a flag (`--class app --branch main --email a@b.c --gate 'cmd' --emit hermes`), so CI runs it with zero prompts; `--dry-run` prints the plan and writes nothing |
+| `gob verify` | run the rule matrix against the current repo — `PASS`/`FAIL`/`SKIP` per row, exit 0 pass · 1 a check failed · 2 could not run · 3 the manifest is broken |
+| `gob bans` | run the ban list (per-pattern red lines over the source tree) |
+| `gob audit` | check recorded dependency claims against live advisory feeds — the only command that touches the network |
+| `gob install` | install the manifest, skills and verifier into a target repo |
+| `gob uninstall` | remove everything an install wrote, byte-exactly (`gob install --target <dir> --uninstall` is the same job) |
+| `gob upgrade` | migrate a repo to the shared global engine at `~/.goblin/engine` — 8 steps, two commits, one report |
+| `gob doctor` | one run across the platforms below: DETECTED / NOT-DETECTED / DRIFT per platform |
+| `gob emit` | write the skills + context block for one platform (`--scope project` or `global`); `--unshadow` removes a hermes project skill whose hash equals the source |
+| `gob init` | the first-run wizard: detect → class → branch/email → first gate → emit → verify, one screen per question; every question has a flag (`--class app --branch main --email a@b.c --gate 'cmd' --emit hermes`), so CI runs it with zero prompts; `--dry-run` prints the plan and writes nothing |
+
+`goblin` remains as a legacy alias for every command above — existing scripts keep working, but
+new commands and docs use `gob`.
 
 ## Platforms
 
-`goblin emit` and `goblin doctor` cover seven agent platforms, each detected via its own anchor:
+`gob emit` and `gob doctor` cover seven agent platforms, each detected via its own anchor:
 
 | platform | what emit writes there |
 |---|---|
@@ -104,7 +107,7 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 | `codex` | skills + context block under `~/.codex` (partial: some commands blocked, `docs/LIMITS.md` #47) |
 | `gemini` | skills + context block under `~/.gemini` (partial: some commands blocked, `docs/LIMITS.md` #47) |
 
-One run of `goblin emit --platform <p> --scope project` writes the skills and the context block a
+One run of `gob emit --platform <p> --scope project` writes the skills and the context block a
 session of that platform reads; `--scope global` writes to the machine-level anchor. `--dry-run`
 prints the full write plan first.
 
@@ -143,7 +146,7 @@ vocabulary.
 
 ## Verify
 
-    goblin verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
+    gob verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
 
 Exit codes: `0` pass · `1` a check failed · `2` could not
 run · `3` the manifest is broken. Every run prints what it cannot see.
@@ -166,7 +169,7 @@ touches the others.
 
     npm uninstall -g @techgoblin/gobstack
 
-This removes the `goblin` and `gob` commands from the machine and nothing else: no project, no
+This removes the `gob` (and legacy `goblin`) commands from the machine and nothing else: no project, no
 repo, no `.goblin/` directory anywhere is touched. Repos you already initialized keep working
 fully — the engine is vendored into each repo's `.goblin/`, so the CLI's absence removes no
 capability (you lose the installer/upgrade/emit entry points, not the gate; see layer (c) for
@@ -174,10 +177,10 @@ the machine-level skills the CLI wrote).
 
 **(b) A project's harness** — the `.goblin/` tree an install created in one repo:
 
-    goblin uninstall --target .
+    gob uninstall --target .
 
-(equivalently `goblin install --target . --uninstall`; through the short alias:
-`gob uninstall --target .`). The uninstall is **byte-exact**: it removes exactly the files
+(equivalently `gob install --target . --uninstall` — through the legacy alias, spell it `goblin`
+instead of `gob`). The uninstall is **byte-exact**: it removes exactly the files
 `installed.json` records — hash-compared preimages, so a file you edited after install is
 reported and kept, never clobbered — then every directory that leaves empty. After it, the repo
 has zero goblin files; only the project's own record (`HANDOFF.md`, `AGENTS.md`, `reviews/`, the
@@ -188,19 +191,19 @@ self-contained until the moment you remove it.
 **(c) Global agent skills** — the machine-level skills an `emit --scope global` wrote outside any
 repo:
 
-    goblin emit --undo --platform <p> --scope global
+    gob emit --undo --platform <p> --scope global
 
 (`--undo` is the same byte-exact reversal as `--uninstall`, under its friendlier name). By hand,
 the same job is deleting the platform's anchor entries: `~/.claude/skills/goblin-*` (and the
 equivalents under `~/.hermes`, `~/.copilot`, `~/.cursor`, `~/.config/opencode`, `~/.codex`,
-`~/.gemini` — `goblin doctor` lists which platforms were detected).
+`~/.gemini` — `gob doctor` lists which platforms were detected).
 
 The short version, for a full removal from a machine and its repos: (c) first, then (b) in each
 initialized repo, then (a).
 
 ## Re-pin the referenced standard
 
-    goblin install --target <dir> --re-pin
+    gob install --target <dir> --re-pin
 
 `practice_sha256:` pins the referenced standard and `IN-02` re-checks it, so editing that standard
 — a legitimate, intended edit — reds `IN-02` in every installed repo. `--re-pin` re-records that
