@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# t-upgrade.sh — W3: `goblin upgrade`, the 0.4.4 per-repo → global migration, the
+# t-upgrade.sh — W3: `gob upgrade`, the 0.4.4 per-repo → global migration, the
 # shadowing footer, and the installer's re-shadow refusal (W3-SPEC §6-§7).
 #
 #   U1  the happy path: dry-run writes nothing, --yes lands the engine, rewrites the

@@ -28,12 +28,12 @@ mkdir -p "$HOMEDIR"
 # ---- SH1: no args --------------------------------------------------------------
 OUT1=$(node "$SRC/bin/goblin.js" 2>&1); RC1=$?
 check "SH1 no args exits 2" "$([ "$RC1" -eq 2 ] && echo 0 || echo 1)"
-printf '%s' "$OUT1" | grep -q 'start here: goblin init'
+printf '%s' "$OUT1" | grep -q 'start here: gob init'
 check "SH1 the usage names the guided first step" "$?"
 printf '%s' "$OUT1" | grep -q 'uninstall: npm uninstall -g @techgoblin/gobstack'
 check "SH1 the usage names the npm uninstall" "$?"
 for sub in verify bans audit upgrade doctor emit init; do
-  printf '%s' "$OUT1" | grep -q "goblin $sub"
+  printf '%s' "$OUT1" | grep -q "gob $sub"
   check "SH1 the usage lists $sub" "$?"
 done
 
@@ -53,9 +53,9 @@ check "SH3 the refusal names the unknown word" "$?"
 
 # ---- SH4: `install` keeps the legacy fallback ---------------------------------
 OUT4=$(node "$SRC/bin/goblin.js" install --help 2>&1); RC4=$?
-check "SH4 goblin install --help exits 0" "$([ "$RC4" -eq 0 ] && echo 0 || echo 1)"
-printf '%s' "$OUT4" | grep -q 'goblin-install — drop the harness into a target repo'
-check "SH4 the output is goblin-install's own usage" "$?"
+check "SH4 gob install --help exits 0" "$([ "$RC4" -eq 0 ] && echo 0 || echo 1)"
+printf '%s' "$OUT4" | grep -q 'gob install — drop the harness into a target repo'
+check "SH4 the output is the installer's own usage" "$?"
 
 # ---- SH5: `uninstall` is a real job --------------------------------------------
 P="$WORK/probe"

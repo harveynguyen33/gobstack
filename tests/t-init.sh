@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # t-init.sh — W6: the first-run wizard (bin/goblin-init).
 #
-#   T1  non-interactive flags-only end to end on a fresh probe: goblin init --class app
+#   T1  non-interactive flags-only end to end on a fresh probe: gob init --class app
 #       --branch main --email ... --gate 'bash tests/run-tests.sh' --emit hermes
 #       --scope project --yes installs, patches the declared identity and the gate into
 #       .goblin/goblin.yaml (read back through g_yaml_gates), emits hermes project-scope,
@@ -14,7 +14,7 @@
 #   T5  idempotent re-run: the second identical run is the installer's no-op, exit 0
 #   T6  bad input: unknown --emit platform and a nonsense --class exit 2 naming the enum
 #   T7  the dispatcher: `bin/goblin init` routes to goblin-init; `bin/goblin.js init`
-#       reaches the same script; `goblin init --help` exits 0
+#       reaches the same script; `gob init --help` exits 0
 #
 # Every fixture lives in a mktemp sandbox with HOME pointed inside it — no test writes
 # the real $HOME. The PATH is stripped to the system dirs so the host's own hermes
@@ -160,7 +160,7 @@ check "the refusal names the class enum" "$?"
 
 # ---- T7: the dispatcher routes ----------------------------------------------------
 OUT8=$( cd "$WORK" && env PATH="$BARE_PATH" bash "$SRC/bin/goblin" init --help 2>&1 ); RC8=$?
-check "goblin init --help exits 0 through the dispatcher" "$RC8"
+check "gob init --help exits 0 through the dispatcher" "$RC8"
 printf '%s' "$OUT8" | grep -q -- "--class"
 check "the usage names the class flag" "$?"
 OUT9=$( cd "$WORK" && node "$SRC/bin/goblin.js" init --help 2>&1 ); RC9=$?

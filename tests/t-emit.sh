@@ -9,7 +9,7 @@
 #       files gone, created dirs rmdired, second uninstall a no-op exit 0
 #   T5  refusals R1-R7: each exits its code, names the path, leaves the tree untouched
 #   T6  migrated-repo emission: engine_dir declared, payload gone -> emit claude from
-#       the CLI payload; goblin verify green; CL-01 PASS via the §5.3 re-point
+#       the CLI payload; gob verify green; CL-01 PASS via the §5.3 re-point
 #       (RED-then-GREEN control); --unshadow removes hash-equal, refuses hash-differ
 #   T9  core/all/none: core emits exactly the measured 6 dirs; none emits the context
 #       block only; the printed index-size equals an independent awk re-measure
@@ -200,7 +200,7 @@ $EMIT --platform claude --scope project --skills core --target "$REPO" >/dev/nul
 check "T6 migrated probe: CL-01 FAILs before any artifact (no vacuous pass)" "$(( RED == 1 ? 0 : 1 ))"
 check "T6 emit claude into the migrated repo exits 0" "$E6"
 check "T6 CL-01 PASSes on the emitted artifact (the §5.3 re-point)" "$GREEN"
-check "T6 goblin verify is green on the emitted-only migrated repo" "$(( FULL == 0 ? 0 : 1 ))"
+check "T6 gob verify is green on the emitted-only migrated repo" "$(( FULL == 0 ? 0 : 1 ))"
 # --unshadow on a hash-equal project copy removes it (hermes path)
 $EMIT --platform hermes --scope project --skills core --target "$REPO" >/dev/null 2>&1
 snap "$REPO/.hermes" "$WORK/us1"

@@ -1297,8 +1297,8 @@ out=$( cd "$W1_GMODE" && bash "$SRC/bin/goblin-verify" --only AU-01 2>&1 )
 printf '%s' "$out" | grep -q 'SKIP  AU-01.*no automation producer found'
 check "W1: no producer anywhere -> AU-01 SKIPs with the reason (the born-RED FIX)" "$?"
 out=$( cd "$W1_GMODE" && bash "$SRC/bin/goblin-verify" --only SC-07 2>&1 )
-printf '%s' "$out" | grep -q 'goblin audit'
-check "W1: a global-mode SC-07 SKIP names the CLI verb (goblin audit)" "$?"
+printf '%s' "$out" | grep -q 'gob audit'
+check "W1: a global-mode SC-07 SKIP names the CLI verb (gob audit)" "$?"
 printf '%s' "$out" | grep -q '.goblin/audit.tsv'
 check "  and the record it names is still the repo-local one" "$?"
 rm -rf /tmp/w1-engine-gmode

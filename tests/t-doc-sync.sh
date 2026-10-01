@@ -254,7 +254,7 @@ fi
 # for a public audience. npm is THE install path, and the clone is not a path at all:
 #   1. the npm identity is present (a reader arriving from npmjs.com must find it);
 #   2. the npm install command is stated verbatim;
-#   3. the `goblin` CLI is named as what the npm install yields, `goblin install`
+#   3. the `gob` CLI is named as what the npm install yields, `gob install`
 #      as its install command;
 #   4. NO user-facing clone/install instruction survives: the checkout's
 #      `bin/goblin-install` and the clone URL must not appear in the README as an
@@ -269,8 +269,8 @@ grep -q '@techgoblin/gobstack' README.md
 check "README names the npm package @techgoblin/gobstack (W5-D)" "$?"
 grep -q 'npm install -g @techgoblin/gobstack' README.md
 check "  and states the npm install path (npm install -g @techgoblin/gobstack)" "$?"
-grep -q 'goblin install' README.md
-check "  and names goblin install as the npm CLI's install command (W5-D)" "$?"
+grep -q 'gob install' README.md
+check "  and names gob install as the npm CLI's install command (W5-D)" "$?"
 if grep -q 'bin/goblin-install' README.md; then
   note "FAIL README still presents bin/goblin-install as an install instruction (W5-D)"
   fail=1
@@ -290,7 +290,7 @@ fi
 # is gone: npm is the only route it gives, in §2, §3, §10 and the appendix.
 grep -q 'npm i -g @techgoblin/gobstack' docs/GUIDE.md
 check "docs/GUIDE.md names the npm route (W5-D)" "$?"
-grep -q 'goblin install --target . --class A' docs/GUIDE.md
+grep -q 'gob install --target . --class A' docs/GUIDE.md
 check "  and gives the npm CLI's Step-1 command (W5-D)" "$?"
 if grep -q 'bin/goblin-install' docs/GUIDE.md || grep -qi 'route b' docs/GUIDE.md \
    || grep -qF '"$GS' docs/GUIDE.md; then
