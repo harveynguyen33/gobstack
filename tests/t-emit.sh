@@ -235,5 +235,79 @@ $EMIT --platform claude --scope project --skills core --target "$REPO" --dry-run
 [ -e "$REPO/.claude" ] && DRYW=1 || DRYW=0
 check "T5 --dry-run exits 0 and writes nothing" "$(( DRY + DRYW ))"
 
+# ---- T11: global scope tilde-expansion (the literal-'~' regression) -----------------
+# Measured regression (W6): adapter.tsv's skills_path_global carries a tilde path
+# (hermes: ~/.hermes/skills/<name>/SKILL.md); skills_root()/skill_rel() joined it
+# with TARGET=$HOME verbatim, so files landed at $HOME/~/.hermes/... — a LITERAL
+# tilde directory. The join must tilde-expand BEFORE joining, and nothing may ever
+# create a literal '~' entry. Covers every platform's global scope, plus the npm
+# shim route (node bin/goblin.js emit ...) that surfaced the bug.
+TILDE_ROOTS() { # <platform> -> prints the tilde-expanded global root for $HOMEDIR
+  case "$1" in
+    claude)   printf '%s\n' "$HOMEDIR/.claude" ;;
+    hermes)   printf '%s\n' "$HOMEDIR/.hermes" ;;
+    copilot)  printf '%s\n' "$HOMEDIR/.copilot" ;;
+    cursor)   printf '%s\n' "$HOMEDIR/.cursor" ;;
+    opencode) printf '%s\n' "$HOMEDIR/.config/opencode" ;;
+    codex)    printf '%s\n' "$HOMEDIR/.agents" ;;
+    *)        printf '%s\n' "$HOMEDIR/.gemini" ;;
+  esac
+}
+for platform in claude hermes copilot cursor opencode codex "$GOB_GEMINI"; do
+  new_home "tilde-$platform"
+  # seed the detect anchor so global scope passes the §3 gate (global emits refuse on
+  # a NOT-DETECTED platform by design); the anchor IS the tilde-expanded root itself.
+  case "$platform" in
+    claude)   mkdir -p "$HOMEDIR/.claude" ;;
+    hermes)   mkdir -p "$HOMEDIR/.hermes" ;;
+    copilot)  mkdir -p "$HOMEDIR/.copilot" ;;
+    cursor)   mkdir -p "$HOMEDIR/.cursor" ;;
+    opencode) mkdir -p "$HOMEDIR/.config/opencode" ;;
+    codex)    mkdir -p "$HOMEDIR/.codex" ;;
+    *)        mkdir -p "$HOMEDIR/.gemini" ;;
+  esac
+  HOME="$HOMEDIR" $EMIT --platform "$platform" --scope global --skills core >/dev/null 2>&1
+  check "T11 $platform: global emit exits 0" "$?"
+  # no literal '~' entry may exist anywhere under the sandbox home
+  [ -e "$HOMEDIR/~" ]; check "T11 $platform: no literal '~' dir in \$HOME" "$(( 1 - $? ))"
+  ROOT=$(TILDE_ROOTS "$platform")
+  [ -f "$ROOT/skills/goblin-mode/SKILL.md" ]
+  check "T11 $platform: SKILL.md under the tilde-expanded root" "$?"
+done
+
+# ledger rows carry the RESOLVED absolute path (never a ~ component, never relative)
+new_home tilde-ledger
+GOBLIN_EMISSIONS="$HOMEDIR/.goblin-stack/emissions.tsv"
+GOBLIN_PREIMAGES="$HOMEDIR/.goblin-stack/preimages"
+mkdir -p "$HOMEDIR/.hermes"
+HOME="$HOMEDIR" $EMIT --platform hermes --scope global --skills core >/dev/null 2>&1
+awk -F'\t' 'NR>1 && $3 ~ /(^|\/)~(\/|$)/ {bad=1} NR>1 && $3 !~ /^\// {bad=1} END{exit bad}' \
+  "$GOBLIN_EMISSIONS"
+check "T11 ledger paths are resolved absolute paths (no ~ component)" "$?"
+[ -f "$HOMEDIR/.hermes/skills/goblin-mode/SKILL.md" ]
+check "T11 ledger write landed at the real tilde-expanded path" "$?"
+
+# the npm shim route (the original discovery path): node bin/goblin.js emit --scope global
+new_home tilde-shim
+GOBLIN_EMISSIONS="$HOMEDIR/.goblin-stack/emissions.tsv"
+GOBLIN_PREIMAGES="$HOMEDIR/.goblin-stack/preimages"
+mkdir -p "$HOMEDIR/.hermes"
+HOME="$HOMEDIR" node "$SRC/bin/goblin.js" emit --platform hermes --scope global --skills core >/dev/null 2>&1; SHIM=$?
+check "T11 shim: node bin/goblin.js emit --scope global exits 0" "$SHIM"
+[ -e "$HOMEDIR/~" ]; check "T11 shim: no literal '~' dir in \$HOME" "$(( 1 - $? ))"
+[ -f "$HOMEDIR/.hermes/skills/goblin-mode/SKILL.md" ]
+check "T11 shim: SKILL.md at \$HOME/.hermes/skills (tilde-expanded)" "$?"
+
+# the 'wrote' display names the RESOLVED absolute path, never a '$HOME/~' lie
+new_home tilde-display
+GOBLIN_EMISSIONS="$HOMEDIR/.goblin-stack/emissions.tsv"
+GOBLIN_PREIMAGES="$HOMEDIR/.goblin-stack/preimages"
+mkdir -p "$HOMEDIR/.hermes"
+WROTE=$(HOME="$HOMEDIR" $EMIT --platform hermes --scope global --skills core 2>/dev/null | grep '^wrote ' || true)
+printf '%s' "$WROTE" | grep -qF "$HOMEDIR/.hermes/skills/goblin-mode"
+check "T11 'wrote' display names the resolved absolute path" "$?"
+printf '%s' "$WROTE" | grep -qF "/~/"; BAD_DISPLAY=$?
+check "T11 'wrote' display carries no literal '~' component" "$(( 1 - BAD_DISPLAY ))"
+
 if [ "$fail" -eq 0 ]; then note "t-emit: PASS"; else note "t-emit: FAIL"; fi
 exit "$fail"
