@@ -67,6 +67,7 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 | `goblin upgrade` | migrate a repo to the shared global engine at `~/.goblin/engine` — 8 steps, two commits, one report |
 | `goblin doctor` | one run across the platforms below: DETECTED / NOT-DETECTED / DRIFT per platform |
 | `goblin emit` | write the skills + context block for one platform (`--scope project` or `global`); `--unshadow` removes a hermes project skill whose hash equals the source |
+| `goblin init` | the first-run wizard: detect → class → branch/email → first gate → emit → verify, one screen per question; every question has a flag (`--class app --branch main --email a@b.c --gate 'cmd' --emit hermes`), so CI runs it with zero prompts; `--dry-run` prints the plan and writes nothing |
 
 ## Platforms
 

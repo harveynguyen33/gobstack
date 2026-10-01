@@ -559,3 +559,17 @@ the Node the gates ran under.
     identity", never "no commit in this repo's history carries an ambient one". A wrong-identity
     commit that has since been followed by correct ones is invisible to every run. Recorded as a
     boundary; no row change implied.
+
+51. **`gob init` writes its three added values into `goblin.yaml` itself, not through a
+    template.** Install renders `.goblin/goblin.yaml` from `templates/goblin.yaml.tmpl` and
+    owns it (`put_once`: never rewritten after the first install) — and install correctly
+    carries no `--branch/--email/--gate` flags, because those keys are the project's to edit.
+    The wizard therefore `sed`-patches `branch:` and `owner_email:` and rewrites the first
+    gate's `cmd:` line right after install renders the file, fail-closed: the gate must read
+    back through the engine's own `g_yaml_gates` or the run stops. The cost is a second
+    writer for exactly those three lines: a hand-customised comment placement survives, but a
+    future template change to those lines' shapes (renamed keys, a multi-gate default) must
+    be mirrored in `bin/goblin-init`. The wizard never rewrites anything outside the declared
+    keys, and a re-run after a hand edit of another line leaves that line alone. Recorded as
+    a boundary; the alternative — teaching install three wizard-only flags — would put wizard
+    vocabulary into the installer's contract for no gain.
