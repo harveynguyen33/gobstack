@@ -42,8 +42,14 @@ else
   g_abspath() {
     case "$1" in
       /*) printf '%s\n' "$1" ;;
-      "~"|"~/"*) printf '%s\n' "$HOME/${1#\~/}" ;;
+      "~"|"~/"*) printf '%s\n' "$HOME/${1#~/}" ;;
       *) printf '%s\n' "$PWD/$1" ;;
+    esac
+  }
+  g_expand_tilde() {
+    case "$1" in
+      "~"|"~/"*) printf '%s\n' "$HOME/${1#~/}" ;;
+      *) printf '%s\n' "$1" ;;
     esac
   }
   g_err() { printf 'error: %s\n' "$*" >&2; }
@@ -170,11 +176,19 @@ A_CTX=$(read_adapter 6)
 [ -n "$(read_adapter 8)" ] || die "adapter table cell docs_read is empty - the PROBE-REQUIRED shape was never measured, so the adapter is not installable ($TSV)" 1
 
 skills_pattern() { if [ "$SCOPE" = project ]; then printf '%s' "$A_PROJ"; else printf '%s' "$A_GLOB"; fi; }
-skills_root() { local pat; pat=$(skills_pattern); pat=${pat%%<name>*}; printf '%s/%s' "$TARGET" "${pat%/}"; }
-skill_rel() { local p; p=$(skills_pattern); p=${p/<name>/$1}; printf '%s' "$p"; }
+# Adapter paths may carry a tilde prefix (skills_path_global: ~/.hermes/skills/<name>/...).
+# g_expand_tilde MUST run before any join with TARGET: joining the raw pattern turned
+# global scope into $HOME/~/.hermes/... — a literal '~' directory (measured, T11).
+# After expansion the pattern is absolute (global scope) or still TARGET-relative
+# (project scope, the dot-dir skills pattern) — pattern_joined joins only the relative form.
+skills_pattern_abs() { g_expand_tilde "$(skills_pattern)"; }
+pattern_joined() { local p; p=$(skills_pattern_abs); case "$p" in /*) ;; *) p="$TARGET/${p#/}" ;; esac; printf '%s\n' "$p"; }
+skills_root() { local pat; pat=$(pattern_joined); pat=${pat%%<name>*}; printf '%s\n' "$pat"; }
+skill_rel() { local p; p=$(pattern_joined); p=${p/<name>/$1}; printf '%s' "$p"; }
 ctx_file() {
   [ "$A_CTX" = "-" ] && return 1
-  printf '%s/%s' "$TARGET" "$A_CTX"
+  # the context cell is TARGET-relative by contract; expand a tilde only if present
+  case "$A_CTX" in "~"*) printf '%s\n' "$(g_expand_tilde "$A_CTX")" ;; *) printf '%s/%s' "$TARGET" "$A_CTX" ;; esac
 }
 
 # ---- detection (§3) --------------------------------------------------------------
@@ -228,7 +242,7 @@ ledger_has() { awk -F'\t' -v p="$1" -v h="$2" 'NR>1 && $3==p && ($4==h || $5==h)
 emit_one_skill() {
   local name="$1" src="$SRCSKILLS/$1/SKILL.md" dst_root dst path pre post
   [ -f "$src" ] || die "skills source is missing $name/SKILL.md under $SRCSKILLS" 2
-  dst_root=$(skills_root); path=$(skill_rel "$name"); dst="$TARGET/$path"
+  dst_root=$(skills_root); path=$(skill_rel "$name"); dst="$path"   # skill_rel is joined + absolute
   if [ ! -d "$dst_root/$name" ]; then
     [ "$DRYRUN" -eq 0 ] && { mkdir -p "$dst_root/$name" || die "cannot create $dst_root/$name" 1; }
   fi
@@ -238,9 +252,9 @@ emit_one_skill() {
     # R4: content that is neither the emitted bytes nor any ledger record is user-owned.
     die "$dst exists and is not goblin-owned (hash ${pre:0:8}...) - I will not overwrite it. fix: remove or rename it, or emit --skills none" 1
   fi
-  if [ "$DRYRUN" -eq 1 ]; then printf 'would write %s\n' "$path"; return 0; fi
+  if [ "$DRYRUN" -eq 1 ]; then printf 'would write %s\n' "$dst"; return 0; fi
   if [ "$pre" = "$post" ]; then
-    printf 'unchanged %s\n' "$path"
+    printf 'unchanged %s\n' "$dst"
     return 0
   fi
   printf '%s\t%s\n' "$dst" "$pre" >> "$RUN_ROWS"
@@ -252,7 +266,7 @@ emit_one_skill() {
   cp "$src" "$dst" || die "cannot write $dst" 1
   WRITES=$((WRITES + 1))
   ledger_line "$PLATFORM" "$SCOPE" "$dst" "$pre" "$post"
-  printf 'wrote %s\n' "$path"
+  printf 'wrote %s\n' "$dst"
   return 0
 }
 
@@ -277,7 +291,7 @@ EOF
 write_context() {
   local cf pre
   cf=$(ctx_file) || return 0   # hermes: no context file by design (AGENTS.md is the bootstrap)
-  if [ "$DRYRUN" -eq 1 ]; then printf 'would manage the goblin-stack block in %s\n' "$A_CTX"; return 0; fi
+  if [ "$DRYRUN" -eq 1 ]; then printf 'would manage the goblin-stack block in %s\n' "$(ctx_file 2>/dev/null || printf '%s' "$A_CTX")"; return 0; fi
   write_block_file
   if [ ! -f "$cf" ]; then
     mkdir -p "$(dirname "$cf")" || die "cannot create $(dirname "$cf")" 1
@@ -285,7 +299,7 @@ write_context() {
     cp "$BLOCK_FILE" "$cf" || die "cannot create $cf" 1
     WRITES=$((WRITES + 1))
     ledger_line "$PLATFORM" "$SCOPE" "$cf" "-" "$(g_sha256_file "$cf")"
-    printf 'created %s (context block)\n' "$A_CTX"
+    printf 'created %s (context block)\n' "$cf"
     return 0
   fi
   pre=$(g_sha256_file "$cf")
@@ -300,7 +314,7 @@ write_context() {
       # BEFORE any row is staged (a staged-then-deleted row would erase the run that
       # DID write the file, leaving uninstall nothing to reverse).
       rm -f "$cf.new"
-      printf 'unchanged %s (context block)\n' "$A_CTX"
+      printf 'unchanged %s (context block)\n' "$cf"
       return 0
     fi
     printf '%s\t%s\n' "$cf" "$pre" >> "$RUN_ROWS"
@@ -316,7 +330,7 @@ write_context() {
   fi
   WRITES=$((WRITES + 1))
   ledger_line "$PLATFORM" "$SCOPE" "$cf" "$pre" "$(g_sha256_file "$cf")"
-  printf 'updated %s (context block)\n' "$A_CTX"
+  printf 'updated %s (context block)\n' "$cf"
   return 0
 }
 
@@ -389,7 +403,7 @@ do_unshadow() {
   [ "$SCOPE" = project ] || die "--unshadow removes PROJECT-scope copies; say --scope project" 1
   local root_path root d name src dst h srch n=0
   root_path=$(skills_pattern); root_path=${root_path%%<name>*}
-  root="$TARGET/${root_path%/}"
+  root=$(pattern_joined); root=${root%%<name>*}; root=${root%/}
   [ -d "$root" ] || { g_info "emit: no $root_path under the target - nothing to unshadow"; exit 0; }
   local found=0
   # Pass 1: verify EVERY copy first. R7 (a hash differing from the source is a real local

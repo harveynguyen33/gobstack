@@ -1749,6 +1749,12 @@ class_part_artifact() {
       # precedent in tests/run-tests.sh): the tool's own name, literal or inside a variable's
       # name, would trip MD-01's pattern in every vendored copy of this file. W4b added the
       # four remaining platforms' emitted roots; the last one's dir name is assembled too.
+      # The global-scope probes are gated on GOBLIN_GLOBAL=1: a global path under the real
+      # $HOME is not evidence about THIS repo, and letting it count made the T6 RED control
+      # pass vacuously on any machine whose operator emits globally (measured 2026-10-01:
+      # new_home() isolates GOBLIN_EMISSIONS but not HOME, so the fallbacks reached the
+      # operator's real ~/.hermes). GOBLIN_GLOBAL=1 is set by an operator who wants the
+      # global tier to count; tests that need isolation leave it unset.
       local _cl_1 _cl_2 _cl_3 _g1 _g2
       _cl_1="$(printf '%s' '.cl')"; _cl_2="$(printf '%s' 'a')"; _cl_3="$(printf '%s' 'ude')"
       _g1="$(printf '%s' '.gem')"; _g2="$(printf '%s' 'ini')"
@@ -1759,13 +1765,15 @@ class_part_artifact() {
       [ -f "$ROOT/.opencode/skills/goblin-mode/SKILL.md" ] && return 0
       [ -f "$ROOT/.agents/skills/goblin-mode/SKILL.md" ] && return 0
       [ -f "$ROOT/$_g1$_g2/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "${HOME:-$ROOT}/.copilot/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "${HOME:-$ROOT}/$_cl_1$_cl_2$_cl_3/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "${HOME:-$ROOT}/.cursor/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "${HOME:-$ROOT}/.opencode/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "${HOME:-$ROOT}/.agents/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "${HOME:-$ROOT}/.hermes/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "${HOME:-$ROOT}/$_g1$_g2/skills/goblin-mode/SKILL.md" ] && return 0
+      if [ "${GOBLIN_GLOBAL:-0}" = "1" ]; then
+        [ -f "${HOME:-$ROOT}/.copilot/skills/goblin-mode/SKILL.md" ] && return 0
+        [ -f "${HOME:-$ROOT}/$_cl_1$_cl_2$_cl_3/skills/goblin-mode/SKILL.md" ] && return 0
+        [ -f "${HOME:-$ROOT}/.cursor/skills/goblin-mode/SKILL.md" ] && return 0
+        [ -f "${HOME:-$ROOT}/.opencode/skills/goblin-mode/SKILL.md" ] && return 0
+        [ -f "${HOME:-$ROOT}/.agents/skills/goblin-mode/SKILL.md" ] && return 0
+        [ -f "${HOME:-$ROOT}/.hermes/skills/goblin-mode/SKILL.md" ] && return 0
+        [ -f "${HOME:-$ROOT}/$_g1$_g2/skills/goblin-mode/SKILL.md" ] && return 0
+      fi
       [ -f "${GOBLIN_EMISSIONS:-${HOME:-}/.goblin-stack/emissions.tsv}" ] \
         && awk -F'\t' -v r="$ROOT" 'NR>1 && index($3, r) == 1 { found=1 } END { exit !found }' \
            "${GOBLIN_EMISSIONS:-${HOME:-}/.goblin-stack/emissions.tsv}" && return 0
