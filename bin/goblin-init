@@ -22,7 +22,7 @@
 # state, printed here with the counts and the next steps. install/emit refusals and a
 # verify that cannot run are propagated, never wrapped into a 0.
 #
-# Palette: the goblin-ui tokens — accent #F54E00 (logotype, active step, the ◆ rail
+# Palette: the family design tokens — accent #F54E00 (logotype, active step, the ◆ rail
 # glyph), green #4ade80 (✔), text #e4e4e6, muted #9d9da3, dim #808088 (borders, idle ○),
 # critical #ff5f57 (FAIL), medium #febc2e (advisory). Truecolor when COLORTERM allows,
 # nearest 16-colour slot otherwise, off under NO_COLOR or a pipe. No background is ever
@@ -43,7 +43,7 @@ fi
 VERSION=$(cat "$SRC/VERSION" 2>/dev/null || printf 'unknown')
 
 # ---------------------------------------------------------------- palette -----
-# goblin-ui/src/tokens.ts, mapped to ANSI. Truecolor when COLORTERM says so, else the
+# The family design tokens, mapped to ANSI. Truecolor when COLORTERM says so, else the
 # nearest 16-colour slot. NO_COLOR or a piped stdout turns colour off entirely.
 TTY_OUT=0; [ -t 1 ] && TTY_OUT=1
 TTY_IN=0;  [ -t 0 ] && TTY_IN=1
