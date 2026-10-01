@@ -183,7 +183,7 @@ rail_seed "${C_ACCENT}▄███▄ ▄██▄ ██▄  █    ▄█▄ �
 rail_seed "${C_ACCENT}█   █ █  █ █▄▀█ █     █  █▄ █   ▀██▄   █   █   █ █    █ █${C_RESET}"
 rail_seed "${C_ACCENT}█ ▄██ █  █ █▄▀█ █     █  █ ▄█   ▄█▀    █   █████ █    ██${C_RESET}"
 rail_seed "${C_ACCENT}▀██▀▀ ▀██▀ ██▀  ▀▀▀▀ ▀█▀ █  █   ██▀▀   ▀   █   █ ▀██▀ █ █${C_RESET}"
-rail_seed "     ${C_DIM}discipline around whatever executes${C_RESET}"
+rail_seed "     ${C_MUTED}discipline around whatever executes${C_RESET}"
 rail_seed ""
 rail_seed "${C_TEXT}  gob init${C_RESET} ${C_MUTED}— first-run setup (gobstack v$VERSION)${C_RESET}"
 rail_seed "  ${C_MUTED}6 steps · every step has a flag · nothing is written until the plan is confirmed${C_RESET}"
