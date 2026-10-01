@@ -53,7 +53,7 @@ Measured shape of this table: **87 rows** - 82 target, 5 source; advisory 10, ga
 | `DS-01` | target | script | Runtime data is not test fixture: a gate run must not write it. | `goblin-verify --only DS-01` (builtin) | — |
 | `DS-02` | target | gate | Snapshot before, verify after. | `goblin-verify --only DS-02` (builtin) | — |
 | `DOC-01` | target | advisory | A significant change updates the docs that teach it. | `advisory` | 'Significant' is a judgement; a diff-size heuristic fails on the cases that matter. |
-| `DOC-02` | target | advisory | System-level changes are recorded in the vault via the pkm profile. | `advisory` | Vault writes route through another profile by a stricter rule than goblin-stack may add; the repo can only state it. |
+| `DOC-02` | target | advisory | System-level changes are recorded wherever the project's standard says they live. | `advisory` | Where the recording lives may be owned by a stricter external rule than goblin-stack may add; the repo can only state it. |
 | `SK-01` | target | lint | Every shipped skill has name + description frontmatter. | goblin-verify --only SK-01 | W1: the check is a builtin so the engine.mode=global clause can run - in global mode the procedure tier is emitted per platform (not carried in this repo) and the row SKIPs with that reason instead of passing vacuously on a repo with no skills (§2.5 names SK-01 alongside SK-02/SK-04). In vendored mode it is exactly the old loop: every SKILL.md must open with frontmatter carrying both name and description. |
 | `SK-02` | target | script | The installed skills match their recorded hashes (no drift). | `goblin-verify --only SK-02` (builtin) | — |
 | `SK-03` | target | script | A rule with no mechanism is labelled advisory, and the advisory count is reported. | `goblin-verify --only SK-03` (builtin) | — |
@@ -119,7 +119,7 @@ reports its state.
 - **MD-03** (no check at all) - Role-pinned fan-out goes through kanban, not a model-less subagent spawn.
 - **PG-04** (no check at all) - Never bypass what the forge enforces.
 - **DOC-01** (no check at all) - A significant change updates the docs that teach it.
-- **DOC-02** (no check at all) - System-level changes are recorded in the vault via the pkm profile.
+- **DOC-02** (no check at all) - System-level changes are recorded wherever the project's standard says they live.
 - **SC-09** (no check at all) - Auth is applied consistently across sibling routes. Added when the missing entry was measured: the count said 9 and this list held 8.
 - **JG-03** (no check at all) - A judge lane that has never returned a non-`done` verdict is escalated. The history that would show a bad lane lives across cards and repos, so the counter-measure is policy - one known-red control verdict per wave, recorded in `docs/LOOP.md` - not a command.
 

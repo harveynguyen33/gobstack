@@ -319,8 +319,8 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     (`return 2`, never a FAIL): goblin-stack cannot choose the fleet's models, and a repo-local file
     cannot observe *which* model a lane actually ran. Measured on this box at X1: Harvey's
     `fleet-model.yaml` names **no `judge:` profile at all**, so `MD-02` reports the judge lane
-    **unresolved** and prints the one-line remedy, while every profile it *does* name — `default`,
-    `architect`, `reviewer`, `coder`, `chef`, `homelab`, `pkm`, `news-digest`, `researcher` —
+    **unresolved** and prints the one-line remedy, while every profile it *does* name — nine of
+    them, the named per-fleet role profiles this setup routes its lanes through —
     resolves to one model under an active promotion. So on this box the honest reading is: the judge
     lane is not mapped, and the moment it is mapped it will be the author's own family. The
     comparison is exact model equality, not a version-stripped "family": two spellings of the same
