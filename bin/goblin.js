@@ -13,7 +13,13 @@
 //   goblin doctor [...]                   -> bin/goblin-doctor (W4a)
 //   goblin emit   [...]                   -> bin/goblin-emit (W4a)
 //   goblin init   [...]                   -> bin/goblin-init (W6, the first-run wizard)
-//   anything else (install)               -> bin/goblin-install
+//   goblin uninstall [--target <dir>]     -> bin/goblin-install --uninstall
+//   goblin install [...]                  -> bin/goblin-install (the one legacy fallback)
+//   no args | -h/--help | any other unrecognized first arg
+//                                         -> this file's short usage, exit 2. A bare `goblin`
+//                                            used to fall through into the installer; a typo
+//                                            (`goblin inti`) silently installed too. Both now
+//                                            print the usage and stop.
 //
 // Non-negotiables (§4.3): args are passed as an ARRAY, never a shell string (no
 // injection surface); `bash` is named explicitly (a packager stripping the
@@ -40,9 +46,58 @@ if (arg0 === "--version" || arg0 === "-V" || arg0 === "-v") {
 
 const SCRIPT = { verify: "goblin-verify", bans: "goblin-bans", audit: "goblin-audit", upgrade: "goblin-upgrade", doctor: "goblin-doctor", emit: "goblin-emit", init: "goblin-init" };
 const [cmd, ...rest] = process.argv.slice(2);
-const target = SCRIPT[cmd] ?? "goblin-install"; // install → goblin-install (v1); init is a real subcommand since W6
+
+// No args, a help flag, or an unrecognized first arg: short usage, exit 2. The one survivor of
+// the old catch-all fallback is the literal `install` first arg — bare `goblin` mapped to the
+// installer through npm's bin default, and a typo (`goblin inti`) silently installed into
+// whatever directory the shell sat in. A bare subcommand-less `goblin install ...` keeps the
+// installer; everything else stops here and names the word it did not know.
+function usage() {
+  process.stderr.write(
+[
+"goblin <command>",
+"",
+"  goblin init      start here — the guided first step (detect, class, emit, first verify)",
+"  goblin verify    run the rule matrix against the current repo",
+"  goblin bans      run the ban list (per-pattern red lines over the source tree)",
+"  goblin audit     check recorded dependency claims against live advisory feeds",
+"  goblin upgrade   migrate a repo to the shared global engine at ~/.goblin/engine",
+"  goblin doctor    one detection/drift run across the agent platforms",
+"  goblin emit      write the skills + context block for one platform",
+"  goblin uninstall --target .        remove exactly what an install wrote (preimages)",
+"",
+"start here: goblin init",
+"uninstall: npm uninstall -g @techgoblin/gobstack",
+"",
+].join("\n"));
+}
+
+if (cmd === undefined || cmd.startsWith("-")) {
+  usage();
+  process.exit(2);
+}
+if (!SCRIPT[cmd] && cmd !== "install" && cmd !== "uninstall") {
+  process.stderr.write(`goblin: unrecognized command: ${cmd}\n\n`);
+  usage();
+  process.exit(2);
+}
+
+let target;
+let extra = [];
+if (cmd === "install") {
+  target = "goblin-install"; // the one legacy fallback, kept verbatim
+} else if (cmd === "uninstall") {
+  // `goblin uninstall --target <dir>` routes into the installer's uninstall job — the shape
+  // docs/GUIDE.md and README already promise. `--uninstall` is appended FIRST so the user's
+  // own `--target <dir>` and options still parse, and a stray literal `--uninstall` cannot
+  // appear twice.
+  target = "goblin-install";
+  extra = ["--uninstall"];
+} else {
+  target = SCRIPT[cmd];
+}
 const file = path.join(__dirname, "..", "bin", target);
 // execPath-independent: call bash explicitly so Windows-WSL/Git-Bash works and no
 // shebang resolution is needed.
-const r = spawnSync("bash", [file, ...rest], { stdio: "inherit" });
+const r = spawnSync("bash", [file, ...extra, ...rest], { stdio: "inherit" });
 process.exit(r.status ?? 2);
