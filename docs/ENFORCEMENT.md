@@ -6,6 +6,13 @@ real command that `goblin-verify` runs, or the literal `advisory`, or the marker
 builtins in `bin/goblin-verify`, so the row stays self-describing and the matrix stays the
 single source of truth).
 
+Some `if_not_why` cells carry internal workstream tags — `W1`..`W5` — recording which redesign
+of this toolkit last touched that rule's check (W1 the global-engine split, W2 the version
+sync and npm shim, W3 the upgrade migration, W4 the platform adapters, W5 the publish prep).
+They are historical provenance only: the rule text and its check are authoritative, not the
+tag. `D1`..`D6` are the design decisions in `docs/DESIGN.md`; `Z1`-style identifiers are
+independent verification pass IDs.
+
 `scope` is `target` (runs in an installed repo via `goblin-verify`) or `source` (runs in
 this repo via `tests/run-tests.sh`). `enforced_by` is one of five values, and the enum is
 closed and now ENFORCED (`IN-03`'s third clause, Z1-5): `script`, `lint`, `gate`, `advisory`,
