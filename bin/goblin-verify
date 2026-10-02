@@ -261,15 +261,17 @@ if [ -n "$ONLY" ]; then
 fi
 
 if [ ! -f "$CONFIG" ]; then
-  g_err "not installed: $CONFIG is absent. Run: goblin-install --target $ROOT --class <A|B|C|D|E>"
+  g_err "not installed: $CONFIG is absent. Run: goblin-install --target $ROOT --class <software|service|game|research|fleet>"
   exit 2
 fi
 
-CLASS=$(g_yaml_scalar "$CONFIG" class)
-case "$CLASS" in
-  A|B|C|D|E|F) ;;
-  *) g_err "unknown class '${CLASS:-<empty>}' in $CONFIG (expected A|B|C|D|E|F)"; exit 2 ;;
-esac
+# The class is read-time resolved: goblin.yaml records the canonical name on new installs, but
+# every repo installed before the 5-class merge records a letter (A..F) or an old name
+# (app/agent/desktop). g_class_canon maps them all to the five canonical names; the tsv carries
+# the canonical names, so nothing else in this file has to know about letters. `desktop`/F -> software.
+CLASS_RAW=$(g_yaml_scalar "$CONFIG" class)
+CLASS=$(g_class_canon "$CLASS_RAW") \
+  || { g_err "unknown class '${CLASS_RAW:-<empty>}' in $CONFIG (expected software|service|game|research|fleet, or A-E / app / agent / desktop)"; exit 2; }
 
 # Root vs git toplevel. find_installed_root resolves the CONFIG lookup correctly, but the
 # rows that shell out to git run in $ROOT and git resolves that to the ENCLOSING repo when
@@ -374,8 +376,12 @@ PERF_BASELINE_COMMIT=$(g_unquote "$(g_yaml_block_scalar "$CONFIG" perf baseline_
 PERF_BASELINE_VALUE=$(g_yaml_block_scalar "$CONFIG" perf baseline_value)
 PERF_MEASURED=$(g_unquote "$(g_yaml_block_scalar "$CONFIG" perf measured)")
 PERF_HOST_GATE=$(g_yaml_block_scalar "$CONFIG" perf host_gate)
+# The electron opt-in (software class): true means the electron ban set stays on regardless of a
+# hand-edited bans: list, and a perf host gate must be declared (PF-01). Absent on a repo
+# installed before the merge — read as off, so a legacy class-F repo verifies with no rewrite.
+ELECTRON=$(g_yaml_scalar "$CONFIG" electron)
 export SEC_GITIGNORE_FAMILY SEC_BUILD_OUTPUT SEC_AUDIT_CMD SEC_AUDIT_MAX_AGE SEC_WAIVER_MAX_AGE
-export SEC_WRITE_ROUTES PERF_METRIC PERF_CMD PERF_BASELINE_VALUE PERF_HOST_GATE
+export SEC_WRITE_ROUTES PERF_METRIC PERF_CMD PERF_BASELINE_VALUE PERF_HOST_GATE ELECTRON
 
 # Whole days between an ISO date and today, or empty when the date does not parse on this host
 # (`date -d` is GNU; the row FAILS rather than assuming, because an unreadable date is not a
@@ -1594,6 +1600,13 @@ check_pf_01() {
   # to ignore it.
   local rname bad=0
   rname=$(g_yaml_block_scalar "$CONFIG" ratchet name)
+  # The electron opt-in's done-definition: an Electron repo declares its host gate (the FPS /
+  # main_thread_busy_pct number a hermetic rule cannot measure). `electron: true` with no host
+  # gate is a repo missing half its definition — FAIL, before the baseline skip below can mask it.
+  if [ "$ELECTRON" = "true" ] && [ -z "$PERF_HOST_GATE" ]; then
+    printf 'electron: true requires a declared perf.host_gate — declare the host-gate probe (the number no hermetic rule can measure) or drop electron: true\n'
+    return 1
+  fi
   [ -n "$PERF_METRIC" ] || {
     printf 'this class declares no perf metric (perf.metric is empty). The ratchet still carries\n%s; declare metric/cmd here the day you pick one\n' "${rname:-nothing}"
     return 3

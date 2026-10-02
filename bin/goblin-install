@@ -3,7 +3,11 @@
 #
 # Usage: gob install --target <dir> [options]   (script: bin/goblin-install)
 #   --target <dir>        required; the repo root to install into
-#   --class A|B|C|D|E|F    required unless --uninstall or --re-pin; anything else needs an explicit class
+#   --class <name>        required unless --uninstall or --re-pin; one of
+#                         software|service|game|research|fleet, or the aliases A-E / app / agent
+#                         / desktop (desktop/F => software + --electron); anything else is refused
+#   --electron            the electron opt-in overlay over the software class (electron: true):
+#                         the app_bundle_bytes ratchet, BN-06..09 bans, the host-gate declaration
 #   --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)
 #   --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md); a named path that is absent is reported, never silently dropped
 #   --parts <list>        comma list to install; default = every part the class requires
@@ -57,6 +61,10 @@ UNINSTALL=0
 RE_PIN=0
 FORCE=0
 OPT_OUT=""
+# The electron opt-in (the merged desktop/F class): renders presets/electron-overlay.yaml over
+# the software preset. Auto-set when --class resolves via the desktop/F/f alias, so the alias
+# behaves as the old class F did rather than silently installing weaker software.
+ELECTRON=0
 
 usage() {
   # The header comment runs from line 2 to the first blank line, so adding an option cannot
@@ -73,6 +81,7 @@ while [ $# -gt 0 ]; do
     --practice)  PRACTICE="${2:-}"; PRACTICE_ARG="$PRACTICE"; shift 2 ;;
     --parts)     PARTS="${2:-}"; shift 2 ;;
     --archive)   ARCHIVE="true"; shift ;;
+    --electron)  ELECTRON=1; shift ;;
     --skills)    SKILLS="${2:-}"; SKILLS_NAMED=1; shift 2 ;;
     --dry-run)   DRY_RUN=1; shift ;;
     --upgrade)   UPGRADE=1; shift ;;
@@ -239,8 +248,13 @@ if [ "$RE_PIN" -eq 1 ]; then
   exit 0
 fi
 
-[ -n "$CLASS" ] || { g_err "--class is required (A|B|C|D|E|F)"; exit 2; }
-case "$CLASS" in A|B|C|D|E|F) ;; *) g_err "--class must be one of A B C D E F, got '$CLASS'"; exit 2 ;; esac
+[ -n "$CLASS" ] || { g_err "--class is required (software|service|game|research|fleet, or A-E / app / agent / desktop)"; exit 2; }
+# Resolve every accepted spelling to the canonical class NAME before anything reads it. The
+# letters A-E and the old names app/agent/desktop are read-time aliases; desktop/F/f also sets
+# the electron opt-in so the merged class behaves as the old class F did.
+g_class_is_electron_alias "$CLASS" && ELECTRON=1
+CLASS=$(g_class_canon "$CLASS") \
+  || { g_err "--class must be software|service|game|research|fleet (or A-E / app / agent / desktop), got '$CLASS'"; exit 2; }
 case "$SKILLS" in yes|no) ;; *) g_err "--skills must be yes or no"; exit 2 ;; esac
 
 # W6 migration safety: on a --upgrade (or any re-install) of a repo whose record shows skills
@@ -257,10 +271,24 @@ if [ -f "$INSTALLED" ] && [ "$SKILLS_NAMED" -eq 0 ]; then
   fi
 fi
 
-PRESET=$(ls "$SRC"/presets/"$CLASS"-*.yaml 2>/dev/null | head -n 1)
-[ -n "$PRESET" ] || { g_err "no preset for class $CLASS"; exit 2; }
+PRESET="$SRC/presets/$CLASS.yaml"
+[ -f "$PRESET" ] || { g_err "no preset for class $CLASS ($PRESET)"; exit 2; }
 
-preset() { local v; v=$(g_yaml_scalar "$PRESET" "$1"); printf '%s' "${v%\"}" | sed 's/^"//'; }
+# The electron overlay (the merged desktop/F class): every key it declares — including an empty
+# one like sec_write_routes: "" — wins over the class preset; an absent key falls through. This
+# is config, not a second code path: the same preset() reader, one layer up.
+OVERLAY=""
+if [ "$ELECTRON" -eq 1 ]; then
+  OVERLAY="$SRC/presets/electron-overlay.yaml"
+  [ -f "$OVERLAY" ] || { g_err "no electron overlay at $OVERLAY"; exit 2; }
+fi
+overlay_has() { [ -n "$OVERLAY" ] && grep -qE "^$1:" "$OVERLAY"; }
+
+preset() {
+  local v
+  if overlay_has "$1"; then v=$(g_yaml_scalar "$OVERLAY" "$1"); else v=$(g_yaml_scalar "$PRESET" "$1"); fi
+  printf '%s' "${v%\"}" | sed 's/^"//'
+}
 
 HARNESS_DIR=$(preset harness_dir); [ -n "$HARNESS_DIR" ] || HARNESS_DIR=checks
 SCAFFOLD=$(preset scaffold_checks); [ -n "$SCAFFOLD" ] || SCAFFOLD=no
@@ -488,6 +516,7 @@ render_config() {
   runtime="  - $RUNTIME_DATA"
   render "$SRC/templates/goblin.yaml.tmpl" \
     CLASS "$CLASS" \
+    ELECTRON "$( [ "$ELECTRON" -eq 1 ] && printf 'true' || printf 'false' )" \
     BRANCH "$BRANCH" \
     MODELS_FILE "$MODELS" \
     PRACTICE "$PRACTICE" \

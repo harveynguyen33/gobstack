@@ -1,4 +1,4 @@
-# presets/B-service-config.yaml — class B: service / configuration.
+# presets/service.yaml — the `service` class (letter/alias B).
 #
 # "Done" means a contract (schema, route, API) is unchanged, or the change is intentional
 # and migrated. The class turns off the REPLAY and the PR gate, because a config repo has no
