@@ -375,29 +375,37 @@ if [ -n "$EMIT" ]; then
     [ -n "$ok" ] || { g_err "--emit: unknown platform '$w' — I ship $PLA, hermes, copilot, cursor, opencode, codex, $GEM"; exit 2; }
   done
 else
+  # neutral-first: a flags-only run with no --emit emits NOTHING. The detected rows are
+  # shown on the emit screen as pre-ticked SUGGESTIONS for the interactive path; in
+  # non-interactive mode silence means the neutral harness only.
   EMIT_SELECTED=""
-  while IFS=$'\t' read -r p _proj _glob _hit; do
-    [ -n "$p" ] || continue
-    EMIT_SELECTED="$EMIT_SELECTED $p"
-  done <<< "$DET_ROWS"
+  if [ "$YES" -eq 0 ] && [ "$TTY_IN" -eq 1 ]; then
+    while IFS=$'\t' read -r p _proj _glob _hit; do
+      [ -n "$p" ] || continue
+      EMIT_SELECTED="$EMIT_SELECTED $p"
+    done <<< "$DET_ROWS"
+  fi
 fi
 EMIT_N=$(printf '%s' "$EMIT_SELECTED" | awk 'NF' | wc -l | tr -d '[:space:]')
 
 if [ "$TTY_IN" -eq 1 ] && [ -z "$EMIT" ] && [ "$YES" -eq 0 ]; then
   rail_say ""
-  rail_say "      ${C_MUTED}emit now — the skills go into:$C_RESET"
+  rail_say "      ${C_MUTED}agent skills are opt-in, per platform — emit them into:$C_RESET"
   for p in $PLATFORMS; do
     hit=""
     while IFS=$'	' read -r dp _a _b _c; do [ "$dp" = "$p" ] && hit=1; done <<< "$DET_ROWS"
     [ -n "$hit" ] || continue
     rail_say "      ${C_GREEN}✔$C_RESET $C_TEXT$p$C_RESET"
   done
-  rail_say "      ${C_MUTED}Enter = these; or type platform names to override$C_RESET"
+  rail_say "      ${C_MUTED}the install itself writes none — the harness stays neutral$C_RESET"
+  rail_say "      ${C_MUTED}Enter = these; or type platform names to override (none: type x)$C_RESET"
   printf '      '
   read -r REPLY_EMIT
   ASKED_ANY=1
   rail_say ""
-  if [ -n "$REPLY_EMIT" ]; then
+  if [ "$REPLY_EMIT" = "x" ] || [ "$REPLY_EMIT" = "none" ]; then
+    EMIT_SELECTED=""
+  elif [ -n "$REPLY_EMIT" ]; then
     EMIT_SELECTED=""
     for w in $REPLY_EMIT; do
       ok=""
@@ -456,7 +464,7 @@ if [ "$TTY_OUT" -eq 1 ]; then
 else
   printf 'gob init [run] goblin-install --target %s --class %s\n' "$TARGET" "$CLASS"
 fi
-bash "$SRC/bin/goblin-install" --target "$TARGET" --class "$CLASS" --yes
+bash "$SRC/bin/goblin-install" --target "$TARGET" --class "$CLASS" --skills no --yes
 EXIT_INSTALL=$?
 if [ "$EXIT_INSTALL" -ne 0 ]; then
   g_err "install failed (exit $EXIT_INSTALL) — the refusals above name the path and the fix"
@@ -546,7 +554,11 @@ if [ "$DRYRUN" -eq 0 ]; then
   printf '    1. %sthe %s skipped checks ARE your checklist — gob verify names each one%s\n' "$C_TEXT" "$SKIPPED" "$C_RESET"
   printf '    2. %sreplace the placeholder gate in .goblin/goblin.yaml with your real commands (P8 step 3)%s\n' "$C_TEXT" "$C_RESET"
   printf '    3. %snot emitted here: gob emit --platform <p> --scope global%s\n' "$C_TEXT" "$C_RESET"
-  printf '    4. %shermes skills trust %s   # one-time, so the project-tier skills load%s\n' "$C_TEXT" "$TARGET" "$C_RESET"
+  if [ "$EMIT_N" -gt 0 ]; then
+    printf '    4. %shermes skills trust %s   # one-time, so the project-tier skills load%s\n' "$C_TEXT" "$TARGET" "$C_RESET"
+  else
+    printf '    4. %sagent skills are opt-in per platform: gob emit --platform <p>%s\n' "$C_TEXT" "$C_RESET"
+  fi
   printf '\n'
   if [ "$VERIFY_RC" -eq 0 ]; then
     printf '  %s▙ the goblin sees you. keep the gate green.%s\n' "$C_ACCENT" "$C_RESET"

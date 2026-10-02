@@ -14,7 +14,10 @@ same way the fleet's own tool reads it. Everything else is line-oriented shell.
     --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md)
     --parts <list>        comma list to install; default = every part the class requires
     --archive             mark the project archive: verify requires no HANDOFF and no gates
-    --skills yes|no       install .hermes/skills (default yes; needs the one-time trust step)
+    --skills yes|no       install agent skills under .hermes/skills (default no — the harness is
+                          neutral; opt in per platform with: gob emit --platform <p>). On a repo whose
+                          record already has skills installed, an OMITTED flag keeps them; an explicit
+                          --skills no removes them.
     --dry-run             print the plan; write nothing
     --upgrade             re-install at the current version; report created/updated/unchanged/skipped
     --opt-out <part>      record the part in disabled: so its required checks are skipped
@@ -37,7 +40,7 @@ files whose hash changed and prints `created C · updated U · unchanged N · sk
 
 | kind | recorded as | overwritten? | hash-checked? | removed by `--uninstall`? |
 |---|---|---|---|---|
-| installed artifact (bin, manifest, roles, skills, harness scaffold) | `files` | yes, on upgrade | yes — IN-02, SK-02 | yes |
+| installed artifact (bin, manifest, roles, opt-in skills, harness scaffold) | `files` | yes, on upgrade | yes — IN-02, SK-02 | yes |
 | created once, then yours (`.goblin/goblin.yaml`, `HANDOFF.md`, `AGENTS.md`, `*-SPEC.md`, `reviews/.gitkeep`) | `owned` | never | no — you are meant to edit them | no, except the config |
 | pre-existing, left alone | `refused` | never | no — IN-04 only proves it was not taken over | no |
 
@@ -112,9 +115,9 @@ Output is one line per executed row, in manifest order, plus a summary line at t
     ADV   MD-02  code lane and review lane both resolve to the same family
     SKIP  HS-02  no pinned pre-change commit yet - REPLAY not provable
 
-Those four lines are one row of each marking. The summary line of a green class-A run is:
+Those four lines are one row of each marking. The summary line of a green default class-A run is:
 
-          43 passed, 0 failed, 11 advisory, 28 skipped
+          38 passed, 0 failed, 11 advisory, 33 skipped
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -135,8 +138,10 @@ settings that make a workflow a **gate** are written down.
 
 ### A fresh install verifies green
 
-Measured on a fresh class-A install, committed with no hand edit: **`43 passed, 0 failed,
-11 advisory, 28 skipped`, exit 0.** Twenty-eight rows skip with a reason: `HS-02` — no pre-change commit
+Measured on a fresh DEFAULT class-A install (skills opt-in, W6 neutral-first), committed with no
+hand edit: **`38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0.** Thirty-three rows skip with
+a reason — the same not-yet rows as before, plus the five skill rows (`SK-01`..`SK-04`,
+`AU-04`) that skip on the `playbooks` opt-out a skills-free install records: `HS-02` — no pre-change commit
 is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `AU-02` and `AU-03`, which
 have no report to audit in a repo where no reporter has run — `SC-06`, `SC-07` and `SC-08`, which
 have no dependency manifest, no lockfile and no audit record to read yet — `PF-01`, which has
@@ -173,13 +178,20 @@ verifier is reporting FAILs.
 - **Per part:** `--opt-out <part>` records the part in `disabled:`. `goblin-verify` then reports
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a class's `-` (off) real.
-- **The opt-out numbers are pinned (V3-3).** A fresh class-A install with `--skills no` verifies
-  `39 passed, 0 failed, 11 advisory, 28 skipped`, exit 0, and `tests/t-install-off-switch.sh`
-  asserts that line: a silent drift in the opt-out path is caught rather than left as a number
-  nobody wrote down (the `--skills no` count moved from `37/0/9/11` at v0.2 to here when the ban
-  rows landed, and no file recorded the shift; **the skipped count moved 15 → 18 on 2026-09-25
-  (G1)** — the three new feature-map rows skip on the same path for the same reason, measured;
-  **and 18 → 24 on 2026-09-25 (W3)** — the six judge/loop rows skip there too, measured).
+- **The opt-out numbers are pinned (V3-3).** A class-A install with an explicit `--skills no`
+  verifies `38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0, and
+  `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
+  rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
+  at v0.2 when the ban rows landed, **15 → 18 on 2026-09-25 (G1)** — the feature-map rows,
+  **18 → 24 on 2026-09-25 (W3)** — the judge/loop rows, and **to `38/0/11/33` at W6
+  (neutral-first)**, when this opt-out shape BECAME the default and the two lines converged:
+  the old default install measured `43/0/11/28`).
+- **Skills, W6 neutral-first.** A default install ships no agent skills. A repo whose record has
+  `skills: yes` keeps them through every flag-less re-install and `--upgrade` (the installer
+  reads the record's choice and says so out loud); an explicit `--skills no` removes exactly the
+  recorded skill files; `--uninstall` removes everything recorded, as always.
+  `tests/t-install-off-switch.sh` walks that migration: install `--skills yes`, upgrade flag-less,
+  the skills survive byte-identical; uninstall, and they are all gone.
 - **Whole harness:** `--uninstall` deletes the `files` list plus `.goblin/goblin.yaml`, removes
   every directory that leaves empty (deepest first, after `installed.json` itself is gone — the
   order that used to leave `.goblin/` and the sixteen `.hermes/skills/*` directories behind),

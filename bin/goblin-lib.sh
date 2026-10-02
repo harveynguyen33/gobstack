@@ -216,6 +216,37 @@ g_installed_scalar() {
   sed -n "s/^[[:space:]]*\"$2\"[[:space:]]*:[[:space:]]*\"\{0,1\}\([^\",]*\)\"\{0,1\},\{0,1\}$/\1/p" "$1" | head -n 1
 }
 
+# g_installed_scalar_options <file> <key> — the value of one key inside the "options" object
+# of an install record (e.g. skills). The installer writes options on ONE line
+# (`"options": {"skills": "yes", ...}`), so the awk reads that line's shape directly; a
+# multi-line variant is read the same way the other installed_* readers read their block.
+g_installed_scalar_options() {
+  awk -v k="$2" '
+    /^[[:space:]]*"options"[[:space:]]*:[[:space:]]*\{/ && index($0, "\"" k "\"") {
+      # single-line form: pull the value out between the key and the next , or }
+      line = $0
+      sub(/^[^{]*\{/, "", line)          # everything up to and including the opening brace
+      n = split(line, pair, ",")
+      for (i = 1; i <= n; i++) {
+        p = pair[i]
+        sub(/^[[:space:]]*/, "", p); sub(/[[:space:]]*$/, "", p)
+        key = p; sub(/[[:space:]]*:.*/, "", key); gsub(/"/, "", key)
+        if (key == k) {
+          v = p; sub(/^[^:]*:[[:space:]]*/, "", v); gsub(/"/, "", v); sub(/\}[[:space:]]*$/, "", v)
+          print v; exit
+        }
+      }
+      exit
+    }
+    /^[[:space:]]*"options"[[:space:]]*:[[:space:]]*\{/ { inf = 1; next }
+    inf && /^[[:space:]]*\}/ { inf = 0 }
+    inf && index($0, "\"" k "\"") {
+      v = $0; sub(/^[^:]*:[[:space:]]*/, "", v); sub(/,?[[:space:]]*$/, "", v); gsub(/"/, "", v)
+      print v; exit
+    }
+  ' "$1"
+}
+
 # ------------------------------------------------------------- self-test -----
 # Proves the parser actually parses. Every assertion is a real comparison against a
 # value written to a temp file in this function — blank the awk in g_yaml_scalar and

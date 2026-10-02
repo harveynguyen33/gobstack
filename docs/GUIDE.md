@@ -106,18 +106,20 @@ or the plain installer this wizard drives, if you prefer the one-shot shape:
 
 Expected output (this is a real transcript, trimmed):
 
-    created 50 · updated 0 · unchanged 0 · skipped 0
+    created 25 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
       2. .goblin/bin/goblin-verify   # or add .goblin/bin to PATH
       3. edit .goblin/goblin.yaml: replace the default gate with your real commands (P8 step 3)
-      4. hermes skills trust /tmp/gs-try   # one-time, so the project-tier skills load
+      4. agent skills are opt-in: gob emit --platform <p>   # hermes, claude, copilot, cursor, opencode, codex, gemini
 
-**`created 50`** is the installer's count of the files it **tracks** — the 41 in its `files` map,
-the 8 it `owns`, and `.gitignore`. It writes **51**: the 51st is `.goblin/installed.json`, the
-record it keeps for itself, which it writes but does not count. It has written nothing outside this
-directory.
+**`created 25`** is the installer's count of the files it **tracks** — the 16 in its `files`
+map, the 8 it `owns`, and `.gitignore`. It writes **26**: the 26th is `.goblin/installed.json`,
+the record it keeps for itself, which it writes but does not count. It has written nothing
+outside this directory. The default install ships **no agent skills** — the harness is neutral,
+and `gob emit --platform <p>` is the per-platform opt-in (the old `--skills yes` default is
+still there for repos that want the Hermes project tier vendored).
 
 ### Why `git init -b main` matters
 
@@ -141,14 +143,14 @@ branch** (unless you want to).
 You will see one line per rule. The shape:
 
     PASS  IN-01  (test -s .goblin/installed.json && grep -q '"version"' .goblin/installed.json)
-    PASS  IN-02  40 installed files hashed | practice pin ok
+    PASS  IN-02  16 installed files hashed | practice pin ok
     FAIL  HP-05  HANDOFF.md names no commit that exists in this repo
     SKIP  HS-02  no pinned pre-change commit yet - the REPLAY is not provable
     ADV   HP-04  A stale sentence is corrected in place... (advisory)
 
 and a summary line at the bottom:
 
-    42 passed, 1 failed, 11 advisory, 28 skipped     # the one FAIL is HP-05, below
+    37 passed, 1 failed, 11 advisory, 33 skipped     # the one FAIL is HP-05, below
 
 ### How to read that output
 
@@ -185,7 +187,7 @@ against a declared expectation. That is exactly what you want it to do.
 `HEAD when this file was written: `0000000``, and `HP-05` **rejects that placeholder on purpose**.
 A file that names a commit which does not exist is worse than one that names none — it looks like a
 record. Commit first, then write the real short SHA in. Measured: with the placeholder left in,
-verify reports `42 passed, 1 failed`; with the real SHA, `43 passed, 0 failed`.
+verify reports `37 passed, 1 failed`; with the real SHA, `38 passed, 0 failed`.
 
 ---
 
@@ -305,9 +307,9 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the **41 files it
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the **16 files it
 tracks** — not the 8 it `owns` (including `.goblin/goblin.yaml`, which §5 has you editing) and not
-`.goblin/installed.json`; edit one of the 41 — the exercise below uses `.goblin/bans/README.md`.
+`.goblin/installed.json`; edit one of the 16 — the exercise below uses `.goblin/bans/README.md`.
 
     # REPLAY-BEGIN (this exact block is run by tests/t-doc-guide.sh - keep the two copies identical)
     .goblin/bin/goblin-verify --only IN-02                 # expect PASS
@@ -393,13 +395,13 @@ the next session.
 A class-A install lands on a specific shape. The scaffold ships one deliberate red — `HP-05`, the
 `0000000` placeholder in `HANDOFF.md` (§4) — so a literal first run prints:
 
-    42 passed, 1 failed, 11 advisory, 28 skipped     (the one FAIL is HP-05)
+    37 passed, 1 failed, 11 advisory, 33 skipped     (the one FAIL is HP-05)
 
 Name a real commit in `HANDOFF.md` and commit, and it is green:
 
-    43 passed, 0 failed, 11 advisory, 28 skipped     (on a real project; your numbers will differ)
+    38 passed, 0 failed, 11 advisory, 33 skipped     (on a real project; your numbers will differ)
 
-**Twenty-eight rows skipping is correct**, and each skip prints its reason. In plain terms: the
+**Thirty-three rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
 scolding.
 
@@ -579,7 +581,7 @@ with *"prove it was broken first"* — it is the one practice that survives cont
     # 1. try it somewhere disposable
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
     git init -b main
-    gob install --target . --class A                     # expect: created 50
+    gob install --target . --class A                     # expect: created 25 (no skills — those are gob emit)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"

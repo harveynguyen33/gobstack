@@ -71,7 +71,9 @@ done
 new_home h2; new_repo h2
 printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
 printf 'the referenced standard\n' > "$WORK/standard.md"
-bash "$SRC/bin/goblin-install" --target "$REPO" --class A --models "$WORK/models.yaml" \
+# W6 neutral-first: this control compares the installer's .hermes write with emit's, so the
+# fixture opts in explicitly (a default install now ships no skills at all).
+bash "$SRC/bin/goblin-install" --target "$REPO" --class A --skills yes --models "$WORK/models.yaml" \
   --practice "$WORK/standard.md" >/dev/null 2>&1
 snap "$REPO/.hermes" "$WORK/i1"
 $EMIT --platform hermes --scope project --skills all --target "$REPO" >/dev/null 2>&1
@@ -165,7 +167,9 @@ new_home h6; REPO="$WORK/repo6"; mkdir -p "$REPO"
 ( cd "$REPO" && git init -q -b main && git config user.name "Test Runner" \
     && git config user.email "runner@example.com" \
     && printf '# probe\n' > README.md && git add -A && git commit -q -m seed )
-bash "$SRC/bin/goblin-install" --target "$REPO" --class A --models "$WORK/models.yaml" \
+# W6 neutral-first: --skills yes models the pre-W6 repo this fixture migrates (a record with
+# skills installed and NO playbooks opt-out, so CL-01's RED control below is meaningful).
+bash "$SRC/bin/goblin-install" --target "$REPO" --class A --skills yes --models "$WORK/models.yaml" \
   --practice "$WORK/standard.md" >/dev/null 2>&1
 ( cd "$REPO" && sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md \
     && git add -A && git commit -q -m 'docs: HANDOFF names the HEAD it describes'

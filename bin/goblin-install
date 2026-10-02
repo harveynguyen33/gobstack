@@ -8,7 +8,8 @@
 #   --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md); a named path that is absent is reported, never silently dropped
 #   --parts <list>        comma list to install; default = every part the class requires
 #   --archive             mark the project archive: verify requires no HANDOFF and no gates
-#   --skills yes|no       install .hermes/skills (default yes; needs the one-time skills trust step)
+#   --skills yes|no       install agent skills under .hermes/skills (default no; opt in per
+#                         platform with: gob emit --platform <p>)
 #   --dry-run             print the plan; write nothing
 #   --upgrade             re-install at the current version; report created/updated/unchanged/skipped
 #   --opt-out <part>      record the part in disabled: so its required checks are skipped
@@ -40,7 +41,16 @@ PRACTICE="${GOBLIN_PRACTICE:-$HOME/projects/PROJECT-PRACTICE.md}"
 PRACTICE_ARG=""
 PARTS=""
 ARCHIVE="false"
-SKILLS="yes"
+# W6 neutral-first: a default install is a NEUTRAL harness (manifest + verify + HANDOFF +
+# .goblin) with NO agent skills. Agent skills are an explicit opt-in (--skills yes, or the
+# per-platform gob emit path the wizard's emit screen drives). The old default (yes) was the
+# house's own setup, not a product default: a non-agent user got a dead .hermes/ tree, and a
+# user of another agent harness got nothing at all.
+SKILLS="no"
+# Whether --skills was named on the command line: an OMITTED flag on a re-install means
+# "whatever the record says" (the migration contract below); a NAMED --skills no is an
+# explicit opt-out and is honoured verbatim.
+SKILLS_NAMED=0
 DRY_RUN=0
 UPGRADE=0
 UNINSTALL=0
@@ -63,7 +73,7 @@ while [ $# -gt 0 ]; do
     --practice)  PRACTICE="${2:-}"; PRACTICE_ARG="$PRACTICE"; shift 2 ;;
     --parts)     PARTS="${2:-}"; shift 2 ;;
     --archive)   ARCHIVE="true"; shift ;;
-    --skills)    SKILLS="${2:-}"; shift 2 ;;
+    --skills)    SKILLS="${2:-}"; SKILLS_NAMED=1; shift 2 ;;
     --dry-run)   DRY_RUN=1; shift ;;
     --upgrade)   UPGRADE=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
@@ -232,6 +242,20 @@ fi
 [ -n "$CLASS" ] || { g_err "--class is required (A|B|C|D|E|F)"; exit 2; }
 case "$CLASS" in A|B|C|D|E|F) ;; *) g_err "--class must be one of A B C D E F, got '$CLASS'"; exit 2 ;; esac
 case "$SKILLS" in yes|no) ;; *) g_err "--skills must be yes or no"; exit 2 ;; esac
+
+# W6 migration safety: on a --upgrade (or any re-install) of a repo whose record shows skills
+# were installed, an OMITTED --skills flag must READ that state, not silently strip it. The
+# idempotence contract (created/updated/unchanged) holds only if the effective skills choice
+# for a flag-less re-install is `the record's choice`, so previously-installed skills survive
+# every upgrade unchanged. An EXPLICIT --skills no is honoured verbatim (the switch stays
+# real), and --uninstall still removes exactly what the record lists.
+if [ -f "$INSTALLED" ] && [ "$SKILLS_NAMED" -eq 0 ]; then
+  PREV_SKILLS=$(g_installed_scalar_options "$INSTALLED" skills)
+  if [ "$PREV_SKILLS" = "yes" ]; then
+    SKILLS="yes"
+    g_info "skills: this repo's install record has agent skills installed - they are kept (remove them with an explicit --skills no, or --uninstall)"
+  fi
+fi
 
 PRESET=$(ls "$SRC"/presets/"$CLASS"-*.yaml 2>/dev/null | head -n 1)
 [ -n "$PRESET" ] || { g_err "no preset for class $CLASS"; exit 2; }
@@ -572,6 +596,30 @@ if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
   done
 fi
 
+# W6 neutral-first: an EXPLICIT --skills no re-install of a repo that HAS recorded skills
+# removes them — the switch stays real in both directions. The paths come from the previous
+# record, so exactly what was installed is what goes; a skill file the project edited by hand
+# is refused by put's own contract (never clobbered silently), reported in the summary.
+if [ "$SKILLS_NAMED" -eq 1 ] && [ "$SKILLS" = "no" ] && [ -n "$PREV_FILES" ]; then
+  while IFS= read -r rel; do
+    case "$rel" in .hermes/skills/*) ;; *) continue ;; esac
+    dst="$TARGET/$rel"
+    [ -f "$dst" ] || { rm -f "$TARGET/.goblin/$(basename "$rel")" 2>/dev/null; continue; }
+    if [ "$DRY_RUN" -eq 1 ]; then
+      g_info "plan: remove $rel (explicit --skills no)"
+    else
+      rm -f "$dst"
+      g_info "removed $rel (explicit --skills no)"
+    fi
+  done <<EOF
+$PREV_FILES
+EOF
+  # the emptied .hermes/skills/*/<name> and .hermes/ directories go too (deepest first)
+  if [ "$DRY_RUN" -eq 0 ]; then
+    find "$TARGET/.hermes" -depth -type d -exec rmdir {} + 2>/dev/null
+  fi
+fi
+
 # The automation producers. They land in the target so the target is self-contained and
 # IN-02/SK-02 hash them like every other installed file; the cron copy step then reads from
 # here (see the "next:" block and automations/README.md).
@@ -667,12 +715,20 @@ fi
 } > "$TMP/installed.json"
 
 PREV_VERSION=""
-if [ -f "$INSTALLED" ]; then PREV_VERSION=$(g_installed_scalar "$INSTALLED" version); fi
+RECORD_SKILLS_EFFECTIVE=""
+if [ -f "$INSTALLED" ]; then
+  PREV_VERSION=$(g_installed_scalar "$INSTALLED" version)
+  # The record's own skills choice (after the migration read above): a flip of the effective
+  # choice IS a change even when no file hash moved — the explicit --skills no re-install must
+  # rewrite the record (and drop the files), never report no-op over a state change.
+  RECORD_SKILLS_EFFECTIVE=$(g_installed_scalar_options "$INSTALLED" skills)
+fi
 
 
 if [ "$DRY_RUN" -eq 0 ]; then
   mkdir -p "$TARGET/.goblin"
-  if [ "$CREATED" -eq 0 ] && [ "$UPDATED" -eq 0 ] && [ "$PREV_VERSION" = "$VERSION" ]; then
+  if [ "$CREATED" -eq 0 ] && [ "$UPDATED" -eq 0 ] && [ "$PREV_VERSION" = "$VERSION" ] \
+     && [ "$(printf '%s' "$RECORD_SKILLS_EFFECTIVE" )" = "$(printf '%s' "$SKILLS")" ]; then
     g_info "no-op: $UNCHANGED files unchanged (v$VERSION already installed)"
   else
     cp "$TMP/installed.json" "$INSTALLED"
@@ -699,6 +755,8 @@ if [ "$DRY_RUN" -eq 0 ]; then
   g_info "  3. edit .goblin/goblin.yaml: replace the default gate with your real commands (P8 step 3)"
   if [ "$SKILLS" = "yes" ]; then
     g_info "  4. hermes skills trust $TARGET   # one-time, so the project-tier skills load"
+  else
+    g_info "  4. agent skills are opt-in: gob emit --platform <p>   # run gob doctor for the platform list"
   fi
   g_info ""
   g_info "automations (optional; neither writes outside this repo, and A-02 has no agent in it):"

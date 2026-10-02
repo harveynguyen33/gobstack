@@ -111,7 +111,7 @@ deliberate trade or an unfilled gap.
     drift check — `IN-02`, `SK-02`, and `HS-01`'s hash of the harness dir — reads its expected
     hash out of that one file, and that file is the one file no check protects. Measured: append a
     byte to `.goblin/bin/goblin-verify`, rewrite its recorded hash in `installed.json`, commit, and
-    the run is **fully GREEN** (`43 passed, 0 failed`, exit 0). One edit defeats three rows at
+    the run is **fully GREEN** (`38 passed, 0 failed`, exit 0). One edit defeats three rows at
     once, and it is the cheapest way to fake a green run. Doing better needs an anchor the target
     cannot edit — a signature, or a hash held outside the repo — and goblin-stack has no such
     trust root: the source checkout is not guaranteed to exist at verify time, and any value

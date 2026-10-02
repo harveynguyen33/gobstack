@@ -123,14 +123,40 @@ check "no shipped doc or skill claims a fresh install is not automatically green
   "$([ -z "$FALSE_CLAIM" ] && echo 0 || echo 1)"
 
 # The three prose docs and the shipped bootstrap skill must carry the measured line; the other
-# shipped skills do not discuss a verify run and are not required to.
+# shipped skills do not discuss a verify run and are not required to. W6 neutral-first: the
+# measured green path is the DEFAULT install's (skills opt-in, 38/0/11/33) — the pre-W6 default
+# measured 43/0/11/28 and its copies are gone.
 GREEN_CLAIM=""
 for f in README.md docs/CONTRACTS.md docs/ADOPTION.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '43 passed, 0 failed, 11 advisory, 28 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '38 passed, 0 failed, 11 advisory, 33 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, CONTRACTS, ADOPTION and the shipped bootstrap skill state the measured green path" \
   "$([ -z "$GREEN_CLAIM" ] && echo 0 || echo 1)"
+
+# ---- W6 neutral-first: the docs teach skills as an opt-in, never as an install default --------
+# The 2026-10-01 audit finding: a default install that copies skills is a house leftover, not a
+# neutral product default. The docs must say which side of the line they are on, in both
+# directions: the opt-in is stated where a reader decides (README's platform section, the
+# guide's install step), and no user-facing doc may claim the install writes skills by default.
+for f in README.md docs/GUIDE.md; do
+  norm_text "$f" | grep -q 'agent skills are opt-in'
+  check "$f states agent skills are opt-in (W6 neutral-first)" "$?"
+done
+norm_text README.md | grep -q 'gob emit --platform'
+check "README names gob emit --platform as the opt-in path (W6 neutral-first)" "$?"
+# The stale claim, normalised like every matcher above: 'install' as subject of copying skills.
+STALE_INSTALL_SKILLS=""
+for f in README.md docs/GUIDE.md docs/CONTRACTS.md docs/ADOPTION.md; do
+  norm_text "$f" | grep -qE 'install(s|ed)? (the )?(manifest, )?skills' && STALE_INSTALL_SKILLS="$STALE_INSTALL_SKILLS $f"
+  norm_text "$f" | grep -q 'install .hermes/skills (default yes' && STALE_INSTALL_SKILLS="$STALE_INSTALL_SKILLS $f"
+done
+[ -z "$STALE_INSTALL_SKILLS" ] || note "still claims the install copies skills:$STALE_INSTALL_SKILLS"
+check "no user-facing doc claims the install copies skills by default (W6 neutral-first)" \
+  "$([ -z "$STALE_INSTALL_SKILLS" ] && echo 0 || echo 1)"
+# The contracts doc documents the migration contract (an upgrade keeps recorded skills).
+norm_text docs/CONTRACTS.md | grep -q 'skills: yes keeps them'
+check "docs/CONTRACTS.md states the upgrade-keeps-recorded-skills contract (W6 neutral-first)" "$?"
 
 # ---- W4-A: the CI lane's blind spots are stated where a run will see them --------------------
 # The lane's own finding is that a workflow file is not a gate: GitHub reports a SKIPPED job as
