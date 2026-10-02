@@ -445,6 +445,10 @@ m_pf_01()  { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e 's/^  bas
 # nothing cross-checked it.
 m_pf_ceiling_match() { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e "s/^  baseline_commit: .*/  baseline_commit: $PRE_CHANGE/" -e 's/^  baseline_value: .*/  baseline_value: 0/' -e 's/^  measured: .*/  measured: 2026-01-01/' .goblin/goblin.yaml; }
 m_pf_ceiling_raise() { m_pf_ceiling_match; sed -i 's/^  ceiling: .*/  ceiling: 100000/' .goblin/goblin.yaml; }
+# W6: the electron opt-in's done-definition. The class-A fixture records electron: false; turning
+# it on while the host gate is blank is a repo missing half its definition -> PF-01 FAILs (the
+# positive half - electron: true WITH a host gate - is exercised in tests/t-verify-green.sh).
+m_pf_electron_nohost() { sed -i -e 's/^electron: false/electron: true/' -e 's/^  host_gate: .*/  host_gate: /' .goblin/goblin.yaml; }
 
 # ---- the ban list (G5): BN-00..BN-03, BN-05 ------------------------------------------------
 # Every mutation is the exact move a ban forbids. The bans are TEXT probes (no npm, no AST), so
@@ -722,6 +726,7 @@ expect_red "SC-09 (advisory row: wired, not biting)" SC-09 1 m_sc_09
 expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
 expect_green "G8-6b: the ceiling matches the recorded baseline"        PF-01 m_pf_ceiling_match
 expect_red   "G8-6b: the ceiling raised by hand, the baseline untouched" PF-01 1 m_pf_ceiling_raise
+expect_red   "W6: electron: true declared with no perf host gate"       PF-01 1 m_pf_electron_nohost
 
 # ---- G5: the ban list is a gate, not a wish - one control per row -----------------------------
 expect_red   "the ban table loses a row the matrix still names" BN-00 1 m_bn_00_orphan
