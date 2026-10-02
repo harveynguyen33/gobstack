@@ -164,26 +164,30 @@ OR its `enforced_by` cell does.
 the installer records every `-` part in `disabled:`, so its rows report `SKIP (opt-out)`
 instead of silently passing, and `CL-01` fails if a forbidden part's artifact exists.
 
-| part | A | B | C | D | E | F |
-|---|---|---|---|---|---|---|
-| handoff | R | R | R | R | R | R |
-| spec | R | R | R | - | R | R |
-| gate | R | R | R | O | R | R |
-| replay | R | - | R | - | O | R |
-| ratchet | R | O | O | - | O | R |
-| pr-gate | O | - | O | - | O | O |
-| review-panel | O | - | R | - | O | O |
-| playbooks | R | R | R | R | R | R |
-| tokens | O | - | - | - | - | O |
-| ci-gate | R | - | O | - | O | R |
+| part | software | service | game | research | fleet |
+|---|---|---|---|---|---|
+| handoff | R | R | R | R | R |
+| spec | R | R | R | - | R |
+| gate | R | R | R | O | R |
+| replay | R | - | R | - | O |
+| ratchet | R | O | O | - | O |
+| pr-gate | O | - | O | - | O |
+| review-panel | O | - | R | - | O |
+| playbooks | R | R | R | R | R |
+| tokens | O | - | - | - | O |
+| ci-gate | R | - | O | - | O |
 
-Class **F** is the desktop shell: it needs a part no other class has — a **host gate**, a number
-measured on a machine with a display — and forbids nothing the others allow except a renderer that
-reaches Node directly, which its ban list catches. `ci-gate` is the one part added at W4: when it
-is required or optional the installer renders `templates/ci/goblin-gate.yml.tmpl` into
-`.github/workflows/goblin-gate.yml`, and when it is `-` the artifact must be **absent** (which is
-why `CL-01` keys off that exact path, not the `.github/` directory — a repo is still allowed CI of
-its own). `docs/CI.md` is the contract for what that file does and does not make true.
+The five columns carry the domain names; the letters `A`..`E` and the older names `app` (software)
+and `agent` (fleet) are read-time aliases. The old `F` class — the Electron shell — was merged into
+`software`: the merge measured the two need columns identical on all ten parts, so what it added
+lives in config, not in this table. The **electron opt-in** (`electron: true`) turns the electron
+bans `BN-06`..`BN-09` on even when a hand-edited `bans:` list omits them, and requires a declared
+**host gate** — a number measured on a machine with a display; `docs/CI.md` §3 is the contract for
+it. `ci-gate` is the one part added at W4: when it is required or optional the installer renders
+`templates/ci/goblin-gate.yml.tmpl` into `.github/workflows/goblin-gate.yml`, and when it is `-` the
+artifact must be **absent** (which is why `CL-01` keys off that exact path, not the `.github/`
+directory — a repo is still allowed CI of its own). `docs/CI.md` is the contract for what that file
+does and does not make true.
 
 ## The ban list (G5)
 

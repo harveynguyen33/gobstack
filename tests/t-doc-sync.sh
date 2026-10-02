@@ -175,17 +175,17 @@ done
 grep -q 'main_thread_busy_pct' docs/CI.md && grep -q 'app_bundle_bytes' docs/CI.md
 check "docs/CI.md carries the Electron perf deviation, both metrics named" "$?"
 
-# ---- W4-B: the class matrix is rendered from manifest/classes.tsv ----------------------------
-# The part/class table is where a reader decides what a class owes, so it is the one place a sixth
-# class can rot in silence: the row set moved to `ci-gate R/-/O/-/O/R` at W4 and
-# docs/ENFORCEMENT.md's table has to move with it. The tsv is one row per (class, part) pair -
-# `class<TAB>part<TAB>need` - and the doc renders a missing part as an em dash, so normalise.
-# docs/ADOPTION.md's matrix is prose ("SPEC before change", "Design tokens"), so it is checked for
-# its COLUMNS, not cell by cell.
+# ---- W4-B / W6: the class matrix is rendered from manifest/classes.tsv ------------------------
+# The part/class table is where a reader decides what a class owes, so it is the one place a class
+# can rot in silence: the row set moved to `ci-gate R/-/O/-/O/R` at W4, and W6 merged the sixth
+# (desktop/F) class into `software` - five domain-named columns now, with A-E as read-time aliases.
+# The tsv is one row per (class, part) pair - `class<TAB>part<TAB>need` - and the doc renders a
+# missing part as an em dash, so normalise. docs/ADOPTION.md's matrix is prose ("SPEC before
+# change", "Design tokens"), so it is checked for its COLUMNS, not cell by cell.
 CLASS_DRIFT=""
 CLS=$(awk -F'\t' 'NR>1 { if (!seen[$2]++) print $2 }' manifest/classes.tsv)
 for part in $CLS; do
-  want=$(for c in A B C D E F; do
+  want=$(for c in software service game research fleet; do
            need=$(awk -F'\t' -v c="$c" -v p="$part" '$1==c && $2==p { print $3 }' manifest/classes.tsv)
            printf '%s|' "${need:--}"
          done | sed 's/|$//')
