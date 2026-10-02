@@ -53,7 +53,11 @@ new_i1() {
     git config user.email "runner@example.com"
     printf '# the probe repo\n' > README.md
     git add -A && git commit -q -m "seed"
-    bash "$INSTALL" --target . --class A --models "$WORK/models.yaml" \
+    # W6 neutral-first: this fixture is the PRE-migration 0.4.4 shape (record: 41 files,
+    # 20 skills, no playbooks opt-out), so it opts in explicitly — the new DEFAULT installs
+    # no skills and its record is 16 entries, which the migration's 41→23 arithmetic does
+    # not describe.
+    bash "$INSTALL" --target . --class A --skills yes --models "$WORK/models.yaml" \
       --practice "$WORK/standard.md" >/dev/null 2>&1
     git add -A && git commit -q -m "install gobstack"
     hs=$(git rev-parse --short HEAD)

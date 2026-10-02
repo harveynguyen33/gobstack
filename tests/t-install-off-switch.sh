@@ -85,5 +85,56 @@ check "  and SK-02 is opt-out rather than FAIL (the pre-fix defect)" "$?"
 printf '%s' "$NS_OUT" | grep -q '38 passed, 0 failed, 11 advisory, 33 skipped'
 check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 38/0/11/33)" "$?"
 
+# ---- W6 migration safety: an upgrade must not strip previously-installed skills ---------------
+# The pre-W6 default was --skills yes, so every existing install carries .hermes/skills recorded
+# in installed.json. The new default is no. The idempotence contract (created/updated/unchanged)
+# holds only if a re-install that OMITS the flag reads the record's choice: skills stay until
+# --uninstall removes exactly what the record lists.
+mkfix "$WORK/migrate"
+bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills yes \
+  --models "$WORK/models.yaml" >/dev/null 2>&1
+check "migration fixture: --skills yes installs" "$?"
+S_BEFORE=$(find .hermes/skills -name SKILL.md | sort)
+REC_BEFORE=$(sha256sum .goblin/installed.json | awk '{print $1}')
+git add -A && git commit -q -m "chore: install (--skills yes, the pre-W6 shape)"
+# the upgrade: the NEW default (no flag), same class — must keep every skill
+UP_OUT=$(bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --upgrade \
+  --models "$WORK/models.yaml" 2>&1); UP_RC=$?
+check "upgrade with the new default exits 0" "$UP_RC"
+S_AFTER=$(find .hermes/skills -name SKILL.md 2>/dev/null | sort)
+[ "$S_BEFORE" = "$S_AFTER" ] && [ -n "$S_AFTER" ]
+check "  and every previously-installed skill survives byte-identical (same list)" "$?"
+grep -q '"skills": "yes"' .goblin/installed.json
+check "  and the record still says skills=yes (the choice was read, not reset)" "$?"
+printf '%s' "$UP_OUT" | grep -q 'agent skills installed - they are kept'
+check "  and the run says so out loud (not a silent state change)" "$?"
+git add -A && git commit -q -m "chore: upgrade (default flag, skills kept)"
+# a plain SECOND install (no upgrade, no flag) keeps them too
+bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A \
+  --models "$WORK/models.yaml" >/dev/null 2>&1
+[ "$(find .hermes/skills -name SKILL.md 2>/dev/null | sort)" = "$S_AFTER" ]
+check "a plain re-install (no flag) keeps the skills too" "$?"
+# explicit --skills no is still a real switch: the skills go, the record follows
+bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills no \
+  --models "$WORK/models.yaml" >/dev/null 2>&1
+check "an explicit --skills no re-install exits 0" "$?"
+[ ! -e .hermes ]
+check "  and the explicit opt-out removes .hermes (no dead tree)" "$?"
+grep -q '"skills": "no"' .goblin/installed.json
+check "  and the record follows the explicit choice" "$?"
+git add -A && git commit -q -m "chore: explicit skills opt-out"
+# rebuild the skills, then --uninstall removes everything recorded (the F2-7 contract)
+bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills yes \
+  --models "$WORK/models.yaml" >/dev/null 2>&1
+N_BEFORE_UN=$(find .hermes/skills -name SKILL.md | wc -l | tr -d ' ')
+[ "$N_BEFORE_UN" -gt 0 ]
+check "fixture rebuilt: $N_BEFORE_UN skills installed before the uninstall" "$?"
+UN_OUT=$(bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --uninstall 2>&1); UN_RC=$?
+check "uninstall exits 0" "$([ "$UN_RC" -eq 0 ] && echo 0 || echo 1)"
+[ ! -e .hermes ]
+check "  and .hermes is gone (every recorded skill removed)" "$?"
+printf '%s' "$UN_OUT" | grep -qE 'removed [0-9]+ file\(s\)'
+check "  and the summary counts what it removed" "$?"
+
 if [ "$fail" -eq 0 ]; then note "t-install-off-switch: PASS"; else note "t-install-off-switch: FAIL"; fi
 exit "$fail"

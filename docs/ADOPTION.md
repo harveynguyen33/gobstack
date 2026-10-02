@@ -102,13 +102,16 @@ Each step is independently useful and the later ones build on the earlier:
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .goblin/bin/goblin-verify         # 42 passed, 1 failed - HP-05, until HANDOFF names a commit
-    hermes skills trust <target>      # one-time, so the project-tier skills load
+    .goblin/bin/goblin-verify         # 37 passed, 1 failed - HP-05, until HANDOFF names a commit
+    gob emit --platform <p>           # optional, per platform: the agent skills are an opt-in
 
-A class-A install is **green** — `43 passed, 0 failed, 11 advisory, 28 skipped`, exit 0 — once
+A default class-A install (no agent skills) is **green** — `38 passed, 0 failed, 11 advisory,
+33 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
-the one expected red (`42 passed, 1 failed`). Both numbers are measured, not assumed
-(`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Twenty-eight rows skip with a reason: `HS-02` (no
+the one expected red (`37 passed, 1 failed`). Both numbers are measured, not assumed
+(`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Thirty-three rows skip with a reason: the
+five skill rows (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free
+install records, plus the not-yet rows: `HS-02` (no
 pinned pre-change commit yet), `AU-02`/`AU-03` (no report has been filed, so there is nothing to
 dedup and no reporter run to audit), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile,
 no audit record), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-05` (no `src/` for a ban
@@ -160,7 +163,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .goblin/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the class's full green path (`43 passed, 0 failed, 11 advisory, 28 skipped`, exit 0 for
+   Success is the class's full green path (`38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0 for
    class A) with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three

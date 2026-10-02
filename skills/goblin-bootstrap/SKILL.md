@@ -9,11 +9,16 @@ Use when adopting goblin-stack in a repo, or starting one.
 
 1. **Classify the project A-F.** The class selects which parts are required, optional or off;
    it is not a stringency level. F is a desktop shell: it adds the electron bans and a host gate.
-2. **`goblin-install --target <dir> --class <x>`**
-3. **`goblin-verify`** — a class-A install verifies green: `43 passed, 0 failed, 11
-   advisory, 28 skipped`, exit 0, once `HANDOFF.md` names a commit that exists; before that edit the
-   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`42 passed, 1 failed`).
-   Twenty-eight rows skip with a reason, and the reason matters: `HS-02`
+2. **`goblin-install --target <dir> --class <x>`** — the default install is a NEUTRAL harness:
+   no agent skills. Opt in per platform afterwards with `gob emit --platform <p>` (or vendor the
+   Hermes project tier with `--skills yes`).
+3. **`goblin-verify`** — a default class-A install (no agent skills) verifies green:
+   `38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0, once `HANDOFF.md` names a commit that
+   exists; before that edit the
+   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`37 passed, 1 failed`).
+   Thirty-three rows skip with a reason, and the reason matters: the five skill rows
+   (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free install records,
+   then `HS-02`
    (no pinned pre-change commit yet, so the REPLAY is not provable), `AU-02`/`AU-03` (no report
    has been filed in this repo), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile, no
    audit record), `PF-01` (no perf baseline measured yet), `BN-01`/`BN-02`/`BN-05` (the ban table is

@@ -43,7 +43,10 @@ check "the verifier landed" "$([ -x .goblin/bin/goblin-verify ] && echo 0 || ech
 # v0.3 (G5): the ban engine, installed with the table it reads.
 check ".goblin/bin holds exactly goblin-audit + goblin-bans + goblin-verify + goblin-lib.sh" \
   "$([ "$(ls .goblin/bin | sort | tr '\n' ' ')" = "goblin-audit goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
-check "the project-tier skills landed" "$([ -f .hermes/skills/goblin-mode/SKILL.md ] && echo 0 || echo 1)"
+# W6 neutral-first: a DEFAULT install ships no agent skills — the harness is neutral. The
+# explicit opt-in (--skills yes) is what installs them, asserted in t-init.sh's flags run.
+check "a default install writes NO .hermes dir (skills are opt-in)" \
+  "$([ ! -e .hermes ] && echo 0 || echo 1)"
 
 git add -A && git commit -q -m "chore: install"
 STATUS_BEFORE=$(git status --porcelain)

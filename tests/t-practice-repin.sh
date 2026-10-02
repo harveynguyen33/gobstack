@@ -70,6 +70,9 @@ git config user.email "runner@example.com"
 printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 
+# W6 neutral-first: the default install is skills=no, and this control previously read the
+# installed copy of the practice skill under .hermes/skills/. The control now reads the SOURCE
+# copy (skills/*/SKILL.md is the installer's write set — the same file, pre-copy).
 bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --models "$WORK/models.yaml" \
   --practice "$WORK/standard.md" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
@@ -97,8 +100,8 @@ printf '%s' "$out" | grep -q -- '--re-pin'
 check "  and the failure detail names the re-pin remedy (CONTROL)" "$?"
 grep -q -- '--re-pin' .goblin/bin/goblin-verify
 check "  and the installed verifier names it (CONTROL)" "$?"
-grep -q -- '--re-pin' .hermes/skills/practice/SKILL.md
-check "  and the installed practice skill names it (CONTROL)" "$?"
+grep -q -- '--re-pin' "$SRC/skills/practice/SKILL.md"
+check "  and the practice skill names it (CONTROL; the source copy — a default install ships no skills)" "$?"
 grep -q -- '--re-pin' "$SRC/docs/CONTRACTS.md"
 check "  and docs/CONTRACTS.md documents it (CONTROL)" "$?"
 

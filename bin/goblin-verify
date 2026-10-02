@@ -536,6 +536,13 @@ check_in_02() {
           [ -e "$ROOT/$p" ] || continue ;;
       esac
     fi
+    # W6 neutral-first: an EXPLICIT --skills no re-install removes the recorded skill files
+    # by design (the record follows the switch). Their absence on a record whose options now
+    # say skills=no is the documented opt-out, not drift - the same clause W4a wrote for the
+    # global tier, scoped to the record's own declared choice.
+    case "$p" in
+      .hermes/skills/*) [ -e "$ROOT/$p" ] || [ "$(g_installed_scalar_options "$INSTALLED" skills)" = "yes" ] || continue ;;
+    esac
     n=$((n + 1))
     cur=$(g_sha256_file "$ROOT/$p")
     if [ "$cur" != "$h" ]; then
@@ -2661,6 +2668,21 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
   only_selected "$id" || continue
 
   part=$(row_part "$id")
+  # W6 neutral-first: in global engine mode AU-01's subject is the PRODUCER glob, which
+  # global mode reads from the engine dir — the row must run there even when the repo's
+  # skills opt-out (playbooks) is set, or the W1 control below it is skip-masked. This
+  # clause precedes the opt-out branch on purpose. SK-01/SK-02/SK-04 and AU-02..AU-04 keep
+  # their opt-out semantics.
+  if [ "$id" = "AU-01" ] && [ "$ENGINE_MODE" = "global" ]; then
+    out=$(check_au_01 2>&1); rc=$?
+    case "$rc" in
+      0) PASS=$((PASS + 1)); emit "$id" PASS "$out" ;;
+      1) FAIL=$((FAIL + 1)); emit "$id" FAIL "$out" ;;
+      2) ADV=$((ADV + 1));  emit "$id" ADV "$out" ;;
+      3) SKIP=$((SKIP + 1)); emit "$id" SKIP "$out" ;;
+    esac
+    continue
+  fi
   if [ -n "$part" ] && g_part_disabled "$CONFIG" "$part"; then
     SKIP=$((SKIP + 1)); emit "$id" SKIP "$rule (opt-out: $part)"; continue
   fi

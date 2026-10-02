@@ -121,7 +121,10 @@ printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 PRE_CHANGE=$(git rev-parse --short HEAD)
 
-bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+# W6 neutral-first: the default install is skills=no, and this fixture's SK-*/AU-* controls
+# need their subjects — the installed skills and the automation producers are what the
+# mutations below violate. So the fixture opts in explicitly.
+bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --skills yes --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"

@@ -12,16 +12,19 @@
 #       `# expect PASS|FAIL` annotation promises - verdict AND exit code. At d5424be the exercise
 #       promised a FAIL from `--only GT-02` that the shipped configuration cannot produce
 #       (measured: PASS rc 0), i.e. the guide taught the lesson backwards.
-#   D4  `created 50` is the installer's count of the files it TRACKS; it writes 51, because
-#       `.goblin/installed.json` is written but not counted. The number in the guide is checked
-#       against a real install and the gloss must say which file the counter omits.
+#   D4  `created 25` is the installer's count of the files it TRACKS (W6 neutral-first: the
+#       DEFAULT install is skills=no — was `created 50`/51 with the Hermes tier vendored); it
+#       writes 26, because `.goblin/installed.json` is written but not counted. The number in
+#       the guide is checked against a real install and the gloss must say which file the
+#       counter omits.
 #   D5  §1's network claim must be scoped the way every other copy of it is (GUARDRAILS: "No
 #       network at verify time"; README/CONTRACTS: under "Dependencies").
 #   §3/§9  the guide's own reproducible numbers, re-measured here on a fresh class-A install: the
-#       `created 50` line, the day-one line (`42 passed, 1 failed, 11 advisory, 28 skipped`) and the
-#       green-path line (`43 passed, 0 failed, 11 advisory, 28 skipped`). A number no run prints is
-#       the defect this half exists to catch. The skipped count moved 24 -> 28 when the four P15
-#       rows (`RC-01`..`RC-04`) landed: on a fresh install with no declared corpus they all SKIP.
+#       `created 25` line, the day-one line (`37 passed, 1 failed, 11 advisory, 33 skipped`) and the
+#       green-path line (`38 passed, 0 failed, 11 advisory, 33 skipped`) — the W6 neutral-first
+#       shapes (skills opt-in moved the pass count 43 -> 38 and the skip count 28 -> 33; before
+#       that the skipped count had moved 24 -> 28 when the four P15 rows landed). A number no run
+#       prints is the defect this half exists to catch.
 #   AB3 §8's rule sentence names HOW MANY files `IN-02` covers, and §11 states a review score. The
 #       sentence said "hashes every file the installer wrote" - measured false (the installer writes
 #       51, the row's `files` map is 41), so the reader's counterexample file drifted nothing. The
@@ -134,10 +137,12 @@ fi
 
 # ---- D4: the file count, and the gloss the guide puts on it ------------------------------------
 ONDISK=$(find . -path ./.git -prune -o -type f -print | wc -l)
-[ "$ONDISK" = "51" ]
-check "a class-A install writes 51 files (measured here: $ONDISK; the installer reports created $CREATED)" "$?"
+# W6 neutral-first: the DEFAULT install is skills=no, so the write set is the neutral harness
+# (26 files: 16 tracked + .goblin/installed.json + 8 owned + .gitignore) — was 51 with skills.
+[ "$ONDISK" = "26" ]
+check "a default class-A install writes 26 files, no skills (measured here: $ONDISK; created $CREATED)" "$?"
 check "  and the guide quotes the installer's own count ($CREATED)" \
-  "$(printf '%s' "$CREATED" | grep -qE '^50$' && echo 0 || echo 1)"
+  "$(printf '%s' "$CREATED" | grep -qE '^25$' && echo 0 || echo 1)"
 grep -qF "created $CREATED · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
 check "  and the guide's transcript of it is the line the installer printed" "$?"
 ! grep -q 'means it wrote 50 files' "$GUIDE"
@@ -213,14 +218,14 @@ check "  and the same paragraph now scopes it to verify time" "$?"
 
 # ---- §3/§9: the guide's own numbers, re-measured ------------------------------------------------
 DAYONE=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$DAYONE" | grep -qE '^42 passed, 1 failed, 11 advisory, 28 skipped$'
+printf '%s\n' "$DAYONE" | grep -qE '^37 passed, 1 failed, 11 advisory, 33 skipped$'
 check "the day-one run prints the shape the guide documents ($DAYONE)" "$?"
 
 HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$GREEN" | grep -qE '^43 passed, 0 failed, 11 advisory, 28 skipped$'
+printf '%s\n' "$GREEN" | grep -qE '^38 passed, 0 failed, 11 advisory, 33 skipped$'
 check "naming a real commit makes it green ($GREEN)" "$?"
 
 # EVERY summary-shaped line in the guide must be one of the two a real run printed. The loose form

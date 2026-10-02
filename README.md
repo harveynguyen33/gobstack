@@ -50,14 +50,17 @@ After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other
     gob verify                             # or .goblin/bin/goblin-verify, inside the target
-    hermes skills trust <target>              # one-time, Hermes users, so project-tier skills load
+    gob emit --platform <p>                   # optional, per platform: the agent skills are an opt-in
     gob audit                              # once, deliberately: the ONLY network step (SC-07)
 
-**A class-A install verifies green — `43 passed, 0 failed, 11 advisory, 28 skipped`, exit 0 — once
+**A default class-A install (no agent skills — those are `gob emit`'s job) verifies green —
+`38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists. Before that edit the scaffold's `0000000` placeholder is
-the one expected red: `42 passed, 1 failed`, `HP-05`. Both numbers measured 2026-09-25; the run and
-the fix are step 2 of `docs/GUIDE.md`.**
-Twenty-eight rows skip (`HS-02` has no pinned pre-change commit yet, so the REPLAY is not provable;
+the one expected red: `37 passed, 1 failed`, `HP-05`. Both numbers measured at W6 (neutral-first);
+the run and the fix are step 2 of `docs/GUIDE.md`.**
+Thirty-three rows skip — the five skill rows (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks`
+opt-out a skills-free install records, then the not-yet rows (`HS-02` has no pinned pre-change
+commit yet, so the REPLAY is not provable;
 `AU-02` and `AU-03` have no report to audit; `SC-06`, `SC-07` and `SC-08` have no dependency
 manifest, no lockfile and no audit record to read; `PF-01` has no measured perf baseline;
 `BN-01`/`BN-02`/`BN-05` have no `src/` for a ban to read, and `BN-03` plus the four electron bans
@@ -83,7 +86,7 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 | `gob verify` | run the rule matrix against the current repo — `PASS`/`FAIL`/`SKIP` per row, exit 0 pass · 1 a check failed · 2 could not run · 3 the manifest is broken |
 | `gob bans` | run the ban list (per-pattern red lines over the source tree) |
 | `gob audit` | check recorded dependency claims against live advisory feeds — the only command that touches the network |
-| `gob install` | install the manifest, skills and verifier into a target repo |
+| `gob install` | install the harness into a target repo: manifest, verifier, gates, HANDOFF — no agent skills (those are an opt-in: `gob emit --platform <p>`, or `--skills yes`) |
 | `gob uninstall` | remove everything an install wrote, byte-exactly (`gob install --target <dir> --uninstall` is the same job) |
 | `gob upgrade` | migrate a repo to the shared global engine at `~/.goblin/engine` — 8 steps, two commits, one report |
 | `gob doctor` | one run across the platforms below: DETECTED / NOT-DETECTED / DRIFT per platform |
@@ -110,6 +113,13 @@ new commands and docs use `gob`.
 One run of `gob emit --platform <p> --scope project` writes the skills and the context block a
 session of that platform reads; `--scope global` writes to the machine-level anchor. `--dry-run`
 prints the full write plan first.
+
+**Agent skills are opt-in.** A `gob install` writes the neutral harness only — `.goblin/`,
+`HANDOFF.md`, `AGENTS.md`, the checks and the `.gitignore` block; no skills directory, and no
+files belonging to any coding agent. The guided path is `gob init`'s emit screen; the one-shot
+path is `gob emit --platform <p>` after installing. Repos whose install predates the opt-in
+default keep their skills through `gob upgrade` (the install record names them; only an explicit
+`--skills no`, or `--uninstall`, removes them).
 
 ## What it is not
 

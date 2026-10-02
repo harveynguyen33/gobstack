@@ -89,12 +89,40 @@ check "hermes project emission exists under the target" "$?"
 # the wizard is a front end over install: the installer's own record must exist
 [ -f "$REPO/.goblin/installed.json" ]
 check "the install record exists (the wizard wrote nothing it did not route)" "$?"
-# commit, then GREEN: the measured fresh path (43 passed, 0 failed)
+# commit, then GREEN: the measured fresh path (43 passed, 0 failed — T1 emitted hermes, so the
+# skills are present and hashed; the DEFAULT install's own green line is T2b below)
 ( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack via gob init" )
 VOUT=$( cd "$REPO" && env PATH="$BARE_PATH" bash .goblin/bin/goblin-verify 2>&1 ); VRC=$?
 check "verify exits 0 after the commit" "$VRC"
 printf '%s' "$VOUT" | grep -qE '[0-9]+ passed, 0 failed'
 check "verify reports 0 failed" "$?"
+# W6 neutral-first: the wizard's install leg passes --skills no explicitly — the opt-in is the
+# emit screen, and the record must say so.
+grep -qF '"skills": "no"' "$REPO/.goblin/installed.json"
+check "the install record carries the skills opt-out (the emit screen is the opt-in)" "$?"
+
+# ---- T2b: the DEFAULT install creates NO .hermes — the neutral-first contract ------
+new_repo t2b
+OUT2B=$(init_env --target "$REPO" --class app --branch main --email "runner@example.com" \
+        --gate "bash tests/run-tests.sh" --yes \
+        < /dev/null 2>&1); RC2B=$?
+check "a flags-only run with no --emit (the default install) exits 0" "$RC2B"
+[ ! -e "$REPO/.hermes" ]
+check "  and writes NO .hermes directory (skills are opt-in, W6 neutral-first)" "$?"
+[ -f "$REPO/HANDOFF.md" ] && [ -f "$REPO/AGENTS.md" ] && [ -f "$REPO/.goblin/goblin.yaml" ] \
+  && [ -x "$REPO/.goblin/bin/goblin-verify" ] && [ -f "$REPO/.goblin/installed.json" ] \
+  && [ -f "$REPO/.gitignore" ]
+check "  and the neutral harness is complete (HANDOFF, AGENTS, .goblin, .gitignore)" "$?"
+grep -qF '"skills": "no"' "$REPO/.goblin/installed.json"
+check "  and the record says skills=no" "$?"
+( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack (neutral default)" )
+VOUT2B=$( cd "$REPO" && env PATH="$BARE_PATH" bash .goblin/bin/goblin-verify 2>&1 ); VRC2B=$?
+check "  and the neutral install verifies green (exit 0)" "$VRC2B"
+printf '%s' "$VOUT2B" | grep -qE '^ *38 passed, 0 failed, 11 advisory, 33 skipped'
+check "  at the measured neutral green line (38/0/11/33)" "$?"
+# the emitted hermes context block (AGENTS.md's emitted twin) must NOT be here either
+grep -q 'gob emit' "$REPO/AGENTS.md"
+check "  and AGENTS.md points at the opt-in (gob emit --platform <p>)" "$?"
 
 # ---- T2: no TTY hang — zero flags, piped stdin ----------------------------------
 new_repo t2
@@ -104,8 +132,11 @@ grep -qF "gob init [3/6] class: A" <<<"$OUT2"
 check "the cascade names the defaulted class" "$?"
 grep -qF "owner_email: runner@example.com" "$REPO/.goblin/goblin.yaml"
 check "the git identity became the declared email" "$?"
-[ -f "$REPO/.hermes/skills/goblin-mode/SKILL.md" ]
-check "the detected-platform default emitted hermes" "$?"
+# W6 neutral-first: a zero-flag run (piped stdin, no detected platforms in the stripped-PATH
+# sandbox) pre-ticks NOTHING and installs NO skills — the neutral harness only. The guided
+# emit screen (a tty run) is the opt-in; T8's pty run below drives it with Enters.
+[ ! -e "$REPO/.hermes" ]
+check "a zero-flag run emits no skills and writes no .hermes (neutral default)" "$?"
 
 # ---- T3: the refusal contract — an existing HANDOFF.md is never taken -----------
 new_repo t3
