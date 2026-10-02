@@ -341,7 +341,7 @@ fi
 # is gone: npm is the only route it gives, in §2, §3, §10 and the appendix.
 grep -q 'npm i -g @techgoblin/gobstack' docs/GUIDE.md
 check "docs/GUIDE.md names the npm route (W5-D)" "$?"
-grep -q 'gob install --target . --class A' docs/GUIDE.md
+grep -q 'gob install --target . --class software' docs/GUIDE.md
 check "  and gives the npm CLI's Step-1 command (W5-D)" "$?"
 if grep -q 'bin/goblin-install' docs/GUIDE.md || grep -qi 'route b' docs/GUIDE.md \
    || grep -qF '"$GS' docs/GUIDE.md; then

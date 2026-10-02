@@ -204,7 +204,7 @@ verifier is reporting FAILs.
 
 ## The two commands, verbatim
 
-    bash bin/goblin-install --target /path/to/repo --class A
+    bash bin/goblin-install --target /path/to/repo --class software
     .goblin/bin/goblin-verify
 
 From a checkout, without installing anything:

@@ -102,7 +102,7 @@ see the plan first:
 
 or the plain installer this wizard drives, if you prefer the one-shot shape:
 
-    gob install --target . --class A
+    gob install --target . --class software
 
 Expected output (this is a real transcript, trimmed):
 
@@ -583,7 +583,7 @@ with *"prove it was broken first"* — it is the one practice that survives cont
     # 1. try it somewhere disposable
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
     git init -b main
-    gob install --target . --class A                     # expect: created 25 (no skills — those are gob emit)
+    gob install --target . --class software              # expect: created 25 (no skills — those are gob emit)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"
@@ -604,7 +604,7 @@ with *"prove it was broken first"* — it is the one practice that survives cont
 
     # 5. do it for real, in a repo you care about
     cd ~/projects/your-project
-    gob install --target . --class A
+    gob install --target . --class software
     git add -A && git commit -m "chore: adopt gobstack"
     .goblin/bin/goblin-verify
     $EDITOR HANDOFF.md              # state / gates (dated!) / next / NOT verified

@@ -28,7 +28,7 @@ dependencies disagree with npm's. If you see `ERESOLVE` after a local install, r
 dependency from `package.json` and install globally instead.
 
 **The two-layer model.** The global install gives you the CLI only. `gob init` (or
-`gob install --target <dir> --class A`) then vendors a self-contained engine into the target
+`gob install --target <dir> --class software`) then vendors a self-contained engine into the target
 repo under `.goblin/` — verifier, manifest, ban probes, skills, all of it. That second layer is
 why an initialized repo keeps working on machines with **no gobstack installed at all**: the
 engine lives in the repo, not in your `node_modules`, and `bash .goblin/bin/goblin-verify` (or a
@@ -36,7 +36,7 @@ plain `git` + `bash` box) is the only runtime the repo's gate needs.
 
 Then, from any project:
 
-    gob install --target /path/to/repo --class A
+    gob install --target /path/to/repo --class software
 
 The installer writes only paths it records, hash-compares before writing, and prints `no-op` on a
 second run with the same arguments. It never overwrites `HANDOFF.md`, `AGENTS.md`, a `*-SPEC.md`,
