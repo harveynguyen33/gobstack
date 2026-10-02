@@ -2,16 +2,17 @@
 # t-render-tokens.sh — Z1-3's control: a RENDERED install carries no unsubstituted template token.
 #
 # The defect this exists for. `templates/goblin.yaml.tmpl` held a `{{GATE2}}` line that no
-# `render` call replaced, so every one of the six classes' installed `.goblin/goblin.yaml`
+# `render` call replaced, so every one of the classes' installed `.goblin/goblin.yaml`
 # carried a raw template token - visible to the operator in their own config, two waves after it
 # was first reported (W5-8). `grep -rl '{{GATE2}}' tests docs manifest bin` was 0 files, which is
 # exactly why nothing caught it: no test, no document, and no row read the rendered output.
 #
-# WHY ALL SIX CLASSES. The rule is per-class, not per-template: a token can be left behind by a
-# class's own preset path, and the install renders four other templates per class (AGENTS.md,
-# HANDOFF.md, ROUND-000-SPEC.md, the CI workflow) plus the config. One class would have caught
-# this particular token, but the control is the generalisation - "a rendered install contains no
-# `{{...}}` token" - so it is run over the whole rendered surface of every class.
+# WHY ALL CLASSES (and the electron opt-in). The rule is per-class, not per-template: a token can
+# be left behind by a class's own preset path, and the install renders four other templates per
+# class (AGENTS.md, HANDOFF.md, ROUND-000-SPEC.md, the CI workflow) plus the config. One class
+# would have caught this particular token, but the control is the generalisation - "a rendered
+# install contains no `{{...}}` token" - so it is run over the whole rendered surface of every
+# class and the electron overlay.
 #
 # WHAT IT CANNOT SEE. It proves no placeholder SURVIVED; it cannot prove a placeholder was
 # replaced by the RIGHT value (a render that substituted an empty string passes here, and the
