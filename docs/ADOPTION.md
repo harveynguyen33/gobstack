@@ -1,26 +1,25 @@
 # Adoption — classes, presets, and the order
 
-## The six classes
+## The five classes
 
 A class is **not** a stringency level. It selects which parts are required, optional or off, and
 it supplies the default gate and ratchet shape. The gate vocabulary differs by class; the
-harness does not.
+harness does not. The names are words; the letters `A`..`E` are read-time aliases.
 
 | Class | What "done" means |
 |---|---|
-| **A. Shipped software** | a gate set reports measured numbers, a round lands, the artifact deploys or publishes |
-| **B. Service / configuration** | a contract (schema, route, API) is unchanged, or the change is intentional and migrated |
-| **C. Game** | a suite green in the Editor **and** a human feel verdict — the verdict is a first-class deliverable |
-| **D. Knowledge / research** | a question is answered with sources and the answer is findable |
-| **E. Agent-fleet config** | a config change is applied, verified against the **artifact**, and versioned |
-| **F. Desktop shell** | the renderer is isolated from Node, the main process is not busy, and the packaged bundle ships no dev dependency |
+| **software** (A) | a gate set reports measured numbers, a round lands, the artifact deploys or publishes |
+| **service** (B) | a contract (schema, route, API) is unchanged, or the change is intentional and migrated |
+| **game** (C) | a suite green in the Editor **and** a human feel verdict — the verdict is a first-class deliverable |
+| **research** (D) | a question is answered with sources and the answer is findable |
+| **fleet** (E) | a config change is applied, verified against the **artifact**, and versioned |
 
 Two placements worth arguing about:
 
 - A repo whose code is small and lives elsewhere, while the repo holds *output*, belongs in
-  **D**, not A — gating it like an application gates the wrong artifact; its gate is freshness,
-  not compilation.
-- An input directory that is not a build target at all belongs in **D** with **`--archive`**.
+  **research**, not **software** — gating it like an application gates the wrong artifact; its gate
+  is freshness, not compilation.
+- An input directory that is not a build target at all belongs in **research** with **`--archive`**.
   Without the flag the installer keeps producing HANDOFFs for a directory whose own design
   folders are empty.
 
@@ -29,25 +28,28 @@ Two placements worth arguing about:
 `R` = required · `O` = optional (installed, reported) · `—` = off. The same data is in
 `manifest/classes.tsv`, and `CL-01` checks it against the repo.
 
-| Part | A | B | C | D | E | F |
-|---|---|---|---|---|---|---|
-| HANDOFF | R | R | R | R | R | R |
-| SPEC before change | R | R | R | — | R | R |
-| Verification gate | R | R | R | O | R | R |
-| Pinned-commit REPLAY | R | — | R | — | O | R |
-| Ratchet | R | O | O | — | O | R |
-| PR gate | O | — | O | — | O | O |
-| Review panel | O | — | R | — | O | O |
-| Playbooks (the skills) | R | R | R | R | R | R |
-| Design tokens | O | — | — | — | — | O |
-| CI lane | R | — | O | — | O | R |
+| Part | software | service | game | research | fleet |
+|---|---|---|---|---|---|
+| HANDOFF | R | R | R | R | R |
+| SPEC before change | R | R | R | — | R |
+| Verification gate | R | R | R | O | R |
+| Pinned-commit REPLAY | R | — | R | — | O |
+| Ratchet | R | O | O | — | O |
+| PR gate | O | — | O | — | O |
+| Review panel | O | — | R | — | O |
+| Playbooks (the skills) | R | R | R | R | R |
+| Design tokens | O | — | — | — | O |
+| CI lane | R | — | O | — | O |
 
-**F is the desktop shell**, added at W4: it declares the Electron failure surface as bans
-(`BN-06`..`BN-09`) and declares its FPS number as a **host gate** rather than a ratchet, because
-the probe that measures it needs Playwright or Electron plus a display — neither of which a
-shipped rule may depend on. Its ratchet carries `app_bundle_bytes` instead. `docs/CI.md` §3 argues
-that in full, including why frame time is the wrong number (measured flat at 16.70 ms while the
-main thread went from 1.8 % to 54.5 % busy).
+**The electron opt-in, not a class**, added at W4: an Electron app is the **software** class with
+`electron: true`, which declares the Electron failure surface as bans (`BN-06`..`BN-09`) and
+declares its FPS number as a **host gate** rather than a ratchet, because the probe that measures
+it needs Playwright or Electron plus a display — neither of which a shipped rule may depend on. Its
+ratchet carries `app_bundle_bytes` instead. The old sixth class was merged into `software` (its need
+column measured identical on all ten parts), and the old `F` letter remains an install-time alias
+that selects `software` **with** the opt-in. `docs/CI.md` §3 argues it in full, including why frame
+time is the wrong number (measured flat at 16.70 ms while the main thread went from 1.8 % to 54.5 %
+busy).
 
 **`—` is a real, enforced option.** The installer records every off part in `disabled:`, so its
 rows report `SKIP (opt-out)`; `CL-01` fails if a forbidden part's artifact exists. A repo with
@@ -105,7 +107,7 @@ Then, in order:
     .goblin/bin/goblin-verify         # 37 passed, 1 failed - HP-05, until HANDOFF names a commit
     gob emit --platform <p>           # optional, per platform: the agent skills are an opt-in
 
-A default class-A install (no agent skills) is **green** — `38 passed, 0 failed, 11 advisory,
+A default software-class install (no agent skills) is **green** — `38 passed, 0 failed, 11 advisory,
 33 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
 the one expected red (`37 passed, 1 failed`). Both numbers are measured, not assumed
@@ -164,7 +166,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        .goblin/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
    Success is the class's full green path (`38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0 for
-   class A) with `git status --short` empty.
+   the software class) with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three
 headings plus a `State` block, one dated gate line and a `Not verified` block, 15 lines, no line

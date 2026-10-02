@@ -196,8 +196,12 @@ done
 [ -z "$CLASS_DRIFT" ] || note "class matrix drifted from manifest/classes.tsv:$CLASS_DRIFT"
 check "docs/ENFORCEMENT.md renders the class matrix from manifest/classes.tsv (W4-B)" \
   "$([ -z "$CLASS_DRIFT" ] && echo 0 || echo 1)"
-grep -q '^| \*\*F\. Desktop shell\*\* |' docs/ADOPTION.md
-check "docs/ADOPTION.md names the sixth class (W4-B)" "$?"
+# W6: the sixth (desktop/F) class is merged into software; ADOPTION now teaches five domain-named
+# classes and carries the electron opt-in that replaced F. The old pin measured the F row itself.
+grep -q '^| \*\*software\*\* (A) |' docs/ADOPTION.md
+check "docs/ADOPTION.md names the software class (W6: the F class merged in)" "$?"
+grep -qi 'electron opt-in' docs/ADOPTION.md
+check "  and states the electron opt-in that replaced the sixth class (W6)" "$?"
 grep -qi '^| CI lane |' docs/ADOPTION.md
 check "  and gives it a CI-lane row in the preset matrix" "$?"
 grep -q 'docs/CI.md' README.md
