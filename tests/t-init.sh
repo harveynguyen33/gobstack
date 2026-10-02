@@ -128,7 +128,7 @@ check "  and AGENTS.md points at the opt-in (gob emit --platform <p>)" "$?"
 new_repo t2
 OUT2=$(init_env --target "$REPO" < /dev/null 2>&1); RC2=$?
 check "a zero-flag piped run finishes (no prompt hang), exit 0" "$RC2"
-grep -qF "gob init [3/6] class: A" <<<"$OUT2"
+grep -qF "gob init [3/6] class: software" <<<"$OUT2"
 check "the cascade names the defaulted class" "$?"
 grep -qF "owner_email: runner@example.com" "$REPO/.goblin/goblin.yaml"
 check "the git identity became the declared email" "$?"
@@ -161,7 +161,7 @@ OUT4=$(init_env --target "$REPO" --class research --branch trunk --email "a@b.c"
         --gate "make check" --emit hermes --dry-run \
         < /dev/null 2>&1); RC4=$?
 check "dry-run exits 0" "$RC4"
-printf '%s' "$OUT4" | grep -qF "class       D"
+printf '%s' "$OUT4" | grep -qF "class       research"
 check "the plan names the class" "$?"
 printf '%s' "$OUT4" | grep -qF "(hermes)"
 check "the plan names the emit platform" "$?"
@@ -186,7 +186,7 @@ printf '%s' "$OUT6" | grep -q "unknown platform 'nosuch'"
 check "the refusal names the platform and the enum" "$?"
 OUT7=$(init_env --target "$WORK/t1" --class zebra --yes < /dev/null 2>&1); RC7=$?
 check "a nonsense class exits 2" "$([ "$RC7" -eq 2 ] && echo 0 || echo 1)"
-printf '%s' "$OUT7" | grep -q "app|service|game|research|agent|desktop"
+printf '%s' "$OUT7" | grep -q "software|service|game|research|fleet"
 check "the refusal names the class enum" "$?"
 
 # ---- T7: the dispatcher routes ----------------------------------------------------
