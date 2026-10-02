@@ -285,7 +285,7 @@ fi
 g_class_is_electron_alias "$CLASS" && ELECTRON=1
 CLASS_RAW="$CLASS"
 CLASS=$(g_class_canon "$CLASS") \
-  || { g_err "--class must be software|service|game|research|fleet (or A-E / app / agent / desktop), got '$CLASS'"; exit 2; }
+  || { g_err "--class must be software|service|game|research|fleet (or A-E / app / agent / desktop), got '$CLASS_RAW'"; exit 2; }
 case "$CLASS_RAW" in
   app|agent|desktop) g_info "note: '$CLASS_RAW' is now called '$CLASS' (accepted as an alias)";;
 esac

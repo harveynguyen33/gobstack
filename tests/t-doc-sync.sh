@@ -196,6 +196,12 @@ done
 [ -z "$CLASS_DRIFT" ] || note "class matrix drifted from manifest/classes.tsv:$CLASS_DRIFT"
 check "docs/ENFORCEMENT.md renders the class matrix from manifest/classes.tsv (W4-B)" \
   "$([ -z "$CLASS_DRIFT" ] && echo 0 || echo 1)"
+# W6 review guard: the matrix loop above iterates the tsv's PARTS, so it cannot see a re-added
+# CLASS - a silently restored sixth class passed the whole suite. Pin the class SET itself.
+CLS_SET=$(awk -F'\t' 'NR>1 { if (!seen[$1]++) print $1 }' manifest/classes.tsv | sort | tr '\n' ' ')
+[ "$CLS_SET" = "fleet game research service software " ] || note "classes.tsv class set is not the canonical five: '$CLS_SET'"
+check "manifest/classes.tsv carries exactly the five canonical classes (W6)" \
+  "$([ "$CLS_SET" = "fleet game research service software " ] && echo 0 || echo 1)"
 # W6: the sixth (desktop/F) class is merged into software; ADOPTION now teaches five domain-named
 # classes and carries the electron opt-in that replaced F. The old pin measured the F row itself.
 grep -q '^| \*\*software\*\* (A) |' docs/ADOPTION.md

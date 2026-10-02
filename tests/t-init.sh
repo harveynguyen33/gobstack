@@ -188,6 +188,8 @@ OUT7=$(init_env --target "$WORK/t1" --class zebra --yes < /dev/null 2>&1); RC7=$
 check "a nonsense class exits 2" "$([ "$RC7" -eq 2 ] && echo 0 || echo 1)"
 printf '%s' "$OUT7" | grep -q "software|service|game|research|fleet"
 check "the refusal names the class enum" "$?"
+printf '%s' "$OUT7" | grep -q "got 'zebra'"
+check "  and names the input it refused (W6 review F1)" "$?"
 
 # ---- T7: the dispatcher routes ----------------------------------------------------
 OUT8=$( cd "$WORK" && env PATH="$BARE_PATH" bash "$SRC/bin/goblin" init --help 2>&1 ); RC8=$?

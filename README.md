@@ -46,6 +46,12 @@ of file it manages: `docs/CONTRACTS.md`.
 A repo that already has its own `HANDOFF.md` exits 1 on the refusal. That is the contract, not a
 failure: reconcile the file rather than forcing over it — `docs/ADOPTION.md`.
 
+`--class` picks the preset: **software** (the default — shipped features, PRs, review gates),
+**service** (backend jobs, config, unattended runs), **game** (playable builds, perf budgets),
+**research** (specs, replays, reference corpora) and **fleet** (config-of-the-agent repos).
+The single letters `A`–`E` are accepted aliases. What each preset turns on is the matrix in
+`docs/ADOPTION.md`; the older names still resolve (see `docs/CONTRACTS.md`).
+
 After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other

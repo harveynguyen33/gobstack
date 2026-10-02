@@ -253,8 +253,9 @@ fi
 # letters A-E and the old names app/agent/desktop are read-time aliases; desktop/F/f also sets
 # the electron opt-in so the merged class behaves as the old class F did.
 g_class_is_electron_alias "$CLASS" && ELECTRON=1
+CLASS_RAW="$CLASS"
 CLASS=$(g_class_canon "$CLASS") \
-  || { g_err "--class must be software|service|game|research|fleet (or A-E / app / agent / desktop), got '$CLASS'"; exit 2; }
+  || { g_err "--class must be software|service|game|research|fleet (or A-E / app / agent / desktop), got '$CLASS_RAW'"; exit 2; }
 case "$SKILLS" in yes|no) ;; *) g_err "--skills must be yes or no"; exit 2 ;; esac
 
 # W6 migration safety: on a --upgrade (or any re-install) of a repo whose record shows skills
