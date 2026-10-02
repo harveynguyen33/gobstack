@@ -275,7 +275,8 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     flow-style `jobs: {…}` mapping is refused, and a `#` inside a quoted string truncates the line
     it is on. Two further measured gaps: the template's job is `ubuntu-latest` with no cache, so a
     repo whose gate needs a display, a licence, a GPU or a signed-in session cannot use it at all
-    (that is a **host** gate — the class-C rule, restated for class F), and a private repo's
+    (that is a **host** gate — the class-C rule, restated for class F; **corrected 2026-10-02 (W6):**
+    F is merged into `software`, so this is the electron opt-in), and a private repo's
     Actions minutes are billed to the account (2,000/month free). Measured ground truth at W4:
     **one** first-party workflow exists in the whole estate and it self-skips; five of the six
     repos with a remote have none.
@@ -295,7 +296,9 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     while the main thread went from 1.8 % to 54.5 % busy, `docs/CI.md` §3.3); an absolute FPS
     claim is not. Three further Electron failure modes are **recorded, not mechanised**, and
     `docs/CI.md` §4 says why: the dependency-graph boundary check, `ipcMain` sender validation,
-    and fuses at package time.
+    and fuses at package time. **Corrected 2026-10-02 (W6):** this preset is now
+    `presets/electron-overlay.yaml`, rendered over `presets/software.yaml` by `--electron` (or the
+    `desktop`/`F` install alias) — the old `F` class was merged into `software`.
 36. **A ban's exemption reaches the probe through its environment, so a custom probe can ignore it.**
     `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` are filtered *before* the exit code is
     chosen, because a filter applied to a probe's stdout afterwards cannot change a verdict — that
@@ -589,3 +592,17 @@ the Node the gates ran under.
     a source row can never fail a user's repo, and a target row can never substitute for the
     framework's own suite. Recorded as a definition; `docs/ENFORCEMENT.md`'s scope paragraph
     carries the same sentence for the reader who arrives there first.
+
+53. **The sixth class is gone: the desktop shell is `software` + `electron: true`, and `A`..`E` are
+    read-time aliases.** W6 merged `F` into `software` because their `manifest/classes.tsv` need
+    columns were measured identical on all ten parts — the old column added config (the electron
+    `bans:`, the `perf.host_gate:`, the `app_bundle_bytes` ratchet, the `dist out release`
+    build-output scope), never a part. Measured on the merge tree (2026-10-02): the tsv is 50 rows
+    over five classes; `gob init --class desktop`, `--class F` and `--class software --electron`
+    render byte-identical `goblin.yaml` (`class: software`, `electron: true`); and a pre-merge repo
+    carrying `class: F` with no `electron:` key verifies unchanged, `38 passed, 0 failed, 11
+    advisory, 33 skipped`, exit 0, with `git status --porcelain` empty — zero writes, because its
+    bans and host gate live in its own config. What this costs, recorded rather than fixed: such a
+    repo gets the merge's declaration-time host-gate check only after hand-adding `electron: true`;
+    its bans and host gate keep running either way, so nothing fails closed, and the CLI keeps
+    accepting `desktop`/`F` as aliases.

@@ -43,8 +43,8 @@ not the model.
 
 ## 2. What goblin-stack places, and what it checks
 
-The `ci-gate` part is `R` for classes A and F, `O` for C and E, and `-` for B and D
-(`manifest/classes.tsv`). When it is installed, the installer renders
+The `ci-gate` part is `R` for **software**, `O` for **game** and **fleet**, and `-` for **service**
+and **research** (`manifest/classes.tsv`). When it is installed, the installer renders
 `templates/ci/goblin-gate.yml.tmpl` into `.github/workflows/goblin-gate.yml` — one job, no `if:` at
 any level, whose only step runs `.goblin/bin/goblin-verify`. It is `owned`, so a second install is a
 no-op and a hand-edited copy is never overwritten.
@@ -70,11 +70,14 @@ comment and cannot count toward a pass.
 
 ---
 
-## 3. The Electron / desktop-shell class (F)
+## 3. The Electron opt-in (software class)
 
-Class F exists because a desktop shell needs a part no other class has — a **host gate**, a number
-measured on a machine with a display — and forbids a thing the others allow: a **renderer that
-reaches Node or the filesystem directly**. That is a new row-set, not a flag on class A.
+An Electron app is the **`software`** class with `electron: true`. The opt-in exists because such an
+app needs a part no other shape has — a **host gate**, a number measured on a machine with a display
+— and forbids a thing the plain software class allows: a **renderer that reaches Node or the
+filesystem directly**. The merge measured the old sixth class's part needs identical to `software` on
+all ten parts, so none of this is a sixth column in `manifest/classes.tsv`: it is the `bans:` list and
+the `perf.host_gate:` key, rendered over the software preset by `presets/electron-overlay.yaml`.
 
 ### 3.1 The failure surface, and the check for each
 
@@ -94,14 +97,14 @@ reaches Node or the filesystem directly**. That is a new row-set, not a flag on 
 
 ### 3.2 The perf lane: one ratchet, and a host gate beside it
 
-There is **one** mechanism, and class F reuses it unchanged: `ratchet: {name, cmd, ceiling}`,
+There is **one** mechanism, and the opt-in reuses it unchanged: `ratchet: {name, cmd, ceiling}`,
 enforced by `GT-04`/`GT-05` and pinned to a commit by `PF-01`. A second perf mechanism is not
 introduced.
 
 What the ratchet measures here is `app_bundle_bytes` — the packaged bundle's byte count. It is
 hermetic, it needs no browser, no display and no dependency, and a fat bundle is a slow cold start on
 every machine. **The FPS number is declared as a host gate instead** (`perf_host_gate:` in
-`presets/F-electron.yaml`), and carried in the HANDOFF with the date it was measured.
+`presets/electron-overlay.yaml`), and carried in the HANDOFF with the date it was measured.
 
 This is a **deviation from G6 §B.3**, which put `main_thread_busy_pct` in the ratchet, and the reason
 is measured: the instrument that produces it — CDP `Performance.getMetrics`, or

@@ -207,6 +207,27 @@ check "  and gives it a CI-lane row in the preset matrix" "$?"
 grep -q 'docs/CI.md' README.md
 check "README's document table names the CI lane (W4-B)" "$?"
 
+# ---- W6: desktop/F is a legacy ALIAS, never a class a reader picks ----------------------------
+# W6 merged the sixth (desktop/F) class into software — their classes.tsv need columns were
+# identical on all ten parts. The CLI still accepts `desktop`/`F` as a read-time alias, documented
+# once on docs/CONTRACTS.md's --class line; no doc that teaches the class CHOICE may carry it. Same
+# shape as the W5-D clone-install absence assertions below.
+DESKTOP_TAUGHT=""
+for f in README.md docs/GUIDE.md docs/ADOPTION.md docs/ENFORCEMENT.md docs/CI.md skills/goblin-bootstrap/SKILL.md; do
+  grep -qi 'desktop' "$f" && DESKTOP_TAUGHT="$DESKTOP_TAUGHT $f"
+done
+if [ -z "$DESKTOP_TAUGHT" ]; then
+  note "ok   no class-choice doc teaches 'desktop' as a class (W6: desktop/F is a legacy alias)"
+else
+  note "FAIL still presents 'desktop' as a class:$DESKTOP_TAUGHT"
+  grep -ni 'desktop' $DESKTOP_TAUGHT | head -3
+  fail=1
+fi
+# And the alias is still documented, once, where the CLI surface is described - so the absence
+# above cannot be satisfied by deleting the back-compat story.
+grep -qi 'desktop' docs/CONTRACTS.md
+check "docs/CONTRACTS.md documents desktop/F as a read-time alias (W6)" "$?"
+
 # ---- F2-3: the unsigned record is admitted -----------------------------------
 grep -qi 'is not signed' docs/LIMITS.md
 check "docs/LIMITS.md admits that installed.json is not signed (F2-3)" "$?"

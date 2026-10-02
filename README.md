@@ -53,7 +53,7 @@ After installing, in this order:
     gob emit --platform <p>                   # optional, per platform: the agent skills are an opt-in
     gob audit                              # once, deliberately: the ONLY network step (SC-07)
 
-**A default class-A install (no agent skills — those are `gob emit`'s job) verifies green —
+**A default software-class install (no agent skills — those are `gob emit`'s job) verifies green —
 `38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists. Before that edit the scaffold's `0000000` placeholder is
 the one expected red: `37 passed, 1 failed`, `HP-05`. Both numbers measured at W6 (neutral-first);
@@ -91,7 +91,7 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 | `gob upgrade` | migrate a repo to the shared global engine at `~/.goblin/engine` — 8 steps, two commits, one report |
 | `gob doctor` | one run across the platforms below: DETECTED / NOT-DETECTED / DRIFT per platform |
 | `gob emit` | write the skills + context block for one platform (`--scope project` or `global`); `--unshadow` removes a hermes project skill whose hash equals the source |
-| `gob init` | the first-run wizard: detect → class → branch/email → first gate → emit → verify, one screen per question; every question has a flag (`--class app --branch main --email a@b.c --gate 'cmd' --emit hermes`), so CI runs it with zero prompts; `--dry-run` prints the plan and writes nothing |
+| `gob init` | the first-run wizard: detect → class → branch/email → first gate → emit → verify, one screen per question; every question has a flag (`--class software --branch main --email a@b.c --gate 'cmd' --emit hermes`), so CI runs it with zero prompts; `--dry-run` prints the plan and writes nothing |
 
 `goblin` remains as a legacy alias for every command above — existing scripts keep working, but
 new commands and docs use `gob`.
@@ -145,9 +145,9 @@ below is the reference material the guide points into, so the two do not compete
 | `docs/CONTRACTS.md` | the installer/verifier interface, exit codes, idempotency, uninstall |
 | `docs/INTEGRATION.md` | the board, cron, the skills precedence order, the referenced standard |
 | `docs/RISKS.md` | the risk register, the advisory rows named, the non-goals |
-| `docs/CI.md` | the CI lane: what makes a workflow a gate, the four settings a repository cannot set, and the desktop-shell class |
+| `docs/CI.md` | the CI lane: what makes a workflow a gate, the four settings a repository cannot set, and the electron opt-in |
 | `docs/LOOP.md` | the judge role and the loop contract: what a goal-mode loop actually does, the record, and what neither can see |
-| `docs/ADOPTION.md` | the six classes, the preset matrix, the adoption order |
+| `docs/ADOPTION.md` | the five classes, the preset matrix, the adoption order |
 | `docs/LIMITS.md` | where this is weaker than its sources, and what is unproven |
 
 `manifest/enforcement.tsv` is the source of truth for rules; `manifest/classes.tsv` for what a

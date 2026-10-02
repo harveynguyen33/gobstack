@@ -7,12 +7,15 @@ description: P8: adopt goblin-stack in a repo - classify, install, verify, then 
 
 Use when adopting goblin-stack in a repo, or starting one.
 
-1. **Classify the project A-F.** The class selects which parts are required, optional or off;
-   it is not a stringency level. F is a desktop shell: it adds the electron bans and a host gate.
+1. **Classify the project into one of five classes.** `software`, `service`, `game`, `research` or
+   `fleet` — the class selects which parts are required, optional or off; it is not a stringency
+   level. `software` also carries the electron opt-in (`--electron`): an Electron app is `software`
+   with the electron bans and a host gate, not a sixth class. The letters `A`-`E` and the older
+   names are read-time aliases.
 2. **`goblin-install --target <dir> --class <x>`** — the default install is a NEUTRAL harness:
    no agent skills. Opt in per platform afterwards with `gob emit --platform <p>` (or vendor the
    Hermes project tier with `--skills yes`).
-3. **`goblin-verify`** — a default class-A install (no agent skills) verifies green:
+3. **`goblin-verify`** — a default software-class install (no agent skills) verifies green:
    `38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0, once `HANDOFF.md` names a commit that
    exists; before that edit the
    scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`37 passed, 1 failed`).

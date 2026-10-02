@@ -97,7 +97,7 @@ see the plan first:
     git config user.email "you@example.com"
     git config user.name "you"
 
-    gob init --target . --class app --branch main --email "you@example.com" \
+    gob init --target . --class software --branch main --email "you@example.com" \
         --gate "bash tests/run-tests.sh" --yes
 
 or the plain installer this wizard drives, if you prefer the one-shot shape:
@@ -199,7 +199,7 @@ Everything you configure lives in **one file**, created once and then never over
 
 Open it. The keys that matter on day one:
 
-    class: A                              # A|B|C|D|E|F - what kind of project this is (step 6)
+    class: software                       # software|service|game|research|fleet (A-E are aliases) - what kind of project this is (step 6)
     branch: main                          # DECLARED, never assumed
     owner_email: you@example.com          # the commit identity this repo expects
     practice: /path/to/your-standard.md   # optional: your own house rules, hash-pinned
@@ -245,19 +245,21 @@ supplies the default gate shape. Choose by asking *what does "done" mean here?*
 
 | Class | Choose it when | "Done" means |
 |---|---|---|
-| **A · Shipped software** | an app, library, or tool users run | a gate set reports measured numbers and a round lands |
-| **B · Service / config** | an API, schema, route, or deployment config | the contract is unchanged, or the change is deliberate and migrated |
-| **C · Game** | a game | a suite is green **and** a human feel verdict exists |
-| **D · Knowledge / research** | notes, a vault, a research directory | a question is answered with sources and is findable |
-| **E · Agent-fleet config** | your agent's own config (`~/.hermes`) | the change is applied, verified against the artifact, versioned |
-| **F · Desktop shell** | an Electron / desktop app | renderer isolated from Node, main process not busy, no dev dependency shipped |
+| **software** (A) | an app, library, or tool users run | a gate set reports measured numbers and a round lands |
+| **service** (B) | an API, schema, route, or deployment config | the contract is unchanged, or the change is deliberate and migrated |
+| **game** (C) | a game | a suite is green **and** a human feel verdict exists |
+| **research** (D) | notes, a vault, a research directory | a question is answered with sources and is findable |
+| **fleet** (E) | your agent's own config (`~/.hermes`) | the change is applied, verified against the artifact, versioned |
+
+An Electron app is **software** with `electron: true` — the opt-in adds the electron bans and a host
+gate, not a sixth class. The old `F` letter still resolves there as an install alias.
 
 **Two placements people get wrong:**
 
-- A repo that holds *output* while the code lives elsewhere → **D**, not A. Gating it like an
-  application gates the wrong artifact.
-- A plain input directory that is not a build target → **D** with `--archive`, which tells verify to
-  expect no HANDOFF and no gates, and to say so.
+- A repo that holds *output* while the code lives elsewhere → **research**, not **software**. Gating
+  it like an application gates the wrong artifact.
+- A plain input directory that is not a build target → **research** with `--archive`, which tells
+  verify to expect no HANDOFF and no gates, and to say so.
 
 Switch class later by editing `class:` in the config and re-running install. The parts you no longer
 need are recorded as **disabled** and will report `SKIP (opt-out)` rather than failing.
@@ -392,7 +394,7 @@ the next session.
 
 ## 9. What to expect on day one (so you do not misread it)
 
-A class-A install lands on a specific shape. The scaffold ships one deliberate red — `HP-05`, the
+A software-class install lands on a specific shape. The scaffold ships one deliberate red — `HP-05`, the
 `0000000` placeholder in `HANDOFF.md` (§4) — so a literal first run prints:
 
     37 passed, 1 failed, 11 advisory, 33 skipped     (the one FAIL is HP-05)
@@ -409,7 +411,7 @@ Two readings that are easy to get wrong:
 
 - **Advisory rows are not passes.** Ten rules are labelled `advisory` — counted, not enforced, and
   nine of them carry no executable check at all. The count is capped by `advisory_ceiling: 10`, and
-  a class-A install already sits at 10 of 10: adding another unenforceable rule fails verify until
+  a software-class install already sits at 10 of 10: adding another unenforceable rule fails verify until
   one is removed. That is intentional. (The summary line can print `11 advisory`: the eleventh ADV
   line is `JG-02`, a row with a real command of its own that reports ADV here because your model
   file declares no `judge:` lane — it prints the remedy rather than failing a repo for a fleet's
@@ -485,7 +487,7 @@ engine and silently de-migrate the record).
 
 ### Commands
 
-    gob install --target <dir> --class A|B|C|D|E|F [options]
+    gob install --target <dir> --class <software|service|game|research|fleet> [options]
     gob install --target <dir> --uninstall
     gob install --target <dir> --re-pin
     gob install --target <dir> --upgrade
