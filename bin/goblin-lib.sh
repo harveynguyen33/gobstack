@@ -185,6 +185,33 @@ g_part_disabled() {
 }
 
 # ------------------------------------------------------------- class data ----
+# g_class_canon <spelling> -> the canonical class NAME
+#   software | service | game | research | fleet
+# The taxonomy is five domain-named classes. The letters A-E and the older taught domain names
+# (app, agent, desktop) stay as READ-TIME aliases so every existing installed.json / goblin.yaml
+# - which record a letter or an old name - keeps verifying with no rewrite. `desktop` / `F` / `f`
+# resolve to `software`: F was merged into A (their classes.tsv need columns are identical), and
+# what made a desktop shell different is the `electron:` opt-in + ban list, config keys the repo
+# already carries. Unknown spelling -> empty output; the caller refuses with the enum.
+g_class_canon() {
+  case "$1" in
+    software|A|a|app)    printf 'software' ;;
+    service|B|b)         printf 'service' ;;
+    game|C|c)            printf 'game' ;;
+    research|D|d)        printf 'research' ;;
+    fleet|E|e|agent)     printf 'fleet' ;;
+    desktop|F|f)         printf 'software' ;;
+    *) return 1 ;;
+  esac
+}
+
+# g_class_is_electron_alias <spelling> -> 0 when the spelling is the merged desktop/F spelling.
+# `--class desktop` (or F/f) must mean the OLD desktop install, not a silently weaker software
+# one: the installer auto-sets electron: true so the alias behaves as F did.
+g_class_is_electron_alias() {
+  case "$1" in desktop|F|f) return 0 ;; *) return 1 ;; esac
+}
+
 # g_class_need <classes.tsv> <class> <part> -> R | O | -
 g_class_need() {
   awk -F'\t' -v c="$2" -v p="$3" '
