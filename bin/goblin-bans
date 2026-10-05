@@ -88,6 +88,14 @@ if [ -f "$CONFIG" ]; then
   ENABLED=$(g_yaml_scalar "$CONFIG" bans)
   ENABLED=${ENABLED#[}; ENABLED=${ENABLED%]}
   ENABLED=$(printf '%s' "$ENABLED" | tr ',' ' ' | tr -s ' ' ' ')
+  # The electron opt-in (software class): `electron: true` turns the electron ban set ON even
+  # when a hand-edited bans: list omits it — the declaration is the contract, and the engine
+  # (not the LLM) is what makes a listed ban non-skippable. A repo without the key is unaffected.
+  if [ "$(g_yaml_scalar "$CONFIG" electron)" = "true" ]; then
+    for e in BN-06 BN-07 BN-08 BN-09; do
+      case " $ENABLED " in *" $e "*) ;; *) ENABLED="$ENABLED $e" ;; esac
+    done
+  fi
 fi
 enabled() {
   [ -z "$ENABLED" ] && return 1

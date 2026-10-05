@@ -175,17 +175,17 @@ done
 grep -q 'main_thread_busy_pct' docs/CI.md && grep -q 'app_bundle_bytes' docs/CI.md
 check "docs/CI.md carries the Electron perf deviation, both metrics named" "$?"
 
-# ---- W4-B: the class matrix is rendered from manifest/classes.tsv ----------------------------
-# The part/class table is where a reader decides what a class owes, so it is the one place a sixth
-# class can rot in silence: the row set moved to `ci-gate R/-/O/-/O/R` at W4 and
-# docs/ENFORCEMENT.md's table has to move with it. The tsv is one row per (class, part) pair -
-# `class<TAB>part<TAB>need` - and the doc renders a missing part as an em dash, so normalise.
-# docs/ADOPTION.md's matrix is prose ("SPEC before change", "Design tokens"), so it is checked for
-# its COLUMNS, not cell by cell.
+# ---- W4-B / W6: the class matrix is rendered from manifest/classes.tsv ------------------------
+# The part/class table is where a reader decides what a class owes, so it is the one place a class
+# can rot in silence: the row set moved to `ci-gate R/-/O/-/O/R` at W4, and W6 merged the sixth
+# (desktop/F) class into `software` - five domain-named columns now, with A-E as read-time aliases.
+# The tsv is one row per (class, part) pair - `class<TAB>part<TAB>need` - and the doc renders a
+# missing part as an em dash, so normalise. docs/ADOPTION.md's matrix is prose ("SPEC before
+# change", "Design tokens"), so it is checked for its COLUMNS, not cell by cell.
 CLASS_DRIFT=""
 CLS=$(awk -F'\t' 'NR>1 { if (!seen[$2]++) print $2 }' manifest/classes.tsv)
 for part in $CLS; do
-  want=$(for c in A B C D E F; do
+  want=$(for c in software service game research fleet; do
            need=$(awk -F'\t' -v c="$c" -v p="$part" '$1==c && $2==p { print $3 }' manifest/classes.tsv)
            printf '%s|' "${need:--}"
          done | sed 's/|$//')
@@ -196,12 +196,43 @@ done
 [ -z "$CLASS_DRIFT" ] || note "class matrix drifted from manifest/classes.tsv:$CLASS_DRIFT"
 check "docs/ENFORCEMENT.md renders the class matrix from manifest/classes.tsv (W4-B)" \
   "$([ -z "$CLASS_DRIFT" ] && echo 0 || echo 1)"
-grep -q '^| \*\*F\. Desktop shell\*\* |' docs/ADOPTION.md
-check "docs/ADOPTION.md names the sixth class (W4-B)" "$?"
+# W6 review guard: the matrix loop above iterates the tsv's PARTS, so it cannot see a re-added
+# CLASS - a silently restored sixth class passed the whole suite. Pin the class SET itself.
+CLS_SET=$(awk -F'\t' 'NR>1 { if (!seen[$1]++) print $1 }' manifest/classes.tsv | sort | tr '\n' ' ')
+[ "$CLS_SET" = "fleet game research service software " ] || note "classes.tsv class set is not the canonical five: '$CLS_SET'"
+check "manifest/classes.tsv carries exactly the five canonical classes (W6)" \
+  "$([ "$CLS_SET" = "fleet game research service software " ] && echo 0 || echo 1)"
+# W6: the sixth (desktop/F) class is merged into software; ADOPTION now teaches five domain-named
+# classes and carries the electron opt-in that replaced F. The old pin measured the F row itself.
+grep -q '^| \*\*software\*\* (A) |' docs/ADOPTION.md
+check "docs/ADOPTION.md names the software class (W6: the F class merged in)" "$?"
+grep -qi 'electron opt-in' docs/ADOPTION.md
+check "  and states the electron opt-in that replaced the sixth class (W6)" "$?"
 grep -qi '^| CI lane |' docs/ADOPTION.md
 check "  and gives it a CI-lane row in the preset matrix" "$?"
 grep -q 'docs/CI.md' README.md
 check "README's document table names the CI lane (W4-B)" "$?"
+
+# ---- W6: desktop/F is a legacy ALIAS, never a class a reader picks ----------------------------
+# W6 merged the sixth (desktop/F) class into software — their classes.tsv need columns were
+# identical on all ten parts. The CLI still accepts `desktop`/`F` as a read-time alias, documented
+# once on docs/CONTRACTS.md's --class line; no doc that teaches the class CHOICE may carry it. Same
+# shape as the W5-D clone-install absence assertions below.
+DESKTOP_TAUGHT=""
+for f in README.md docs/GUIDE.md docs/ADOPTION.md docs/ENFORCEMENT.md docs/CI.md skills/goblin-bootstrap/SKILL.md; do
+  grep -qi 'desktop' "$f" && DESKTOP_TAUGHT="$DESKTOP_TAUGHT $f"
+done
+if [ -z "$DESKTOP_TAUGHT" ]; then
+  note "ok   no class-choice doc teaches 'desktop' as a class (W6: desktop/F is a legacy alias)"
+else
+  note "FAIL still presents 'desktop' as a class:$DESKTOP_TAUGHT"
+  grep -ni 'desktop' $DESKTOP_TAUGHT | head -3
+  fail=1
+fi
+# And the alias is still documented, once, where the CLI surface is described - so the absence
+# above cannot be satisfied by deleting the back-compat story.
+grep -qi 'desktop' docs/CONTRACTS.md
+check "docs/CONTRACTS.md documents desktop/F as a read-time alias (W6)" "$?"
 
 # ---- F2-3: the unsigned record is admitted -----------------------------------
 grep -qi 'is not signed' docs/LIMITS.md
@@ -316,7 +347,7 @@ fi
 # is gone: npm is the only route it gives, in §2, §3, §10 and the appendix.
 grep -q 'npm i -g @techgoblin/gobstack' docs/GUIDE.md
 check "docs/GUIDE.md names the npm route (W5-D)" "$?"
-grep -q 'gob install --target . --class A' docs/GUIDE.md
+grep -q 'gob install --target . --class software' docs/GUIDE.md
 check "  and gives the npm CLI's Step-1 command (W5-D)" "$?"
 if grep -q 'bin/goblin-install' docs/GUIDE.md || grep -qi 'route b' docs/GUIDE.md \
    || grep -qF '"$GS' docs/GUIDE.md; then

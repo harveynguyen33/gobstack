@@ -9,7 +9,10 @@ same way the fleet's own tool reads it. Everything else is line-oriented shell.
     goblin-install --target <dir> [options]
 
     --target <dir>        required; the repo root to install into
-    --class A|B|C|D|E|F  required unless --uninstall or --re-pin
+    --class <class>       required unless --uninstall or --re-pin. One of the five domain classes:
+                          software · service · game · research · fleet. The letters A-E and the
+                          older names app (software), agent (fleet) and desktop/F (software + the
+                          electron opt-in) are read-time aliases.
     --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)
     --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md)
     --parts <list>        comma list to install; default = every part the class requires
@@ -115,7 +118,7 @@ Output is one line per executed row, in manifest order, plus a summary line at t
     ADV   MD-02  code lane and review lane both resolve to the same family
     SKIP  HS-02  no pinned pre-change commit yet - REPLAY not provable
 
-Those four lines are one row of each marking. The summary line of a green default class-A run is:
+Those four lines are one row of each marking. The summary line of a green default software-class run is:
 
           38 passed, 0 failed, 11 advisory, 33 skipped
 
@@ -138,7 +141,7 @@ settings that make a workflow a **gate** are written down.
 
 ### A fresh install verifies green
 
-Measured on a fresh DEFAULT class-A install (skills opt-in, W6 neutral-first), committed with no
+Measured on a fresh DEFAULT software-class install (skills opt-in, W6 neutral-first), committed with no
 hand edit: **`38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0.** Thirty-three rows skip with
 a reason — the same not-yet rows as before, plus the five skill rows (`SK-01`..`SK-04`,
 `AU-04`) that skip on the `playbooks` opt-out a skills-free install records: `HS-02` — no pre-change commit
@@ -178,7 +181,7 @@ verifier is reporting FAILs.
 - **Per part:** `--opt-out <part>` records the part in `disabled:`. `goblin-verify` then reports
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a class's `-` (off) real.
-- **The opt-out numbers are pinned (V3-3).** A class-A install with an explicit `--skills no`
+- **The opt-out numbers are pinned (V3-3).** A software-class install with an explicit `--skills no`
   verifies `38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
@@ -201,7 +204,7 @@ verifier is reporting FAILs.
 
 ## The two commands, verbatim
 
-    bash bin/goblin-install --target /path/to/repo --class A
+    bash bin/goblin-install --target /path/to/repo --class software
     .goblin/bin/goblin-verify
 
 From a checkout, without installing anything:

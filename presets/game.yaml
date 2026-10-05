@@ -1,4 +1,4 @@
-# presets/C-game.yaml — class C: game.
+# presets/game.yaml — the `game` class (letter/alias C).
 #
 # "Done" means a suite green in the Editor AND a human feel verdict. The verdict is a
 # first-class deliverable, which is why this class requires the review-panel part: the panel

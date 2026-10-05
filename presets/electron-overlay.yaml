@@ -1,0 +1,38 @@
+# presets/electron-overlay.yaml — the electron opt-in for the `software` class.
+#
+# The `desktop` class is gone; F was merged into software because their classes.tsv need
+# columns are IDENTICAL on all 10 parts (measured). Everything F added beyond software lives in
+# plain goblin.yaml config keys, so it is an OVERLAY, not a class: `gob install --class software
+# --electron` (or the `--class desktop` / `F` alias, which sets --electron) renders the keys
+# below OVER the software preset. An absent key falls through to presets/software.yaml; a key
+# present here — including an empty one like sec_write_routes: "" — wins.
+#
+# The prose F carried (label / done_means / notes) is preserved here for the record; it is not a
+# rendered template key, so it never reaches a target's goblin.yaml.
+label: Desktop shell
+done_means: the renderer is isolated from Node, the main process is not busy, and the packaged bundle ships no dev dependency
+# software's A-only second gate (the TODO ceiling) is NOT applied: F never had it.
+gate2_name: ""
+gate2_cmd: ""
+# The perf lane is the shipped ratchet, reused verbatim; the hermetic number here is the
+# packaged bundle's byte count (a fat bundle is a slow cold start on every machine).
+ratchet_name: app_bundle_bytes
+ratchet_cmd: find dist out release -type f -exec cat {} + 2>/dev/null | wc -c
+sec_build_output: dist out release
+# A renderer that reaches the filesystem or Node directly is forbidden, so there are no write
+# routes to allow (software allows app/ and src/app/; the overlay blanks that).
+sec_write_routes: ""
+# perf_metric must EQUAL ratchet_name (PF-01 fails when the budget and the measurement disagree).
+perf_metric: app_bundle_bytes
+perf_cmd: find dist out release -type f -exec cat {} + 2>/dev/null | wc -c
+# THE FPS NUMBER IS A HOST GATE, not the ratchet: the instrument that produces
+# main_thread_busy_pct needs Playwright or Electron plus a GUI, which the no-npm contract
+# forbids a shipped rule to launch. It is DECLARED here and carried in the HANDOFF with its date
+# (docs/LIMITS.md #34, docs/CI.md carries the sweep). `electron: true` with this empty FAILs PF-01.
+perf_host_gate: "Electron run - main_thread_busy_pct with a window open (app.getAppMetrics()[i].cpu.percentCPUUsage, or CDP Performance.getMetrics), on a machine with a display"
+# The nine electron bans (G5's mechanism, G6's failure surface): nodeIntegration, context
+# isolation / sandbox, the dangerous webPreferences, and synchronous IPC / @electron/remote. An
+# unlisted ban SKIPs with a reason, so the other classes are unaffected; with electron: true the
+# engine also treats BN-06..09 as enabled even if a hand-edited bans: list omits them.
+bans: BN-01, BN-02, BN-05, BN-06, BN-07, BN-08, BN-09
+notes: a perf number measured on one box is not a user's experience - the renderer half can be a CI job, the Electron half is a host gate and cannot be.

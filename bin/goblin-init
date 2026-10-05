@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # goblin-init — the W6 first-run wizard (`gob init`).
 #
-#   gob init [--target <dir>] [--class <app|service|game|research|agent|desktop|A..F>]
-#               [--branch <name>] [--email <addr>] [--gate <cmd>]
+#   gob init [--target <dir>] [--class <software|service|game|research|fleet|A..E|app|agent|desktop>]
+#               [--electron] [--branch <name>] [--email <addr>] [--gate <cmd>]
 #               [--emit <p[,p..]>] [--scope project|global] [--yes] [--dry-run]
 #
 # One screen per question, answered steps collapsing into the ✔/◆/○ rail above. On a tty
@@ -143,6 +143,7 @@ ask_value() {
 
 # ------------------------------------------------------------------ flags -----
 TARGET="" CLASS="" BRANCH="" EMAIL="" GATE="" EMIT="" SCOPE=""
+ELECTRON=0
 YES=0; DRYRUN=0
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
@@ -150,6 +151,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --target)  TARGET="${2:-}"; shift 2 ;;
     --class)   CLASS="${2:-}"; shift 2 ;;
+    --electron) ELECTRON=1; shift ;;
     --branch)  BRANCH="${2:-}"; shift 2 ;;
     --email)   EMAIL="${2:-}"; shift 2 ;;
     --gate)    GATE="${2:-}"; shift 2 ;;
@@ -255,45 +257,45 @@ if [ -z "$CLASS" ]; then
   if [ "$TTY_IN" -eq 1 ]; then
     rail_say ""
     rail_say "      ${C_MUTED}what kind of work does this repo do?$C_RESET"
-    rail_say "      $C_TEXT  1 ▸ app        shipped features, PRs, review gates        ${C_DIM}(class A)$C_RESET"
+    rail_say "      $C_TEXT  1 ▸ software   shipped features, PRs, review gates        ${C_DIM}(class A)$C_RESET"
     rail_say "      $C_TEXT  2   service    backend jobs, config, unattended runs      ${C_DIM}(class B)$C_RESET"
     rail_say "      $C_TEXT  3   game       playable builds, perf budgets              ${C_DIM}(class C)$C_RESET"
     rail_say "      $C_TEXT  4   research   specs, replays, reference corpora          ${C_DIM}(class D)$C_RESET"
-    rail_say "      $C_TEXT  5   agent      fleets, loops, unattended automation       ${C_DIM}(class E)$C_RESET"
-    rail_say "      $C_TEXT  6   desktop    the shell you live in, perf budget         ${C_DIM}(class F)$C_RESET"
-    rail_say "      ${C_MUTED}↑ number + Enter · Enter = app · the class letter works too (A-F)$C_RESET"
+    rail_say "      $C_TEXT  5   fleet      fleets, loops, unattended automation       ${C_DIM}(class E)$C_RESET"
+    rail_say "      ${C_MUTED}↑ number + Enter · Enter = software · a class letter also works (A-E)$C_RESET"
+    rail_say "      ${C_DIM}an Electron desktop shell: pick software, then --electron$C_RESET"
     printf '      '
     read -r REPLY_CLASS
     ASKED_ANY=1
     rail_say ""
   else
     REPLY_CLASS="1"
-    cascade "class: app (default; --class app|service|game|research|agent|desktop or A-F)"
+    cascade "class: software (default; --class software|service|game|research|fleet or A-E)"
   fi
   case "$REPLY_CLASS" in
-    1) CLASS="app" ;; 2) CLASS="service" ;; 3) CLASS="game" ;;
-    4) CLASS="research" ;; 5) CLASS="agent" ;; 6) CLASS="desktop" ;;
-    *) CLASS="${REPLY_CLASS:-app}" ;;
+    1) CLASS="software" ;; 2) CLASS="service" ;; 3) CLASS="game" ;;
+    4) CLASS="research" ;; 5) CLASS="fleet" ;;
+    *) CLASS="${REPLY_CLASS:-software}" ;;
   esac
 fi
-# Normalise every accepted spelling to the letter goblin-install requires. Domain names,
-# the class letter, and a lowercase letter all resolve; anything else is refused here,
-# with the full enum, rather than deep inside the installer.
-case "$CLASS" in
-  app|A|a)      CLASS="A" ;;
-  service|B|b)  CLASS="B" ;;
-  game|C|c)     CLASS="C" ;;
-  research|D|d) CLASS="D" ;;
-  agent|E|e)    CLASS="E" ;;
-  desktop|F|f)  CLASS="F" ;;
-  *)
-    g_err "--class must be app|service|game|research|agent|desktop (or A-F), got '$CLASS'"
-    exit 2 ;;
+# Resolve every accepted spelling to the canonical class NAME. The letters A-E and the old
+# taught names (app/agent/desktop) are read-time aliases; anything else is refused here, with
+# the full enum, rather than deep inside the installer. `desktop`/F means the OLD desktop
+# install, so it also sets the electron opt-in.
+g_class_is_electron_alias "$CLASS" && ELECTRON=1
+CLASS_RAW="$CLASS"
+CLASS=$(g_class_canon "$CLASS") \
+  || { g_err "--class must be software|service|game|research|fleet (or A-E / app / agent / desktop), got '$CLASS_RAW'"; exit 2; }
+case "$CLASS_RAW" in
+  app|agent|desktop) g_info "note: '$CLASS_RAW' is now called '$CLASS' (accepted as an alias)";;
 esac
-CLASS_NAME=$(ls "$SRC"/presets/"$CLASS"-*.yaml 2>/dev/null | head -n 1)
-STEP_VAL[1]="$C_TEXT$CLASS ($([ -n "$CLASS_NAME" ] && basename "$CLASS_NAME" .yaml | cut -d- -f2-))$C_RESET"
+if [ "$ELECTRON" -eq 1 ]; then
+  g_info "electron: on (the desktop opt-in — the app_bundle_bytes ratchet, BN-06..09 bans, a host gate)"
+fi
+CLASS_NAME="$SRC/presets/$CLASS.yaml"
+STEP_VAL[1]="$C_TEXT$CLASS$C_RESET"
 if [ "$TTY_OUT" -eq 1 ]; then
-  rail_say "  ✔ $((CURRENT - 1)). class            $C_TEXT$CLASS$([ -n "$CLASS_NAME" ] && printf ' — %s' "$(basename "$CLASS_NAME" .yaml | cut -d- -f2-)")$C_RESET"
+  rail_say "  ✔ $((CURRENT - 1)). class            $C_TEXT$CLASS$C_RESET"
 else
   cascade "class: $CLASS"
 fi
@@ -460,11 +462,15 @@ fi
 # never rewinds past its own buffer by counting lines it did not print.
 if [ "$TTY_OUT" -eq 1 ]; then
   rail_note ""
-  rail_note "  ${C_MUTED}running: goblin-install --target $TARGET --class $CLASS${C_RESET}"
+  rail_note "  ${C_MUTED}running: goblin-install --target $TARGET --class $CLASS$([ "$ELECTRON" -eq 1 ] && printf ' --electron')${C_RESET}"
 else
-  printf 'gob init [run] goblin-install --target %s --class %s\n' "$TARGET" "$CLASS"
+  printf 'gob init [run] goblin-install --target %s --class %s%s\n' "$TARGET" "$CLASS" "$([ "$ELECTRON" -eq 1 ] && printf ' --electron')"
 fi
-bash "$SRC/bin/goblin-install" --target "$TARGET" --class "$CLASS" --skills no --yes
+if [ "$ELECTRON" -eq 1 ]; then
+  bash "$SRC/bin/goblin-install" --target "$TARGET" --class "$CLASS" --electron --skills no --yes
+else
+  bash "$SRC/bin/goblin-install" --target "$TARGET" --class "$CLASS" --skills no --yes
+fi
 EXIT_INSTALL=$?
 if [ "$EXIT_INSTALL" -ne 0 ]; then
   g_err "install failed (exit $EXIT_INSTALL) — the refusals above name the path and the fix"

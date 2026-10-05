@@ -1,4 +1,4 @@
-# presets/E-fleet-config.yaml — class E: agent-fleet configuration.
+# presets/fleet.yaml — the `fleet` class (letters/aliases E, agent).
 #
 # "Done" means a config change is applied, verified against the ARTIFACT, and versioned.
 # The gate therefore checks the artifact (a commit exists, dated), never the intention.

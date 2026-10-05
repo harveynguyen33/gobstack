@@ -1,4 +1,4 @@
-# presets/A-shipped-software.yaml — class A: shipped software.
+# presets/software.yaml — the `software` class (letters/aliases A, app).
 #
 # A class is not a stringency level. It selects WHICH PARTS are required, optional or off
 # (manifest/classes.tsv), and it supplies the default gate/ratchet shape below. The gate

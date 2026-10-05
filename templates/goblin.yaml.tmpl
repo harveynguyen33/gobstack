@@ -4,8 +4,16 @@
 # Format: a flat, line-oriented YAML subset, parsed by .goblin/bin/goblin-lib.sh. No YAML
 # library, no network, no npm. Keep one key per line and keep comments on their own line.
 
-# Which class this project is (A|B|C|D|E). Selects the required parts (manifest/classes.tsv).
+# Which class this project is: software | service | game | research | fleet.
+# The letters A-E and the older names app/agent/desktop are READ-TIME aliases, so an old
+# value keeps verifying; `desktop`/`F` resolve to software. Selects the required parts
+# (manifest/classes.tsv).
 class: {{CLASS}}
+
+# Electron opt-in (software class). true turns on the electron ban set (BN-06..09) even if the
+# bans: list below omits them, and requires a declared perf.host_gate (PF-01 fails without one).
+# The `desktop`/`F` install alias sets this true; a text-editor app leaves it false.
+electron: {{ELECTRON}}
 
 # The default branch, DECLARED, never assumed. A preset that assumes the wrong branch
 # silently skips a repo.
