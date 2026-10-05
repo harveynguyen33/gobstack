@@ -59,6 +59,11 @@ new_i1() {
     # not describe.
     bash "$INSTALL" --target . --class A --skills yes --models "$WORK/models.yaml" \
       --practice "$WORK/standard.md" >/dev/null 2>&1
+    # The migration's I3 gate accepts only 0.4.x records, and since the 0.5.0 bump the
+    # installer stamps the CURRENT source version. The fixture must describe a PRE-migration
+    # 0.4.4 install, so pin the record's version back after installing (the hashes are
+    # unaffected — installed.json is not inside its own files map; measured 2026-10-05).
+    sed -i 's/"version": "0\.[0-9][0-9]*\.[0-9][0-9]*"/"version": "0.4.4"/' "$1/.goblin/installed.json"
     git add -A && git commit -q -m "install gobstack"
     hs=$(git rev-parse --short HEAD)
     sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$hs\`/" HANDOFF.md
@@ -215,8 +220,14 @@ check "U11 the refusal names the revert remedy" "$?"
 # the refusal wrote nothing (the payload was NOT re-created)
 [ -z "$(git -C "$P" status --porcelain)" ]
 check "U11 the refused install wrote nothing" "$?"
-# revert the re-upgrade: on the vendored repo again, the install keeps its no-op path
+# revert the re-upgrade: on the vendored repo again, the install keeps its no-op path.
+# The no-op path needs the record's version to equal the CURRENT source version, and the
+# reverted tree carries the pinned legacy 0.4.4 record (see new_i1) — so re-pin FORWARD to
+# the source version before installing, exactly what a user at the current version has.
 git -C "$P" revert --no-edit HEAD HEAD~1 >/dev/null 2>&1
+CUR_V=$(cat "$SRC/VERSION")
+sed -i "s/\"version\": \"0\.4\.4\"/\"version\": \"$CUR_V\"/" "$P/.goblin/installed.json"
+git -C "$P" add -A && git -C "$P" commit -q -m "record at the current source version"
 HOME="$HOMEDIR" bash "$INSTALL" --target "$P" --class A --models "$WORK/models.yaml" --practice "$WORK/standard.md" > "$WORK/u11b" 2>&1
 RC_U11B=$?
 grep -q 'no-op:' "$WORK/u11b"
@@ -224,7 +235,11 @@ check "U11 on the reverted (vendored) repo the install stays a no-op" \
   "$([ "$RC_U11B" -eq 0 ] && grep -q 'no-op:' "$WORK/u11b" && echo 0 || echo 1)"
 )
 (# ============================================================ U12: gate.sh + CI re-point --
-# re-upgrade the (vendored-again) probe and read the re-pointed artifacts
+# re-upgrade the (vendored-again) probe and read the re-pointed artifacts. U11b's no-op
+# install left the record at the CURRENT source version, which the I3 gate (0.4.x only)
+# refuses — pin the record back to the legacy 0.4.4 shape first (same move as new_i1).
+sed -i 's/"version": "0\.[0-9][0-9]*\.[0-9][0-9]*"/"version": "0.4.4"/' "$P/.goblin/installed.json"
+git -C "$P" add -A && git -C "$P" commit -q -m "restore the legacy record for the re-upgrade"
 OUT_U12=$(up "$P" --engine-dir "$HOMEDIR/engine" --yes 2>&1); RC_U12=$?
 check "U12 the re-upgrade for U12 exits 0" "$([ "$RC_U12" -eq 0 ] && echo 0 || echo 1)"
 GATE_OUT=$(in_dir "$P" env HOME="$HOMEDIR" bash checks/gate.sh 2>&1); RC_GATE=$?
