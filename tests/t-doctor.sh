@@ -72,8 +72,11 @@ check "T2 no other platform DRIFTs" "$([ "$(wc -l < "$WORK/drift-sects.txt")" -e
 cp "$SRC/skills/practice/SKILL.md" "$TAMPER"
 
 # ---- T2b: a stale context-block VERSION is drift ---------------------------------
+# The tamper swaps the STAMPED version (the emit-time VERSION, v0.5.0 since the 0.5.0 bump)
+# for a wrong one; the restore puts the stamped one back. Both seds read the stamp from
+# $SRC/VERSION so the fixture tracks the bump instead of a hardcoded string.
 for ctx in AGENTS.md CLAUDE.md GEMINI.md; do
-  [ -f "$REPO/$ctx" ] && sed -i 's/goblin-stack:begin v0.4.4/goblin-stack:begin v0.0.1/' "$REPO/$ctx"
+  [ -f "$REPO/$ctx" ] && sed -i "s/goblin-stack:begin v$(cat "$SRC/VERSION")/goblin-stack:begin v0.0.1/" "$REPO/$ctx"
 done
 OUT=$(HOME="$HOMEDIR" PATH="$BARE_PATH" $DOCTOR --target "$REPO" 2>&1); RC=$?
 check "T2 stale marker VERSION: doctor exits 1" "$(( RC == 1 ? 0 : 1 ))"
@@ -81,7 +84,7 @@ printf '%s\n' "$OUT" | grep -q 'does not match v'
 check "T2 the stale block names the VERSION mismatch" "$?"
 # restore the marker VERSION
 for ctx in AGENTS.md CLAUDE.md GEMINI.md; do
-  [ -f "$REPO/$ctx" ] && sed -i 's/goblin-stack:begin v0.0.1/goblin-stack:begin v0.4.4/' "$REPO/$ctx"
+  [ -f "$REPO/$ctx" ] && sed -i "s/goblin-stack:begin v0.0.1/goblin-stack:begin v$(cat "$SRC/VERSION")/" "$REPO/$ctx"
 done
 OUT=$(HOME="$HOMEDIR" PATH="$BARE_PATH" $DOCTOR --target "$REPO" 2>&1); RC=$?
 check "T2 after the restore, doctor is clean again (exit 0)" "$RC"
