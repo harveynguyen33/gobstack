@@ -176,7 +176,7 @@ tty_key() { # -> REPLY_KEY: UP | DOWN | SPACE | ENTER | <char>
         "[B") REPLY_KEY="DOWN" ;;
         *)    REPLY_KEY="OTHER" ;;
       esac ;;
-    ""|$(printf '\r'))  # Enter: LF from a cooked tty, CR from a raw one
+    ""|$(printf '\r')|$(printf '\n'))  # Enter: CR raw, LF cooked/ICRNL, LF from script(1)
       REPLY_KEY="ENTER" ;;
     " ")  # a literal space byte — dd bs=1 count=1 hands it through unreduced
       REPLY_KEY="SPACE" ;;
