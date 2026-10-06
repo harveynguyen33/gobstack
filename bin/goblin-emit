@@ -221,9 +221,18 @@ g_index_bytes() {
   local files=() n
   for n in $(selected_skills); do files+=("$SRCSKILLS/$n/SKILL.md"); done
   [ "${#files[@]}" -eq 0 ] && { printf '0'; return 0; }
-  awk 'FNR==1{c=0;n=0} /^---$/{c++; next}
-       c==1 && /^name:/{n+=length($0)+1} c==1 && /^description:/{n+=length($0)+1}
-       ENDFILE{tot+=n} END{print tot+0}' "${files[@]}" 2>/dev/null
+  # Portability (BSD catch, 2026-10-06): ENDFILE is a gawk extension. On mawk (the Debian
+  # default) and the macOS BWK awk it is a syntax error, stderr was discarded, and the
+  # run printed "procedure index size: 0 bytes" on every non-gawk machine. Sum per file
+  # with FNR==1 as the reset — the same meaning under every awk.
+  local f total=0
+  for f in "${files[@]}"; do
+    n=$(awk 'FNR==1{n=0} /^---$/{c++; next}
+         c==1 && /^name:/{n+=length($0)+1} c==1 && /^description:/{n+=length($0)+1}
+         END{print n+0}' "$f" 2>/dev/null)
+    total=$((total + ${n:-0}))
+  done
+  printf '%d' "$total"
 }
 
 # ---- the ledger (§4.4) -------------------------------------------------------------

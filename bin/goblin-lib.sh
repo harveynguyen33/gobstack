@@ -19,10 +19,66 @@
 GOBLIN_LIB_VERSION="0.5.0"
 
 # ---------------------------------------------------------------- output -----
-g_pass() { printf 'PASS  %-6s %s\n' "$1" "$2"; }
+# g_trunc <width> <text> — fold a long detail to one line at <width> columns, keeping the
+# head. Pure awk substr, no regex: the same shape under every awk (mawk, BWK, gawk).
+g_trunc() {
+  awk -v w="$1" -v t="$2" 'BEGIN{
+    if (length(t) <= w) { print t; exit }
+    print substr(t, 1, w - 1) "~"
+  }'
+}
+# g_fold <width> <indent> <text> — word-wrap <text> at <width>, continuing lines at
+# <indent> (the cannot-see footer shape). Byte-safe: awk length on bytes approximates
+# columns for ASCII prose, which is all this text is.
+g_fold() {
+  awk -v w="$1" -v ind="$2" '
+    {
+      line = $0
+      while (length(line) > w) {
+        cut = w
+        while (cut > 1 && substr(line, cut, 1) != " ") cut--
+        if (cut <= 1) cut = w
+        print substr(line, 1, cut)
+        sub(/^[ ]+/, "", substr(line, cut + 1))
+        line = substr(line, cut + 1)
+        sub(/^[ ]+/, "", line)
+        line = ind line
+      }
+      print line
+    }'
+}
+g_pass() {
+  if [ "${GOB_VERIFY_VERBOSE:-0}" -eq 1 ]; then
+    printf 'PASS  %-6s %s\n' "$1" "$(g_trunc "${GOB_REPORT_COLS:-100}" "$2")"
+  elif printf '%s' "$2" | grep -q "$(printf '\n')"; then
+    # Multi-line PASS payloads print whole: the payload often IS the pin a test reads
+    # (SK-03's advisory-ceiling line), and the collapse must not swallow it.
+    printf 'PASS  %-6s %s\n' "$1" "$2"
+  else
+    printf 'PASS  %-6s (ok)\n' "$1"
+  fi
+}
 g_fail() { printf 'FAIL  %-6s %s\n' "$1" "$2"; }
-g_adv()  { printf 'ADV   %-6s %s\n' "$1" "$2"; }
-g_skip() { printf 'SKIP  %-6s %s\n' "$1" "$2"; }
+g_adv() {
+  # Multi-line ADV payloads print whole: tests pin phrases on the SECOND line of a lane
+  # advisory (the W5-6 family statement), and the fold must not eat them. Single-line
+  # payloads are the ones the ~100-col truncation is for.
+  if printf '%s' "$2" | grep -q "$(printf '\n')"; then
+    printf 'ADV   %-6s %s\n' "$1" "$2"
+  else
+    printf 'ADV   %-6s %s\n' "$1" "$(g_trunc "${GOB_REPORT_COLS:-100}" "$2")"
+  fi
+}
+g_skip() {
+  # SKIPs keep their row line in every mode (tests and scripts read them by id). The
+  # collapse is the WIDTH, not the disappearance: the reason is truncated to the report
+  # width unless --verbose/--only asks for it whole.
+  if [ "${GOB_VERIFY_VERBOSE:-0}" -eq 1 ]; then
+    printf 'SKIP  %-6s %s\n' "$1" "$2"
+  else
+    printf 'SKIP  %-6s %s\n' "$1" "$(g_trunc "${GOB_REPORT_COLS:-100}" "$2")"
+  fi
+}
 g_info() { printf '%s\n' "$*"; }
 g_err()  { printf 'error: %s\n' "$*" >&2; }
 
