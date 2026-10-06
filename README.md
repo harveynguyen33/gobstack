@@ -56,7 +56,7 @@ After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other
     gob verify                             # or .goblin/bin/goblin-verify, inside the target
-    gob emit --platform <p>                   # optional, per platform: the agent skills are an opt-in
+    gob sync --platform <p>                   # optional, per platform: the agent skills are an opt-in (gob emit is the same verb)
     gob audit                              # once, deliberately: the ONLY network step (SC-07)
 
 **A default software-class install (no agent skills — those are `gob emit`'s job) verifies green —
@@ -92,12 +92,13 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 | `gob verify` | run the rule matrix against the current repo — `PASS`/`FAIL`/`SKIP` per row, exit 0 pass · 1 a check failed · 2 could not run · 3 the manifest is broken |
 | `gob bans` | run the ban list (per-pattern red lines over the source tree) |
 | `gob audit` | check recorded dependency claims against live advisory feeds — the only command that touches the network |
-| `gob install` | install the harness into a target repo: manifest, verifier, gates, HANDOFF — no agent skills (those are an opt-in: `gob emit --platform <p>`, or `--skills yes`) |
+| `gob install` | install the harness into a target repo: manifest, verifier, gates, HANDOFF — no agent skills (those are an opt-in: `gob sync --platform <p>`, or `--skills yes`); `--ci-gate yes|no` opts the CI lane in or out (default: the class decides) |
 | `gob uninstall` | remove everything an install wrote, byte-exactly (`gob install --target <dir> --uninstall` is the same job) |
 | `gob upgrade` | migrate a repo to the shared global engine at `~/.goblin/engine` — 8 steps, two commits, one report |
 | `gob doctor` | one run across the platforms below: DETECTED / NOT-DETECTED / DRIFT per platform |
-| `gob emit` | write the skills + context block for one platform (`--scope project` or `global`); `--unshadow` removes a hermes project skill whose hash equals the source |
-| `gob init` | the first-run wizard: detect → class → branch/email → first gate → emit → verify, one screen per question; every question has a flag (`--class software --branch main --email a@b.c --gate 'cmd' --emit hermes`), so CI runs it with zero prompts; `--dry-run` prints the plan and writes nothing |
+| `gob emit` | write the skills + context block for one platform (`--scope project` or `global`); `--unshadow` removes a hermes project skill whose hash equals the source; `gob sync` is the same command under its friendlier name — both spellings work |
+| `gob sync` | the emit verb, renamed (wizard v2): same engine, same flags, same exit contract; `gob emit --help` and `gob sync --help` are byte-identical apart from the verb name |
+| `gob init` | the first-run wizard: detect → class → identity → health check → ci → sync → done, one screen per question; every question has a flag (`--class software --branch main --email a@b.c --gate 'cmd' --emit hermes`), so CI runs it with zero prompts; the ci step defaults to no — nothing under .github/ unless you opt in (`--ci-gate yes|no` overrides); `--dry-run` prints the plan and writes nothing |
 
 `goblin` remains as a legacy alias for every command above — existing scripts keep working, but
 new commands and docs use `gob`.
@@ -122,10 +123,11 @@ prints the full write plan first.
 
 **Agent skills are opt-in.** A `gob install` writes the neutral harness only — `.goblin/`,
 `HANDOFF.md`, `AGENTS.md`, the checks and the `.gitignore` block; no skills directory, and no
-files belonging to any coding agent. The guided path is `gob init`'s emit screen; the one-shot
-path is `gob emit --platform <p>` after installing. Repos whose install predates the opt-in
-default keep their skills through `gob upgrade` (the install record names them; only an explicit
-`--skills no`, or `--uninstall`, removes them).
+files belonging to any coding agent. The guided path is `gob init`'s sync screen; the one-shot
+path is `gob sync --platform <p>` after installing (`gob emit --platform <p>` is the same
+command under its original name — both work byte-identically). Repos whose install predates the
+opt-in default keep their skills through `gob upgrade` (the install record names them; only an
+explicit `--skills no`, or `--uninstall`, removes them).
 
 ## What it is not
 

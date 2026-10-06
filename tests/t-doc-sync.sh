@@ -143,8 +143,26 @@ for f in README.md docs/GUIDE.md; do
   norm_text "$f" | grep -q 'agent skills are opt-in'
   check "$f states agent skills are opt-in (W6 neutral-first)" "$?"
 done
-norm_text README.md | grep -q 'gob emit --platform'
-check "README names gob emit --platform as the opt-in path (W6 neutral-first)" "$?"
+norm_text README.md | grep -q 'gob sync --platform'
+check "README names gob sync --platform as the opt-in path (wizard v2 renamed the verb)" "$?"
+norm_text README.md | grep -qE 'gob emit .{0,4}platform <p> is the same'
+check "README states gob emit is the same command under its original name (wizard v2)" "$?"
+# The wizard's step order: seven screens (wizard v2 added the ci step and renamed emit to
+# sync). The doc sentence and this pin move together.
+norm_text README.md | grep -q 'detect . class . identity . health check . ci . sync . done'
+check "README states the wizard's 7-step order (wizard v2)" "$?"
+norm_text docs/GUIDE.md | grep -q 'health check, class,'
+check "docs/GUIDE.md names the health-check screen first (wizard v2)" "$?"
+norm_text docs/GUIDE.md | grep -q 'the ci opt-in, which platforms to sync'
+check "docs/GUIDE.md names the ci screen and the sync rename (wizard v2)" "$?"
+# The ci default-no shape: the wizard's unanswered default is an explicit no (nothing under
+# .github/ without consent); the installer flag's own default stays the class contract.
+norm_text README.md | grep -q 'the ci step defaults to no'
+check "README states the ci default (no unless opted in) (wizard v2)" "$?"
+norm_text docs/GUIDE.md | grep -q 'nothing lands under .github/ unless you opt in'
+check "docs/GUIDE.md states the ci default (no unless opted in) (wizard v2)" "$?"
+norm_text docs/GUIDE.md | grep -q 'no is recorded as an opt-out'
+check "docs/GUIDE.md states the explicit no is a recorded opt-out (wizard v2)" "$?"
 # The stale claim, normalised like every matcher above: 'install' as subject of copying skills.
 STALE_INSTALL_SKILLS=""
 for f in README.md docs/GUIDE.md docs/CONTRACTS.md docs/ADOPTION.md; do

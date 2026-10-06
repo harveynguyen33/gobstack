@@ -68,9 +68,9 @@ PREIMG="${GOBLIN_PREIMAGES:-$HOME/.goblin-stack/preimages}"
 
 usage() {
   cat <<USAGE
-gob emit — per-platform emission (W4a, the seven platforms since W4b).
+gob sync — per-platform skill sync (W4a, the seven platforms since W4b).
 
-  gob emit --platform <$_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2>
+  gob sync --platform <$_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2>
               --scope project|global
               [--skills core|all|none] [--target <dir>] [--source <path>]
               [--uninstall] [--unshadow] [--dry-run] [--strict]
@@ -85,6 +85,8 @@ gob emit — per-platform emission (W4a, the seven platforms since W4b).
                refuse-and-name on any that differ (a real local edit is never auto-removed)
   --dry-run    print the full write plan (every path + the priced index size), write nothing
   --strict     make a NOT-DETECTED platform a hard error instead of a project-scope allowance
+
+`gob emit` is the same command under its original name — both names work, byte-identically.
 
 Exit codes: 0 ok or no-op | 1 refusal (with the path and the fix) | 2 bad input.
 USAGE
@@ -143,7 +145,7 @@ case "$PLATFORM" in
   "")      printf 'error: emit: --platform is required\n' >&2; usage >&2; exit 2 ;;
   $_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2) ;;
   *)
-    die "unknown platform '$PLATFORM' - gob emit ships $_PLA, hermes, copilot, cursor, opencode, codex, $_G1$_G2" 2
+    die "unknown platform '$PLATFORM' - gob sync ships $_PLA, hermes, copilot, cursor, opencode, codex, $_G1$_G2" 2
     ;;
 esac
 TSV="$ADAPTERS_DIR/$PLATFORM/adapter.tsv"

@@ -22,10 +22,11 @@ not a rule dump — the rules live in one executable place, and facts beat requi
 harness on purpose, so nothing here assumes which coding agent you use. To install the
 procedure skills for your tool:
 
-    gob emit --platform <p>
+    gob sync --platform <p>
 
 (`--scope project` writes them inside this repo; `--scope global` writes them for your user.)
-Run `gob emit` with no platform to see the list. If skills were installed here, they live
+Run `gob sync` with no platform to see the list (`gob emit` is the same command under its
+original name). If skills were installed here, they live
 under the platform's own directory, and `gob verify` hashes them.
 
 Two things this repo does not do: it does not choose models (a role resolves through the

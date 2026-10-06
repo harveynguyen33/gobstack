@@ -19,6 +19,11 @@
 #   --opt-out <part>      record the part in disabled: so its required checks are skipped
 #   --uninstall           remove exactly the files in installed.json
 #   --re-pin              re-record practice_sha256: for an edited standard; nothing else changes
+#   --ci-gate yes|no      the CI lane opt-in (default: the class decides - ci-gate R/O places
+#                         .github/workflows/goblin-gate.yml, ci-gate '-' never does). An
+#                         explicit no opts the part out (recorded in disabled: so CL-01
+#                         reports the opt-out, never a silent absence); an explicit yes is
+#                         refused for a class that forbids the part.
 #   --force               allow overwriting a file goblin-stack did not create
 #   --yes                 non-interactive; take the defaults above
 #
@@ -61,6 +66,11 @@ UNINSTALL=0
 RE_PIN=0
 FORCE=0
 OPT_OUT=""
+# The CI lane opt-in (wizard v2). Empty = the class decides, exactly as before this flag
+# existed: every pre-existing invocation (and every pipe) keeps its byte-identical shape.
+# "no" is an explicit opt-out of the ci-gate part; "yes" is an explicit opt-in, refused for
+# a class that forbids the part (CL-01 would fail it on the very first verify).
+CI_GATE_OPT=""
 # The electron opt-in (the merged desktop/F class): renders presets/electron-overlay.yaml over
 # the software preset. Auto-set when --class resolves via the desktop/F/f alias, so the alias
 # behaves as the old class F did rather than silently installing weaker software.
@@ -88,6 +98,7 @@ while [ $# -gt 0 ]; do
     --uninstall) UNINSTALL=1; shift ;;
     --re-pin)    RE_PIN=1; shift ;;
     --opt-out)   OPT_OUT="${2:-}"; shift 2 ;;
+    --ci-gate)   CI_GATE_OPT="${2:-}"; shift 2 ;;
     --force)     FORCE=1; shift ;;
     --yes)       shift ;;
     -h|--help)   usage; exit 0 ;;
@@ -257,6 +268,7 @@ CLASS_RAW="$CLASS"
 CLASS=$(g_class_canon "$CLASS") \
   || { g_err "--class must be software|service|game|research|fleet (or A-E / app / agent / desktop), got '$CLASS_RAW'"; exit 2; }
 case "$SKILLS" in yes|no) ;; *) g_err "--skills must be yes or no"; exit 2 ;; esac
+case "$CI_GATE_OPT" in ""|yes|no) ;; *) g_err "--ci-gate must be yes or no, got '$CI_GATE_OPT'"; exit 2 ;; esac
 
 # W6 migration safety: on a --upgrade (or any re-install) of a repo whose record shows skills
 # were installed, an OMITTED --skills flag must READ that state, not silently strip it. The
@@ -354,7 +366,15 @@ WANT_RATCHET=1; [ "$(need ratchet)" = "-" ] && WANT_RATCHET=0
 # The CI lane (G6 A.6). Installed for a class that requires or permits it (A, C, E, F) and never
 # for one that forbids it (B, D) - where CL-01 then requires the file to be ABSENT, which is why
 # class_part_artifact keys off this exact path rather than off .github/workflows/.
+# Wizard v2 adds the explicit opt-in/out: the empty default keeps the class-driven shape
+# byte-identical for every existing invocation; `no` opts the part out (recorded in disabled:
+# so CL-01 reports the opt-out rather than a silent absence, the --skills no precedent); `yes`
+# is refused for a class that forbids the part, because the file could never survive verify.
 WANT_CI_GATE=1; [ "$(need ci-gate)" = "-" ] && WANT_CI_GATE=0
+case "$CI_GATE_OPT" in
+  no)  WANT_CI_GATE=0; OPT_OUT="${OPT_OUT:+$OPT_OUT,}ci-gate" ;;
+  yes) [ "$WANT_CI_GATE" -eq 1 ] || { g_err "--ci-gate yes: class $CLASS forbids the ci-gate part - CI is not in this class's contract (see docs/CI.md)"; exit 2; } ;;
+esac
 [ "$ARCHIVE" = "true" ] && { WANT_SPEC=0; WANT_REVIEWS=0; SCAFFOLD=no; }
 
 OWNER_EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
@@ -731,7 +751,7 @@ fi
   printf '  "source_sha": "%s",\n' "$( cd "$SRC" && git rev-parse HEAD 2>/dev/null || echo unknown )"
   printf '  "class": "%s",\n' "$CLASS"
   printf '  "installed_at": "%s",\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf '  "options": {"skills": "%s", "archive": %s, "parts": "%s"},\n' "$SKILLS" "$ARCHIVE" "${PARTS:-all}"
+  printf '  "options": {"skills": "%s", "archive": %s, "parts": "%s", "ci_gate": "%s"},\n' "$SKILLS" "$ARCHIVE" "${PARTS:-all}" "${CI_GATE_OPT:-class}"
   printf '  "files": {\n'
   awk -F'\t' 'NF==2 {printf "    \"%s\": \"%s\",\n", $1, $2}' "$TMP/files.tsv" | sed '$ s/,$//'
   printf '  },\n'

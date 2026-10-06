@@ -5,7 +5,7 @@
 #   gob bans   [--only <id[,id...]>] [--list]
 #   gob audit  [--target <dir>] [--print]
 #   gob doctor [--platform <p>]      # W4a
-#   gob emit   --platform <p> [...]  # W4a/W4b
+#   gob emit   --platform <p> [...]  # W4a/W4b; `gob sync` is the same verb, renamed
 #   gob init   [...]                 # W6: the first-run wizard
 #   gob upgrade [--target .] [...]   # W3
 #   gob --version
@@ -46,7 +46,8 @@ gob — the gobstack command line.
   gob bans   [--only <id[,id...]>] [--list]
   gob audit  [--target <dir>] [--print]
   gob doctor [--platform <p>] [--target <dir>]
-  gob emit   --platform <p> --scope project|global [...]
+  gob emit   --platform <p> --scope project|global [...]   # alias: gob sync
+  gob sync   --platform <p> --scope project|global [...]   # the same verb, friendlier name
   gob init   [--target <dir>] [--class app|A-F] [--dry-run]
   gob upgrade [--target .] [--dry-run] [--yes] [--engine-dir <path>]
   gob --version
@@ -92,6 +93,11 @@ case "$CMD" in
   emit)
     # W4a: per-platform emission (the §4 contract); the 0/1/2 exit contract is the
     # same three values verify's wrapper states, propagated verbatim.
+    exec bash "$SRC/bin/goblin-emit" "$@"
+    ;;
+  sync)
+    # Wizard v2: the friendlier name for the same emission engine. `emit` stays a
+    # first-class verb; this case only adds the alias and propagates identically.
     exec bash "$SRC/bin/goblin-emit" "$@"
     ;;
   init)

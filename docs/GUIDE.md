@@ -88,9 +88,9 @@ one way this guide installs it.
 **Do not install into a real project yet.** You want to see what it does before it touches
 something you care about.
 
-The guided path is `gob init` — one screen per question (class, branch/email, first
-gate, which platforms to emit), every question also answerable by flag, `--dry-run` to
-see the plan first:
+The guided path is `gob init` — one screen per question (health check, class,
+identity (branch/email), the health check, the CI opt-in, which platforms to sync), every question also
+answerable by flag, `--dry-run` to see the plan first:
 
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
     git init -b main
@@ -99,6 +99,13 @@ see the plan first:
 
     gob init --target . --class software --branch main --email "you@example.com" \
         --gate "bash tests/run-tests.sh" --yes
+
+The wizard's ci step asks whether the gate should also run in CI
+(`.github/workflows/goblin-gate.yml`). The wizard's default is **no** — nothing lands under `.github/` unless you opt in. (Outside the wizard, `gob install`'s own default is the class decides: a class whose
+contract requires or permits the ci-gate part gets the workflow, one that forbids it never does.)
+`--ci-gate yes|no` overrides: an explicit `no` is recorded as an opt-out (so verify reports the
+opt-out, never a silent absence), and an explicit `yes` is refused for a class that forbids the
+part.
 
 or the plain installer this wizard drives, if you prefer the one-shot shape:
 
@@ -112,13 +119,14 @@ Expected output (this is a real transcript, trimmed):
       1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
       2. .goblin/bin/goblin-verify   # or add .goblin/bin to PATH
       3. edit .goblin/goblin.yaml: replace the default gate with your real commands (P8 step 3)
-      4. agent skills are opt-in: gob emit --platform <p>   # hermes, claude, copilot, cursor, opencode, codex, gemini
+      4. agent skills are opt-in: gob sync --platform <p>   # hermes, claude, copilot, cursor, opencode, codex, gemini
 
 **`created 25`** is the installer's count of the files it **tracks** — the 16 in its `files`
 map, the 8 it `owns`, and `.gitignore`. It writes **26**: the 26th is `.goblin/installed.json`,
 the record it keeps for itself, which it writes but does not count. It has written nothing
 outside this directory. The default install ships **no agent skills** — the harness is neutral,
-and `gob emit --platform <p>` is the per-platform opt-in (the old `--skills yes` default is
+and `gob sync --platform <p>` is the per-platform opt-in (`gob emit` is the same command under
+its original name; the old `--skills yes` default is
 still there for repos that want the Hermes project tier vendored).
 
 ### Why `git init -b main` matters
@@ -448,7 +456,7 @@ with no fallback** — a repo is never judged by an engine it did not declare. A
 says `mode=global` keeps hashing whatever files it still holds; the engine's own identity prints in
 every run's footer (`engine: mode=… cli_sha256=… enforcement_tsv_sha256=…`). The same commands are
 available outside any repo through the npm CLI: `gob verify` / `gob bans` / `gob audit` /
-`gob doctor` / `gob emit` / `gob upgrade` / `gob --version`.
+`gob doctor` / `gob sync` / `gob upgrade` / `gob --version`.
 
 **Migrating a repo to the global engine (W3):**
 
@@ -476,7 +484,7 @@ engine and silently de-migrate the record).
 |---|---|
 | `goblin-install` | `0` ok · `1` a refusal (with the path and the fix) · `2` bad input |
 | `goblin-verify` | `0` all checks passed · `1` a check failed · `2` could not run · `3` the manifest itself is broken |
-| `goblin` (npm CLI) | propagates the subcommand's codes verbatim — `verify`/`bans`/`audit`/`--version`; `install`/`uninstall`/`re-pin`/`upgrade` route into `goblin-install` (`upgrade` migrates to the global engine: `0` ok · `1` refusal · `2` bad input); `doctor`/`emit` carry the same contract: `doctor` exits `0` every probed platform DETECTED and clean · `1` any DRIFT · `2` nothing to probe, and `emit` exits `0` ok or no-op · `1` refusal (with the path and the fix) · `2` bad input or unknown platform |
+| `goblin` (npm CLI) | propagates the subcommand's codes verbatim — `verify`/`bans`/`audit`/`--version`; `install`/`uninstall`/`re-pin`/`upgrade` route into `goblin-install` (`upgrade` migrates to the global engine: `0` ok · `1` refusal · `2` bad input); `doctor`/`emit` carry the same contract: `doctor` exits `0` every probed platform DETECTED and clean · `1` any DRIFT · `2` nothing to probe, and `emit` exits `0` ok or no-op · `1` refusal (with the path and the fix) · `2` bad input or unknown platform; `sync` is the same verb renamed and propagates identically |
 | platforms (W4b) | `emit`/`doctor` cover seven: `claude`, `hermes`, `copilot`, `cursor`, `opencode`, `codex`, `gemini` — each detected via its own anchor (`~/.claude`, `~/.hermes`, `~/.copilot`, `~/.cursor`, `~/.config/opencode`, `~/.codex`, `~/.gemini`); codex and gemini carry `partial` command-blocking (see LIMITS #47) |
 
 `3` is the one to notice: it means gobstack's own rule table is malformed, not your project.
@@ -583,7 +591,7 @@ with *"prove it was broken first"* — it is the one practice that survives cont
     # 1. try it somewhere disposable
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
     git init -b main
-    gob install --target . --class software              # expect: created 25 (no skills — those are gob emit)
+    gob install --target . --class software              # expect: created 25 (no skills — those are gob sync)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"

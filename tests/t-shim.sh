@@ -10,6 +10,8 @@
 #        plan (`would remove ...`) and exits 0 — the dispatcher's uninstall job is real
 #   SH6  --version is byte-identical to VERSION (the V6 property, re-pinned here so a
 #        shim edit cannot move it)
+#   SH7  `sync` routes to the same engine as `emit` (wizard v2 renamed the verb): the
+#        two --help texts are byte-identical and the alias is in the short usage
 #
 # Everything runs against the checkout's bin/goblin.js; the uninstall probe installs
 # into a mktemp repo under a throwaway HOME, like t-init.sh does.
@@ -32,7 +34,7 @@ printf '%s' "$OUT1" | grep -q 'start here: gob init'
 check "SH1 the usage names the guided first step" "$?"
 printf '%s' "$OUT1" | grep -q 'uninstall: npm uninstall -g @techgoblin/gobstack'
 check "SH1 the usage names the npm uninstall" "$?"
-for sub in verify bans audit upgrade doctor emit init; do
+for sub in verify bans audit upgrade doctor emit sync init; do
   printf '%s' "$OUT1" | grep -q "gob $sub"
   check "SH1 the usage lists $sub" "$?"
 done
@@ -54,7 +56,7 @@ check "SH3 the refusal names the unknown word" "$?"
 # ---- SH4: `install` keeps the legacy fallback ---------------------------------
 OUT4=$(node "$SRC/bin/goblin.js" install --help 2>&1); RC4=$?
 check "SH4 gob install --help exits 0" "$([ "$RC4" -eq 0 ] && echo 0 || echo 1)"
-printf '%s' "$OUT4" | grep -q 'gob install — drop the harness into a target repo'
+printf '%s' "$OUT4" | grep -q 'drop the harness into a target repo'
 check "SH4 the output is the installer's own usage" "$?"
 
 # ---- SH5: `uninstall` is a real job --------------------------------------------
@@ -78,6 +80,18 @@ check "SH5 the uninstall plan is the installer's (would remove ...)" "$?"
 node "$SRC/bin/goblin.js" --version > "$WORK/v.out" 2>/dev/null
 cmp -s "$WORK/v.out" "$SRC/VERSION"
 check "SH6 --version prints VERSION byte-for-byte" "$?"
+
+# ---- SH7: `sync` is the renamed `emit` (wizard v2) ------------------------------
+# Same engine, so the two --help texts are byte-identical and the alias is listed
+# in the short usage. The exit contract propagates verbatim (a bad input exits 2).
+node "$SRC/bin/goblin.js" sync --help > "$WORK/sync.out" 2>&1
+node "$SRC/bin/goblin.js" emit --help > "$WORK/emit.out" 2>&1
+cmp -s "$WORK/sync.out" "$WORK/emit.out"
+check "SH7 gob sync --help and gob emit --help are byte-identical" "$?"
+printf '%s' "$OUT1" | grep -q 'alias: gob emit'
+check "SH7 the short usage marks sync as the emit alias" "$?"
+node "$SRC/bin/goblin.js" sync --platform nosuch >/dev/null 2>&1
+check "SH7 a bad sync platform carries emit's exit-2 contract" "$([ $? -eq 2 ] && echo 0 || echo 1)"
 
 rm -rf "$WORK"
 FAIL_N=$(grep -c . "$FAILFILE" 2>/dev/null || true)

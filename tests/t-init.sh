@@ -69,8 +69,8 @@ OUT=$(init_env --target "$REPO" --class app --branch main --email "runner@exampl
 check "flags-only init exits 0" "$RC"
 grep -qF "gob init [run] goblin-install" <<<"$OUT"
 check "the run names the install engine call" "$?"
-grep -qF "gob init [run] goblin-emit --platform hermes --scope project" <<<"$OUT"
-check "the run names the emit engine call" "$?"
+grep -qF "gob init [run] gob sync --platform hermes --scope project" <<<"$OUT"
+check "the run names the sync engine call (wizard v2 vocabulary)" "$?"
 grep -qF "gob init [verify]" <<<"$OUT"
 check "the run reaches the verify step" "$?"
 grep -qF "owner_email: runner@example.com" "$REPO/.goblin/goblin.yaml"
@@ -118,17 +118,19 @@ check "  and the record says skills=no" "$?"
 ( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack (neutral default)" )
 VOUT2B=$( cd "$REPO" && env PATH="$BARE_PATH" bash .goblin/bin/goblin-verify 2>&1 ); VRC2B=$?
 check "  and the neutral install verifies green (exit 0)" "$VRC2B"
-printf '%s' "$VOUT2B" | grep -qE '^ *38 passed, 0 failed, 11 advisory, 33 skipped'
-check "  at the measured neutral green line (38/0/11/33)" "$?"
+# wizard-v2: the unanswered ci step defaults to an explicit no, so the neutral install
+# carries no .github workflow — one gate row fewer, one skip more. Measured 2026-10-06.
+printf '%s' "$VOUT2B" | grep -qE '^ *37 passed, 0 failed, 11 advisory, 34 skipped'
+check "  at the measured neutral green line (37/0/11/34, ci=no)" "$?"
 # the emitted hermes context block (AGENTS.md's emitted twin) must NOT be here either
-grep -q 'gob emit' "$REPO/AGENTS.md"
-check "  and AGENTS.md points at the opt-in (gob emit --platform <p>)" "$?"
+grep -q 'gob sync' "$REPO/AGENTS.md"
+check "  and AGENTS.md points at the opt-in (gob sync --platform <p>, wizard v2 vocabulary)" "$?"
 
 # ---- T2: no TTY hang — zero flags, piped stdin ----------------------------------
 new_repo t2
 OUT2=$(init_env --target "$REPO" < /dev/null 2>&1); RC2=$?
 check "a zero-flag piped run finishes (no prompt hang), exit 0" "$RC2"
-grep -qF "gob init [3/6] class: software" <<<"$OUT2"
+grep -qF "gob init [3/7] class: software" <<<"$OUT2"
 check "the cascade names the defaulted class" "$?"
 grep -qF "owner_email: runner@example.com" "$REPO/.goblin/goblin.yaml"
 check "the git identity became the declared email" "$?"
@@ -224,21 +226,24 @@ if command -v script >/dev/null 2>&1; then
   check "the pty transcript names no unbound variable" "$([ $? -ne 0 ] && echo 0 || echo 1)"
   grep -qF "invalid number" "$TS"
   check "the pty transcript has no printf arg-mismatch (invalid number)" "$([ $? -ne 0 ] && echo 0 || echo 1)"
-  grep -q "✔ 1. platforms" "$TS"
-  check "the tty rail shows the answered platforms row collapsed with its value" "$?"
+  grep -q "✔ 1. detect" "$TS"
+  check "the tty rail shows the answered detect row collapsed with its value (wizard v2 names)" "$?"
   grep -qE "◆.+2\. class" "$TS"
   check "the tty rail marks the current step with the accent diamond" "$?"
   grep -q "✔ 2. class" "$TS"
   check "the tty rail shows class answered on the next screen" "$?"
   grep -qE "$(printf '\033')\[[0-9]+A" "$TS"
   check "the redraw moves the cursor only on a tty (cursor-up present in the typescript)" "$?"
-  # T8b: the rewind amount must cover the FULL drawn frame — buffer + the 6 rail rows.
-  # Rewinding by the buffer count alone (the 0.5.0-beta.1 defect the client caught on a
-  # Mac, 2026-10-06) left 6 stale rail rows painted, so every screen ≥2 stacked a second
-  # banner frame under them: the duplicate-logo screenshot. Pin the arithmetic in the
-  # source, and pin that a buffer-only rewind shape never returns.
-  grep -qF 'RAIL_BUF[@]} + 6' "$SRC/bin/goblin-init"
-  check "rail_rewind covers the full drawn frame (buffer + 6 rail rows) (T8b)" "$?"
+  # T8b: the rewind amount must cover the FULL drawn frame — buffer + the 7 rail rows
+  # (wizard v2: the rail grew from 6 steps to 7). Rewinding by the buffer count alone
+  # (the 0.5.0-beta.1 defect the client caught on a Mac, 2026-10-06) left the stale rail
+  # rows painted, so every screen ≥2 stacked a second banner frame under them: the
+  # duplicate-logo screenshot. Pin the arithmetic in the source, and pin that a
+  # buffer-only rewind shape never returns.
+  grep -qF 'RAIL_BUF[@]} + N_STEPS' "$SRC/bin/goblin-init"
+  check "rail_rewind covers the full drawn frame (buffer + N_STEPS rail rows) (T8b)" "$?"
+  ! grep -qF 'RAIL_BUF[@]} + 6' "$SRC/bin/goblin-init"
+  check "no hardcoded 6-row rewind remains (the rail is 7 rows now) (T8b)" "$?"
   ! grep -qF "printf '\\033[%dA\\033[J' \"\${#RAIL_BUF[@]}\"" "$SRC/bin/goblin-init"
   check "no buffer-only rewind remains (the dup-banner shape) (T8b)" "$?"
   # And the unbraced-var species on line 244's branch: a colour var directly adjacent to a
