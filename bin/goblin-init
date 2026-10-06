@@ -3,9 +3,13 @@
 #
 #   gob init [--target <dir>] [--class <software|service|game|research|fleet|A..E|app|agent|desktop>]
 #               [--electron] [--branch <name>] [--email <addr>] [--gate <cmd>]
-#               [--emit <p[,p..]>] [--scope project|global] [--yes] [--dry-run]
+#               [--ci-gate yes|no] [--emit <p[,p..]>] [--scope project|global] [--yes] [--dry-run]
 #
-# One screen per question, answered steps collapsing into the ✔/◆/○ rail above. On a tty
+# Seven screens, one per question, answered steps collapsing into the ✔/◆/○ rail above.
+# On a tty the class and ci steps are a KEYBOARD RADIO (arrows move the ▸ pointer, Enter
+# commits; a typed number still works), the emit step is CHECKBOXES (space toggles ☑/☐,
+# Enter commits), and the health check and identity prompts show their accepted default in
+# the [default] form. On a tty
 # the whole wizard frame (logotype, header, answered rows, rail) is redrawn in place from
 # a saved buffer of the wizard's own lines — never by counting printed output, which the
 # installer/emit engines would break. Every question has a flag: with the flags set (or
@@ -16,7 +20,7 @@
 # The wizard is a FRONT END over the existing engines, never a second installer:
 #   .goblin/ + the payload   -> bin/goblin-install  (its refusal contract — an existing
 #                               HANDOFF.md is never overwritten — applies verbatim)
-#   skills + context blocks  -> bin/goblin-emit --scope project (the same code path)
+#   skills + context blocks  -> gob sync (= gob emit; the same code path, friendlier name)
 #   the verdict              -> bin/goblin-verify
 #
 # Exit codes: 0 done | 1 a refusal (named path + fix) | 2 bad input, or verify could
@@ -69,13 +73,14 @@ if [ "$TTY_OUT" -eq 1 ] && [ -z "${NO_COLOR:-}" ]; then
 fi
 
 # ---------------------------------------------------------------- the rail ----
-# 6 steps; the ✔/◆/○ vocabulary. The rail is redrawn in place on a tty from a SAVED
+# 7 steps; the ✔/◆/○ vocabulary. The rail is redrawn in place on a tty from a SAVED
 # BUFFER of the wizard's own lines (RAIL_BUF) — never by counting the output between
 # draws, because the installer/emit engines print freely and break naive accounting.
 # Over a pipe nothing is saved and nothing rewinds: each screen is one numbered line.
-STEP_LABELS=("platforms" "class" "branch/email" "first gate" "emit" "done")
-STEP_VAL=("" "" "" "" "" "")
+STEP_LABELS=("health" "class" "branch/email" "first gate" "ci" "emit" "done")
+STEP_VAL=("" "" "" "" "" "" "")
 CURRENT=1
+N_STEPS=7
 
 # rail_say: one line of wizard output on a tty — stored in the redraw buffer AND
 # printed with a VT100 clear-line prefix (the redraw may overwrite a longer old line).
@@ -104,12 +109,13 @@ rail_note() {
 }
 rail_rewind() {
   if [ "$TTY_OUT" -eq 1 ]; then
-    # The drawn frame is the buffer PLUS the 6 rail rows rail_draw prints under it.
-    # Rewinding by the buffer count alone left the 6 rail rows painted on screen, so the
-    # next draw stacked a second frame under them — the duplicate-banner the client caught
-    # on a Mac (2026-10-06): every screen ≥2 grew the stack by one frame. Rewind the full
-    # drawn height. (Clean-room catch, second fixture round.)
-    printf '\033[%dA\033[J' "$(( ${#RAIL_BUF[@]} + 6 ))"
+    # The drawn frame is the buffer PLUS the N_STEPS rail rows rail_draw prints under
+    # it. Rewinding by the buffer count alone left the rail rows painted on screen, so
+    # the next draw stacked a second frame under them — the duplicate-banner the client
+    # caught on a Mac (2026-10-06): every screen ≥2 grew the stack by one frame. Rewind
+    # the full drawn height; the count is N_STEPS, so the rail growing again (wizard v2:
+    # 6 steps to 7) cannot reintroduce the stack.
+    printf '\033[%dA\033[J' "$(( ${#RAIL_BUF[@]} + N_STEPS ))"
   fi
 }
 rail_draw() { # reprint the saved buffer, then the live rail row for $CURRENT
@@ -118,7 +124,7 @@ rail_draw() { # reprint the saved buffer, then the live rail row for $CURRENT
   for line in "${RAIL_BUF[@]}"; do
     printf '\033[2K%s\n' "$line"
   done
-  for i in 1 2 3 4 5 6; do
+  for i in 1 2 3 4 5 6 7; do
     label="${STEP_LABELS[$((i - 1))]}"
     if [ "$i" -lt "$CURRENT" ]; then
       glyph="✔"; col="$C_GREEN"
@@ -132,17 +138,132 @@ rail_draw() { # reprint the saved buffer, then the live rail row for $CURRENT
 }
 rail_reset() { RAIL_BUF=(); }
 cascade() { # the pipe-degraded shape: one numbered line per screen (zero cursor motion)
-  printf 'gob init [%d/6] %s\n' "$CURRENT" "$1"
+  printf 'gob init [%d/%d] %s\n' "$CURRENT" "$N_STEPS" "$1"
 }
 
-# ask_value <label> <default> -> REPLY (Enter = default; non-tty stdin = default)
 ask_value() {
   local label="$1" dflt="$2"
   if [ "$TTY_IN" -eq 0 ]; then REPLY="$dflt"; return 0; fi
-  printf '      %s%s%s %s─ %s' "$C_TEXT" "$label" "$C_RESET" "$C_DIM" "$dflt"
+  # The [default] form: what Enter accepts sits on the line, in brackets, before the cursor.
+  printf '      %s%s%s %s[%s]%s ' "$C_TEXT" "$label" "$C_RESET" "$C_DIM" "$dflt" "$C_RESET"
   read -r REPLY
   rail_say ""
   [ -n "$REPLY" ] || REPLY="$dflt"
+  return 0
+}
+
+# ---- the interactive selection primitives (tty only) --------------------------
+# The class and ci steps are a RADIO: one ▸ pointer, arrows move it, Enter commits
+# (the number-then-Enter path keeps working). The emit step is CHECKBOXES: space toggles
+# the pointed row between ☑ and ☐, Enter commits. Raw mode is taken for one key and
+# ALWAYS restored on the same line — a wizard that dies in raw mode bricks the shell.
+KEY_UP=$'\033[A'; KEY_DOWN=$'\033[B'
+tty_key() { # -> REPLY_KEY: UP | DOWN | SPACE | ENTER | <char>
+  local k rest
+  REPLY_KEY="ENTER"
+  [ "$TTY_IN" -eq 1 ] || return 0
+  stty raw -echo 2>/dev/null
+  k=$(dd bs=1 count=1 2>/dev/null)
+  rest=""
+  if [ "$k" = "$(printf '\033')" ]; then
+    rest=$(dd bs=1 count=2 2>/dev/null)
+  fi
+  stty sane 2>/dev/null
+  case "$k" in
+    "$(printf '\033')")
+      case "$rest" in
+        "[A") REPLY_KEY="UP" ;;
+        "[B") REPLY_KEY="DOWN" ;;
+        *)    REPLY_KEY="OTHER" ;;
+      esac ;;
+    ""|$(printf '\r'))  # Enter: LF from a cooked tty, CR from a raw one
+      REPLY_KEY="ENTER" ;;
+    " ")  # a literal space byte — dd bs=1 count=1 hands it through unreduced
+      REPLY_KEY="SPACE" ;;
+    *)   REPLY_KEY="$k" ;;
+  esac
+  return 0
+}
+
+# ask_radio <prompt> <var-out> <option-label>...  -> sets <var-out> to the CHOSEN LABEL.
+# Space/Enter on the pointed row commits; arrows move; a digit pre-positions then commits.
+ask_radio() {
+  local prompt="$1" out="$2"; shift 2
+  local opts=("$@") n=$# sel=0 i key redraw
+  if [ "$TTY_IN" -ne 1 ]; then sel=0; printf -v "$out" '%s' "${opts[$sel]}"; return 0; fi
+  redraw=1
+  while :; do
+    if [ "$redraw" -eq 1 ]; then
+      printf '\033[2K\r'
+      printf '      %s\n' "$prompt"
+      for i in "${!opts[@]}"; do
+        if [ "$i" -eq "$sel" ]; then
+          printf '  %s▸ %s%s%s\n' "$C_ACCENT" "$C_TEXT" "${opts[$i]}" "$C_RESET"
+        else
+          printf '    %s%s%s\n' "$C_DIM" "${opts[$i]}" "$C_RESET"
+        fi
+      done
+      redraw=0
+    fi
+    tty_key; key="$REPLY_KEY"
+    case "$key" in
+      UP)    [ "$sel" -gt 0 ] && sel=$((sel - 1)) && redraw=1 ;;
+      DOWN)  [ "$sel" -lt $((n - 1)) ] && sel=$((sel + 1)) && redraw=1 ;;
+      ENTER) break ;;
+      SPACE) break ;;
+      [1-9]) [ "$key" -le "$n" ] 2>/dev/null && { sel=$((key - 1)); break; } ;;
+    esac
+    if [ "$redraw" -eq 1 ]; then
+      # rewind the option rows + the prompt line, then redraw
+      printf '\033[%dA' "$(( n + 1 ))"
+    fi
+  done
+  printf -v "$out" '%s' "${opts[$sel]}"
+  return 0
+}
+
+# ask_check_pre <prompt> <pre-ticked-space-list> <label>... -> CHOOSE_FLAGS parallel to
+# the labels, 1 = on (a label named in the pre-tick list starts ☑). Space toggles the
+# pointed row (☑/☐), arrows move, Enter commits. Non-tty stdin leaves the flags exactly
+# as pre-ticked (the caller already decided them).
+CHOOSE_FLAGS=()
+ask_check_pre() {
+  local prompt="$1" pretick="$2"; shift 2
+  local opts=("$@") n=$# sel=0 i key redraw w
+  CHOOSE_FLAGS=()
+  for i in "${!opts[@]}"; do
+    CHOOSE_FLAGS[i]=0
+    for w in $pretick; do [ "${opts[$i]}" = "$w" ] && CHOOSE_FLAGS[i]=1; done
+  done
+  if [ "$TTY_IN" -ne 1 ]; then return 0; fi
+  redraw=1
+  while :; do
+    if [ "$redraw" -eq 1 ]; then
+      printf '\033[2K\r'
+      printf '      %s\n' "$prompt"
+      for i in "${!opts[@]}"; do
+        local mark pointer
+        if [ "${CHOOSE_FLAGS[$i]}" -eq 1 ]; then mark="☑"; else mark="☐"; fi
+        if [ "$i" -eq "$sel" ]; then
+          printf '  %s▸ %s%s %s%s\n' "$C_ACCENT" "$C_TEXT" "$mark" "${opts[$i]}" "$C_RESET"
+        else
+          printf '    %s%s %s%s\n' "$C_DIM" "$mark" "${opts[$i]}" "$C_RESET"
+        fi
+      done
+      redraw=0
+    fi
+    tty_key; key="$REPLY_KEY"
+    case "$key" in
+      UP)    [ "$sel" -gt 0 ] && sel=$((sel - 1)) && redraw=1 ;;
+      DOWN)  [ "$sel" -lt $((n - 1)) ] && sel=$((sel + 1)) && redraw=1 ;;
+      SPACE) CHOOSE_FLAGS[$sel]=$(( 1 - CHOOSE_FLAGS[$sel] )); redraw=1 ;;
+      ENTER) break ;;
+      [1-9]) [ "$key" -le "$n" ] 2>/dev/null && { sel=$((key - 1)); break; } ;;
+    esac
+    if [ "$redraw" -eq 1 ]; then
+      printf '\033[%dA' "$(( n + 1 ))"
+    fi
+  done
   return 0
 }
 
@@ -160,6 +281,7 @@ while [ $# -gt 0 ]; do
     --branch)  BRANCH="${2:-}"; shift 2 ;;
     --email)   EMAIL="${2:-}"; shift 2 ;;
     --gate)    GATE="${2:-}"; shift 2 ;;
+    --ci-gate) CI_GATE="${2:-}"; shift 2 ;;
     --emit)    EMIT="${2:-}"; shift 2 ;;
     --scope)   SCOPE="${2:-}"; shift 2 ;;
     --yes)     YES=1; shift ;;
@@ -193,7 +315,7 @@ rail_seed "${C_ACCENT}▀██▀▀ ▀██▀ ██▀  ▀▀▀▀ ▀�
 rail_seed "     ${C_MUTED}discipline around whatever executes${C_RESET}"
 rail_seed ""
 rail_seed "${C_TEXT}  gob init${C_RESET} ${C_MUTED}— first-run setup (gobstack v$VERSION)${C_RESET}"
-rail_seed "  ${C_MUTED}6 steps · every step has a flag · nothing is written until the plan is confirmed${C_RESET}"
+rail_seed "  ${C_MUTED}7 steps · every step has a flag · nothing is written until the plan is confirmed${C_RESET}"
 rail_seed ""
 if [ "$TTY_OUT" -eq 1 ]; then
   rail_draw
@@ -239,9 +361,9 @@ done
 STEP_VAL[0]="$C_DIM$DET_N detected$C_RESET"
 if [ "$TTY_OUT" -eq 1 ]; then
   rail_say ""
-  rail_say "  ✔ 1. platforms      $C_TEXT$DET_N detected$C_RESET"
+  rail_say "  ✔ 1. health         $C_TEXT$DET_N platform(s) clean$C_RESET"
   if [ "$DET_N" -eq 0 ]; then
-    rail_say "      ${C_YELLOW}no platform detected here — the wizard will still install the harness; emit later with gob emit$C_RESET"
+    rail_say "      ${C_YELLOW}no platform detected here — the wizard will still install the harness; sync later with gob sync$C_RESET"
   else
     while IFS=$'\t' read -r p proj glob hit; do
       [ -n "$p" ] || continue
@@ -250,7 +372,7 @@ if [ "$TTY_OUT" -eq 1 ]; then
     done <<< "$DET_ROWS"
   fi
 else
-  cascade "platforms: $DET_N detected ($(printf '%s' "$DET_ROWS" | awk -F'\t' '{printf "%s ", $1}'))"
+  cascade "health: $DET_N platform(s) detected ($(printf '%s' "$DET_ROWS" | awk -F'\t' '{printf "%s ", $1}'))"
 fi
 
 # ------------------------------------------------------------ screen 3: class -
@@ -261,27 +383,21 @@ CLASS_DEFAULT=1
 if [ -z "$CLASS" ]; then
   if [ "$TTY_IN" -eq 1 ]; then
     rail_say ""
-    rail_say "      ${C_MUTED}what kind of work does this repo do?$C_RESET"
-    rail_say "      $C_TEXT  1 ▸ software   shipped features, PRs, review gates        ${C_DIM}(class A)$C_RESET"
-    rail_say "      $C_TEXT  2   service    backend jobs, config, unattended runs      ${C_DIM}(class B)$C_RESET"
-    rail_say "      $C_TEXT  3   game       playable builds, perf budgets              ${C_DIM}(class C)$C_RESET"
-    rail_say "      $C_TEXT  4   research   specs, replays, reference corpora          ${C_DIM}(class D)$C_RESET"
-    rail_say "      $C_TEXT  5   fleet      fleets, loops, unattended automation       ${C_DIM}(class E)$C_RESET"
-    rail_say "      ${C_MUTED}↑ number + Enter · Enter = software · a class letter also works (A-E)$C_RESET"
-    rail_say "      ${C_DIM}an Electron desktop shell: pick software, then --electron$C_RESET"
-    printf '      '
-    read -r REPLY_CLASS
     ASKED_ANY=1
+    # The keyboard radio: arrows move the ▸ pointer, Enter commits, a typed number
+    # pre-positions and commits. Non-tty stdin never reaches this branch.
+    ask_radio "what kind of work does this repo do?" REPLY_CLASS \
+      "software — shipped features, PRs, review gates" \
+      "service — backend jobs, config, unattended runs" \
+      "game — playable builds, perf budgets" \
+      "research — specs, replays, reference corpora" \
+      "fleet — fleets, loops, unattended automation"
+    CLASS="${REPLY_CLASS%% —*}"
     rail_say ""
   else
-    REPLY_CLASS="1"
+    CLASS="software"
     cascade "class: software (default; --class software|service|game|research|fleet or A-E)"
   fi
-  case "$REPLY_CLASS" in
-    1) CLASS="software" ;; 2) CLASS="service" ;; 3) CLASS="game" ;;
-    4) CLASS="research" ;; 5) CLASS="fleet" ;;
-    *) CLASS="${REPLY_CLASS:-software}" ;;
-  esac
 fi
 # Resolve every accepted spelling to the canonical class NAME. The letters A-E and the old
 # taught names (app/agent/desktop) are read-time aliases; anything else is refused here, with
@@ -360,8 +476,44 @@ if [ "$TTY_OUT" -eq 1 ]; then
   rail_say "  ✔ $((CURRENT - 1)). first gate      $C_TEXT$GATE$C_RESET"
 fi
 
-# --------------------------------------------------------- screen 6: the plan --
+# -------------------------------------------------------- screen 6: ci gate ----
+# The CI opt-in. The class decides by default (ci-gate R/O places the workflow, '-'
+# never does); an explicit no opts the part out through --ci-gate no, which the installer
+# records in disabled: so CL-01 reports the opt-out rather than a silent absence.
 CURRENT=6
+rail_rewind
+if [ "$TTY_OUT" -eq 1 ]; then rail_draw; fi
+CI_DEFAULT="the class decides"
+if [ "${CI_GATE:-}" = "" ] && [ "$TTY_IN" -eq 1 ] && [ "$YES" -eq 0 ]; then
+  rail_say ""
+  ASKED_ANY=1
+  ask_radio "run the gate in CI too? (.github/workflows/goblin-gate.yml)" REPLY_CI \
+    "class decides — follow the class contract (recommended)" \
+    "yes — write the CI workflow" \
+    "no — no CI lane (recorded as an explicit opt-out)"
+  case "$REPLY_CI" in
+    "yes"*)   CI_GATE="yes" ;;
+    "no"*)    CI_GATE="no" ;;
+    *)        CI_GATE="" ;;
+  esac
+  rail_say ""
+fi
+CI_GATE="${CI_GATE:-}"   # empty = the class decides; yes/no ride the installer's --ci-gate
+case "$CI_GATE" in
+  "")     CI_CHOICE="class decides"; CI_FLAG="" ;;
+  yes)    CI_CHOICE="yes";           CI_FLAG="--ci-gate yes" ;;
+  no)     CI_CHOICE="no (explicit opt-out)"; CI_FLAG="--ci-gate no" ;;
+  *)      g_err "--ci-gate must be yes or no, got '$CI_GATE'"; exit 2 ;;
+esac
+STEP_VAL[4]="$C_DIM$CI_CHOICE$C_RESET"
+if [ "$TTY_OUT" -eq 1 ]; then
+  rail_say "  ✔ $((CURRENT - 1)). ci              $C_DIM$CI_CHOICE$C_RESET"
+else
+  cascade "ci: $CI_CHOICE"
+fi
+
+# -------------------------------------------------------- screen 7: the plan ---
+CURRENT=7
 rail_rewind
 if [ "$TTY_OUT" -eq 1 ]; then rail_draw; fi
 
@@ -397,31 +549,31 @@ EMIT_N=$(printf '%s' "$EMIT_SELECTED" | awk 'NF' | wc -l | tr -d '[:space:]')
 
 if [ "$TTY_IN" -eq 1 ] && [ -z "$EMIT" ] && [ "$YES" -eq 0 ]; then
   rail_say ""
-  rail_say "      ${C_MUTED}agent skills are opt-in, per platform — emit them into:$C_RESET"
+  ASKED_ANY=1
+  # The checkboxes: the detected platforms pre-tick, space toggles the pointed row between
+  # ☑ and ☐, arrows move, Enter commits. The install itself writes none either way — the
+  # harness stays neutral; these are the per-platform skills opt-in.
+  EMIT_OPTS=()
   for p in $PLATFORMS; do
     hit=""
-    while IFS=$'	' read -r dp _a _b _c; do [ "$dp" = "$p" ] && hit=1; done <<< "$DET_ROWS"
+    while IFS=$'\t' read -r dp _a _b _c; do [ "$dp" = "$p" ] && hit=1; done <<< "$DET_ROWS"
     [ -n "$hit" ] || continue
-    rail_say "      ${C_GREEN}✔$C_RESET $C_TEXT$p$C_RESET"
+    EMIT_OPTS+=("$p")
   done
-  rail_say "      ${C_MUTED}the install itself writes none — the harness stays neutral$C_RESET"
-  rail_say "      ${C_MUTED}Enter = these; or type platform names to override (none: type x)$C_RESET"
-  printf '      '
-  read -r REPLY_EMIT
-  ASKED_ANY=1
-  rail_say ""
-  if [ "$REPLY_EMIT" = "x" ] || [ "$REPLY_EMIT" = "none" ]; then
+  if [ "${#EMIT_OPTS[@]}" -gt 0 ]; then
+    ask_check_pre "agent skills are opt-in, per platform — sync them into:" "$EMIT_SELECTED" "${EMIT_OPTS[@]}"
     EMIT_SELECTED=""
-  elif [ -n "$REPLY_EMIT" ]; then
-    EMIT_SELECTED=""
-    for w in $REPLY_EMIT; do
-      ok=""
-      for p in $PLATFORMS; do [ "$p" = "$w" ] && ok=1; done
-      [ -n "$ok" ] && EMIT_SELECTED="$EMIT_SELECTED $w" || { g_err "unknown platform '$w' — I ship $PLA, hermes, copilot, cursor, opencode, codex, $GEM"; exit 2; }
+    i=0
+    for p in "${EMIT_OPTS[@]}"; do
+      [ "${CHOOSE_FLAGS[$i]}" -eq 1 ] && EMIT_SELECTED="$EMIT_SELECTED $p"
+      i=$((i + 1))
     done
+  else
+    rail_say "      ${C_MUTED}no platform detected — nothing to pre-tick; sync later with gob sync --platform <p>$C_RESET"
   fi
+  rail_say ""
 fi
-STEP_VAL[4]="$C_TEXT$EMIT_N platform(s) · scope $SCOPE$C_RESET"
+STEP_VAL[5]="$C_TEXT$EMIT_N platform(s) · scope $SCOPE$C_RESET"
 if [ "$TTY_OUT" -eq 1 ]; then
   rail_say "  ✔ $((CURRENT - 1)). emit             $C_TEXT$EMIT_N platform(s) · scope $SCOPE$C_RESET"
 fi
@@ -437,7 +589,8 @@ add "  ${C_DIM}╭────────────────────�
 add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}install${C_RESET}      $C_DIM.goblin/ + the payload into$C_RESET $C_TEXT$TARGET$C_RESET"
 add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}class${C_RESET}       $C_TEXT$CLASS$C_RESET ${C_DIM}· branch $C_TEXT$BRANCH$C_RESET ${C_DIM}· email$C_RESET $C_TEXT$EMAIL$C_RESET"
 add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}gate${C_RESET}        $C_TEXT$GATE$C_RESET"
-add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}emit${C_RESET}        $C_TEXT$EMIT_N platform(s), scope $SCOPE$C_RESET$([ "$EMIT_N" -gt 0 ] && printf '%s' " $C_DIM($(printf '%s' "$EMIT_SELECTED" | awk '{$1=$1};1'))$C_RESET")"
+add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}ci${C_RESET}          $C_DIM$CI_CHOICE$C_RESET"
+add "  ${C_DIM}│${C_RESET}  ${C_GREEN}✔${C_RESET} ${C_TEXT}sync${C_RESET}        $C_TEXT$EMIT_N platform(s), scope $SCOPE$C_RESET$([ "$EMIT_N" -gt 0 ] && printf '%s' " $C_DIM($(printf '%s' "$EMIT_SELECTED" | awk '{$1=$1};1'))$C_RESET")"
 add "  ${C_DIM}╰──────────────────────────────────────────────────────╯${C_RESET}"
 if [ "$DRYRUN" -eq 1 ]; then
   printf '%s\n' "$BOX"
@@ -467,15 +620,14 @@ fi
 # never rewinds past its own buffer by counting lines it did not print.
 if [ "$TTY_OUT" -eq 1 ]; then
   rail_note ""
-  rail_note "  ${C_MUTED}running: goblin-install --target $TARGET --class $CLASS$([ "$ELECTRON" -eq 1 ] && printf ' --electron')${C_RESET}"
+  rail_note "  ${C_MUTED}running: goblin-install --target $TARGET --class $CLASS$([ "$ELECTRON" -eq 1 ] && printf ' --electron')$([ -n "$CI_FLAG" ] && printf ' %s' "$CI_FLAG")${C_RESET}"
 else
-  printf 'gob init [run] goblin-install --target %s --class %s%s\n' "$TARGET" "$CLASS" "$([ "$ELECTRON" -eq 1 ] && printf ' --electron')"
+  printf 'gob init [run] goblin-install --target %s --class %s%s%s\n' "$TARGET" "$CLASS" "$([ "$ELECTRON" -eq 1 ] && printf ' --electron')" "$([ -n "$CI_FLAG" ] && printf ' %s' "$CI_FLAG")"
 fi
-if [ "$ELECTRON" -eq 1 ]; then
-  bash "$SRC/bin/goblin-install" --target "$TARGET" --class "$CLASS" --electron --skills no --yes
-else
-  bash "$SRC/bin/goblin-install" --target "$TARGET" --class "$CLASS" --skills no --yes
-fi
+INSTALL_ARGS=(--target "$TARGET" --class "$CLASS" --skills no --yes)
+[ "$ELECTRON" -eq 1 ] && INSTALL_ARGS+=(--electron)
+[ -n "$CI_FLAG" ] && INSTALL_ARGS+=($CI_FLAG)
+bash "$SRC/bin/goblin-install" "${INSTALL_ARGS[@]}"
 EXIT_INSTALL=$?
 if [ "$EXIT_INSTALL" -ne 0 ]; then
   g_err "install failed (exit $EXIT_INSTALL) — the refusals above name the path and the fix"
@@ -512,20 +664,20 @@ fi
 EMITTED=0
 for p in $EMIT_SELECTED; do
   if [ "$TTY_OUT" -eq 0 ]; then
-    printf 'gob init [run] goblin-emit --platform %s --scope %s\n' "$p" "$SCOPE"
+    printf 'gob init [run] gob sync --platform %s --scope %s\n' "$p" "$SCOPE"
   else
-    rail_note "  ${C_MUTED}running: goblin-emit --platform $p --scope $SCOPE${C_RESET}"
+    rail_note "  ${C_MUTED}running: gob sync --platform $p --scope $SCOPE${C_RESET}"
   fi
   bash "$SRC/bin/goblin-emit" --platform "$p" --scope "$SCOPE" --target "$TARGET"
   EXIT_EMIT=$?
   if [ "$EXIT_EMIT" -ne 0 ]; then
-    g_err "emit $p failed (exit $EXIT_EMIT) — run 'gob emit --platform $p --scope $SCOPE' to see the refusal again"
+    g_err "sync $p failed (exit $EXIT_EMIT) — run 'gob sync --platform $p --scope $SCOPE' to see the refusal again"
     exit "$EXIT_EMIT"
   fi
   EMITTED=$((EMITTED + 1))
 done
 
-# --------------------------------------------------- screen 6b: done + verify --
+# --------------------------------------------------- screen 7b: done + verify --
 # Spacing pass: exactly one blank line before each done-screen section; the engine's
 # verify output and this screen's own summary stay visually separated.
 if [ "$TTY_OUT" -eq 0 ]; then
@@ -564,11 +716,11 @@ if [ "$DRYRUN" -eq 0 ]; then
   printf '  %snext:%s\n' "$C_MUTED" "$C_RESET"
   printf '    1. %sthe %s skipped checks ARE your checklist — gob verify names each one%s\n' "$C_TEXT" "$SKIPPED" "$C_RESET"
   printf '    2. %sreplace the placeholder gate in .goblin/goblin.yaml with your real commands (P8 step 3)%s\n' "$C_TEXT" "$C_RESET"
-  printf '    3. %snot emitted here: gob emit --platform <p> --scope global%s\n' "$C_TEXT" "$C_RESET"
+  printf '    3. %snot synced here: gob sync --platform <p> --scope global%s\n' "$C_TEXT" "$C_RESET"
   if [ "$EMIT_N" -gt 0 ]; then
     printf '    4. %shermes skills trust %s   # one-time, so the project-tier skills load%s\n' "$C_TEXT" "$TARGET" "$C_RESET"
   else
-    printf '    4. %sagent skills are opt-in per platform: gob emit --platform <p>%s\n' "$C_TEXT" "$C_RESET"
+    printf '    4. %sagent skills are opt-in per platform: gob sync --platform <p>%s\n' "$C_TEXT" "$C_RESET"
   fi
   printf '\n'
   if [ "$VERIFY_RC" -eq 0 ]; then

@@ -44,7 +44,9 @@ if (arg0 === "--version" || arg0 === "-V" || arg0 === "-v") {
   process.exit(0);
 }
 
-const SCRIPT = { verify: "goblin-verify", bans: "goblin-bans", audit: "goblin-audit", upgrade: "goblin-upgrade", doctor: "goblin-doctor", emit: "goblin-emit", init: "goblin-init" };
+const SCRIPT = { verify: "goblin-verify", bans: "goblin-bans", audit: "goblin-audit", upgrade: "goblin-upgrade", doctor: "goblin-doctor", emit: "goblin-emit", sync: "goblin-emit", init: "goblin-init" };
+// `sync` is the friendlier name for `emit` (wizard v2): same engine, same flags, same exit
+// contract. `emit` stays a first-class verb - nothing is removed, this row only adds an alias.
 const [cmd, ...rest] = process.argv.slice(2);
 
 // No args, a help flag, or an unrecognized first arg: short usage, exit 2. The one survivor of
@@ -57,13 +59,13 @@ function usage() {
 [
 "gob <command>",
 "",
-"  gob init      start here — the guided first step (detect, class, emit, first verify)",
+"  gob init      start here — the guided first step (health, class, gate, ci, sync, verify)",
 "  gob verify    run the rule matrix against the current repo",
 "  gob bans      run the ban list (per-pattern red lines over the source tree)",
 "  gob audit     check recorded dependency claims against live advisory feeds",
 "  gob upgrade   migrate a repo to the shared global engine at ~/.goblin/engine",
 "  gob doctor    one detection/drift run across the agent platforms",
-"  gob emit      write the skills + context block for one platform",
+"  gob sync      write the skills + context block for one platform (alias: gob emit)",
 "  gob uninstall --target .          remove exactly what an install wrote (preimages)",
 "",
 "start here: gob init",
