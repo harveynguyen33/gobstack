@@ -232,6 +232,20 @@ if command -v script >/dev/null 2>&1; then
   check "the tty rail shows class answered on the next screen" "$?"
   grep -qE "$(printf '\033')\[[0-9]+A" "$TS"
   check "the redraw moves the cursor only on a tty (cursor-up present in the typescript)" "$?"
+  # T8b: the rewind amount must cover the FULL drawn frame — buffer + the 6 rail rows.
+  # Rewinding by the buffer count alone (the 0.5.0-beta.1 defect the client caught on a
+  # Mac, 2026-10-06) left 6 stale rail rows painted, so every screen ≥2 stacked a second
+  # banner frame under them: the duplicate-logo screenshot. Pin the arithmetic in the
+  # source, and pin that a buffer-only rewind shape never returns.
+  grep -qF 'RAIL_BUF[@]} + 6' "$SRC/bin/goblin-init"
+  check "rail_rewind covers the full drawn frame (buffer + 6 rail rows) (T8b)" "$?"
+  ! grep -qF "printf '\\033[%dA\\033[J' \"\${#RAIL_BUF[@]}\"" "$SRC/bin/goblin-init"
+  check "no buffer-only rewind remains (the dup-banner shape) (T8b)" "$?"
+  # And the unbraced-var species on line 244's branch: a colour var directly adjacent to a
+  # multibyte glyph anywhere in bin/goblin-init — bash parses the longest identifier and
+  # the run dies with 'C_GREEN<glyph>: unbound variable' (client screenshot, 2026-10-06).
+  ! grep -nP '\$C_[A-Z_]+[^\x00-\x7F]' "$SRC/bin/goblin-init"
+  check "no unbraced colour var adjacent to a multibyte glyph (T8c)" "$?"
 else
   note "skip T8: script(1) not available — the pty screen cannot be exercised here"
 fi

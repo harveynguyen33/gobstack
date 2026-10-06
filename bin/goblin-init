@@ -104,7 +104,12 @@ rail_note() {
 }
 rail_rewind() {
   if [ "$TTY_OUT" -eq 1 ]; then
-    printf '\033[%dA\033[J' "${#RAIL_BUF[@]}"
+    # The drawn frame is the buffer PLUS the 6 rail rows rail_draw prints under it.
+    # Rewinding by the buffer count alone left the 6 rail rows painted on screen, so the
+    # next draw stacked a second frame under them — the duplicate-banner the client caught
+    # on a Mac (2026-10-06): every screen ≥2 grew the stack by one frame. Rewind the full
+    # drawn height. (Clean-room catch, second fixture round.)
+    printf '\033[%dA\033[J' "$(( ${#RAIL_BUF[@]} + 6 ))"
   fi
 }
 rail_draw() { # reprint the saved buffer, then the live rail row for $CURRENT
@@ -241,7 +246,7 @@ if [ "$TTY_OUT" -eq 1 ]; then
     while IFS=$'\t' read -r p proj glob hit; do
       [ -n "$p" ] || continue
       case "$glob" in "~"*) glob="${glob/\~/$HOME}" ;; esac
-      rail_say "      $C_GREEN✔$C_RESET $C_TEXT$p$C_RESET $glob $C_DIM($hit)$C_RESET"
+      rail_say "      ${C_GREEN}✔$C_RESET $C_TEXT$p$C_RESET $glob $C_DIM($hit)$C_RESET"
     done <<< "$DET_ROWS"
   fi
 else
