@@ -155,11 +155,12 @@ norm_text docs/GUIDE.md | grep -q 'health check, class,'
 check "docs/GUIDE.md names the health-check screen first (wizard v2)" "$?"
 norm_text docs/GUIDE.md | grep -q 'the ci opt-in, which platforms to sync'
 check "docs/GUIDE.md names the ci screen and the sync rename (wizard v2)" "$?"
-# The ci default-no default-class shape: the flag exists, the empty default is the class contract.
-norm_text README.md | grep -q 'the ci step defaults to the class contract'
-check "README states the ci default (the class decides) (wizard v2)" "$?"
-norm_text docs/GUIDE.md | grep -q 'the default is the class decides'
-check "docs/GUIDE.md states the ci default (the class decides) (wizard v2)" "$?"
+# The ci default-no shape: the wizard's unanswered default is an explicit no (nothing under
+# .github/ without consent); the installer flag's own default stays the class contract.
+norm_text README.md | grep -q 'the ci step defaults to no'
+check "README states the ci default (no unless opted in) (wizard v2)" "$?"
+norm_text docs/GUIDE.md | grep -q 'nothing lands under .github/ unless you opt in'
+check "docs/GUIDE.md states the ci default (no unless opted in) (wizard v2)" "$?"
 norm_text docs/GUIDE.md | grep -q 'no is recorded as an opt-out'
 check "docs/GUIDE.md states the explicit no is a recorded opt-out (wizard v2)" "$?"
 # The stale claim, normalised like every matcher above: 'install' as subject of copying skills.

@@ -118,8 +118,10 @@ check "  and the record says skills=no" "$?"
 ( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack (neutral default)" )
 VOUT2B=$( cd "$REPO" && env PATH="$BARE_PATH" bash .goblin/bin/goblin-verify 2>&1 ); VRC2B=$?
 check "  and the neutral install verifies green (exit 0)" "$VRC2B"
-printf '%s' "$VOUT2B" | grep -qE '^ *38 passed, 0 failed, 11 advisory, 33 skipped'
-check "  at the measured neutral green line (38/0/11/33)" "$?"
+# wizard-v2: the unanswered ci step defaults to an explicit no, so the neutral install
+# carries no .github workflow — one gate row fewer, one skip more. Measured 2026-10-06.
+printf '%s' "$VOUT2B" | grep -qE '^ *37 passed, 0 failed, 11 advisory, 34 skipped'
+check "  at the measured neutral green line (37/0/11/34, ci=no)" "$?"
 # the emitted hermes context block (AGENTS.md's emitted twin) must NOT be here either
 grep -q 'gob sync' "$REPO/AGENTS.md"
 check "  and AGENTS.md points at the opt-in (gob sync --platform <p>, wizard v2 vocabulary)" "$?"

@@ -101,8 +101,8 @@ answerable by flag, `--dry-run` to see the plan first:
         --gate "bash tests/run-tests.sh" --yes
 
 The wizard's ci step asks whether the gate should also run in CI
-(`.github/workflows/goblin-gate.yml`). The default is **the class decides**: a class whose
-contract requires or permits the ci-gate part gets the workflow, one that forbids it never does.
+(`.github/workflows/goblin-gate.yml`). The wizard's default is **no** — nothing lands under `.github/` unless you opt in. (Outside the wizard, `gob install`'s own default is the class decides: a class whose
+contract requires or permits the ci-gate part gets the workflow, one that forbids it never does.)
 `--ci-gate yes|no` overrides: an explicit `no` is recorded as an opt-out (so verify reports the
 opt-out, never a silent absence), and an explicit `yes` is refused for a class that forbids the
 part.

@@ -483,14 +483,14 @@ fi
 CURRENT=6
 rail_rewind
 if [ "$TTY_OUT" -eq 1 ]; then rail_draw; fi
-CI_DEFAULT="the class decides"
+CI_DEFAULT="no — nothing under .github/ (the default)"
 if [ "${CI_GATE:-}" = "" ] && [ "$TTY_IN" -eq 1 ] && [ "$YES" -eq 0 ]; then
   rail_say ""
   ASKED_ANY=1
-  ask_radio "run the gate in CI too? (.github/workflows/goblin-gate.yml)" REPLY_CI \
-    "class decides — follow the class contract (recommended)" \
+  ask_radio "install a CI workflow that runs the health check on every pull request?" REPLY_CI \
+    "no — nothing under .github/ (the default)" \
     "yes — write the CI workflow" \
-    "no — no CI lane (recorded as an explicit opt-out)"
+    "class decides — follow the class contract"
   case "$REPLY_CI" in
     "yes"*)   CI_GATE="yes" ;;
     "no"*)    CI_GATE="no" ;;
@@ -500,7 +500,7 @@ if [ "${CI_GATE:-}" = "" ] && [ "$TTY_IN" -eq 1 ] && [ "$YES" -eq 0 ]; then
 fi
 CI_GATE="${CI_GATE:-}"   # empty = the class decides; yes/no ride the installer's --ci-gate
 case "$CI_GATE" in
-  "")     CI_CHOICE="class decides"; CI_FLAG="" ;;
+  "")     CI_CHOICE="no (the default)"; CI_FLAG="--ci-gate no" ;;
   yes)    CI_CHOICE="yes";           CI_FLAG="--ci-gate yes" ;;
   no)     CI_CHOICE="no (explicit opt-out)"; CI_FLAG="--ci-gate no" ;;
   *)      g_err "--ci-gate must be yes or no, got '$CI_GATE'"; exit 2 ;;
@@ -575,7 +575,7 @@ if [ "$TTY_IN" -eq 1 ] && [ -z "$EMIT" ] && [ "$YES" -eq 0 ]; then
 fi
 STEP_VAL[5]="$C_TEXT$EMIT_N platform(s) · scope $SCOPE$C_RESET"
 if [ "$TTY_OUT" -eq 1 ]; then
-  rail_say "  ✔ $((CURRENT - 1)). emit             $C_TEXT$EMIT_N platform(s) · scope $SCOPE$C_RESET"
+  rail_say "  ✔ $((CURRENT - 1)). sync            $C_TEXT$EMIT_N platform(s) · scope $SCOPE$C_RESET"
 fi
 
 # ---- the plan box: the wizard never writes until this has been on the screen ----
