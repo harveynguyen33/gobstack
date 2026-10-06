@@ -149,7 +149,7 @@ norm_text README.md | grep -qE 'gob emit .{0,4}platform <p> is the same'
 check "README states gob emit is the same command under its original name (wizard v2)" "$?"
 # The wizard's step order: seven screens (wizard v2 added the ci step and renamed emit to
 # sync). The doc sentence and this pin move together.
-norm_text README.md | grep -q 'health check . class . branch/email . first gate . ci . sync . done'
+norm_text README.md | grep -q 'detect . class . identity . health check . ci . sync . done'
 check "README states the wizard's 7-step order (wizard v2)" "$?"
 norm_text docs/GUIDE.md | grep -q 'health check, class,'
 check "docs/GUIDE.md names the health-check screen first (wizard v2)" "$?"

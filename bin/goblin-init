@@ -77,7 +77,7 @@ fi
 # BUFFER of the wizard's own lines (RAIL_BUF) — never by counting the output between
 # draws, because the installer/emit engines print freely and break naive accounting.
 # Over a pipe nothing is saved and nothing rewinds: each screen is one numbered line.
-STEP_LABELS=("health" "class" "branch/email" "first gate" "ci" "emit" "done")
+STEP_LABELS=("detect" "class" "identity" "health check" "ci" "sync" "done")
 STEP_VAL=("" "" "" "" "" "" "")
 CURRENT=1
 N_STEPS=7
@@ -361,7 +361,7 @@ done
 STEP_VAL[0]="$C_DIM$DET_N detected$C_RESET"
 if [ "$TTY_OUT" -eq 1 ]; then
   rail_say ""
-  rail_say "  ✔ 1. health         $C_TEXT$DET_N platform(s) clean$C_RESET"
+  rail_say "  ✔ 1. detect        $C_TEXT$DET_N platform(s) clean$C_RESET"
   if [ "$DET_N" -eq 0 ]; then
     rail_say "      ${C_YELLOW}no platform detected here — the wizard will still install the harness; sync later with gob sync$C_RESET"
   else
@@ -372,7 +372,7 @@ if [ "$TTY_OUT" -eq 1 ]; then
     done <<< "$DET_ROWS"
   fi
 else
-  cascade "health: $DET_N platform(s) detected ($(printf '%s' "$DET_ROWS" | awk -F'\t' '{printf "%s ", $1}'))"
+  cascade "detect: $DET_N platform(s) detected ($(printf '%s' "$DET_ROWS" | awk -F'\t' '{printf "%s ", $1}'))"
 fi
 
 # ------------------------------------------------------------ screen 3: class -
@@ -456,12 +456,12 @@ GATE_DEFAULT="bash tests/run-tests.sh"
 if [ -z "$GATE" ]; then
   if [ "$TTY_IN" -eq 1 ]; then
     rail_say ""
-    rail_say "      ${C_MUTED}one real command that must stay green — suggested for a bash suite:$C_RESET"
+    rail_say "      ${C_MUTED}what command proves this repo is healthy? it must stay green:$C_RESET"
     if [ -f "$TARGET/tests/run-tests.sh" ]; then
       rail_say "      $C_DIM$GATE_DEFAULT$C_RESET"
-      ask_value "gate command" "$GATE_DEFAULT"; GATE="$REPLY"
+      ask_value "health check" "$GATE_DEFAULT"; GATE="$REPLY"
     else
-      ask_value "gate command" "true"; GATE="$REPLY"
+      ask_value "health check" "true"; GATE="$REPLY"
       if [ "$GATE" = "true" ]; then
         rail_say "      ${C_YELLOW}no tests/run-tests.sh found — a placeholder gate is allowed but it proves nothing; replace it in .goblin/goblin.yaml$C_RESET"
       fi
@@ -473,7 +473,7 @@ if [ -z "$GATE" ]; then
 fi
 STEP_VAL[3]="$C_TEXT$GATE$C_RESET"
 if [ "$TTY_OUT" -eq 1 ]; then
-  rail_say "  ✔ $((CURRENT - 1)). first gate      $C_TEXT$GATE$C_RESET"
+  rail_say "  ✔ $((CURRENT - 1)). health check  $C_TEXT$GATE$C_RESET"
 fi
 
 # -------------------------------------------------------- screen 6: ci gate ----

@@ -89,7 +89,7 @@ one way this guide installs it.
 something you care about.
 
 The guided path is `gob init` — one screen per question (health check, class,
-branch/email, first gate, the CI opt-in, which platforms to sync), every question also
+identity (branch/email), the health check, the CI opt-in, which platforms to sync), every question also
 answerable by flag, `--dry-run` to see the plan first:
 
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
