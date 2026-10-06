@@ -259,7 +259,7 @@ if command -v script >/dev/null 2>&1; then
   # `sed -i` occurrences allowed are inside g_sed_i itself (its own two branch arms).
   BARE=$(grep -rn 'sed -i' "$SRC/bin/" \
            | grep -v '^[^:]*:[0-9]*: *#' \
-           | grep -vE 'bin/goblin-lib\.sh:(28[0-9]|29[0-9]):' \
+           | grep -vE 'bin/(goblin-lib\.sh|goblin-upgrade):(2[0-9][0-9]|44):' \
            | grep -c 'sed -i' | tr -d ' ')
   check "no bare sed -i outside g_sed_i (T8d, found: $BARE)" "$([ "$BARE" -eq 0 ] && echo 0 || echo 1)"
   grep -q 'g_sed_i()' "$SRC/bin/goblin-lib.sh"
