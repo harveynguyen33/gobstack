@@ -67,7 +67,7 @@ LEDGER="${GOBLIN_EMISSIONS:-$HOME/.goblin-stack/emissions.tsv}"
 PREIMG="${GOBLIN_PREIMAGES:-$HOME/.goblin-stack/preimages}"
 
 usage() {
-  cat <<USAGE
+  cat <<'USAGE'
 gob sync — per-platform skill sync (W4a, the seven platforms since W4b).
 
   gob sync --platform <$_PLA|hermes|copilot|cursor|opencode|codex|$_G1$_G2>
