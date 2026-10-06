@@ -251,6 +251,19 @@ if command -v script >/dev/null 2>&1; then
   # the run dies with 'C_GREEN<glyph>: unbound variable' (client screenshot, 2026-10-06).
   ! grep -nP '\$C_[A-Z_]+[^\x00-\x7F]' "$SRC/bin/goblin-init"
   check "no unbraced colour var adjacent to a multibyte glyph (T8c)" "$?"
+  # ---- T8d: the BSD-sed source gate --------------------------------------------
+  # A bare `sed -i script file` is a syntax bomb on macOS (BSD sed reads the script as
+  # the -i backup suffix): the client's install died with 'command a expects \ followed
+  # by text' at the wizard's branch write (Mac, 2026-10-06). Every in-place edit in bin/
+  # must go through g_sed_i, which branches on the sed family — the only two literal
+  # `sed -i` occurrences allowed are inside g_sed_i itself (its own two branch arms).
+  BARE=$(grep -rn 'sed -i' "$SRC/bin/" \
+           | grep -v '^[^:]*:[0-9]*: *#' \
+           | grep -vE 'bin/goblin-lib\.sh:(28[0-9]|29[0-9]):' \
+           | grep -c 'sed -i' | tr -d ' ')
+  check "no bare sed -i outside g_sed_i (T8d, found: $BARE)" "$([ "$BARE" -eq 0 ] && echo 0 || echo 1)"
+  grep -q 'g_sed_i()' "$SRC/bin/goblin-lib.sh"
+  check "the g_sed_i helper exists in goblin-lib (T8d)" "$?"
 else
   note "skip T8: script(1) not available — the pty screen cannot be exercised here"
 fi

@@ -636,8 +636,8 @@ fi
 CONFIG="$TARGET/.goblin/goblin.yaml"
 [ -f "$CONFIG" ] || { g_err "install wrote no .goblin/goblin.yaml at $TARGET"; exit 1; }
 if [ "$DRYRUN" -eq 0 ]; then
-  sed -i "s|^branch:.*|branch: $BRANCH|" "$CONFIG" || { g_err "cannot write the declared branch into $CONFIG"; exit 1; }
-  sed -i "s|^owner_email:.*|owner_email: $EMAIL|" "$CONFIG" || { g_err "cannot write the owner email into $CONFIG"; exit 1; }
+  g_sed_i "s|^branch:.*|branch: $BRANCH|" "$CONFIG" || { g_err "cannot write the declared branch into $CONFIG"; exit 1; }
+  g_sed_i "s|^owner_email:.*|owner_email: $EMAIL|" "$CONFIG" || { g_err "cannot write the owner email into $CONFIG"; exit 1; }
   TMP_CFG=$(mktemp) || { g_err "mktemp failed"; exit 2; }
   GATE_SUB=$(mktemp) || { g_err "mktemp failed"; exit 2; }
   # print the gate body once, read it as data: an & or / inside the command must not

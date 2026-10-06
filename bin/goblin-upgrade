@@ -403,7 +403,7 @@ else
     g_err "upgrade: $CONFIG has neither an active nor a commented engine_dir: line - not a 0.4.4 template; aborting"
     exit 2
   fi
-  sed -i "s|^# engine_dir:.*|$(active_engine_line | sed 's/[&|]/\\&/g')|" "$CONFIG"
+  g_sed_i "s|^# engine_dir:.*|$(active_engine_line | sed 's/[&|]/\\&/g')|" "$CONFIG"
 fi
 
 # ---- installed.json: engine block + drop exactly the 18 engine entries ----
@@ -476,7 +476,7 @@ if [ -f "$WF" ] && grep -q 'run: bash .goblin/bin/goblin-verify' "$WF"; then
   # a files-RECORDED artifact, so this rewrite re-hashes its record entry here,
   # in the same commit (IN-02 hashes every recorded file; a rewritten artifact
   # with a stale recorded hash would fail verify #2 — measured this session).
-  sed -i "s|run: bash .goblin/bin/goblin-verify|run: npx @techgoblin/gobstack@$CLI_VERSION run goblin-verify|" "$WF"
+  g_sed_i "s|run: bash .goblin/bin/goblin-verify|run: npx @techgoblin/gobstack@$CLI_VERSION run goblin-verify|" "$WF"
   WF_NEW=$(sha256 "$WF")
   python3 "$PYJ/rehash_record.py" "$INSTALLED" ".github/workflows/goblin-gate.yml" "$WF_NEW" || {
     g_err "upgrade: re-hashing the rewritten workflow in $INSTALLED failed - the tree is uncommitted; fix: git checkout ."

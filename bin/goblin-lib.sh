@@ -274,6 +274,21 @@ g_installed_scalar_options() {
   ' "$1"
 }
 
+# g_sed_i <sed-script> <file...> — in-place sed that works on BOTH sed families.
+# GNU sed takes -i with an optional suffix attached; BSD sed (macOS) REQUIRES an argument
+# after -i (the backup suffix), so a bare `sed -i 's|…|…|' file` makes BSD read the script
+# as the suffix and the file as the program — the client's `sed: 1: "...": command a
+# expects \ followed by text` (Mac, 2026-10-06). The empty-suffix form `-i ''` is a syntax
+# error on GNU, hence the branch. Callers: g_sed_i 's|a|b|' file
+g_sed_i() {
+  local script="$1"; shift
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$script" "$@"
+  else
+    sed -i '' "$script" "$@"
+  fi
+}
+
 # ------------------------------------------------------------- self-test -----
 # Proves the parser actually parses. Every assertion is a real comparison against a
 # value written to a temp file in this function — blank the awk in g_yaml_scalar and

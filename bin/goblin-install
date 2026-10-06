@@ -241,7 +241,7 @@ if [ "$RE_PIN" -eq 1 ]; then
   fi
   # One line, in place. Every other line of the config - comments included - is untouched, so
   # the `owned` contract holds for everything except the single value just asked for.
-  sed -i "s|^practice_sha256:.*|practice_sha256: $NEW_SHA|" "$CONFIG" \
+  g_sed_i "s|^practice_sha256:.*|practice_sha256: $NEW_SHA|" "$CONFIG" \
     || { g_err "could not rewrite the pin in $CONFIG"; exit 1; }
   # Fail closed: never report a re-pin that did not land. The failure this command exists to
   # remove is a hash nobody verified (measured at bf7e9c9: sed -i could not write to a read-only
@@ -793,7 +793,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
         cur=$(g_yaml_scalar "$CONFIG" disabled)
         cur=${cur#[}; cur=${cur%]}
         new=$(printf '%s,%s' "$cur" "$p" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
-        sed -i "s|^disabled:.*|disabled: [$new]|" "$CONFIG"
+        g_sed_i "s|^disabled:.*|disabled: [$new]|" "$CONFIG"
       fi
     done
     g_info "recorded opt-out: $OPT_OUT"
