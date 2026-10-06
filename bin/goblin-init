@@ -3,7 +3,8 @@
 #
 #   gob init [--target <dir>] [--class <software|service|game|research|fleet|A..E|app|agent|desktop>]
 #               [--electron] [--branch <name>] [--email <addr>] [--gate <cmd>]
-#               [--ci-gate yes|no] [--emit <p[,p..]>] [--scope project|global] [--yes] [--dry-run]
+#               [--ci-gate yes|no] [--emit <p[,p..]>] [--scope project|global] [--yes]
+#               [--no-verify] [--dry-run]
 #
 # Seven screens, one per question, answered steps collapsing into the ✔/◆/○ rail above.
 # On a tty the class and ci steps are a KEYBOARD RADIO (arrows move the ▸ pointer, Enter
@@ -270,7 +271,7 @@ ask_check_pre() {
 # ------------------------------------------------------------------ flags -----
 TARGET="" CLASS="" BRANCH="" EMAIL="" GATE="" EMIT="" SCOPE=""
 ELECTRON=0
-YES=0; DRYRUN=0
+YES=0; DRYRUN=0; NOVERIFY=0
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
@@ -285,6 +286,7 @@ while [ $# -gt 0 ]; do
     --emit)    EMIT="${2:-}"; shift 2 ;;
     --scope)   SCOPE="${2:-}"; shift 2 ;;
     --yes)     YES=1; shift ;;
+    --no-verify) NOVERIFY=1; shift ;;
     --dry-run) DRYRUN=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) g_err "unknown option: $1"; usage >&2; exit 2 ;;
@@ -683,7 +685,25 @@ done
 if [ "$TTY_OUT" -eq 0 ]; then
   printf 'gob init [verify] .goblin/bin/goblin-verify\n'
 fi
-if [ "$DRYRUN" -eq 0 ]; then
+VERIFY_RC=0
+if [ "$DRYRUN" -eq 0 ] && [ "$NOVERIFY" -eq 1 ]; then
+  # --no-verify: the operator asked for the install without the health check. The skip is
+  # named, not silent — a run that says nothing reads like a run that verified.
+  if [ "$TTY_OUT" -eq 1 ]; then
+    rail_note "  ${C_MUTED}health check skipped (--no-verify) — run .goblin/bin/goblin-verify when ready${C_RESET}"
+  else
+    printf 'gob init [verify] skipped (--no-verify)\n'
+  fi
+elif [ "$DRYRUN" -eq 0 ]; then
+  # Before the run: what the operator is about to see, and whose debt a red row is. On a
+  # fresh install a dozen rows fail or skip because the repo has not earned them yet —
+  # that is the documented day-one state, not a broken install (docs/GUIDE.md, section 4).
+  local_rows=$(awk -F'\t' 'NR>1 && $2=="target" {n++} END{print n+0}' "$TARGET/.goblin/manifest/enforcement.tsv" 2>/dev/null)
+  if [ "$TTY_OUT" -eq 1 ]; then
+    rail_note "  ${C_MUTED}running the health check (${local_rows} manifest rows, about 10-30s) — red rows found here are the repo day-one debts, not install defects${C_RESET}"
+  else
+    printf 'gob init [verify] running the health check (%s manifest rows, about 10-30s); red rows are the repo day-one debts, not install defects\n' "$local_rows"
+  fi
   VERIFY_OUT=$( cd "$TARGET" && bash .goblin/bin/goblin-verify 2>&1 )
   VERIFY_RC=$?
   PASSED=$(printf '%s' "$VERIFY_OUT" | grep -oE '[0-9]+ passed' | head -n 1 | awk '{print $1}')
@@ -693,6 +713,18 @@ if [ "$DRYRUN" -eq 0 ]; then
   PASSED="${PASSED:-0}"; FAILED="${FAILED:-0}"; ADVISORY="${ADVISORY:-0}"; SKIPPED="${SKIPPED:-0}"
 
   if [ "$TTY_OUT" -eq 1 ]; then
+    # After the run: the counts and the day-one framing FIRST, the row detail after —
+    # a fresh install is red on purpose (docs/GUIDE.md section 4), so the verdict line
+    # is the headline and the rows are the evidence, not a wall that hides it.
+    if [ "$VERIFY_RC" -eq 0 ]; then
+      printf '  %sgob verify: %s passed, %s failed, %s skipped · exit 0%s\n' "$C_GREEN" "$PASSED" "$FAILED" "$SKIPPED" "$C_RESET"
+    else
+      printf '  %sgob verify: %s passed, %s failed, %s skipped · exit %s%s\n' "$C_RED" "$PASSED" "$FAILED" "$SKIPPED" "$VERIFY_RC" "$C_RESET"
+    fi
+    if [ "$FAILED" -gt 0 ]; then
+      printf '  %sthe %s failed rows are day-one debts — listed below, each says the fix%s\n' "$C_MUTED" "$FAILED" "$C_RESET"
+    fi
+    printf '\n'
     printf '%s\n' "$VERIFY_OUT" | while IFS= read -r vl; do
       case "$vl" in
         PASS*) printf '      %s%s%s\n' "$C_GREEN" "$vl" "$C_RESET" ;;
@@ -702,12 +734,6 @@ if [ "$DRYRUN" -eq 0 ]; then
         *)     printf '%s\n' "$vl" ;;
       esac
     done
-    printf '\n'
-    if [ "$VERIFY_RC" -eq 0 ]; then
-      printf '  %sgob verify: %s passed, %s failed, %s skipped · exit 0%s\n' "$C_GREEN" "$PASSED" "$FAILED" "$SKIPPED" "$C_RESET"
-    else
-      printf '  %sgob verify: %s passed, %s failed, %s skipped · exit %s%s\n' "$C_RED" "$PASSED" "$FAILED" "$SKIPPED" "$VERIFY_RC" "$C_RESET"
-    fi
   else
     g_info "gob init [verify] exit $VERIFY_RC: $PASSED passed, $FAILED failed, $ADVISORY advisory, $SKIPPED skipped"
   fi

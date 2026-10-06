@@ -173,6 +173,24 @@ AFTER=$( cd "$REPO" && find . -type f | sort )
 [ "$BEFORE" = "$AFTER" ]
 check "the tree is byte-list unchanged after --dry-run" "$?"
 
+# ---- T4b: --no-verify skips the health check and still exits 0 -------------------
+new_repo t4b
+OUT4B=$(init_env --target "$REPO" --class research --branch main --email "runner@example.com" \
+        --gate "bash tests/run-tests.sh" --no-verify \
+        < /dev/null 2>&1); RC4B=$?
+check "--no-verify run exits 0" "$RC4B"
+printf '%s' "$OUT4B" | grep -qF "gob init [verify] skipped (--no-verify)"
+check "  and names the skip (not a silent pass)" "$?"
+[ -f "$REPO/.goblin/goblin.yaml" ] && [ -f "$REPO/HANDOFF.md" ]
+check "  and the install itself still happened" "$?"
+# commit, then the deferred verify is GREEN: --no-verify defers the health check, it does
+# not weaken it — the same repo verifies clean once the day-one commit exists.
+( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack via gob init (--no-verify)" )
+sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$( cd "$REPO" && git rev-parse --short HEAD )\`/" "$REPO/HANDOFF.md"
+( cd "$REPO" && git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes" )
+V4B=$( cd "$REPO" && env PATH="$BARE_PATH" bash .goblin/bin/goblin-verify 2>&1 ); RC4BV=$?
+check "  and the deferred verify still runs green when invoked by hand" "$RC4BV"
+
 # ---- T5: idempotent re-run -------------------------------------------------------
 OUT5=$(init_env --target "$WORK/t1" --class app --branch main --email "runner@example.com" \
         --gate "bash tests/run-tests.sh" --emit hermes --scope project --yes \
@@ -257,10 +275,20 @@ if command -v script >/dev/null 2>&1; then
   # by text' at the wizard's branch write (Mac, 2026-10-06). Every in-place edit in bin/
   # must go through g_sed_i, which branches on the sed family — the only two literal
   # `sed -i` occurrences allowed are inside g_sed_i itself (its own two branch arms).
-  BARE=$(grep -rn 'sed -i' "$SRC/bin/" \
-           | grep -v '^[^:]*:[0-9]*: *#' \
-           | grep -vE 'bin/(goblin-lib\.sh|goblin-upgrade):(2[0-9][0-9]|44):' \
-           | grep -c 'sed -i' | tr -d ' ')
+  # The allowlist is the FUNCTION BODY, not line numbers: an edit above g_sed_i used to
+  # shift the arms out of a fixed 2xx line window and the gate failed on the helper's
+  # own compliant arms. awk prints the body between `g_sed_i() {` and its closing `}`
+  # for every bin file that defines the helper; the gate counts only hits outside it.
+  BARE=$(for f in "$SRC"/bin/*; do
+           [ -f "$f" ] || continue
+           awk '
+             /^g_sed_i\(\) \{/ { inhelper = 1 }
+             inhelper && /^\}/ { inhelper = 0; next }
+             inhelper { next }
+             /sed -i/ && $0 !~ /^[[:space:]]*#/ { print FILENAME ":" FNR }
+           ' "$f"
+         done \
+         | grep -c 'sed -i' | tr -d ' ')
   check "no bare sed -i outside g_sed_i (T8d, found: $BARE)" "$([ "$BARE" -eq 0 ] && echo 0 || echo 1)"
   grep -q 'g_sed_i()' "$SRC/bin/goblin-lib.sh"
   check "the g_sed_i helper exists in goblin-lib (T8d)" "$?"
