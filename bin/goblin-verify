@@ -28,12 +28,18 @@ ONLY=""
 JSON=0
 LIST=0
 SOURCE=""
+VERBOSE=0
+# PASS details collapse to (ok) in the default listing; --verbose (or --only, which is a
+# forensic single-row run) restores the full payload line by line.
+if [ "${ONLY:-}" != "" ]; then VERBOSE=1; fi
 
 usage() {
   cat <<'USAGE'
 goblin-verify — prove a goblin-stack install is still what it says it is.
 
   --only <id[,id...]>   run only these manifest rows
+  --verbose             print every row full-width (the default collapses PASS payloads
+                        to a count; FAIL and ADV always print in full)
   --list                list the manifest rows and exit
   --json                machine-readable output
   --source <path>       read the manifest from a goblin-stack checkout instead of .goblin/
@@ -44,9 +50,10 @@ USAGE
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --only)   ONLY="${2:-}"; shift 2 ;;
+    --only)   ONLY="${2:-}"; VERBOSE=1; shift 2 ;;
     --json)   JSON=1; shift ;;
     --list)   LIST=1; shift ;;
+    --verbose) VERBOSE=1; shift ;;
     --source) SOURCE="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) g_err "unknown option: $1"; usage >&2; exit 2 ;;
@@ -355,6 +362,14 @@ else
     export GOBLIN_HARNESS_STATE=none
   fi
 fi
+
+# ---- the report format (collapsed listing) ------------------------------------
+# The default listing is one line per row: PASS payloads collapse to (ok) and long ADV
+# sentences fold to the report width; --verbose (or --only) prints every payload
+# full-width. The lib's row printers read these.
+export GOB_VERIFY_VERBOSE="$VERBOSE"
+export GOB_REPORT_COLS="${COLUMNS:-100}"
+[ "$GOB_REPORT_COLS" -ge 40 ] 2>/dev/null || GOB_REPORT_COLS=100
 export GOBLIN_ROOT="$ROOT"
 export GOBLIN_CONFIG="$CONFIG"
 
@@ -609,8 +624,14 @@ check_hp_03() {
   names=${names% }
   rc=0
   out=$(awk -v names="$names" '
-    function hasname(line, k,   i, a, m) {
-      m = split(line, a, /[^A-Za-z0-9_./-]+/)
+    function hasname(line, k,   i, a, m, pat) {
+      # Portability (BSD catch, 2026-10-06): the split pattern must be a STRING, not a
+      # regex literal. In /[^A-Za-z0-9_./-]+/ the third slash ENDS the regex, so the
+      # macOS BWK awk dies with a syntax error ("nonterminated character class") before
+      # reading a single line; gawk accepts it. A string pattern means the same thing
+      # everywhere. (No apostrophes here: this program is a single-quoted shell string.)
+      pat = "[^A-Za-z0-9_./-]+"
+      m = split(line, a, pat)
       for (i = 1; i <= m; i++) if (a[i] == k) return 1
       return 0
     }
@@ -2761,7 +2782,10 @@ else
     printf '      of those %d advisory: the matrix labels %d row(s) advisory; the difference is the non-advisory row(s) reporting ADV by design (an unresolved lane) and any labelled row skipped by an opt-out\n' \
       "$ADV" "$adv_labelled"
   fi
-  cat <<'SEE'
+  # The collapsed listing keeps one line per row (a SKIP's reason is the row's whole
+  # point and scripts read them by id); the width discipline lives in the lib's printers.
+  if [ "$VERBOSE" -eq 1 ]; then
+    cat <<'SEE'
       cannot see: whether a check in the harness dir tests the right path rather than
       merely passing; whether the forge is bound by the workflow CL-01 found; whether a human
       read the diff;
@@ -2793,6 +2817,16 @@ else
       acquisition record EXISTS, never that the number beside it came from the store (HP-03's
       defect, one artifact over). No row here reaches a reference asset in CONTEXT either.
 SEE
+  else
+    # The same statement, folded to a pointer. The unsigned-record admission rides the
+    # short form too: a doc pin (F2-3) reads it out of every run, not only verbose ones.
+    cat <<'SEE'
+      cannot see: whether a check tests the right path rather than merely passing; whether a
+      human read the diff; whether the unsigned install record (.goblin/installed.json — it is
+      not signed) was rewritten; and the per-lane blind spots of the ban, judge/loop, CI and
+      reference lanes. Full statement: `goblin-verify --verbose`, docs/LIMITS.md #18 #27 #28 #33 #43.
+SEE
+  fi
   # ---- the engine footer (W1 §2.2, R-1's residue -> docs/LIMITS.md #43) --------
   # Every run states WHICH engine judged it: the sha256 of the running verifier and of
   # the manifest that judged this run, so a repo can name its judge. The statement is
