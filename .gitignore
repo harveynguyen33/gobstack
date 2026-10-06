@@ -4,3 +4,4 @@
 .goblin/.ds-report
 *.bak
 .DS_Store
+*.tgz
