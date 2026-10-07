@@ -83,7 +83,8 @@ You need node ≥ 18 (for the npm shim only), beyond the row above.
     npm i -g @techgoblin/gobstack
 
 This puts **two** commands on your PATH — `gob` and `goblin`, both the same node shim over the
-bash engine. The docs say `gob` throughout; either works.
+bash engine. The docs say `gob` throughout; `goblin` remains as a legacy alias for existing
+scripts.
 
 ---
 

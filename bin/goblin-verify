@@ -268,7 +268,17 @@ if [ -n "$ONLY" ]; then
 fi
 
 if [ ! -f "$CONFIG" ]; then
-  g_err "not installed: $CONFIG is absent. Run: goblin-install --target $ROOT --class <software|service|game|research|fleet>"
+  # Not installed. When PWD is not the target's own project root, the FIRST suggestion is to
+  # go to the repo you meant, and the install command is named second WITH its target spelled
+  # out — an out-of-context `goblin-install --target $PWD` is how a scratch directory gets
+  # initialized by accident (review 2 §1.6). Exit stays 2.
+  if [ "$ROOT" != "$PWD" ]; then
+    g_err "not installed: $CONFIG is absent — and $PWD is not the installed repo ($ROOT)."
+    g_err "fix: cd to your project repo, then re-run gob verify."
+    g_err "    (installing here would initialize $PWD: goblin-install --target $PWD --class <software|service|game|research|fleet>)"
+  else
+    g_err "not installed: $CONFIG is absent. Run: goblin-install --target $ROOT --class <software|service|game|research|fleet>"
+  fi
   exit 2
 fi
 

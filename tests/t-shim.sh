@@ -12,6 +12,9 @@
 #        shim edit cannot move it)
 #   SH7  `sync` routes to the same engine as `emit` (wizard v2 renamed the verb): the
 #        two --help texts are byte-identical and the alias is in the short usage
+#   SH8  the sync help/refusal prints ONCE and exits (the 78856a8 infinite-loop fix):
+#        `--help` exits 0 with a single usage and no error line; bare `sync` exits 2
+#        with the error exactly once, usage attached; neither repeats
 #
 # Everything runs against the checkout's bin/goblin.js; the uninstall probe installs
 # into a mktemp repo under a throwaway HOME, like t-init.sh does.
@@ -92,6 +95,26 @@ printf '%s' "$OUT1" | grep -q 'alias: gob emit'
 check "SH7 the short usage marks sync as the emit alias" "$?"
 node "$SRC/bin/goblin.js" sync --platform nosuch >/dev/null 2>&1
 check "SH7 a bad sync platform carries emit's exit-2 contract" "$([ $? -eq 2 ] && echo 0 || echo 1)"
+
+# ---- SH8: the sync help/refusal prints ONCE (the 78856a8 infinite-loop fix) ------
+# Pre-fix, `gob sync --help` and bare `gob sync` spun `error: emit: --platform is
+# required` forever (178+ lines measured in the UX review). The regression shape: the
+# error marker must appear EXACTLY once, help exits 0 with no error line at all, bare
+# sync exits 2 — and a second run must produce byte-identical output, so a loop that
+# merely prints fewer copies cannot sneak back.
+node "$SRC/bin/goblin.js" sync --help > "$WORK/sync8h.out" 2>&1; RC8H=$?
+check "SH8 gob sync --help exits 0" "$([ "$RC8H" -eq 0 ] && echo 0 || echo 1)"
+grep -qc 'error:' "$WORK/sync8h.out"
+check "SH8 gob sync --help prints no error line (help is not the refusal path)" "$([ $? -eq 1 ] && echo 0 || echo 1)"
+node "$SRC/bin/goblin.js" sync > "$WORK/sync8a.out" 2>&1; RC8A=$?
+node "$SRC/bin/goblin.js" sync > "$WORK/sync8b.out" 2>&1
+check "SH8 bare gob sync exits 2" "$([ "$RC8A" -eq 2 ] && echo 0 || echo 1)"
+ERR_N=$(grep -c 'error: emit: --platform is required' "$WORK/sync8a.out")
+check "SH8 bare gob sync prints the error exactly once (found: $ERR_N)" "$([ "$ERR_N" -eq 1 ] && echo 0 || echo 1)"
+cmp -s "$WORK/sync8a.out" "$WORK/sync8b.out"
+check "SH8 bare gob sync is deterministic run to run (no loop residue)" "$?"
+printf '%s' "$(cat "$WORK/sync8a.out")" | grep -q 'gob sync --platform'
+check "SH8 the refusal carries the usage (the fix prints help WITH the error)" "$?"
 
 rm -rf "$WORK"
 FAIL_N=$(grep -c . "$FAILFILE" 2>/dev/null || true)

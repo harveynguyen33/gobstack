@@ -46,6 +46,17 @@ check "UX-i and writes NO .github workflow (the ci default is an explicit no)" "
 grep -qF "created 24" "$GUIDE"
 check "  and the guide quotes the wizard's created line" "$?"
 
+# ---- UX-iv: the red verdict ends on the first-FAIL remedy, not the mascot ----------------
+# UX minor polish (review 1 §7 / §10 #9): a RED day-one run used to end on
+# `▙ the goblin sees you. the gate is RED — start there.` — mascot noise on the run's one
+# actionable moment. The tail is now the concrete first command; the mascot line stays a
+# GREEN-run line (bin/goblin-init, same commit as this control). This init run IS red
+# (GT-02's 127 gate below), so both directions are pinned on the transcript already in hand.
+printf '%s' "$OUT" | grep -qF 'start with the first FAIL above — its remedy line says the fix.'
+check "UX-iv the red verdict ends on the first-FAIL remedy line" "$?"
+printf '%s' "$OUT" | grep -qF 'the goblin sees you'
+check "  and the mascot line is gone from a red run" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
 # ---- UX-ii: the three day-one shapes ----------------------------------------------------------
 SUM() { HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//'; }
 

@@ -393,6 +393,13 @@ for f in README.md docs/GUIDE.md; do
     fail=1
   fi
 done
+# The legacy alias is named AS an alias in the guide's install step too (UX minor polish):
+# §2 says the package installs both commands and that `goblin` remains as a legacy alias —
+# the same contract README's line 10 states — so a week-1 reader who meets `goblin` in an old
+# script knows which name the docs follow. Pinned on normalised text: the sentence wraps.
+norm_text docs/GUIDE.md | grep -q 'goblin remains as a legacy alias'
+check "docs/GUIDE.md §2 names goblin as the legacy alias (W6 gob rename)" "$?"
+
 for f in README.md docs/GUIDE.md; do
   n=$(grep -c 'goblin-stack' "$f")
   if [ "$n" -eq 0 ]; then
