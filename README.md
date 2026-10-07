@@ -100,6 +100,7 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 | `gob emit` | write the skills + context block for one platform (`--scope project` or `global`); `--unshadow` removes a hermes project skill whose hash equals the source; `gob sync` is the same command under its friendlier name — both spellings work |
 | `gob sync` | the emit verb, renamed (wizard v2): same engine, same flags, same exit contract; `gob emit --help` and `gob sync --help` are byte-identical apart from the verb name |
 | `gob init` | the first-run wizard: detect → class → identity → health check → ci → sync → done, one screen per question; every question has a flag (`--class software --branch main --email a@b.c --gate 'cmd' --emit hermes`), so CI runs it with zero prompts; the ci step defaults to no — nothing under .github/ unless you opt in (`--ci-gate yes|no` overrides); `--no-verify` skips the closing health check; `--dry-run` prints the plan and writes nothing |
+| `gob map` | generate a starter feature map for this repo (standalone; no install needed): scans Next.js app/pages router, Nuxt, route files, or top-level src/lib modules and writes `features/README.md` + one file per detected feature; never clobbers — an existing map refuses until `--force`, which regenerates the index only |
 
 `goblin` remains as a legacy alias for every command above — existing scripts keep working, but
 new commands and docs use `gob`.

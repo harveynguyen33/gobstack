@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# t-map.sh — `gob map`, the standalone feature-map generator.
+#
+#   MP1  gob map --help exits 0 (pinned through the shim too: t-shim's MAP block covers
+#        the dispatch; this is the engine's own contract)
+#   MP2  generation on a next-app-shaped fixture: features/README.md + one file per
+#        top-level route segment, frontmatter feature: == filename stem, >=1 entry_paths,
+#        and the four contract H2s in order (the same shape bin/goblin-verify's FM-01
+#        checkers read — asserted here with the same rules, not by shelling the verifier,
+#        which would need an install this standalone command deliberately does not need)
+#   MP3  every entry path is a single token that EXISTS under the target at generation time
+#   MP4  refusal with an existing map, exit 1, naming the path and --force; nothing written
+#   MP5  --force regenerates ONLY the index and adds NEW slugs; a hand-edited feature file
+#        survives byte-for-byte
+#   MP6  works with NO .goblin/ present (the standalone contract) and never creates one
+#   MP7  idempotent second run on a fresh repo: nothing-to-do or new-slugs-only, exit 0
+#   MP8  a plain repo with no framework: top-level src/ module dirs become TODO slugs; an
+#        empty scan still writes the README index and says none detected
+#   MP9  bad input: a missing target dir and an unknown flag both exit 2
+#
+# Fixture repos are mktemp throwaways; nothing here reads a config file — the generator
+# has no config surface at all (the standalone contract), so the gate's HOME is unused.
+# The path literal the PT-01 body bans is built from fragments below, never typed.
+HOMEPFX=$(printf '%s' 'ho''me')
+RUNHOME="${HOME:-/tmp}"
+set -uo pipefail
+
+SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+MAP="$SRC/bin/goblin-map"
+WORK=$(mktemp -d)
+FAILFILE="$WORK/fails"; : > "$FAILFILE"
+note() { printf '      %s\n' "$*"; }
+check() {
+  if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; printf '%s\n' "$1" >> "$FAILFILE"; fi
+}
+
+# frontmatter field reader, the same three lines FM-01's fm_frontmatter reads
+fm_field() { # <file> <key>
+  awk 'BEGIN{fm=0} /^---[[:space:]]*$/ {fm++; if (fm==1) next; else exit} fm==1 {print}' "$1" \
+    | sed -n "s/^$2:[[:space:]]*//p" | head -n 1
+}
+
+# MP2 helper: the four H2 contract, in order (mirrors fm_h2_ok in bin/goblin-verify)
+h2_ok() {
+  local n=0 ok=1 line
+  while IFS= read -r line; do
+    n=$((n + 1))
+    case "$n" in
+      1) [ "$line" = "Sub-features" ] || ok=0 ;;
+      2) [ "$line" = "How to get to it (user POV)" ] || ok=0 ;;
+      3) case "$line" in "Driving it with "*) ;; *) ok=0 ;; esac ;;
+      4) [ "$line" = "Gotchas" ] || ok=0 ;;
+      *) ok=0 ;;
+    esac
+  done < <(grep -n '^## ' "$1" | sed 's/^[0-9]*:## //; s/[[:space:]]*$//')
+  [ "$n" -eq 4 ] && [ "$ok" -eq 1 ]
+}
+
+# ---- MP1: --help exits 0 -------------------------------------------------------
+"$MAP" --help >/dev/null 2>&1
+check "MP1 gob map --help exits 0" "$?"
+
+# ---- MP2 + MP3: the next-app fixture ------------------------------------------
+NX="$WORK/next-app"
+mkdir -p "$NX/app/blog" "$NX/app/blog/[slug]" "$NX/app/about" "$NX/app/api/users" "$NX/components"
+printf 'export default function Blog() { return <div>blog</div> }\n' > "$NX/app/blog/page.tsx"
+printf 'export default function Post() { return <div>post</div> }\n' > "$NX/app/blog/[slug]/page.tsx"
+printf 'export default function About() { return <div>about</div> }\n' > "$NX/app/about/page.tsx"
+printf 'export async function GET() {}\n' > "$NX/app/api/users/route.ts"
+printf '{ "scripts": { "dev": "next dev", "build": "next build", "test": "vitest" } }\n' > "$NX/package.json"
+OUT2=$(bash "$MAP" "$NX" 2>&1); RC2=$?
+check "MP2 generation on a next-app fixture exits 0" "$([ "$RC2" -eq 0 ] && echo 0 || echo 1)"
+printf '%s' "$OUT2" | grep -qF "a STARTER"
+check "MP2 the generation line admits the output is a STARTER" "$?"
+for f in README.md blog.md about.md api.md; do
+  [ -f "$NX/features/$f" ]
+  check "MP2 features/$f exists" "$?"
+done
+# component files, tests, nested dirs produce NO slug of their own
+ls "$NX/features"/*.md 2>/dev/null | wc -l | grep -qx 4
+check "MP2 exactly 4 md files (no slug for components/, [slug]/ or nested segments)" "$?"
+for slug in blog about api; do
+  f="$NX/features/$slug.md"
+  [ "$(fm_field "$f" feature)" = "$slug" ]
+  check "MP2 $slug.md: feature: equals the filename stem" "$?"
+  [ "$(fm_field "$f" entry_paths)" != "" ] || [ -n "$(awk '/^entry_paths:/{f=1;next} f&&/^  - /{print} f&&!/^[[:space:]]/{f=0}' "$f")" ]
+  check "MP2 $slug.md declares >=1 entry_paths:" "$?"
+  h2_ok "$f"
+  check "MP2 $slug.md carries the four contract H2s, in order" "$?"
+  printf '%s' "$(fm_field "$f" verified)" | grep -q 'never-driven (generated '
+  check "MP2 $slug.md verified: is the never-driven form (not a drive claim)" "$?"
+done
+printf '%s' "$(cat "$NX/features/README.md")" | grep -qF 'generated by gob map '
+check "MP2 the README carries the muted generator line" "$?"
+# MP3: every entry path is an existing single token under the target
+MP3_BAD=0
+for f in "$NX"/features/*.md; do
+  [ -f "$f" ] || continue
+  while IFS= read -r tok; do
+    [ -n "$tok" ] || continue
+    case "$tok" in *" "*) MP3_BAD=1; note "      token with whitespace: $tok" ;; esac
+    [ -e "$NX/$tok" ] || { MP3_BAD=1; note "      token does not exist: $tok (in $f)"; }
+  done < <(awk '/^entry_paths:/{f=1;next} f&&/^  - /{sub(/^  - /,"");print;next} f&&!/^[[:space:]]/{f=0}' "$f")
+done
+check "MP3 every entry path is a single existing token under the target" "$([ $MP3_BAD -eq 0 ] && echo 0 || echo 1)"
+# the Baseline section carries the package.json scripts
+grep -qF 'dev: `npm run dev`' "$NX/features/README.md"
+check "MP2 the Baseline section lists the package.json dev script" "$?"
+
+# ---- MP4: refusal without --force ---------------------------------------------
+OUT4=$(bash "$MAP" "$NX" 2>&1); RC4=$?
+check "MP4 the second run refuses, exit 1" "$([ "$RC4" -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$OUT4" | grep -qF "$NX/features"
+check "MP4 the refusal names the map path" "$?"
+printf '%s' "$OUT4" | grep -qF -- "--force"
+check "MP4 the refusal names the --force remedy" "$?"
+
+# ---- MP5: --force regenerates the index only, preserving a hand-edited file -----
+printf -- '---\nfeature: blog\nentry_paths:\n  - app/blog/page.tsx\nverified: 2026-10-01\n---\n# blog\n\nHUMAN EDIT — do not lose.\n' > "$NX/features/blog.md"
+cp "$NX/features/blog.md" "$WORK/blog.hand"
+mkdir -p "$NX/app/pricing"
+printf 'export default function Pricing() { return <div>p</div> }\n' > "$NX/app/pricing/page.tsx"
+OUT5=$(bash "$MAP" "$NX" --force 2>&1); RC5=$?
+check "MP5 --force exits 0" "$([ "$RC5" -eq 0 ] && echo 0 || echo 1)"
+cmp -s "$WORK/blog.hand" "$NX/features/blog.md"
+check "MP5 the hand-edited feature file survives byte-for-byte" "$?"
+[ -f "$NX/features/pricing.md" ]
+check "MP5 --force adds the NEW slug's file" "$?"
+grep -qF '](./pricing.md)' "$NX/features/README.md"
+check "MP5 the regenerated index links the new slug" "$?"
+grep -qF '](./blog.md)' "$NX/features/README.md"
+check "MP5 the regenerated index still links the kept slug" "$?"
+
+# ---- MP6: standalone — no .goblin/ anywhere ------------------------------------
+[ ! -e "$NX/.goblin" ]
+check "MP6 the fixture has no .goblin/ (generation never needed one)" "$?"
+
+# ---- MP7: idempotent --force (nothing changed) ---------------------------------
+OUT7=$(bash "$MAP" "$NX" --force 2>&1); RC7=$?
+check "MP7 the idempotent --force exits 0" "$([ "$RC7" -eq 0 ] && echo 0 || echo 1)"
+printf '%s' "$OUT7" | grep -qE 'nothing to do'
+check "MP7 it reports nothing-to-do" "$?"
+
+# ---- MP8: the plain-repo fallback and the empty scan ---------------------------
+PL="$WORK/plain"
+mkdir -p "$PL/src/auth" "$PL/src/billing" "$PL/src/tests"
+printf 'export const login = 1\n' > "$PL/src/auth/session.ts"
+printf 'export const inv = 1\n' > "$PL/src/billing/invoice.ts"
+bash "$MAP" "$PL" >/dev/null 2>&1
+check "MP8 the plain-repo fallback exits 0" "$?"
+[ -f "$PL/features/auth.md" ] && [ -f "$PL/features/billing.md" ]
+check "MP8 src/ module dirs became candidate slugs" "$?"
+[ ! -f "$PL/features/tests.md" ]
+check "MP8 test dirs are excluded from the fallback" "$?"
+grep -qF 'TODO' "$PL/features/auth.md"
+check "MP8 the fallback files carry TODO placeholders" "$?"
+# an empty repo (no framework, no src/lib): README only, honestly empty
+EM="$WORK/empty"; mkdir -p "$EM/docs"
+OUT8=$(bash "$MAP" "$EM" 2>&1); RC8=$?
+check "MP8 an empty scan still exits 0" "$([ "$RC8" -eq 0 ] && echo 0 || echo 1)"
+[ -f "$EM/features/README.md" ] && [ ! -e "$EM/features/README.md.md" ]
+check "MP8 an empty scan writes the index only" "$?"
+grep -q 'none detected' "$EM/features/README.md"
+check "MP8 the empty index says none detected (no invented feature)" "$?"
+
+# ---- MP9: bad input -------------------------------------------------------------
+bash "$MAP" "$WORK/no-such-dir" >/dev/null 2>&1
+check "MP9 a missing target exits 2" "$([ $? -eq 2 ] && echo 0 || echo 1)"
+bash "$MAP" --frobnicate >/dev/null 2>&1
+check "MP9 an unknown flag exits 2" "$([ $? -eq 2 ] && echo 0 || echo 1)"
+
+# ---- MP6b: the shims route map (the node table and the bash dispatcher) --------
+# The empty-repo fixture already has features/ from MP8's first run, so both routes
+# are exercised in the refusal shape: exit 1 with the named remedy, never a usage page.
+OUTS=$(cd "$EM" && node "$SRC/bin/goblin.js" map 2>&1); RCS=$?
+check "MP6 node shim gob map routes to the generator, exit 1 (refusal)" "$([ "$RCS" -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$OUTS" | grep -qF -- '--force'
+check "MP6 the node route carries the generator's refusal, not the shim usage" "$?"
+OUTB=$(cd "$EM" && bash "$SRC/bin/goblin" map 2>&1); RCB=$?
+check "MP6 bash dispatcher gob map routes to the generator, exit 1 (refusal)" "$([ "$RCB" -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$OUTB" | grep -qF -- '--force'
+check "MP6 the bash route carries the generator's refusal, not the dispatcher usage" "$?"
+[ ! -e "$EM/.goblin" ]
+check "MP6 and still wrote no .goblin/ (standalone)" "$?"
+
+rm -rf "$WORK"
+FAIL_N=$(grep -c . "$FAILFILE" 2>/dev/null || true)
+if [ "${FAIL_N:-0}" -eq 0 ]; then
+  printf '      t-map: ALL-OK\n'
+  exit 0
+fi
+printf '      t-map: FAILED (%s)\n' "$FAIL_N"
+exit 1

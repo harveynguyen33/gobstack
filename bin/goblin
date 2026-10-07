@@ -49,6 +49,7 @@ gob — the gobstack command line.
   gob emit   --platform <p> --scope project|global [...]   # alias: gob sync
   gob sync   --platform <p> --scope project|global [...]   # the same verb, friendlier name
   gob init   [--target <dir>] [--class app|A-F] [--dry-run]
+  gob map    [target] [--force]          # the standalone feature-map generator (no install needed)
   gob upgrade [--target .] [--dry-run] [--yes] [--engine-dir <path>]
   gob --version
 
@@ -104,6 +105,11 @@ case "$CMD" in
     # W6: the first-run wizard. It drives install/emit/verify and propagates their
     # exit contract verbatim, like every other subcommand here.
     exec bash "$SRC/bin/goblin-init" "$@"
+    ;;
+  map)
+    # The standalone feature-map generator: routes and propagates its 0/1/2 contract
+    # verbatim, like every other subcommand. It needs no .goblin/ install by design.
+    exec bash "$SRC/bin/goblin-map" "$@"
     ;;
   upgrade)
     # W3: the migration lives in its own checkout-level script (W3-SPEC §1.1);

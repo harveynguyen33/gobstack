@@ -15,6 +15,9 @@
 #   SH8  the sync help/refusal prints ONCE and exits (the 78856a8 infinite-loop fix):
 #        `--help` exits 0 with a single usage and no error line; bare `sync` exits 2
 #        with the error exactly once, usage attached; neither repeats
+#   SH9  `map` routes to the standalone feature-map generator: --help exits 0; on a
+#        fixture repo with an app/page.tsx it generates features/ (exit 0); on a repo
+#        with an existing features/ it refuses with exit 1 naming --force
 #
 # Everything runs against the checkout's bin/goblin.js; the uninstall probe installs
 # into a mktemp repo under a throwaway HOME, like t-init.sh does.
@@ -115,6 +118,25 @@ cmp -s "$WORK/sync8a.out" "$WORK/sync8b.out"
 check "SH8 bare gob sync is deterministic run to run (no loop residue)" "$?"
 printf '%s' "$(cat "$WORK/sync8a.out")" | grep -q 'gob sync --platform'
 check "SH8 the refusal carries the usage (the fix prints help WITH the error)" "$?"
+
+# ---- SH9: `map` routes to the standalone generator ------------------------------
+node "$SRC/bin/goblin.js" map --help > "$WORK/map9h.out" 2>&1; RC9H=$?
+check "SH9 gob map --help exits 0" "$([ "$RC9H" -eq 0 ] && echo 0 || echo 1)"
+grep -qc 'error:' "$WORK/map9h.out"
+check "SH9 gob map --help prints no error line" "$([ $? -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$OUT1" | grep -q 'gob map       generate a starter feature map'
+check "SH9 the short usage lists map" "$?"
+MP="$WORK/maprepo"
+mkdir -p "$MP/app"
+printf 'export default function Home() { return <div>home</div> }\n' > "$MP/app/page.tsx"
+OUT9=$(cd "$MP" && HOME="$HOMEDIR" node "$SRC/bin/goblin.js" map 2>&1); RC9=$?
+check "SH9 gob map on a fixture with app/page.tsx exits 0" "$([ "$RC9" -eq 0 ] && echo 0 || echo 1)"
+[ -f "$MP/features/README.md" ] && [ -f "$MP/features/home.md" ]
+check "SH9 and generates features/ (index + home.md)" "$?"
+OUT9B=$(cd "$MP" && HOME="$HOMEDIR" node "$SRC/bin/goblin.js" map 2>&1); RC9B=$?
+check "SH9 a second gob map on the same repo refuses, exit 1" "$([ "$RC9B" -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$OUT9B" | grep -qF -- '--force'
+check "SH9 and the refusal names --force" "$?"
 
 rm -rf "$WORK"
 FAIL_N=$(grep -c . "$FAILFILE" 2>/dev/null || true)

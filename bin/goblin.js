@@ -13,6 +13,7 @@
 //   gob doctor [...]                      -> bin/goblin-doctor (W4a)
 //   gob emit   [...]                      -> bin/goblin-emit (W4a)
 //   gob init   [...]                      -> bin/goblin-init (W6, the first-run wizard)
+//   gob map    [target] [--force]         -> bin/goblin-map (the standalone feature-map generator)
 //   gob uninstall [--target <dir>]        -> bin/goblin-install --uninstall
 //   gob install [...]                     -> bin/goblin-install (the one legacy fallback)
 //   no args | -h/--help | any other unrecognized first arg
@@ -44,7 +45,7 @@ if (arg0 === "--version" || arg0 === "-V" || arg0 === "-v") {
   process.exit(0);
 }
 
-const SCRIPT = { verify: "goblin-verify", bans: "goblin-bans", audit: "goblin-audit", upgrade: "goblin-upgrade", doctor: "goblin-doctor", emit: "goblin-emit", sync: "goblin-emit", init: "goblin-init" };
+const SCRIPT = { verify: "goblin-verify", bans: "goblin-bans", audit: "goblin-audit", upgrade: "goblin-upgrade", doctor: "goblin-doctor", emit: "goblin-emit", sync: "goblin-emit", init: "goblin-init", map: "goblin-map" };
 // `sync` is the friendlier name for `emit` (wizard v2): same engine, same flags, same exit
 // contract. `emit` stays a first-class verb - nothing is removed, this row only adds an alias.
 const [cmd, ...rest] = process.argv.slice(2);
@@ -66,6 +67,7 @@ function usage() {
 "  gob upgrade   migrate a repo to the shared global engine at ~/.goblin/engine",
 "  gob doctor    one detection/drift run across the agent platforms",
 "  gob sync      write the skills + context block for one platform (alias: gob emit)",
+"  gob map       generate a starter feature map for this repo (standalone; no install needed)",
 "  gob uninstall --target .          remove exactly what an install wrote (preimages)",
 "",
 "start here: gob init",
