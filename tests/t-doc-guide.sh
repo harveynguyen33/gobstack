@@ -136,18 +136,23 @@ if [ "${n:-0}" -ge 1 ]; then
 fi
 
 # ---- D4: the file count, and the gloss the guide puts on it ------------------------------------
+# The WALKED path in the guide is `gob init` (review-UX pass), whose ci screen defaults to an
+# explicit no: `created 24`, no .github workflow, 25 files on disk. The plain installer this
+# wizard drives prints `created 25` and writes 26 (the gloss in §3 quotes both sides of the
+# one-file delta and says which file the counter omits). Both counts are asserted against real
+# runs: the installer's here, the wizard's in t-doc-guide-init.sh.
 ONDISK=$(find . -path ./.git -prune -o -type f -print | wc -l)
 # W6 neutral-first: the DEFAULT install is skills=no, so the write set is the neutral harness
 # (26 files: 16 tracked + .goblin/installed.json + 8 owned + .gitignore) — was 51 with skills.
 [ "$ONDISK" = "26" ]
 check "a default class-A install writes 26 files, no skills (measured here: $ONDISK; created $CREATED)" "$?"
-check "  and the guide quotes the installer's own count ($CREATED)" \
+check "  and the guide quotes the plain installer's own count (created $CREATED)" \
   "$(printf '%s' "$CREATED" | grep -qE '^25$' && echo 0 || echo 1)"
-grep -qF "created $CREATED · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
-check "  and the guide's transcript of it is the line the installer printed" "$?"
+grep -qF "created 24 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
+check "  and the guide's walked-path transcript is the wizard's created-24 line" "$?"
 ! grep -q 'means it wrote 50 files' "$GUIDE"
 check "  and the false gloss ('created 50 means it wrote 50 files') is gone (D4)" "$?"
-GLOSS_LINE=$(grep -n "created $CREATED" "$GUIDE" | head -1 | cut -d: -f1)
+GLOSS_LINE=$(grep -n "created 24" "$GUIDE" | head -1 | cut -d: -f1)
 if [ -n "$GLOSS_LINE" ] && sed -n "${GLOSS_LINE},$((GLOSS_LINE + 12))p" "$GUIDE" | grep -q 'installed\.json'; then
   note "ok   the gloss names the file the counter does not count (.goblin/installed.json)"
 else
@@ -217,6 +222,9 @@ awk '/no server and no dependencies/{f=1} f{print} f && /^[[:space:]]*$/{exit}' 
 check "  and the same paragraph now scopes it to verify time" "$?"
 
 # ---- §3/§9: the guide's own numbers, re-measured ------------------------------------------------
+# The WALKED path is the wizard's (t-doc-guide-init.sh re-measures its 31/6 -> 35/2 -> 36/1
+# shapes against the guide); the plain installer path is re-measured here. The tight set control
+# below accepts BOTH paths' shapes — every line the guide quotes must be one EITHER run printed.
 DAYONE=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
 printf '%s\n' "$DAYONE" | grep -qE '^37 passed, 1 failed, 11 advisory, 33 skipped$'
 check "the day-one run prints the shape the guide documents ($DAYONE)" "$?"
@@ -228,20 +236,34 @@ GREEN=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0
 printf '%s\n' "$GREEN" | grep -qE '^38 passed, 0 failed, 11 advisory, 33 skipped$'
 check "naming a real commit makes it green ($GREEN)" "$?"
 
-# EVERY summary-shaped line in the guide must be one of the two a real run printed. The loose form
-# of this (does the file contain the measured line?) is defeated by the claim living in three
-# places: measured on a deliberately doctored copy that said 41 passed in §9 while §4 still said 42,
-# the loose form reported ok. A quoting claim that lives in three places is exactly how a stale
-# number survives, so the tight form is the control.
+# EVERY summary-shaped line in the guide must be one a real run printed — on this path or the
+# wizard path (the six-shape set t-doc-guide-init.sh owns; the union is asserted there). The
+# loose form of this (does the file contain the measured line?) is defeated by the claim living
+# in three places: measured on a deliberately doctored copy that said 41 passed in §9 while §4
+# still said 42, the loose form reported ok. A quoting claim that lives in three places is
+# exactly how a stale number survives, so the tight form is the control.
+# ...and no summary line in the guide is outside the set both paths print. The plain installer's
+# two shapes are measured just above; the wizard's four are the set t-doc-guide-init.sh owns.
+# The control is a SUBSET check: every summary-shaped line the guide quotes must be a line one of
+# the six measured runs printed. (Equality would additionally demand the guide quote every shape
+# of both paths in one file — the two paths are documented in their own sections, §3/§4 vs §9,
+# and demanding the union in one file would freeze the doc's pedagogy, not its accuracy.)
 SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped' "$GUIDE" \
          | sed -n 's/^[[:space:]]*\([0-9]* passed, [0-9]* failed, [0-9]* advisory, [0-9]* skipped\).*/\1/p' | sort -u)
-if [ "$SHAPES" = "$(printf '%s\n%s' "$DAYONE" "$GREEN" | sort -u)" ]; then
-  note "ok   every summary line the guide quotes is one a run printed ($(printf '%s' "$SHAPES" | tr '\n' ' ' | sed 's/ $//'))"
-else
-  note "FAIL the guide quotes a summary line no run printed:"
-  diff <(printf '%s\n' "$SHAPES") <(printf '%s\n%s' "$DAYONE" "$GREEN" | sort -u) | sed 's/^/        /'
-  fail=1
-fi
+WIZ_SHAPES=$(printf '%s\n' \
+  "31 passed, 6 failed, 11 advisory, 34 skipped" \
+  "35 passed, 2 failed, 11 advisory, 34 skipped" \
+  "36 passed, 0 failed, 11 advisory, 34 skipped" \
+  "36 passed, 1 failed, 11 advisory, 34 skipped")
+MEASURED=$(printf '%s\n%s\n%s\n' "$DAYONE" "$GREEN" "$WIZ_SHAPES" | sort -u)
+SUBSET=0
+while IFS= read -r s; do
+  [ -n "$s" ] || continue
+  printf '%s\n' "$MEASURED" | grep -qxF "$s" || { note "FAIL the guide quotes a summary line no run printed: $s"; SUBSET=1; }
+done <<EOF_SHAPES
+$SHAPES
+EOF_SHAPES
+check "every summary line the guide quotes is one a run printed ($(printf '%s' "$SHAPES" | tr '\n' ' ' | sed 's/ $//'))" "$SUBSET"
 
 # ---- the exercise must not destroy the reader's own uncommitted work ---------------------------
 # The block is path-limited on purpose, and the guide says so in its own parenthetical ("your own
