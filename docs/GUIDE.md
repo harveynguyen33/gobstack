@@ -182,6 +182,25 @@ nothing to read yet." On a brand-new install, two dozen rows skip — because th
 ban to scan, no feature map, no loop record, no pinned pre-change commit. That is correct on day
 one. The list of what is still skipping *is* your onboarding checklist.
 
+### Feature maps: generate with `gob map`, then opt in
+
+The feature-map rows (`FM-01`, `FM-02`) are opt-in by declaration: while `feature_map:` in
+`.goblin/goblin.yaml` is empty, both rows SKIP. When you are ready to keep a map honest, the flow
+is:
+
+1. **Generate a starter.** `gob map` works in any git repo — no `.goblin/` install, no goblin.yaml.
+   It scans the repo (Next.js app/pages router, Nuxt, route files, or top-level `src/`/`lib/`
+   module dirs as TODO placeholders) and writes `features/README.md` plus one file per detected
+   feature. It never clobbers: an existing `features/` refuses until `--force`, which regenerates
+   only the index and adds new slugs — your hand-edited feature files are never rewritten.
+2. **Hand-pass every file.** The generated files say so themselves: a `verified: never-driven
+   (generated <date>)` line is not a drive claim. Edit each one into a real feature description
+   with concrete entry paths and driving steps.
+3. **Then, optionally, declare it.** Set `feature_map: features/README.md` in `.goblin/goblin.yaml`
+   and `FM-01`/`FM-02` start reading it on every verify — that declaration is the CI/verify opt-in,
+   never forced. A repo that wants the generator but not the rows can run `gob map` and never
+   declare anything.
+
 **Read the failure messages.** They are written to be actionable, not decorative. `HP-05` above is
 telling you the HANDOFF does not yet name a commit — fix it by naming your HEAD in the `State`
 section.

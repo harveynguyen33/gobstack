@@ -411,5 +411,24 @@ for f in README.md docs/GUIDE.md; do
   fi
 done
 
+# ---- gob map: the standalone generator is documented where a reader decides -----
+# The docs must teach BOTH halves of the product decision (2026-10): the generator is
+# standalone (works with no .goblin/ install and no goblin.yaml), AND the FM-01/FM-02
+# rows stay opt-in through the feature_map: declaration — generating a map never forces
+# the rows on. Each asserted sentence is the pin for its own edit; the generator
+# behaviour itself is t-map.sh and the shim's SH9.
+norm_text README.md | grep -q 'gob map | generate a starter feature map for this repo (standalone; no install needed)'
+check "README's command table carries the gob map row (standalone)" "$?"
+norm_text README.md | grep -q 'never clobbers . an existing map refuses until --force , which regenerates the index only'
+check "README's gob map row states the never-clobber contract" "$?"
+norm_text docs/GUIDE.md | grep -q 'feature maps: generate with gob map , then opt in'
+check "docs/GUIDE.md has the feature-map section" "$?"
+norm_text docs/GUIDE.md | grep -q 'no .goblin/ install, no goblin.yaml'
+check "the GUIDE section states the standalone contract (no install, no goblin.yaml)" "$?"
+norm_text docs/GUIDE.md | grep -q 'that declaration is the ci/verify opt-in, never forced'
+check "the GUIDE section states FM-01/FM-02 stay opt-in (the declaration decides)" "$?"
+norm_text docs/GUIDE.md | grep -q 'verified: never-driven'
+check "the GUIDE section teaches the never-driven verified form is not a drive claim" "$?"
+
 if [ "$fail" -eq 0 ]; then note "t-doc-sync: PASS"; else note "t-doc-sync: FAIL"; fi
 exit "$fail"
