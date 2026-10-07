@@ -13,6 +13,8 @@
 #   * unparseable output is REFUSED with exit 5 and NO record written — an empty record would
 #     read to SC-07 as "clean", which is the fabricated pass this design exists to prevent;
 #   * a class that declares no audit command exits 3 with a reason instead of writing anything.
+#   * the exit-5 contract is on --help itself (UX minor polish: the review measured a --help
+#     that stopped at 4, so the refusal code was undocumented on the surface a user meets).
 #
 # Run by tests/run-tests.sh.
 set -uo pipefail
@@ -118,6 +120,8 @@ check "unparseable output exits 5" "$([ "$RC" -eq 5 ] && echo 0 || echo 1)"
 check "  and REFUSES to write a record" "$([ ! -f .goblin/audit.tsv ] && echo 0 || echo 1)"
 printf '%s' "$OUT" | grep -q 'REFUSING to write a record'
 check "  and says why, on the way out" "$?"
+bash .goblin/bin/goblin-audit --help 2>&1 | grep -q '^  5  '
+check "  and exit 5 is on --help (the refusal code is documented where the user meets it)" "$?"
 
 sed -i "s|^  audit_cmd: .*|  audit_cmd: bash $WORK/fake-audit.sh|" .goblin/goblin.yaml
 OUT=$(bash .goblin/bin/goblin-audit 2>&1); RC=$?

@@ -752,7 +752,10 @@ elif [ "$DRYRUN" -eq 0 ]; then
   if [ "$VERIFY_RC" -eq 0 ]; then
     printf '  %s▙ the goblin sees you. keep the gate green.%s\n' "$C_ACCENT" "$C_RESET"
   else
-    printf '  %s▙ the goblin sees you. the gate is RED — start there.%s\n' "$C_RED" "$C_RESET"
+    # Red runs end on the concrete first command, not the mascot: the day-one verdict IS the
+    # FAIL list, and the first row's remedy line is the thing to act on (UX minor polish —
+    # the "the goblin sees you" sign-off stays a green-run line only).
+    printf '  %sstart with the first FAIL above — its remedy line says the fix.%s\n' "$C_RED" "$C_RESET"
   fi
 fi
 
