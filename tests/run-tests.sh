@@ -98,7 +98,7 @@ fi
 # ---- the test scripts --------------------------------------------------------
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
          t-verify-nested t-engine-dir t-upgrade t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
-         t-audit t-render-tokens t-gt03-freshness t-doc-guide t-doc-replay t-version-sync \
+         t-audit t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-doc-replay t-version-sync \
          t-emit t-doctor t-init t-banner-stderr t-shim; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"

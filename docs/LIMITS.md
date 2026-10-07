@@ -1,7 +1,8 @@
 # Limits — where this is weaker, and what is unproven
 
 Honest accounting. Nothing here is a hedge for a defect that could be fixed; each is either a
-deliberate trade or an unfilled gap.
+deliberate trade or an unfilled gap. (This file keeps the revision wave codes — `W6`, `Z1`, and
+the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 
 ## Weaker than the Cursor harness it learns from
 

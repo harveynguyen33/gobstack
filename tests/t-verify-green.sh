@@ -102,5 +102,57 @@ cmp -s "$WORK/f/.goblin/goblin.yaml" "$WORK/falias/.goblin/goblin.yaml" \
   && grep -q '"class": "software"' "$WORK/falias/.goblin/installed.json"
 check "  and its config is identical to software+electron (class recorded as software)" "$?"
 
+# ---- UX pass: remedy lines, day-one banners, recovery lines, GT-03's sentence --------------
+# (review 1 scope 4-7) Five print contracts live in the printers and the summary block:
+#   R1  the matrix's remedy column rides under a FAIL (g_fail -> g_remedy, _GOB_MANIFEST) -
+#       absent under every PASS, whole under --only, width-truncated in the default listing.
+#       A GREEN RUN still prints one remedy: the JG-02 lane FAILs nothing but its unresolved
+#       judge lane is ADV BY DESIGN (no judge profile in the fixture's models.yaml), and an ADV
+#       remedy is part of that row's print contract since before this pass - so the pin is on
+#       the remedy-bearing ROWS, not the whole output: every row above the summary is PASS/SKIP
+#       and none of the three RED-direction remedy lines may appear.
+#   R2  the owner-mismatch note (owner_mismatch) - only under a red run, names the email
+#   R3  the fresh-clone banner (fresh_clone) - only under a red run, commit-count keyed
+#   R4  GT-03's failure line is a sentence, not the raw test(1) dump
+# Pinned here in the GREEN direction (the red direction is t-verify-red.sh's, which must
+# produce the violation itself): a green run prints none of it.
+BAD_REMEDIES=$(printf '%s' "$OUT" | grep '^remedy:' | grep -vc 'add the missing profile to the file declared as models_file')
+[ -z "$OUT" ] && BAD_REMEDIES=0
+[ "$BAD_REMEDIES" -eq 0 ]
+check "R1 the only remedy: on a green run is the unresolved-lane ADV remedy (none under a PASS/FAIL row)" "$?"
+printf '%s' "$OUT" | grep -q 'note: this repo records a different owner'
+check "R2 a green run prints no owner-mismatch note" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+printf '%s' "$OUT" | grep -q 'fresh clone detected'
+check "R3 a green run prints no fresh-clone banner" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+printf '%s' "$OUT" | grep -q 'the gate line is older than the last commit'
+check "R4 a green run prints no GT-03 staleness sentence" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
+# R5: the fresh-clone banner is keyed on COMMIT COUNT ONLY (the mtime-vs-reflog branch fired
+# after every ordinary GT-02 write and lingered on aged repos). A repo under 3 commits with a
+# failing row gets the banner; the same repo AGED past 3 commits with the same failing row and
+# repeated GT-02 writes stays silent.
+mkdir -p "$WORK/fresh" && cd "$WORK/fresh"
+git init -q -b main
+git config user.name "Test Runner"
+git config user.email "runner@example.com"
+printf '# fresh\n' > README.md
+git add -A && git commit -q -m "seed"
+bash "$SRC/bin/goblin-install" --target . --class A --models "$WORK/models.yaml" >/dev/null 2>&1
+sed -i 's/^owner_email:.*/owner_email: other@owner.example/' .goblin/goblin.yaml
+git add -A && git commit -q -m "install gobstack"
+FOUT2=$(bash .goblin/bin/goblin-verify 2>&1); FRC2=$?
+check "R5a the 2-commit probe fails for the planted reason (CM-01, exit 1)" "$([ "$FRC2" -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$FOUT2" | grep -q 'fresh clone detected: some of these fails are not yours'
+check "R5b the fresh-clone banner fires under 3 commits" "$?"
+printf '%s' "$FOUT2" | grep -q 'note: this repo records a different owner'
+check "R5c the owner-mismatch note fires beside it (same red run)" "$?"
+git commit -q --allow-empty -m "third commit"
+git commit -q --allow-empty -m "fourth commit"
+FOUT3=$(bash .goblin/bin/goblin-verify 2>&1)
+FOUT4=$(bash .goblin/bin/goblin-verify 2>&1); FRC4=$?
+check "R5d the aged probe still fails for the same planted reason (exit 1)" "$([ "$FRC4" -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$FOUT4" | grep -q 'fresh clone detected'
+check "R5e the banner is SILENT on the aged repo after two GT-02 rewrites (mtime branch gone)" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
 if [ "$fail" -eq 0 ]; then note "t-verify-green: PASS"; else note "t-verify-green: FAIL"; fi
 exit "$fail"

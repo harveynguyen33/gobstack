@@ -1321,6 +1321,106 @@ check "  and the refusal says why" "$?"
 out=$(bash .goblin/bin/goblin-verify --only IN-01,PR-02 2>&1); rc=$?
 check "--only <target id mixed with a source id> still runs the target row" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 
+# ---- UX pass: the RED direction of the five print contracts ---------------------------------
+# (review 1 scope 4-7) t-verify-green pins the green direction (none of it on a green run);
+# these produce the violations and pin that the lines APPEAR. Each mutates the fixture's own
+# copy of the matrix/bytes and restores it, the way the controls above do.
+
+# UX-1: the remedy column rides a FAIL. The class-A matrix carries no remedy prose except the
+# rows named in g_fail's comment, so the control plants a remedy on a row it can fail on
+# demand: GT-02, via a gate that cannot run. Whole under --only (the mode that reads),
+# width-truncated in the default listing - the same two-mode contract the row printers keep.
+m_ux_remark() {
+  # the class-A fixture gates live in goblin.yaml: fail GT-02 via a gate that cannot run, and
+  # give the row a remedy to print (the fixture TSV is restored from $BK afterwards)
+  sed -i 's#^    cmd: git rev-parse --verify --quiet HEAD#    cmd: false#' .goblin/goblin.yaml
+  awk -F'\t' -v OFS='\t' '$1=="GT-02" { $7 = "re-run the gate by hand: bash -c \047false\047, fix the tree, then gob verify again" } { print }' "$BK/enforcement.tsv" > .goblin/manifest/enforcement.tsv
+}
+expect_red "UX-1: a planted remedy prints with the FAIL" GT-02 1 m_ux_remark
+m_ux_remark
+out=$(bash .goblin/bin/goblin-verify --only GT-02 2>&1)
+printf '%s' "$out" | grep -q '^remedy: re-run the gate by hand'
+check "UX-1a the planted remedy prints whole under --only" "$?"
+out=$(bash .goblin/bin/goblin-verify 2>&1)
+printf '%s' "$out" | grep -q '^remedy: re-run the gate by hand'
+check "UX-1b the remedy prints in the default listing too (under the fold width, whole)" "$?"
+cp -a "$BK/enforcement.tsv" .goblin/manifest/enforcement.tsv
+cp -a "$BK/goblin.yaml" .goblin/goblin.yaml
+restore_all
+
+# UX-2: GT-02's failing-gate tail. A gate that prints to stdout AND stderr and fails must have
+# its last non-blank output lines carried indented under the FAIL, from the merged capture -
+# so even a gate that swallows its own exit code cannot hide what it printed.
+m_ux_gate_noise() {
+  cat > .goblin/ux-noise.sh <<'EOF_NOISE'
+echo "ux stdout noise line"
+echo "ux stderr noise line" >&2
+exit 3
+EOF_NOISE
+  sed -i 's#^    cmd: git rev-parse --verify --quiet HEAD#    cmd: bash .goblin/ux-noise.sh#' .goblin/goblin.yaml
+}
+r_ux_gate_noise() { restore_all; rm -f .goblin/ux-noise.sh; }
+expect_red "UX-2: a noisy gate's tail rides the FAIL" GT-02 1 m_ux_gate_noise "" r_ux_gate_noise
+m_ux_gate_noise
+out=$(bash .goblin/bin/goblin-verify --only GT-02 2>&1)
+printf '%s' "$out" | grep -q 'gate commit output (last 20 lines):'
+check "UX-2a the tail header names the gate and the 20-line window" "$?"
+printf '%s' "$out" | grep -q '^  ux stdout noise line'
+check "UX-2b the gate stdout line rides indented under the FAIL" "$?"
+printf '%s' "$out" | grep -q '^  ux stderr noise line'
+check "UX-2c the gate stderr line rides indented under the FAIL (merged capture)" "$?"
+r_ux_gate_noise
+
+# UX-3: the owner-mismatch note. The fixture's owner_email is runner@example.com; a HEAD
+# committed by another identity must FAIL CM-01 and print the note naming the owner.
+m_ux_owner() { git commit -q --allow-empty --author="Someone Else <other@person.example>" -m "not the owner"; }
+expect_red "UX-3: a foreign-author HEAD fails CM-01" CM-01 1 m_ux_owner
+m_ux_owner
+out=$(bash .goblin/bin/goblin-verify 2>&1)
+printf '%s' "$out" | grep -q 'note: this repo records a different owner (you are probably new here)'
+check "UX-3a the owner-mismatch note prints under the red run" "$?"
+out2=$(bash .goblin/bin/goblin-verify --only CM-01 2>&1)
+printf '%s' "$out2" | grep -q 'or update owner_email: in .goblin/goblin.yaml'
+check "UX-3b the note names the owner-email update path (the cell's own tail, whole under --only)" "$?"
+git reset -q --hard HEAD~1
+restore_all
+
+# UX-4: the fresh-clone banner, red direction. The green half (R5 in t-verify-green) proved
+# commit-count keying in both directions; this fixture's own history is long, so the control
+# is a seed probe: 2 commits, planted failure, banner present.
+UX4="$WORK/ux4-fresh"
+rm -rf "$UX4"; mkdir -p "$UX4"
+( cd "$UX4" \
+  && git init -q -b main \
+  && git config user.name "Test Runner" && git config user.email "runner@example.com" \
+  && printf '# ux4\n' > README.md && git add -A && git commit -qm seed \
+  && bash "$SRC/bin/goblin-install" --target . --class A --models "$WORK/models.yaml" >/dev/null 2>&1 \
+  && sed -i 's/^owner_email:.*/owner_email: other@owner.example/' .goblin/goblin.yaml \
+  && git add -A && git commit -qm install )
+out=$( cd "$UX4" && bash .goblin/bin/goblin-verify 2>&1 ); rc=$?
+check "UX-4a the 2-commit probe is RED" "$([ "$rc" -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$out" | grep -q 'fresh clone detected: some of these fails are not yours'
+check "UX-4b the fresh-clone banner prints under the red run" "$?"
+printf '%s' "$out" | grep -q 'docs/GUIDE.md .9'
+check "UX-4c the banner points at the GUIDE section" "$?"
+rm -rf "$UX4"
+
+# UX-5: GT-03's failure line is the sentence, not the raw test(1) dump. Measure, commit, and
+# the staleness the row exists to catch is on screen - as the reader-facing sentence with the
+# recovery verb, never the `(test -f .goblin/last-gate-line && [ ...` invocation text.
+m_ux_gt03() { bash .goblin/bin/goblin-verify --only GT-02 >/dev/null 2>&1; git commit -q --allow-empty -m "the commit that ages the gate line"; }
+r_ux_gt03() { git reset -q --hard HEAD~1; restore_all; }
+expect_red "UX-5: an aged gate line fails GT-03" GT-03 1 m_ux_gt03 "" r_ux_gt03
+bash .goblin/bin/goblin-verify --only GT-02 >/dev/null 2>&1
+git commit -q --allow-empty -m "the commit that ages the gate line"
+out=$(bash .goblin/bin/goblin-verify --only GT-03 2>&1)
+printf '%s' "$out" | grep -q 'the gate line is older than the last commit — re-run gob verify to refresh it'
+check "UX-5a the staleness line is the reader-facing sentence" "$?"
+printf '%s' "$out" | grep -qF 'test -f .goblin/last-gate-line'
+check "UX-5b the raw test(1) dump is gone from the failure line" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+git reset -q --hard HEAD~1
+restore_all
+
 FINAL=$(bash .goblin/bin/goblin-verify 2>&1); FINAL_RC=$?
 [ "$FINAL_RC" -eq 0 ] || printf '%s\n' "$FINAL" | grep -E '^(FAIL|SKIP|ADV)' | sed 's/^/        /'
 check "the fixture is GREEN again after every mutation was restored" "$FINAL_RC"

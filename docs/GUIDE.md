@@ -58,6 +58,10 @@ Everything else in gobstack follows from that sentence. If you remember one thin
 guide, remember that one — it is also the standard the harness holds itself to, and the reason it
 ships a file of things it *cannot* check (`docs/LIMITS.md`).
 
+**Words this guide uses** — gate, ratchet, class, part, replay and the rest are defined in one
+sentence each in `docs/GLOSSARY.md` (rendered from the glossary table the install ships:
+`.goblin/manifest/glossary.tsv`).
+
 ---
 
 ## 2. Before you begin
@@ -78,8 +82,8 @@ You need node ≥ 18 (for the npm shim only), beyond the row above.
 
     npm i -g @techgoblin/gobstack
 
-This puts a single command, `goblin`, on your PATH — the node shim over the bash engine, and the
-one way this guide installs it.
+This puts **two** commands on your PATH — `gob` and `goblin`, both the same node shim over the
+bash engine. The docs say `gob` throughout; either works.
 
 ---
 
@@ -113,7 +117,8 @@ or the plain installer this wizard drives, if you prefer the one-shot shape:
 
 Expected output (this is a real transcript, trimmed):
 
-    created 25 · updated 0 · unchanged 0 · skipped 0
+    created 24 · updated 0 · unchanged 0 · skipped 0
+    recorded opt-out: ci-gate
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
@@ -121,12 +126,13 @@ Expected output (this is a real transcript, trimmed):
       3. edit .goblin/goblin.yaml: replace the default gate with your real commands (P8 step 3)
       4. agent skills are opt-in: gob sync --platform <p>   # hermes, claude, copilot, cursor, opencode, codex, gemini
 
-**`created 25`** is the installer's count of the files it **tracks** — the 16 in its `files`
-map, the 8 it `owns`, and `.gitignore`. It writes **26**: the 26th is `.goblin/installed.json`,
-the record it keeps for itself, which it writes but does not count. It has written nothing
-outside this directory. The default install ships **no agent skills** — the harness is neutral,
-and `gob sync --platform <p>` is the per-platform opt-in (`gob emit` is the same command under
-its original name; the old `--skills yes` default is
+**`created 24`** is the installer's count of the files it **tracks** — one fewer than the plain
+installer's 25, because the wizard's unanswered ci screen defaults to an explicit **no**, which is
+recorded as an opt-out and suppresses `.github/workflows/goblin-gate.yml`. It writes **25**: the
+25th is `.goblin/installed.json`, the record it keeps for itself, which it writes but does not
+count. It has written nothing outside this directory. The default install ships **no agent
+skills** — the harness is neutral, and `gob sync --platform <p>` is the per-platform opt-in
+(`gob emit` is the same command under its original name; the old `--skills yes` default is
 still there for repos that want the Hermes project tier vendored).
 
 ### Why `git init -b main` matters
@@ -150,15 +156,16 @@ branch** (unless you want to).
 
 You will see one line per rule. The shape:
 
-    PASS  IN-01  (test -s .goblin/installed.json && grep -q '"version"' .goblin/installed.json)
-    PASS  IN-02  16 installed files hashed | practice pin ok
+    PASS  IN-01  the install record exists and names its version
+    PASS  IN-02  15 installed files hashed
     FAIL  HP-05  HANDOFF.md names no commit that exists in this repo
+    FAIL  GT-02  gate commit: bash tests/run-tests.sh -> exit 127
     SKIP  HS-02  no pinned pre-change commit yet - the REPLAY is not provable
     ADV   HP-04  A stale sentence is corrected in place... (advisory)
 
 and a summary line at the bottom:
 
-    37 passed, 1 failed, 11 advisory, 33 skipped     # the one FAIL is HP-05, below
+    35 passed, 2 failed, 11 advisory, 34 skipped     # HP-05 and GT-02, below
 
 ### How to read that output
 
@@ -178,6 +185,25 @@ one. The list of what is still skipping *is* your onboarding checklist.
 telling you the HANDOFF does not yet name a commit — fix it by naming your HEAD in the `State`
 section.
 
+### The day-one table, measured on this exact walk
+
+| Step | Command | Verify prints | The FAILs |
+|---|---|---|---|
+| 1. the wizard ran | `gob init ... --yes` | `31 passed, 6 failed, 11 advisory, 34 skipped` | the install is uncommitted (`CM-03`), `HP-05`, `GT-02` exit 127, and the identity/branch rows if you skipped the flags |
+| 2. the first commit | `git add -A && git commit` | `35 passed, 2 failed, 11 advisory, 34 skipped` | `HP-05` (the placeholder) and `GT-02` |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `36 passed, 1 failed, 11 advisory, 34 skipped` | `GT-02` only |
+| 4. your real gate | edit `gates:` in `.goblin/goblin.yaml` (§5) | `36 passed, 0 failed, ...` | none — green |
+
+Two of those deserve their name spelled out:
+
+- **`GT-02` exit 127 is the guide's own teaching point, not a defect.** The default gate is
+  `bash tests/run-tests.sh`, and a throwaway repo has no `tests/` — the shell's own
+  *command not found*. It stays red until §5's most valuable edit (your real `gates:`) replaces
+  it. The failure line tells you this: `gate commit: bash tests/run-tests.sh -> exit 127`.
+- **Step 3 is two steps on purpose.** Naming a real HEAD in `HANDOFF.md` without committing it
+  re-reds `CM-03` (`1 dirty entr(y|ies)`) — commit-as-you-go starts on minute one. Edit, commit,
+  then verify.
+
 ### The three-day-one failures, and why they are not a broken harness
 
 If you ran step 1 without `-b main`, or with the wrong git identity, you will see:
@@ -194,8 +220,9 @@ against a declared expectation. That is exactly what you want it to do.
 `HP-05` deserves one sentence more, because it surprises people: the scaffold ships
 `HEAD when this file was written: `0000000``, and `HP-05` **rejects that placeholder on purpose**.
 A file that names a commit which does not exist is worse than one that names none — it looks like a
-record. Commit first, then write the real short SHA in. Measured: with the placeholder left in,
-verify reports `37 passed, 1 failed`; with the real SHA, `38 passed, 0 failed`.
+record. Commit first, then write the real short SHA in. Measured on this walk: with the placeholder
+left in, verify reports `35 passed, 2 failed`; with the real SHA (and the edit committed),
+`36 passed, 1 failed` — the one FAIL being the `GT-02` exit 127 above.
 
 ---
 
@@ -402,16 +429,20 @@ the next session.
 
 ## 9. What to expect on day one (so you do not misread it)
 
-A software-class install lands on a specific shape. The scaffold ships one deliberate red — `HP-05`, the
-`0000000` placeholder in `HANDOFF.md` (§4) — so a literal first run prints:
+A software-class install through the wizard lands on a specific shape. Two of the first reds are
+the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4), and
+`GT-02`, the default gate pointing at a test script a throwaway repo does not have. The walk in §4
+measured, step by step:
 
-    37 passed, 1 failed, 11 advisory, 33 skipped     (the one FAIL is HP-05)
+    31 passed, 6 failed, 11 advisory, 34 skipped     # straight after the wizard, nothing committed
+    35 passed, 2 failed, 11 advisory, 34 skipped     # first commit: HP-05 and GT-02 left
+    36 passed, 1 failed, 11 advisory, 34 skipped     # real HEAD named and committed: GT-02 left
 
-Name a real commit in `HANDOFF.md` and commit, and it is green:
+Name a real commit in `HANDOFF.md`, commit, and give `gates:` real commands (§5), and it is green:
 
-    38 passed, 0 failed, 11 advisory, 33 skipped     (on a real project; your numbers will differ)
+    36 passed, 0 failed, 11 advisory, 34 skipped     (on a real project; your numbers will differ)
 
-**Thirty-three rows skipping is correct**, and each skip prints its reason. In plain terms: the
+**Thirty-four rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
 scolding.
 
@@ -440,13 +471,14 @@ Two readings that are easy to get wrong:
 | `gob install: unknown subcommand` (exit 2) | you ran a bare `gob install` without the npm package installed | install the npm package first: `npm i -g @techgoblin/gobstack`, then `gob install` |
 | `IN-03` fails, "manifest is broken" | a row has a broken check column | fix the row; this is a source defect, not yours |
 | a `FAIL` you believe is wrong | the check may be weak, or your belief may be | run `--only <id>` and read the command it prints |
+| a changelog or matrix note says `W6` or `Z1-4` | that is a revision wave code | `docs/RECORD-NOTES.md` is the legend, one line per code |
 
 **The `HANDOFF.md` refusal is the most common one, and `--force` is never the answer.** `--force`
 replaces your project's own record with a blank scaffold — the exact act the refusal exists to
 prevent. Reconcile instead: keep your file, and add the five sections it is missing. The measured
 cost of that edit, on a real 2450-line handoff, was **15 lines added, none removed**.
 
-**One engine, many repos (W1):** the rule table does not have to live in every repo. A repo can
+**One engine, many repos:** the rule table does not have to live in every repo. A repo can
 point at a shared engine with one line in `.goblin/goblin.yaml`:
 
     engine_dir: ~/.goblin/engine          # absolute or ~/-prefixed; absent = per-repo engine
@@ -458,7 +490,7 @@ every run's footer (`engine: mode=… cli_sha256=… enforcement_tsv_sha256=…`
 available outside any repo through the npm CLI: `gob verify` / `gob bans` / `gob audit` /
 `gob doctor` / `gob sync` / `gob upgrade` / `gob --version`.
 
-**Migrating a repo to the global engine (W3):**
+**Migrating a repo to the global engine:**
 
     gob upgrade            # 8 steps, two commits, one report
 
@@ -532,6 +564,8 @@ Named procedures, installed as project-local skills. Each has a measurable verif
 | File | Read it for |
 |---|---|
 | `docs/DESIGN.md` | the thesis and every rejected alternative |
+| `docs/GLOSSARY.md` | every term of art in one table (rendered from `.goblin/manifest/glossary.tsv`) |
+| `docs/RECORD-NOTES.md` | the wave codes the changelog uses, one line each |
 | `docs/FLOWS.md` | the playbooks in full, with reasons |
 | `docs/ENFORCEMENT.md` | the rule matrix, rendered for a human |
 | `docs/LIMITS.md` | **what this cannot check** — read this one early |

@@ -62,7 +62,8 @@ After installing, in this order:
 **A default software-class install (no agent skills — those are `gob emit`'s job) verifies green —
 `38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists. Before that edit the scaffold's `0000000` placeholder is
-the one expected red: `37 passed, 1 failed`, `HP-05`. Both numbers measured at W6 (neutral-first);
+the one expected red: `37 passed, 1 failed`, `HP-05`. Both numbers measured at the 0.5.0 neutral-first
+revision (see `docs/RECORD-NOTES.md`, V3);
 the run and the fix are step 2 of `docs/GUIDE.md`.**
 Thirty-three rows skip — the five skill rows (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks`
 opt-out a skills-free install records, then the not-yet rows (`HS-02` has no pinned pre-change
@@ -155,6 +156,8 @@ below is the reference material the guide points into, so the two do not compete
 | `docs/RISKS.md` | the risk register, the advisory rows named, the non-goals |
 | `docs/CI.md` | the CI lane: what makes a workflow a gate, the four settings a repository cannot set, and the electron opt-in |
 | `docs/LOOP.md` | the judge role and the loop contract: what a goal-mode loop actually does, the record, and what neither can see |
+| `docs/RECORD-NOTES.md` | the wave codes the changelog and the matrix parentheticals use, one line each |
+| `docs/GLOSSARY.md` | every term of art in one table (rendered from the shipped `.goblin/manifest/glossary.tsv`) |
 | `docs/ADOPTION.md` | the five classes, the preset matrix, the adoption order |
 | `docs/LIMITS.md` | where this is weaker than its sources, and what is unproven |
 
@@ -174,7 +177,7 @@ run · `3` the manifest is broken. Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-05) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (168 over 82 target rows), each required to go RED and then
+one control per target-scope row (172 over 82 target rows), each required to go RED and then
 restored, plus `t-audit.sh` for the SC-07 producer. **A verifier that only ever prints GREEN is a
 failure**, so that file is the one that matters most.
 

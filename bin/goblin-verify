@@ -367,9 +367,12 @@ fi
 # The default listing is one line per row: PASS payloads collapse to (ok) and long ADV
 # sentences fold to the report width; --verbose (or --only) prints every payload
 # full-width. The lib's row printers read these.
+# The report width and the manifest path the row printers read (the remedy lookup is
+# manifest-driven: the tsv is the source of truth, the engine only renders it).
 export GOB_VERIFY_VERBOSE="$VERBOSE"
 export GOB_REPORT_COLS="${COLUMNS:-100}"
 [ "$GOB_REPORT_COLS" -ge 40 ] 2>/dev/null || GOB_REPORT_COLS=100
+export _GOB_MANIFEST="$MANIFEST"
 export GOBLIN_ROOT="$ROOT"
 export GOBLIN_CONFIG="$CONFIG"
 
@@ -467,7 +470,10 @@ check_in_01() {
   fi
   [ -s "$INSTALLED" ] && grep -q '"version"' "$INSTALLED" \
     && { printf 'the install record exists and names its version\n'; return 0; }
+  # IN-01 recovery line (review 1, scope 4): the record is corrupt or missing; name the two
+  # restores. The matrix's remedy: line rides under the payload via g_fail.
   printf 'installed.json is absent or records no version\n'
+  printf 'recover: gob install --upgrade, or git checkout -- .goblin/installed.json\n'
   return 1
 }
 
@@ -543,6 +549,7 @@ check_in_02() {
   # The engine hash itself is printed in the footer on every run (see the footer, below);
   # this row proves the REPO-LOCAL bytes, and a global engine answers elsewhere.
   local p h cur n=0 bad=0 pin="" detail=""
+  local DRIFTED=""
   while IFS=$'\t' read -r p h; do
     [ -n "$p" ] || continue
     if [ "$ENGINE_MODE" = "global" ]; then
@@ -568,6 +575,7 @@ check_in_02() {
     cur=$(g_sha256_file "$ROOT/$p")
     if [ "$cur" != "$h" ]; then
       printf 'drift: %s recorded %s now %s\n' "$p" "$h" "$cur"
+      DRIFTED="$p"
       bad=1
     fi
   done < <(g_installed_files_strict "$INSTALLED")
@@ -603,6 +611,12 @@ check_in_02() {
     return
   fi
   printf '%d installed files hashed%s\n' "$n" "$pin"
+  # IN-02 recovery line (review 1, scope 4): a drift FAIL carries the exact restore commands,
+  # naming the drifted file the payload above reported. Sits between the row's own lines and
+  # the summary; g_fail appends the matrix's remedy: line under the whole payload.
+  if [ "$bad" -ne 0 ] && [ -n "$DRIFTED" ]; then
+    printf 'recover: git checkout -- %s, or gob install --upgrade\n' "$DRIFTED"
+  fi
   [ "$bad" -eq 0 ]
 }
 
@@ -716,14 +730,41 @@ check_gt_01() {
 }
 
 # run the declared gates; optionally write the one-line measured numbers
+# GT-02 stderr (review 2, scope 2): a gate that fails with nothing on screen (`cmd: false`,
+# exit 127) fails in silence. The LAST ~20 lines of the failing gate's combined output are
+# kept in GT02_TAIL, and the row's FAIL payload carries them indented under the FAIL line,
+# attributed to the gate that produced them. The counts line and every other row's payload
+# are untouched (byte-stable where no gate fails).
+GT02_TAIL=""
 run_gates() {
-  local write_line="$1" name cmd rc bad=0 line=""
+  local write_line="$1" name cmd rc bad=0 line="" out
+  GT02_TAIL=""
   while IFS=$'\t' read -r name cmd; do
     [ -n "$name" ] || continue
-    ( cd "$ROOT" && bash -c "$cmd" ) >/dev/null 2>&1
+    out=$( cd "$ROOT" && bash -c "$cmd" 2>&1 )
     rc=$?
     line="$line $name=$rc"
-    [ "$rc" -eq 0 ] || { printf 'gate %s: %s -> exit %d\n' "$name" "$cmd" "$rc"; bad=1; }
+    if [ "$rc" -ne 0 ]; then
+      printf 'gate %s: %s -> exit %d\n' "$name" "$cmd" "$rc"
+      bad=1
+      local tail_lines
+      tail_lines=$(printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -n 20)
+      if [ -n "$tail_lines" ]; then
+        if [ -n "$GT02_TAIL" ]; then GT02_TAIL="$GT02_TAIL
+"; fi
+        GT02_TAIL="${GT02_TAIL}gate ${name} output (last 20 lines):"
+        while IFS= read -r tl; do
+          GT02_TAIL="$GT02_TAIL
+  $tl"
+        done <<EOF_TAIL
+$tail_lines
+EOF_TAIL
+      else
+        [ -n "$GT02_TAIL" ] && GT02_TAIL="$GT02_TAIL
+"
+        GT02_TAIL="${GT02_TAIL}gate ${name} printed nothing on stdout or stderr before exit ${rc} (a silent failure - the command itself is the diagnostic)"
+      fi
+    fi
   done < <(g_yaml_gates "$CONFIG")
   if [ "$write_line" = "yes" ]; then
     local rname rcmd rval
@@ -739,7 +780,12 @@ run_gates() {
   return $bad
 }
 
-check_gt_02() { run_gates yes; }
+check_gt_02() {
+  local _s=0
+  run_gates yes || _s=$?
+  if [ "$_s" -ne 0 ] && [ -n "$GT02_TAIL" ]; then printf '%s\n' "$GT02_TAIL"; fi
+  return "$_s"
+}
 
 check_gt_04() {
   local n c ceil
@@ -2671,6 +2717,33 @@ rc_hdr_field() {
   '
 }
 
+# ---- the day-one framing (review 1, scope 3) ----------------------------------
+# Two shapes are undeserved reds for a person who just cloned a repo. They are DETECTED and
+# framed — the verdict's exit semantics, the counts and every row's payload are untouched:
+#   (a) owner_email in goblin.yaml is not the current git identity -> the CM-01 red names
+#       whose email the repo actually expects (the remedy column says where to point it);
+#   (b) the repo looks freshly cloned (.goblin committed, but fewer than 3 commits) -> one
+#       banner line after the verdict. Commit count only: an mtime comparison against the
+#       reflog fired after every ordinary GT-02 write, so the banner lingered on aged repos
+#       (the verify itself refreshes last-gate-line forever); a repo under 3 commits is the
+#       only unambiguous fresh-clone shape.
+owner_mismatch() {
+  [ -f "$CONFIG" ] || return 1
+  local declared cur
+  declared=$(grep '^owner_email:' "$CONFIG" | head -n 1 | sed 's/^owner_email:[[:space:]]*//' | tr -d '"')
+  cur=$(cd "$ROOT" && git config user.email 2>/dev/null)
+  [ -n "$declared" ] && [ -n "$cur" ] && [ "$declared" != "$cur" ]
+}
+
+fresh_clone() {
+  [ -f "$INSTALLED" ] || return 1
+  [ -d "$ROOT/.git" ] || return 1
+  local n
+  n=$(cd "$ROOT" && git rev-list --count HEAD 2>/dev/null) || return 1
+  [ "$n" -lt 3 ] && return 0
+  return 1
+}
+
 # ================================================================ runner ======
 
 PASS=0; FAIL=0; ADV=0; SKIP=0; BAD=0
@@ -2752,7 +2825,14 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
       if [ "$rc" -eq 0 ]; then
         [ -n "$detail" ] || detail="($check)"
       else
-        detail="($check -> exit $rc)"
+        # GT-03's one-liner is self-explaining now (review 1, scope 5): the raw `test -f
+        # ... -nt ...` invocation dump told the reader the mechanics and nothing about what
+        # to do; the human line says both. The TSV remedy column carries the same sentence.
+        if [ "$id" = "GT-03" ]; then
+          detail="GT-03 the gate line is older than the last commit — re-run gob verify to refresh it (it rewrites .goblin/last-gate-line)"
+        else
+          detail="($check -> exit $rc)"
+        fi
         rc=1
       fi
       ;;
@@ -2772,6 +2852,18 @@ if [ "$JSON" -eq 1 ]; then
     "$(json_escape "$ROOT")" "$(json_escape "$CLASS")" "$PASS" "$FAIL" "$ADV" "$SKIP" "${JSON_ROWS%,}"
 else
   printf '      %d passed, %d failed, %d advisory, %d skipped\n' "$PASS" "$FAIL" "$ADV" "$SKIP"
+  # Day-one framing, part (a) (review 1, scope 3): the owner mismatch names whose email the
+  # repo expects, under the verdict, before the row detail. One line, no exit semantics.
+  if [ "$FAIL" -gt 0 ] && owner_mismatch; then
+    _owner_declared=$(grep '^owner_email:' "$CONFIG" | head -n 1 | sed 's/^owner_email:[[:space:]]*//' | tr -d '"')
+    printf '      note: this repo records a different owner (you are probably new here) — commit with --author or update owner_email: %s\n' "$_owner_declared"
+    unset _owner_declared
+  fi
+  # Day-one framing, part (b): a fresh clone is not your debt. One banner line, after the
+  # verdict; counts and exit codes untouched.
+  if [ "$FAIL" -gt 0 ] && fresh_clone; then
+    printf '      fresh clone detected: some of these fails are not yours — see docs/GUIDE.md §9 (day one for a new teammate)\n'
+  fi
   # Z1-7: the advisory number above counts TWO different things - the rows the matrix LABELS
   # advisory, and a row that is not advisory-labelled but whose lane cannot be resolved here
   # (JG-02's unresolved judge lane returns 2 = ADV by design). SK-03 counts the first, the ADV

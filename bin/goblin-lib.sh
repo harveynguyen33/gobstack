@@ -58,7 +58,31 @@ g_pass() {
     printf 'PASS  %-6s (ok)\n' "$1"
   fi
 }
-g_fail() { printf 'FAIL  %-6s %s\n' "$1" "$2"; }
+# FAIL keeps its row line whole in every mode, and the matrix's remedy column rides under it.
+# The remedy is the TSV's own cell (IN-01/IN-02/GT-03/CM-01 carry prose there; the pre-remedy
+# rows carry `—`, which prints nothing) — the JG-02 judge-lane `remedy:` line, brought to every
+# row that names one, so the fix a failure needs is printed where the failure is read. A missing
+# column (a manifest written before the column existed) is no remedy, not an error: empty is the
+# same as `—`.
+g_fail() {
+  printf 'FAIL  %-6s %s\n' "$1" "$2"
+  local rem
+  rem=$(g_remedy "$1")
+  case "$rem" in
+    —*) return 0 ;;   # an em-dash cell: history and blindness, never a remedy
+  esac
+  # Whole in verbose/--only mode (the mode that reads, not scans), width-folded otherwise —
+  # the same contract the row printers keep.
+  if [ "${GOB_VERIFY_VERBOSE:-0}" -eq 1 ]; then
+    [ -n "$rem" ] && printf 'remedy: %s\n' "$rem"
+  else
+    [ -n "$rem" ] && printf 'remedy: %s\n' "$(g_trunc "${GOB_REPORT_COLS:-100}" "$rem")"
+  fi
+}
+g_remedy() {
+  [ -f "${_GOB_MANIFEST:-}" ] || return 0
+  awk -F'\t' -v id="$1" 'NR>1 && $1==id { r = $7; if (r != "") print r; exit }' "${_GOB_MANIFEST:-}"
+}
 g_adv() {
   # Multi-line ADV payloads print whole: tests pin phrases on the SECOND line of a lane
   # advisory (the W5-6 family statement), and the fold must not eat them. Single-line
