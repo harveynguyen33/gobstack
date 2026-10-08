@@ -5,6 +5,8 @@
 #   gob init --heuristic                      append the heuristic detection (fallback)
 #   gob init --write <proposal> [--yes]       validate the proposal and install it
 #   gob init --target <dir>                   aim at a directory that is not $PWD
+#   gob init --with-mcp-config                write .mcp.json (repo-distributed MCP
+#                                             registration; ask-once, never overwrites)
 #   gob init --dry-run                        --write without writing anything
 #
 # The CLI calls NO AI API. A bare `gob init` prints:
@@ -41,13 +43,14 @@ g_info() { printf '%s\n' "$*"; }
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 # ------------------------------------------------------------------ flags -----
-TARGET="" WRITE="" HEURISTIC=0 DRYRUN=0 RESYNC=0
+TARGET="" WRITE="" HEURISTIC=0 DRYRUN=0 RESYNC=0 WITH_MCP=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --target)    TARGET="${2:-}"; shift 2 ;;
     --write)     WRITE="${2:-}"; shift 2 ;;
     --heuristic) HEURISTIC=1; shift ;;
     --resync)    RESYNC=1; shift ;;   # init-internal: re-run the sync step (hidden)
+    --with-mcp-config) WITH_MCP=1; shift ;;
     --dry-run)   DRYRUN=1; shift ;;
     --yes)       shift ;;             # accepted for pipe parity; --write is already explicit
     -h|--help)   usage; exit 0 ;;
@@ -278,6 +281,28 @@ for p in $SYNC_SEL; do
     RC=$?; g_err "sync $p failed (exit $RC)"; exit "$RC"; }
 done
 
+# ------------------------------------------------------------- mcp config -----
+# The repo-distributed MCP registration: .mcp.json committed at the repo root is
+# auto-detected by Claude Code and Cursor. Ask-once semantics: an existing file is
+# never overwritten (it may be the team's, or hand-tuned), so a second run refuses
+# and says so — the same shape as the installer's preimage refusals. The bytes are
+# the generated preimage; a user-customized file is untouchable by design.
+MCP_CONFIG="$TARGET/.mcp.json"
+MCP_BYTES='{"mcpServers":{"gob":{"command":"npx","args":["-y","@techgoblin/gobstack","mcp"]}}}'
+if [ "$WITH_MCP" -eq 1 ]; then
+  if [ -f "$MCP_CONFIG" ]; then
+    if [ "$(cat "$MCP_CONFIG")" = "$MCP_BYTES" ]; then
+      g_info "gob init: .mcp.json already carries the generated registration (left as is)"
+    else
+      g_err "refusing to write .mcp.json: the file exists and is not the generated registration — edit it by hand or remove it first"
+      exit 1
+    fi
+  else
+    printf '%s\n' "$MCP_BYTES" > "$MCP_CONFIG" || { g_err "could not write $MCP_CONFIG"; exit 1; }
+    g_info "wrote .mcp.json (the gob MCP server is repo-distributed; Claude Code and Cursor auto-detect it)"
+  fi
+fi
+
 # --------------------------------------------------------------------- done ----
 printf '\n'
 printf 'gob init: installed — class %s, branch %s, owner %s\n' "$CLASS" "$BRANCH" "$EMAIL"
@@ -286,5 +311,6 @@ printf 'next:\n'
 printf '  1. git add -A && git commit   # the install is uncommitted by design\n'
 printf '  2. run .gob/bin/goblin-verify — the skipped rows are the day-one checklist\n'
 printf '  3. features/: gob map (agent brief) then gob map --write features/\n'
-[ -n "$SYNC_SEL" ] || printf '  4. agent skills are opt-in per platform\n'
+printf '  4. register the verify tool for your agent: claude mcp add gob -- npx -y @techgoblin/gobstack mcp (or run gob init --with-mcp-config)\n'
+[ -n "$SYNC_SEL" ] || printf '  5. agent skills are opt-in per platform\n'
 exit 0
