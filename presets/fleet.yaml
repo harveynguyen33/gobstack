@@ -9,12 +9,13 @@ scaffold_checks: no
 gate_name: commit
 gate_cmd: git rev-parse --verify --quiet HEAD
 ratchet_name: todo_markers
-# The harness's own vendored directories are excluded: without it, a fresh class-E install
-# counts the ratchet command line itself (`.gob/goblin.yaml` holds the literal TODO|FIXME)
-# and goblin-stack's own skill prose (`.hermes/skills/*/SKILL.md`), so its gate was born RED
-# against a ceiling measured before those files were written (D8). The fleet's real config —
-# `*.yaml`/`*.yml`/`*.sh` at the root and under `profiles/` — is still counted.
-ratchet_cmd: grep -rniE '\b(TODO|FIXME)\b' --include='*.sh' --include='*.yaml' --include='*.yml' --include='*.md' --exclude-dir=.goblin --exclude-dir=.hermes . 2>/dev/null | wc -l
+# The harness's own vendored directories are excluded, and so is root AGENTS.md: in v2 the
+# config IS the AGENTS.md gob block, so the ratchet command line itself (the literal
+# TODO|FIXME inside `ratchet_cmd:`) lives in a *.md file at the root — without the exclude a
+# fresh install counts its own gate and is born RED against a ceiling measured before the
+# file was written (D8). The fleet's real config — `*.yaml`/`*.yml`/`*.sh` at the root and
+# under `profiles/` — is still counted.
+ratchet_cmd: grep -rniE '\b(TODO|FIXME)\b' --include='*.sh' --include='*.yaml' --include='*.yml' --include='*.md' --exclude-dir=.gob --exclude-dir=.hermes --exclude=AGENTS.md . 2>/dev/null | wc -l
 ratchet_ceiling: measure
 replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs

@@ -10,16 +10,18 @@
 
 set -uo pipefail
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ROOT=$(cd "$SELF_DIR/../.." && pwd)          # .goblin/bans/ -> repo root
-CONFIG="$ROOT/.goblin/goblin.yaml"
+ROOT=$(cd "$SELF_DIR/../.." && pwd)          # .gob/bans/ -> repo root
+CONFIG="$ROOT/AGENTS.md"
 [ -f "$CONFIG" ] || { echo "layer-check: no $CONFIG" >&2; exit 2; }
 
-layers=$(awk '
-  $0 ~ /^layers:[[:space:]]*$/ { inb = 1; next }
-  inb && /^[^ ]/ { inb = 0 }
-  inb && /^  - / { v = $0; sub(/^  - /, "", v); print v }
-' "$CONFIG")
-[ -n "$layers" ] || { echo "no layers declared in $CONFIG - declare a from/to pair to turn BN-05 on"; exit 3; }
+# v2 config shape: the `layers:` flat key INSIDE the `<!-- gob:begin --> ... <!-- gob:end -->`
+# marker block, one `[from1 to1, from2 to2]` array (each item a from/to pair). The block-bounded
+# sed is the same reader g_agents_gates uses in goblin-lib.sh; a line outside the markers is
+# prose and is never read.
+block=$(sed -n "/^<!-- gob:begin/,/^<!-- gob:end/p" "$CONFIG" | sed '1d;$d')
+layers=$(printf '%s\n' "$block" | sed -n 's/^layers:[[:space:]]*//p' | tr ',' '\n' \
+  | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/^\[//; s/\]$//' | grep -v '^$' || true)
+[ -n "$layers" ] || { echo "no layers declared in $CONFIG - declare layers: in the gob block to turn BN-05 on"; exit 3; }
 
 bad=""
 while read -r from to; do

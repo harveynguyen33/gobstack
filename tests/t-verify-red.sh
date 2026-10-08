@@ -141,29 +141,28 @@ check "the installed AGENTS.md names the ban engine (V3-1)" "$?"
 BK="$WORK/backup"
 mkdir -p "$BK"
 cp -a HANDOFF.md "$BK/HANDOFF.md"
-cp -a AGENTS.md "$BK/goblin.yaml"
-cp -a .goblin/installed.json "$BK/installed.json"
-cp -a .goblin/manifest/enforcement.tsv "$BK/enforcement.tsv"
+cp -a AGENTS.md "$BK/agents.md"
+cp -a .gob/installed.json "$BK/installed.json"
+cp -a .gob/manifest/enforcement.tsv "$BK/enforcement.tsv"
 cp -a .hermes/skills/goblin-mode/SKILL.md "$BK/SKILL.md"
 cp -a ROUND-000-SPEC.md "$BK/ROUND-000-SPEC.md"
 cp -a "$WORK/standard.md" "$BK/standard.md"
 cp -a .hermes/skills/goblin-drift-audit/SKILL.md "$BK/drift-audit-SKILL.md"
 cp -a .hermes/skills/goblin-bugreporter/SKILL.md "$BK/bugreporter-SKILL.md"
-cp -a .goblin/automations "$BK/automations"
-cp -a .goblin/audit-waiver.tsv "$BK/audit-waiver.tsv"
-cp -a .goblin/install-hooks.allowlist "$BK/install-hooks.allowlist"
-cp -a .goblin/boundary-waivers "$BK/boundary-waivers"
-cp -a .goblin/manifest/bans.tsv "$BK/bans.tsv"
+cp -a .gob/automations "$BK/automations"
+cp -a .gob/audit-waiver.tsv "$BK/audit-waiver.tsv"
+cp -a .gob/install-hooks.allowlist "$BK/install-hooks.allowlist"
+cp -a .gob/boundary-waivers "$BK/boundary-waivers"
+cp -a .gob/manifest/bans.tsv "$BK/bans.tsv"
 # G2 mutates roles.yaml (the judge lane's profile list) and the mapping file (a judge profile
 # beside the code lane). Both are restored: a leaked judge profile would turn MD-02's ADV into a
 # PASS for every control below it.
-cp -a .goblin/roles.yaml "$BK/roles.yaml"
+cp -a .gob/roles.yaml "$BK/roles.yaml"
 cp -a "$WORK/models.yaml" "$BK/models.yaml"
-# W4: the CI lane. A class-A install now carries .github/workflows/goblin-gate.yml, and CL-01
-# requires it (ci-gate is `R` for A), so it must come back byte-for-byte after every workflow
-# mutation below - the `rm -rf .github` this used to be would have left the final full run RED on
-# a required part.
-cp -a .github "$BK/github"
+# v2 DELETION NOTE (wave B): the CI lane is gone product-wide - no .github/workflows is
+# installed and CL-01 no longer names ci-gate. The W4 backup of .github and the whole PG-05/
+# PG-06 workflow-mutation family it served are deleted with it (the same treatment
+# t-verify-green gave the CI controls).
 # .gitignore is mutated by m_sc_02 and must come back byte-for-byte: the fixture-green check at
 # the end of this file is what caught its absence.
 cp -a .gitignore "$BK/gitignore"
@@ -172,32 +171,32 @@ cp -a .gitignore "$BK/gitignore"
 # true by construction and so is GREEN on the pre-change tree, which would make HS-02 FAIL for a
 # reason unrelated to the declared command. The scaffold comes back byte-for-byte.
 cp -a checks/assert.mjs "$BK/assert.mjs"
-# W1: the IN-02 clause-2 control deletes .goblin/bin and .goblin/manifest wholesale, so
+# W1: the IN-02 clause-2 control deletes .gob/bin and .gob/manifest wholesale, so
 # the whole engine payload is backed up (once, here) and rebuilt by restore_all.
-cp -a .goblin/bin "$BK/bin"
-cp -a .goblin/manifest "$BK/manifest"
+cp -a .gob/bin "$BK/bin"
+cp -a .gob/manifest "$BK/manifest"
 
 restore_all() {
   cp -a "$BK/HANDOFF.md" HANDOFF.md
-  cp -a "$BK/goblin.yaml" AGENTS.md
-  cp -a "$BK/installed.json" .goblin/installed.json
-  # W1: the IN-02 clause-2 control deletes .goblin/bin and .goblin/manifest wholesale,
+  cp -a "$BK/agents.md" AGENTS.md
+  cp -a "$BK/installed.json" .gob/installed.json
+  # W1: the IN-02 clause-2 control deletes .gob/bin and .gob/manifest wholesale,
   # so the restore rebuilds them from the backup before the per-file copies below.
-  rm -rf .goblin/bin .goblin/manifest
-  cp -a "$BK/bin" .goblin/bin
-  cp -a "$BK/manifest" .goblin/manifest
-  cp -a "$BK/roles.yaml" .goblin/roles.yaml
+  rm -rf .gob/bin .gob/manifest
+  cp -a "$BK/bin" .gob/bin
+  cp -a "$BK/manifest" .gob/manifest
+  cp -a "$BK/roles.yaml" .gob/roles.yaml
   cp -a "$BK/models.yaml" "$WORK/models.yaml"
   cp -a "$BK/SKILL.md" .hermes/skills/goblin-mode/SKILL.md
   cp -a "$BK/ROUND-000-SPEC.md" ROUND-000-SPEC.md
   cp -a "$BK/standard.md" "$WORK/standard.md"
   cp -a "$BK/drift-audit-SKILL.md" .hermes/skills/goblin-drift-audit/SKILL.md
   cp -a "$BK/bugreporter-SKILL.md" .hermes/skills/goblin-bugreporter/SKILL.md
-  cp -a "$BK/automations/." .goblin/automations/
+  cp -a "$BK/automations/." .gob/automations/
   cp -a "$BK/gitignore" .gitignore
   rm -f checks/green.mjs checks/red.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
-        .goblin/state.json .goblin/last-gate-line .goblin/.ds-report .goblin/ratchet-last \
-        .envrc .goblin/audit.tsv package.json package-lock.json reference-manifest.json
+        .gob/state.json .gob/last-gate-line .gob/.ds-report \
+        .envrc .gob/audit.tsv package.json package-lock.json reference-manifest.json
   # P15: the four RC- controls declare a corpus in directories a class-A install does not have, so
   # the last thing each leaves behind is removed here (the r_rc03_git hook only handles the index).
   rm -rf manifests refs notes
@@ -212,16 +211,14 @@ restore_all() {
   # by hand still prints `IN-02 ... 40 installed files hashed | practice pin ok` at exit 0, and this
   # file exits 0 (`t-verify-red: PASS`) with this `cp` line deleted. The restore is what keeps the
   # fixture byte-accurate for the green check at the end of the file.
-  cp -a "$BK/install-hooks.allowlist" .goblin/install-hooks.allowlist
+  cp -a "$BK/install-hooks.allowlist" .gob/install-hooks.allowlist
   cp -a "$BK/assert.mjs" checks/assert.mjs
   rm -f reviews/fixture-*.md
-  # G2: the planted loop record. A leftover .goblin/loop/ would leave JG-01/LP-* green by
+  # G2: the planted loop record. A leftover .gob/loop/ would leave JG-01/LP-* green by
   # accident AND count as an untracked file for CM-03 in the final full run.
-  rm -rf .goblin/loop
+  rm -rf .gob/loop
   rm -rf reports
-  rm -rf .github
-  cp -a "$BK/github" .github
-  rm -rf dist src app .hermes/skills/verify-fix
+  rm -rf dist src app features
   git add -A >/dev/null 2>&1
   git commit -q -m "test: restore fixture" >/dev/null 2>&1 || true
 }
@@ -265,13 +262,13 @@ function expect_green {
 }
 
 # ---- mutations: the exact violation each row exists to catch ------------------
-m_in_01()         { sed -i '/"version"/d' .goblin/installed.json; }
+m_in_01()         { sed -i '/"version"/d' .gob/installed.json; }
 m_edit_practice() { printf '# an edited byte\n' >> "$WORK/standard.md"; }
-m_blank_row()     { sed -i -E 's/^(HP-05\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t)[^\t]*/\1/' .goblin/manifest/enforcement.tsv; }
-m_in_04()         { sed -i 's|^  "refused": {|  "refused": {\n    "checks/gone.mjs": "deadbeef",|' .goblin/installed.json; }
+m_blank_row()     { sed -i -E 's/^(HP-05\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t)[^\t]*/\1/' .gob/manifest/enforcement.tsv; }
+m_in_04()         { sed -i 's|^  "refused": {|  "refused": {\n    "checks/gone.mjs": "deadbeef",|' .gob/installed.json; }
 # Z1-5: a typo in the `enforced_by` cell. docs/ENFORCEMENT.md calls the enum closed; before the
 # fix NOTHING read the column, so this changed no verdict anywhere in the run.
-m_bad_enum()      { awk -F'\t' -v OFS='\t' '{ if ($1=="BN-01") $4="bogus"; print }' .goblin/manifest/enforcement.tsv > .goblin/manifest/enforcement.tsv.n && mv .goblin/manifest/enforcement.tsv.n .goblin/manifest/enforcement.tsv; }
+m_bad_enum()      { awk -F'\t' -v OFS='\t' '{ if ($1=="BN-01") $4="bogus"; print }' .gob/manifest/enforcement.tsv > .gob/manifest/enforcement.tsv.n && mv .gob/manifest/enforcement.tsv.n .gob/manifest/enforcement.tsv; }
 
 m_drop_handoff()  { rm -f HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: drop handoff" >/dev/null 2>&1; }
 m_drop_heading()  { sed -i 's/^## Gates$/#### Gates/' HANDOFF.md; git add -A >/dev/null 2>&1; git commit -q -m "test: demote the Gates heading" >/dev/null 2>&1; }
@@ -316,7 +313,7 @@ m_no_gate_line()  { awk '
   inG && /^[[:space:]]*[-*][[:space:]]/ {next}
   {print}
 ' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md; }
-m_row_fails()     { awk -F'\t' -v OFS='\t' -v x="$1" 'NR==1{print;next} {if ($1==x) $6="false"; print}' .goblin/manifest/enforcement.tsv > .goblin/manifest/enforcement.tsv.new; mv .goblin/manifest/enforcement.tsv.new .goblin/manifest/enforcement.tsv; }
+m_row_fails()     { awk -F'\t' -v OFS='\t' -v x="$1" 'NR==1{print;next} {if ($1==x) $6="false"; print}' .gob/manifest/enforcement.tsv > .gob/manifest/enforcement.tsv.new; mv .gob/manifest/enforcement.tsv.new .gob/manifest/enforcement.tsv; }
 m_hp_04()         { m_row_fails HP-04; }
 m_no_head()       { sed -i -E 's/`[0-9a-f]{7,40}`/`deadbee`/' HANDOFF.md; }
 
@@ -324,23 +321,31 @@ m_drop_spec()     { rm -f ./*-SPEC.md; git add -A >/dev/null 2>&1; git commit -q
 m_untracked_spec() { printf '# a round nobody committed\n\n- AC1: `x` prints `y`\n' > ROUND-001-SPEC.md; }
 m_feely_ac()      { printf '\n- AC9: the panel feels right\n' >> ROUND-000-SPEC.md; }
 
-m_no_gates()      { sed -i '/^gates:/,/^$/{/^$/d; d}' AGENTS.md; }
+# v2 gate shape: one flat `gate_<name>_cmd:` line per gate, so dropping the gates is
+# dropping every such line (GT-01: `no gate declared`).
+m_no_gates()      { sed -i '/^gate_[A-Za-z0-9_-]*_cmd:/d' AGENTS.md; }
 # G8-3: a DECLARED gate that loses its `cmd:` used to survive as a silent drop from GT-01's
 # count (`1 declared gate(s)` for a config that declares two). Three forms, all of them a
 # one-line edit: the cmd line deleted, re-indented out of the gate block, and blanked.
-m_gate_no_cmd()   { sed -i '/^    cmd: test /d' AGENTS.md; }
-m_gate_indent_cmd(){ sed -i 's/^    cmd: test /  cmd: test /' AGENTS.md; }
-m_gate_blank_cmd(){ sed -i 's/^    cmd: test .*/    cmd:/' AGENTS.md; }
-m_break_gate()    { sed -i 's|^    cmd: git rev-parse --verify --quiet HEAD|    cmd: false|' AGENTS.md; }
-m_drop_gate_line(){ rm -f .goblin/last-gate-line; }
+# G8-3's three yaml-era forms map onto the flat shape like this: the deleted-cmd form is
+# the key line deleted; the blanked-cmd form is the key with a value-less line (the reader
+# stores exactly that form, so it is a distinct state, and g_agents_gates hands GT-01 an
+# empty cmd for it). The re-indented form has NO flat analogue - a gate's name and its cmd
+# are one line, so there is nothing to indent out of anything - and that control is
+# DELETED with the shape rather than faked: a fake would be a mutation that merely
+# duplicates the blank form under an old name.
+m_gate_blank_cmd(){ sed -i 's/^gate_commit_cmd: .*/gate_commit_cmd:/' AGENTS.md; }
+m_break_gate()    { sed -i 's|^gate_commit_cmd: .*|gate_commit_cmd: false|' AGENTS.md; }
+m_drop_gate_line(){ rm -f .gob/last-gate-line; }
 # The class-A ratchet is the PERF metric (G4 D2): the TODO count moved into the `todo_ceiling`
 # gate. So m_no_ratchet strips the metric name and m_ratchet_rise grows the measured number.
-m_no_ratchet()    { sed -i 's/^  name: client_js_bytes/  name:/' AGENTS.md; }
+m_no_ratchet()    { sed -i 's/^ratchet\.name:.*/ratchet.name:/' AGENTS.md; }
 m_ratchet_rise()  { mkdir -p dist/assets; printf 'console.log("a byte that was not there before")\n' > dist/assets/chunk.js; }
 m_todo_gate()     { sed -i 's/-le 160/-le 0/' AGENTS.md; printf '// TODO: over the ceiling\n' > todo-marker.mjs; }
 
 m_no_harness_dir() { sed -i 's|^harness_dir: .*|harness_dir: nowhere|' AGENTS.md; }
-m_green_harness() { printf 'console.log("PASS  nothing\\n"); process.exit(0);\n' > checks/green.mjs; git add -A >/dev/null 2>&1; git commit -q -m "test: a harness green on both trees" >/dev/null 2>&1; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" AGENTS.md; }
+pin_pre_change() { sed -i "s/^replay\.commit:.*/replay.commit: $PRE_CHANGE/" AGENTS.md; }
+m_green_harness() { printf 'console.log("PASS  nothing\\n"); process.exit(0);\n' > checks/green.mjs; git add -A >/dev/null 2>&1; git commit -q -m "test: a harness green on both trees" >/dev/null 2>&1; pin_pre_change; }
 m_hs_03()         { m_row_fails HS-03; }
 # Z1-4: `replay.cmd` was read only to assert it was non-empty, and the row ran `node <file>`
 # itself - so the declared command and its `{name}` placeholder were decorative and `false`
@@ -351,8 +356,8 @@ m_hs_03()         { m_row_fails HS-03; }
 #                      (`node checks/{name}.mjs`) -> PASS, so the row is not always-red;
 #   m_replay_cmd_false the RED half: the same tree with `replay.cmd: false`, a command that
 #                      interpolates no `{name}` and so replayed nothing.
-m_replay_all_red()   { rm -f checks/*.mjs; printf 'process.exit(1)\n' > checks/red.mjs; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" AGENTS.md; }
-m_replay_cmd_false() { m_replay_all_red; sed -i 's|^  cmd: node checks/{name}.mjs|  cmd: false|' AGENTS.md; }
+m_replay_all_red()   { rm -f checks/*.mjs; printf 'process.exit(1)\n' > checks/red.mjs; pin_pre_change; }
+m_replay_cmd_false() { m_replay_all_red; sed -i 's/^replay\.cmd:.*/replay.cmd: false/' AGENTS.md; }
 # Z2-3: the harness FILE NAME is part of the command text the shell parses, because Z1-4 made the
 # row run the DECLARED command instead of `node "$f"`. The name is therefore substituted shell-
 # quoted, and this is the measurement: the file is named with `;` and `#`. Unquoted, the name
@@ -360,7 +365,7 @@ m_replay_cmd_false() { m_replay_all_red; sed -i 's|^  cmd: node checks/{name}.mj
 # file GREEN on the pre-change tree and FAILed - measured on 846c132's bin/goblin-verify: rc 1,
 # "z2;true;#.mjs was GREEN on the pre-change tree". Quoted, `node` receives ONE argument, the
 # harness runs, exits 1, and the row passes - which is what this control asserts.
-m_replay_meta_name() { rm -f checks/*.mjs; printf 'process.exit(1)\n' > 'checks/z2;true;#.mjs'; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" AGENTS.md; }
+m_replay_meta_name() { rm -f checks/*.mjs; printf 'process.exit(1)\n' > 'checks/z2;true;#.mjs'; pin_pre_change; }
 
 m_bad_author()    { git -c user.email=someone@else.test commit -q --allow-empty -m "test: ambient author"; }
 m_cm_02()         { m_row_fails CM-02; }
@@ -410,8 +415,8 @@ m_wf_none()       { rm -rf .github; git add -A >/dev/null 2>&1; git commit -q -m
 # already produced (the shipped workflow passes, and PG-06 skips when there is nothing to read).
 m_wf_nothing()    { :; }
 
-m_tracked_runtime() { sed -i 's|^  - .goblin/state.json|  - README.md|' AGENTS.md; }
-m_drop_ds_report()  { rm -f .goblin/.ds-report; }
+m_tracked_runtime() { sed -i 's|^runtime_data: .*|runtime_data: [README.md]|' AGENTS.md; }
+m_drop_ds_report()  { rm -f .gob/.ds-report; }
 
 m_doc_01()        { m_row_fails DOC-01; }
 m_doc_02()        { m_row_fails DOC-02; }
@@ -428,7 +433,7 @@ m_sc_03()  { mkdir -p src; printf 'export const k = process.env.NEXT_PUBLIC_API_
 m_sc_04()  { mkdir -p src; printf 'document.cookie = "theme=dark";\n' > src/cookie.ts; }
 m_sc_05()  { mkdir -p app/api/contact; printf 'export async function POST(req) {\n  const b = await req.json();\n  await save(b);\n}\n' > app/api/contact/route.ts; }
 m_sc_06()  { printf '{"name":"fixture","version":"1.0.0"}\n' > package.json; }
-m_sc_07()  { printf '# .goblin/audit.tsv - written by goblin-audit 0.2.0 on 2020-01-01\n# command: npm audit --json\nmeasured 2020-01-01\n' > .goblin/audit.tsv; }
+m_sc_07()  { printf '# .gob/audit.tsv - written by goblin-audit 0.2.0 on 2020-01-01\n# command: npm audit --json\nmeasured 2020-01-01\n' > .gob/audit.tsv; }
 m_sc_08()  { printf '{\n  "packages": {\n    "node_modules/esbuild": {\n      "version": "0.1.0",\n      "hasInstallScript": true\n    }\n  }\n}\n' > package-lock.json; }
 # Z2-2: the SAME lockfile on ONE LINE. The reader is line-anchored, so before the fix this shape
 # matched nothing and the row printed `0 install hook(s), 0 allowlisted` - a PASS, exit 0, where
@@ -436,39 +441,41 @@ m_sc_08()  { printf '{\n  "packages": {\n    "node_modules/esbuild": {\n      "v
 # (it did not - a vacuous PASS), and the allowlisted one must PASS (so the fix is not "any
 # minified lock FAILs").
 m_sc_08_minified()    { printf '{"name":"fixture","lockfileVersion":3,"packages":{"node_modules/esbuild":{"version":"0.1.0","hasInstallScript":true}}}\n' > package-lock.json; }
-m_sc_08_minified_ok() { m_sc_08_minified; printf 'esbuild\n' >> .goblin/install-hooks.allowlist; }
+m_sc_08_minified_ok() { m_sc_08_minified; printf 'esbuild\n' >> .gob/install-hooks.allowlist; }
 m_sc_09()  { m_row_fails SC-09; }
-m_pf_01()  { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e 's/^  baseline_commit: .*/  baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^  baseline_value: .*/  baseline_value: 1/' -e 's/^  measured: .*/  measured: 2026-01-01/' AGENTS.md; }
+m_pf_01()  { sed -i -e 's/^perf\.metric:.*/perf.metric: client_js_bytes/' -e 's/^perf\.baseline_commit:.*/perf.baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^perf\.baseline_value:.*/perf.baseline_value: 1/' -e 's/^perf\.measured:.*/perf.measured: 2026-01-01/' AGENTS.md; }
 # G8-6b: the budget and the measurement have to be the SAME number. Two controls - the honest
 # record passes, and a one-line `ceiling:` raise that leaves the baseline alone FAILs. Before the
 # fix both were GREEN: the passing line printed `baseline_value 0 ... (ceiling 100000)` and
 # nothing cross-checked it.
-m_pf_ceiling_match() { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e "s/^  baseline_commit: .*/  baseline_commit: $PRE_CHANGE/" -e 's/^  baseline_value: .*/  baseline_value: 0/' -e 's/^  measured: .*/  measured: 2026-01-01/' AGENTS.md; }
-m_pf_ceiling_raise() { m_pf_ceiling_match; sed -i 's/^  ceiling: .*/  ceiling: 100000/' AGENTS.md; }
+m_pf_ceiling_match() { sed -i -e 's/^perf\.metric:.*/perf.metric: client_js_bytes/' -e "s/^perf\.baseline_commit:.*/perf.baseline_commit: $PRE_CHANGE/" -e 's/^perf\.baseline_value:.*/perf.baseline_value: 0/' -e 's/^perf\.measured:.*/perf.measured: 2026-01-01/' AGENTS.md; }
+m_pf_ceiling_raise() { m_pf_ceiling_match; sed -i 's/^ratchet\.ceiling:.*/ratchet.ceiling: 100000/' AGENTS.md; }
 # W6: the electron opt-in's done-definition. The class-A fixture records electron: false; turning
 # it on while the host gate is blank is a repo missing half its definition -> PF-01 FAILs (the
 # positive half - electron: true WITH a host gate - is exercised in tests/t-verify-green.sh).
-m_pf_electron_nohost() { sed -i -e 's/^electron: false/electron: true/' -e 's/^  host_gate: .*/  host_gate: /' AGENTS.md; }
+m_pf_electron_nohost() { sed -i -e 's/^electron: false/electron: true/' -e 's/^perf\.host_gate:.*/perf.host_gate:/' AGENTS.md; }
 
 # ---- the ban list (G5): BN-00..BN-03, BN-05 ------------------------------------------------
 # Every mutation is the exact move a ban forbids. The bans are TEXT probes (no npm, no AST), so
 # the violation is a real line of source the probe reads - not a mocked tool.
-m_bn_00_orphan()   { sed -i '/^BN-05\t/d' .goblin/manifest/bans.tsv; }
-m_bn_00_norepl()   { awk -F'\t' -v OFS='\t' '{ if ($1=="BN-01") $5=""; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; }
+m_bn_00_orphan()   { sed -i '/^BN-05\t/d' .gob/manifest/bans.tsv; }
+m_bn_00_norepl()   { awk -F'\t' -v OFS='\t' '{ if ($1=="BN-01") $5=""; print }' .gob/manifest/bans.tsv > .gob/manifest/bans.tsv.n && mv .gob/manifest/bans.tsv.n .gob/manifest/bans.tsv; }
 m_bn_01()          { mkdir -p src; printf 'export const a: any = 1;\n' > src/bn01.ts; }
 # V3-2: the engine judged by stdout emptiness, so a detect that reports a violation through its
 # EXIT CODE alone was read as clean - fail-open, in the lane whose whole job is failing closed.
 # The ban really is violated on disk (`: any`), and the detect says so only with exit 1.
-m_bn_exit1_detect() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "exit 1"; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; mkdir -p src; printf 'export const a: any = 1;\n' > src/bn01.ts; }
+m_bn_exit1_detect() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "exit 1"; print }' .gob/manifest/bans.tsv > .gob/manifest/bans.tsv.n && mv .gob/manifest/bans.tsv.n .gob/manifest/bans.tsv; mkdir -p src; printf 'export const a: any = 1;\n' > src/bn01.ts; }
 # W5-12: a DEFANGED probe - `BN-01`'s detect set to `true`, so it always reports clean. Both ban
 # rows then PASS vacuously (measured), because neither can read a table whose rows were weakened.
 # The decision (Z1) is to RECORD that rather than fix it: the guard that holds is IN-02's drift
-# check over `.goblin/manifest/bans.tsv` (docs/LIMITS.md #28), and this control is that guard -
+# check over `.gob/manifest/bans.tsv` (docs/LIMITS.md #28), and this control is that guard -
 # the defanging is caught, one row over, by the only row that can see it.
-m_bn_defang()      { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "true"; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; }
+m_bn_defang()      { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "true"; print }' .gob/manifest/bans.tsv > .gob/manifest/bans.tsv.n && mv .gob/manifest/bans.tsv.n .gob/manifest/bans.tsv; }
 m_bn_02()          { mkdir -p src; printf '// @ts-expect-error\nexport const b = 1;\n' > src/bn02.ts; }
 m_bn_03()          { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-03, BN-05]/' AGENTS.md; mkdir -p src/components; printf 'export const P = () => { fetch("/api/x"); return null; };\n' > src/components/panel.tsx; }
-m_bn_05()          { printf '\nlayers:\n  - src/renderer src/main\n' >> AGENTS.md; mkdir -p src/renderer src/main; printf "import { db } from '../main/db';\nexport const r = db;\n" > src/renderer/p.ts; }
+# v2: `layers:` is a flat key INSIDE the marker block, so the mutation sets it in place
+# (an append would land after the end marker, where the parser never reads).
+m_bn_05()          { sed -i 's|^layers:\([[:space:]]*\).*|layers: [src/renderer src/main]|' AGENTS.md; mkdir -p src/renderer src/main; printf "import { db } from '../main/db';\nexport const r = db;\n" > src/renderer/p.ts; }
 # A tree BN-05 can read (so its globs match) but with no `layers:` declared: the row must SKIP
 # with that reason, never pass vacuously.
 m_bn_05_nolayers() { mkdir -p src/renderer; printf 'export const r = 1;\n' > src/renderer/p.ts; }
@@ -495,10 +502,10 @@ m_bn_09()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-09]/' AGENTS
 # being red for the old reason. This comment claimed "every one of them is RED on the pre-fix
 # tree" without that distinction (Z2-4); the CHANGELOG's corrected sentence - in the 0.4.0 entry,
 # corrected by 0.4.1 - says which sense it means.
-m_bn_01_exempt()      { m_bn_01; awk '{ if ($0 ~ /^bans_exempt:/) { print; print "  - BN-01 src"; next } print }' AGENTS.md > AGENTS.md.n && mv AGENTS.md.n AGENTS.md; }
+m_bn_01_exempt()      { m_bn_01; sed -i 's|^bans_exempt:\([[:space:]]*\).*|bans_exempt: [BN-01 src]|' AGENTS.md; }
 # The other direction: the exception names a DIFFERENT path, so the same violation still counts.
 # Without this half, an engine that exempted everything would pass the control above.
-m_bn_01_exempt_else() { m_bn_01; awk '{ if ($0 ~ /^bans_exempt:/) { print; print "  - BN-01 app"; next } print }' AGENTS.md > AGENTS.md.n && mv AGENTS.md.n AGENTS.md; }
+m_bn_01_exempt_else() { m_bn_01; sed -i 's|^bans_exempt:\([[:space:]]*\).*|bans_exempt: [BN-01 app]|' AGENTS.md; }
 m_bn_01_banok()       { mkdir -p src; printf 'export const a: any = 1; // BAN-OK(BN-01): the value is narrowed at the boundary\n' > src/bn01.ts; }
 # The documented form carries a reason. A bare marker is not an escape, and the line stays RED.
 m_bn_01_banok_noreason() { mkdir -p src; printf 'export const a: any = 1; // BAN-OK(BN-01)\n' > src/bn01.ts; }
@@ -512,8 +519,8 @@ m_bn_01_banok_other() { mkdir -p src; printf 'export const a: any = 1; // BAN-OK
 # are the cluster with a real engine underneath". These are those three. Helpers rather than
 # copies, because every case needs the same `layers:` pair and an entry appended to the
 # `bans_exempt:` key the installer wrote.
-add_layers() { printf '\nlayers:\n  - src/renderer src/main\n' >> AGENTS.md; mkdir -p src/renderer src/main; }
-add_exempt() { awk -v v="$1" '{ if ($0 ~ /^bans_exempt:/) { print; print "  - " v; next } print }' AGENTS.md > AGENTS.md.n && mv AGENTS.md.n AGENTS.md; }
+add_layers() { sed -i 's|^layers:\([[:space:]]*\).*|layers: [src/renderer src/main]|' AGENTS.md; mkdir -p src/renderer src/main; }
+add_exempt() { sed -i "s|^bans_exempt:\([[:space:]]*\).*|bans_exempt: [$1]|" AGENTS.md; }
 # item 1 - `bans_exempt:` honoured by the LAYER probe. This is bans/layer-check.sh, a different
 # file from grep-ban.sh, which is the only probe the five W5-1/W5-2 controls above reach; and it
 # is the sibling of the probe whose regression (a documented escape that produced a permanent
@@ -537,7 +544,7 @@ m_bn_05_exempt_slash()   { add_layers; mkdir -p src/renderer/legacy; printf "imp
 # ambient.
 m_bn_01_probe_env()      { set_bn01_probe; mkdir -p src; printf 'export const a: number = 1;\n' > src/clean.ts; add_exempt "BN-01 src"; }
 m_bn_01_probe_env_none() { set_bn01_probe; mkdir -p src; printf 'export const a: number = 1;\n' > src/clean.ts; }
-set_bn01_probe() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "test \"$GOBLIN_BANS_ID\" = BN-01 && test \"$GOBLIN_BANS_EXEMPT\" = src"; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; }
+set_bn01_probe() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "test \"$GOBLIN_BANS_ID\" = BN-01 && test \"$GOBLIN_BANS_EXEMPT\" = src"; print }' .gob/manifest/bans.tsv > .gob/manifest/bans.tsv.n && mv .gob/manifest/bans.tsv.n .gob/manifest/bans.tsv; }
 
 m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
@@ -550,7 +557,7 @@ m_adv_ceiling_bad() { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: ten/' AG
 # These five rows are NEW, so there is no pre-change tree for their controls: what the control
 # proves is that the rule bites on a real violation, and that the row is wired into the runner.
 # The wiring proof is IN-03/PR-03's enumeration plus one control per row here.
-m_au_01()         { printf '\ncurl https://example.invalid/thing\n' >> .goblin/automations/drift-audit.sh; }
+m_au_01()         { printf '\ncurl https://example.invalid/thing\n' >> .gob/automations/drift-audit.sh; }
 m_au_02()         { mkdir -p reports/fixture; printf 'repo: .\nsymptom: the panel shows the wrong total\ndedup_key: bug:.:2026-09-24\n' > reports/fixture/report.yaml; }
 m_au_03()         { mkdir -p reports/fixture; printf 'stray\n' > stray.txt; }
 m_au_04()         { sed -i 's|^## Write surface$|## Surface|' .hermes/skills/goblin-drift-audit/SKILL.md; }
@@ -580,12 +587,10 @@ git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target "$TARGET_B" --class B --models "$WORK/models.yaml" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack (class B)"
 cd "$TARGET"
-m_b_tokens() { printf 'a_part_class_B_turns_off: true\n' > .goblin/tokens.yaml; }
-restore_b()  { rm -f .goblin/tokens.yaml; rm -rf .github; }
-# W4: ci-gate is `-` for class B, so the workflow goblin-stack writes elsewhere must be ABSENT
-# here. CL-01 keys off the exact path, not the directory, so a class-B repo is still allowed to
-# carry CI of its own - which is why this control plants goblin-stack's own filename.
-m_b_workflow() { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    steps:\n      - run: echo hi\n' > .github/workflows/goblin-gate.yml; }
+m_b_tokens() { printf 'a_part_class_B_turns_off: true\n' > .gob/tokens.yaml; }
+restore_b()  { rm -f .gob/tokens.yaml; }
+# v2 DELETION NOTE (wave B): the class-B CI-lane control (m_b_workflow) is deleted with the CI
+# lane itself - there is no goblin-gate.yml for a class-B repo to forbid any more.
 
 # ---- the 82 target-scope rows, in manifest order ------------------------------
 expect_red "a manifest with no version"            IN-01 1 m_in_01
@@ -625,8 +630,10 @@ expect_red "an AC that is a feeling, not a check"  SP-03 1 m_feely_ac
 expect_red "no gate declared"                      GT-01 1 m_no_gates
 # G8-3: the third condition of G8's own 9/10 sentence - "G8-3's parser made to fail loudly".
 # Each of the three forms is RED at 72490f0, where GT-01 reported the surviving gate(s).
-expect_red "G8-3: a declared gate whose cmd line was deleted"    GT-01 1 m_gate_no_cmd
-expect_red "G8-3: a declared gate whose cmd line was re-indented" GT-01 1 m_gate_indent_cmd
+# v2: the re-indent and deleted-line controls are DELETED with the yaml shape. A gate is one
+# flat line, so deleting the line deletes the GATE (that is m_no_gates above, already covered)
+# and re-indenting is not a state the reader can even represent; the blanked form below is the
+# only way a declared gate can lose its cmd and keep its name.
 expect_red "G8-3: a declared gate whose cmd value was blanked"   GT-01 1 m_gate_blank_cmd
 expect_red "a gate that exits non-zero"            GT-02 1 m_break_gate
 expect_red "no measured gate line"                 GT-03 1 m_drop_gate_line
@@ -665,20 +672,11 @@ expect_red "a review with a wrong patch-id"        PG-03 1 m_bad_review
 expect_red "PG-04 (advisory row: wired, not biting)" PG-04 1 m_pg_04
 # W4/G6: re-declared PG-05. The old body counted "every step is guarded", so the four shapes
 # below all PASSED it. Measured on the pre-change tree: see W4.md section 3.
-expect_red   "a self-skipping workflow (every step guarded)"   PG-05 1 m_self_skip_wf
-expect_red   "G8's hole: a JOB-level if: makes every step self-skip" PG-05 1 m_job_if_wf
-expect_red   "a job that declares no step at all"              PG-05 1 m_nosteps_wf
-expect_red   "a workflow with no jobs to run"                  PG-05 1 m_nojobs_wf
-expect_red   "the real shape: one UNGUARDED step decides whether the gate step runs" PG-05 1 m_decider_wf
-expect_green "a commented-out if: is not a conditional gate"    PG-05 m_wf_comment_if
-# W4/G6: PG-06 - the gate CI runs is the gate the project declares. One control per clause, plus
-# the SKIP half: nothing to compare is reported as a reason, never as a pass.
-expect_green "the installed workflow runs the declared gate set" PG-06 m_wf_nothing
-expect_red   "a workflow that runs npm test instead"            PG-06 1 m_wf_npm_test
-expect_red   "the verifier called with --only (a different truth for the same SHA)" PG-06 1 m_wf_only
-expect_red   "the verifier call commented out"                  PG-06 1 m_wf_commented
-expect_green "each declared gate command run verbatim"          PG-06 m_wf_verbatim
-expect_green "no workflow at all -> PG-06 skips with a reason"   PG-06 m_wf_none
+# v2 DELETION NOTE (wave B): the PG-05 and PG-06 controls are DELETED, not migrated. The CI
+# lane is a v2 product deletion: nothing installs .github/workflows, PG-05/PG-06 have no
+# subject to mutate, and the row family itself is gone from the matrix the same way
+# t-verify-green deleted its CI controls. PG-04 (advisory, above) stays: it proves the ROW
+# RUNNER is wired, which is independent of what any row reads.
 
 expect_red "a runtime_data path that is git-tracked" DS-01 1 m_tracked_runtime
 expect_red "no DS-01 snapshot to verify"           DS-02 1 m_drop_ds_report
@@ -747,19 +745,19 @@ expect_red   "W5-12: a defanged ban probe is caught by the drift guard, one row 
 # census calls it "verified working, control missing"), so the RED direction is a deliberately
 # broken copy of the engine - its table made unreadable (the missing-table path) and its `--list`
 # output emptied - which is what turns each of these three assertions red.
-BANS=.goblin/bin/goblin-bans
+BANS=.gob/bin/goblin-bans
 out=$($BANS --list 2>&1); rc=$?
 printf '%s' "$out" | grep -q '^BN-01' && [ "$rc" -eq 0 ]
 check "Y1-§7 item 5: --list prints the table (BN-01 named)" "$?"
-mv .goblin/manifest/bans.tsv "$WORK/bans.tsv.parked"
+mv .gob/manifest/bans.tsv "$WORK/bans.tsv.parked"
 out=$($BANS 2>&1); rc=$?
 printf '%s' "$out" | grep -qi 'no ban table' && [ "$rc" -eq 2 ]
 check "Y1-§7 item 4a: a missing ban table is exit 2, not a silent pass" "$?"
-printf 'id\tscope\tban\tdetect\n' > .goblin/manifest/bans.tsv
+printf 'id\tscope\tban\tdetect\n' > .gob/manifest/bans.tsv
 out=$($BANS 2>&1); rc=$?
 printf '%s' "$out" | grep -qi 'holds no bans' && [ "$rc" -eq 2 ]
 check "Y1-§7 item 4b: an empty ban table is exit 2, not a silent pass" "$?"
-mv "$WORK/bans.tsv.parked" .goblin/manifest/bans.tsv
+mv "$WORK/bans.tsv.parked" .gob/manifest/bans.tsv
 expect_red   "a ts-expect-error suppression"                 BN-02 1 m_bn_02
 expect_red   "a fetch() called from a component"                BN-03 1 m_bn_03
 expect_red "an import across a declared layer boundary"       BN-05 1 m_bn_05
@@ -828,7 +826,11 @@ expect_red   "AA1 §7-2: with no exemption declared the probe sees an EMPTY GOBL
 # The empty-config case is asserted first, because it is the state every fresh install is in: a
 # declared value that is empty must report SKIP with its own reason, never a vacuous PASS (the
 # shape PROJECT-PRACTICE section 3 calls out and PG-01..PG-03 still have).
-MAPDIR=".hermes/skills/verify-fix/features"
+# v2: the map CANNOT live under .hermes/ any more - FM-02 excludes the harness directories
+# (.gob/, .hermes/, the declared harness_dir) from its source search (W5-4), so a map seeded
+# there could never resolve a token and every FM control below would be vacuously RED. The
+# map is repo content and lives at the repo root; only its restore stays with the hygiene.
+MAPDIR="features"
 FM_SRC="src/panel/index.ts"
 plant_map() {
   mkdir -p "$MAPDIR" "$(dirname "$FM_SRC")"
@@ -871,7 +873,7 @@ Select a row. Run \`node -e 'process.stdout.write("1")'\`. The total updates.
 ## Gotchas
 - a row with no children shows no total
 MAPEOF
-  sed -i "s|^feature_map: .*|feature_map: $MAPDIR/README.md|" AGENTS.md
+  sed -i "s|^feature_map:\([[:space:]]*\).*|feature_map: $MAPDIR/README.md|" AGENTS.md
   git add -A >/dev/null 2>&1; git commit -q -m "test: seed the feature map" >/dev/null 2>&1
 }
 # Every mutation below seeds the map first and then breaks exactly one clause.
@@ -894,12 +896,14 @@ m_fm_02_stub()      { plant_map; sed -i 's|^  - panel-root$|  - g_yaml_block_sca
 m_fm_02_untracked() { plant_map; printf 'untracked-panel-root\n' > src/panel/late.ts; \
                       sed -i 's|^  - panel-root$|  - untracked-panel-root|' "$MAPDIR/panel.md"; \
                       sed -i 's|^verified: .*|verified: 2020-01-01|' "$MAPDIR/panel.md"; }
-m_va_01_fail()      { sed -i 's|^verify_doctor: .*|verify_doctor: false|' AGENTS.md; }
+m_va_01_fail()      { sed -i 's|^verify_doctor:\([[:space:]]*\).*|verify_doctor: false|' AGENTS.md; }
 
 # The empty config is the fresh-install state: each row SKIPs (the builtin returns 3, which the
 # runner counts as a SKIP; the process still exits 0 - only FAIL or a broken manifest exits
 # non-zero), and the reason names WHY.
-for pair in "FM-01:no map is declared" "FM-02:no entry paths to resolve" "VA-01:no doctor is declared"; do
+# v2: VA-01's empty-config reason still says "no doctor is declared"; FM-01/FM-02 name
+# the config key itself now.
+for pair in "FM-01:feature_map: is empty" "FM-02:feature_map: is empty" "VA-01:no doctor is declared"; do
   rid=${pair%%:*}; want=${pair#*:}
   out=$(bash .gob/bin/goblin-verify --only "$rid" 2>&1); rc=$?
   printf '%s' "$out" | grep -q "^SKIP  $rid.*$want"; hit=$?
@@ -932,14 +936,14 @@ expect_red   "a verify_doctor that exits non-zero" VA-01 1 m_va_01_fail
 # control that proves the rows are not always-red - and then one clause at a time is broken.
 #
 # The empty state is asserted first, because it is the state every fresh install is in: with no
-# .goblin/loop/ the six loop-dependent rows must report SKIP with their reason, never a vacuous
+# .gob/loop/ the six loop-dependent rows must report SKIP with their reason, never a vacuous
 # PASS (the PG-01..PG-03 shape). JG-02 is the exception by design: it reads roles.yaml and the
 # mapping file, so a lane that resolves to no provider/model is an ADV with its one-line remedy,
 # and that is asserted in t-verify-green.sh (ADV, exit 0).
-LOOP=".goblin/loop"
+LOOP=".gob/loop"
 plant_loop() {
   mkdir -p "$LOOP"
-  printf '# the loop exit condition: exit 0 == the loop is finished\ntest -f .goblin/loop/done\n' > "$LOOP/predicate"
+  printf '# the loop exit condition: exit 0 == the loop is finished\ntest -f .gob/loop/done\n' > "$LOOP/predicate"
   sha256sum "$LOOP/predicate" | awk '{print $1}' > "$LOOP/predicate.sha256"
   printf 'exit=1 ts=2026-09-25T00:00:00Z\n' > "$LOOP/first-run"
   printf '12\n' > "$LOOP/budget"
@@ -958,7 +962,7 @@ m_loop_plant()   { plant_loop; }
 m_jg_02_ok()     { plant_judge_lane; }
 # The judge is the author: role-judge resolves to the code lane's own profile. A FAIL, not an ADV -
 # the declared lanes are visible to a repo, which is the whole point of the row.
-m_jg_02_shared() { plant_judge_lane; sed -i 's/^  profiles: \[judge\]$/  profiles: [coder]/' .goblin/roles.yaml; }
+m_jg_02_shared() { plant_judge_lane; sed -i 's/^  profiles: \[judge\]$/  profiles: [coder]/' .gob/roles.yaml; }
 # A verdict resting on a command that ran: `cmd:` resolves NOTHING by design, because the command's
 # output is not in the record and a verdict resting on it is the self-report the row refuses.
 m_jg_01_cmd()    { plant_loop; sed -i "s|sha:$(git rev-parse HEAD)|cmd:npm test|" "$LOOP/decisions.tsv"; }
@@ -1060,14 +1064,8 @@ expect_red   "a loop that ended not-green and left no write-up"  LP-05 1 m_lp_05
 expect_red   "a write-up shorter than three lines"               LP-05 1 m_lp_05_short
 
 expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
-expect_red "a class-B repo carrying the CI lane it forbids" CL-01 1 m_b_workflow "$TARGET_B" restore_b
-# The complement, on class A: there `ci-gate` is `R`, so the SAME path being absent is the class
-# contract violated. Both controls move one file in opposite directions, which is the point of
-# keying the artifact on the path rather than on the `.github/` directory - each carries its own
-# restore, because a control that leaves the tree changed makes the next one lie.
-m_a_nowf()  { mv .github/workflows/goblin-gate.yml "$WORK/gg.bak"; }
-restore_a() { mkdir -p .github/workflows; mv "$WORK/gg.bak" .github/workflows/goblin-gate.yml; }
-expect_red "a class-A repo with the CI lane its class REQUIRES removed" CL-01 1 m_a_nowf "$TARGET" restore_a
+# v2 DELETION NOTE (wave B): the two CI-lane CL-01 controls (class B forbids goblin-gate.yml;
+# class A requires it) are deleted with the lane - the class contract no longer names ci-gate.
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip
 
 # ---- P15: the reference-corpus rows, RC-01..RC-04 ------------------------------------------------
@@ -1085,11 +1083,11 @@ rc_manifest() {
 }
 # Declare the corpus, and a build output this fixture does not otherwise have.
 rc_declare() {
-  sed -i 's|^  build_output: .*|  build_output: dist|' AGENTS.md
-  sed -i 's|^reference_manifest: .*|reference_manifest: reference-manifest.json|' AGENTS.md
+  sed -i 's|^security\.build_output:.*|security.build_output: dist|' AGENTS.md
+  sed -i 's|^reference_manifest:\([[:space:]]*\).*|reference_manifest: reference-manifest.json|' AGENTS.md
   rc_manifest reference-manifest.json
 }
-m_rc_key_empty() { sed -i 's|^reference_manifest: .*|reference_manifest:|' AGENTS.md; }
+m_rc_key_empty() { sed -i 's|^reference_manifest:\([[:space:]]*\).*|reference_manifest:|' AGENTS.md; }
 # The declared-but-empty control: the corpus is declared and its manifest is well-shaped, but the
 # fixture has no build output for RC-01 to scan - RC-01 must still exit 0 (nothing to check), and
 # RC-02 must pass the well-shaped manifest. Declared as a function because expect_green invokes it.
@@ -1164,7 +1162,7 @@ expect_green "a well-formed acquisition record"                              RC-
 # are RED against 43f7f69, where the line was `advisory 9 of ceiling 10` and nothing else -
 # measured in V1.md. The numbers come from the fixture, not from this file, so the control still
 # holds if a later card legitimately spends the slot.
-ADV_N=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' .goblin/manifest/enforcement.tsv)
+ADV_N=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' .gob/manifest/enforcement.tsv)
 ADV_C=$(sed -n 's/^advisory_ceiling:[[:space:]]*//p' AGENTS.md | head -n 1)
 : "${ADV_C:=10}"
 out=$(bash .gob/bin/goblin-verify --only SK-03 2>&1)
@@ -1192,15 +1190,15 @@ check "W1: every run's footer names cli_sha256 and enforcement_tsv_sha256" "$?"
 # is not drift (W3 removes them by design), and a repo-local recorded file that drifts
 # still FAILs. The engine: block is planted by hand (the migration that writes it is
 # W3). Both runs go through the CHECKOUT's verifier with --source: the control deletes
-# the repo's own .goblin/bin + .goblin/manifest, so the installed interpreter and the
+# the repo's own .gob/bin + .gob/manifest, so the installed interpreter and the
 # vendored fallback must not be the thing being tested here.
 w1_plant_engine_record() {
   python3 -c '
 import json
-rec = json.load(open(".goblin/installed.json"))
+rec = json.load(open(".gob/installed.json"))
 rec["engine"] = {"mode": "global", "engine_dir": "/tmp/w1-engine-gmode",
-                 "cli_version": "0.4.4", "cli_sha256": "a", "enforcement_tsv_sha256": "b"}
-json.dump(rec, open(".goblin/installed.json", "w"), indent=2)
+                 "cli_version": "0.6.0", "cli_sha256": "a", "enforcement_tsv_sha256": "b"}
+json.dump(rec, open(".gob/installed.json", "w"), indent=2)
 '
 }
 m_in_02_global_local_drift() {
@@ -1209,7 +1207,7 @@ m_in_02_global_local_drift() {
 }
 m_in_02_global_engine_gone() {
   w1_plant_engine_record
-  rm -rf .goblin/bin .goblin/manifest
+  rm -rf .gob/bin .gob/manifest
 }
 # Clause 3 (§2.2): a global repo whose files map is EMPTY hashes nothing and passes - the
 # lenient reader (g_installed_files) leaks the engine: block's key/value pairs as phantom
@@ -1219,10 +1217,10 @@ m_in_02_global_files_empty() {
   w1_plant_engine_record
   python3 -c '
 import json
-rec = json.load(open(".goblin/installed.json"))
+rec = json.load(open(".gob/installed.json"))
 rec["files"] = {}
 rec["owned"] = {}
-json.dump(rec, open(".goblin/installed.json", "w"), indent=2)
+json.dump(rec, open(".gob/installed.json", "w"), indent=2)
 '
 }
 m_in_02_global_files_empty
@@ -1271,7 +1269,7 @@ r_au_01_declared() { rm -rf automations; }
 expect_red   "W1: the repo's OWN automation producer with a network verb" AU-01 1 m_au_01_declared_network "" r_au_01_declared
 expect_red   "W1: automations declared but the producer is gone"          AU-01 1 m_au_01_declared_gone    "" r_au_01_declared
 # The SKIP half cannot run on this fixture: its VENDORED engine payload
-# (.goblin/automations/*.sh) supplies producers, so AU-01 PASSES here by design. The SKIP
+# (.gob/automations/*.sh) supplies producers, so AU-01 PASSES here by design. The SKIP
 # fires only when NO producer exists in either place - the global-mode probe below (the
 # SC-07 block, which strips the engine payload) is the repo that proves it.
 
@@ -1294,10 +1292,11 @@ cp -r "$SRC/manifest" /tmp/w1-engine-gmode/manifest
   && sed -i "/^models_file:/a engine_dir: /tmp/w1-engine-gmode" AGENTS.md \
   && python3 -c '
 import json
-rec = json.load(open(".goblin/installed.json"))
-rec["engine"] = {"mode": "global", "engine_dir": "/tmp/w1-engine-gmode", "cli_version": "0.4.4", "cli_sha256": "a", "enforcement_tsv_sha256": "b"}
-json.dump(rec, open(".goblin/installed.json", "w"), indent=2)' \
-  && rm -rf .goblin/bin .goblin/manifest .goblin/bans .goblin/automations .goblin/roles.yaml )
+rec = json.load(open(".gob/installed.json"))
+rec["engine"] = {"mode": "global", "engine_dir": "/tmp/w1-engine-gmode", "cli_version": "0.6.0", "cli_sha256": "a", "enforcement_tsv_sha256": "b"}
+json.dump(rec, open(".gob/installed.json", "w"), indent=2)' \
+  && sed -i 's/^security\.audit_cmd:.*/security.audit_cmd: npm audit --json/' AGENTS.md \
+  && rm -rf .gob/bin .gob/manifest .gob/bans .gob/automations .gob/roles.yaml )
 # The probe is the repo the SC-07 block builds below; the AU-01 SKIP half runs there
 # because that is the only producer-less repo in this file. Kept as a plain block: the
 # two checks below share the probe's one build.
@@ -1307,7 +1306,7 @@ check "W1: no producer anywhere -> AU-01 SKIPs with the reason (the born-RED FIX
 out=$( cd "$W1_GMODE" && bash "$SRC/bin/goblin-verify" --only SC-07 2>&1 )
 printf '%s' "$out" | grep -q 'gob audit'
 check "W1: a global-mode SC-07 SKIP names the CLI verb (gob audit)" "$?"
-printf '%s' "$out" | grep -q '.goblin/audit.tsv'
+printf '%s' "$out" | grep -q '.gob/audit.tsv'
 check "  and the record it names is still the repo-local one" "$?"
 rm -rf /tmp/w1-engine-gmode
 
@@ -1331,10 +1330,10 @@ check "--only <target id mixed with a source id> still runs the target row" "$([
 # demand: GT-02, via a gate that cannot run. Whole under --only (the mode that reads),
 # width-truncated in the default listing - the same two-mode contract the row printers keep.
 m_ux_remark() {
-  # the class-A fixture gates live in goblin.yaml: fail GT-02 via a gate that cannot run, and
-  # give the row a remedy to print (the fixture TSV is restored from $BK afterwards)
-  sed -i 's#^    cmd: git rev-parse --verify --quiet HEAD#    cmd: false#' AGENTS.md
-  awk -F'\t' -v OFS='\t' '$1=="GT-02" { $7 = "re-run the gate by hand: bash -c \047false\047, fix the tree, then gob verify again" } { print }' "$BK/enforcement.tsv" > .goblin/manifest/enforcement.tsv
+  # the class-A fixture gates are flat keys in AGENTS.md: fail GT-02 via a gate that cannot
+  # run, and give the row a remedy to print (the fixture TSV is restored from $BK afterwards)
+  sed -i 's#^gate_commit_cmd: .*#gate_commit_cmd: false#' AGENTS.md
+  awk -F'\t' -v OFS='\t' '$1=="GT-02" { $7 = "re-run the gate by hand: bash -c \047false\047, fix the tree, then gob verify again" } { print }' "$BK/enforcement.tsv" > .gob/manifest/enforcement.tsv
 }
 expect_red "UX-1: a planted remedy prints with the FAIL" GT-02 1 m_ux_remark
 m_ux_remark
@@ -1344,22 +1343,21 @@ check "UX-1a the planted remedy prints whole under --only" "$?"
 out=$(bash .gob/bin/goblin-verify 2>&1)
 printf '%s' "$out" | grep -q '^remedy: re-run the gate by hand'
 check "UX-1b the remedy prints in the default listing too (under the fold width, whole)" "$?"
-cp -a "$BK/enforcement.tsv" .goblin/manifest/enforcement.tsv
-cp -a "$BK/goblin.yaml" AGENTS.md
+cp -a "$BK/enforcement.tsv" .gob/manifest/enforcement.tsv
 restore_all
 
 # UX-2: GT-02's failing-gate tail. A gate that prints to stdout AND stderr and fails must have
 # its last non-blank output lines carried indented under the FAIL, from the merged capture -
 # so even a gate that swallows its own exit code cannot hide what it printed.
 m_ux_gate_noise() {
-  cat > .goblin/ux-noise.sh <<'EOF_NOISE'
+  cat > .gob/ux-noise.sh <<'EOF_NOISE'
 echo "ux stdout noise line"
 echo "ux stderr noise line" >&2
 exit 3
 EOF_NOISE
-  sed -i 's#^    cmd: git rev-parse --verify --quiet HEAD#    cmd: bash .goblin/ux-noise.sh#' AGENTS.md
+  sed -i 's#^gate_commit_cmd: git rev-parse --verify --quiet HEAD#gate_commit_cmd: bash .gob/ux-noise.sh#' AGENTS.md
 }
-r_ux_gate_noise() { restore_all; rm -f .goblin/ux-noise.sh; }
+r_ux_gate_noise() { restore_all; rm -f .gob/ux-noise.sh; }
 expect_red "UX-2: a noisy gate's tail rides the FAIL" GT-02 1 m_ux_gate_noise "" r_ux_gate_noise
 m_ux_gate_noise
 out=$(bash .gob/bin/goblin-verify --only GT-02 2>&1)
@@ -1407,7 +1405,7 @@ rm -rf "$UX4"
 
 # UX-5: GT-03's failure line is the sentence, not the raw test(1) dump. Measure, commit, and
 # the staleness the row exists to catch is on screen - as the reader-facing sentence with the
-# recovery verb, never the `(test -f .goblin/last-gate-line && [ ...` invocation text.
+# recovery verb, never the `(test -f .gob/last-gate-line && [ ...` invocation text.
 m_ux_gt03() { bash .gob/bin/goblin-verify --only GT-02 >/dev/null 2>&1; git commit -q --allow-empty -m "the commit that ages the gate line"; }
 r_ux_gt03() { git reset -q --hard HEAD~1; restore_all; }
 expect_red "UX-5: an aged gate line fails GT-03" GT-03 1 m_ux_gt03 "" r_ux_gt03
@@ -1416,7 +1414,7 @@ git commit -q --allow-empty -m "the commit that ages the gate line"
 out=$(bash .gob/bin/goblin-verify --only GT-03 2>&1)
 printf '%s' "$out" | grep -q 'the gate line is older than the last commit — re-run gob verify to refresh it'
 check "UX-5a the staleness line is the reader-facing sentence" "$?"
-printf '%s' "$out" | grep -qF 'test -f .goblin/last-gate-line'
+printf '%s' "$out" | grep -qF 'test -f .gob/last-gate-line'
 check "UX-5b the raw test(1) dump is gone from the failure line" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 git reset -q --hard HEAD~1
 restore_all
@@ -1432,7 +1430,7 @@ check "the fixture is GREEN again after every mutation was restored" "$FINAL_RC"
 # reader comparing it with the ADV lines saw a mismatch that only the row's why-cell explained.
 # This is a text assertion rather than an `expect_*` call for the same reason the judge-lane
 # comparison is: the row exits 0 either way and the claim is about the LINE it prints.
-ADV_LABELLED=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' .goblin/manifest/enforcement.tsv)
+ADV_LABELLED=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' .gob/manifest/enforcement.tsv)
 ADV_PRINTED=$(printf '%s\n' "$FINAL" | grep -cE '^ADV')
 printf '%s\n' "$FINAL" | grep -q "of those $ADV_PRINTED advisory: the matrix labels $ADV_LABELLED row(s) advisory"
 check "Z1-7: the summary prints the advisory arithmetic ($ADV_PRINTED ADV lines vs $ADV_LABELLED labelled)" "$?"

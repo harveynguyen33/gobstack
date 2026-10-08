@@ -111,9 +111,9 @@ enabled() {
 # keeps the old behaviour, which fails CLOSED, never open.
 exempt_paths() { # exempt_paths <id> -> path prefixes, one per line
   [ -f "$CONFIG" ] || return 0
-  # v2 shape: one exemption per line, "<ban id> <path prefix>" — the id is the first
-  # field of a bans_exempt line (the yaml block-list shape has no flat spelling).
-  g_agents_read "$CONFIG" bans_exempt | awk -v id="$1" '$1==id {print $2}'
+  # v2 shape: one flat `[BN-01 src, BN-02 app]` array — item 1 is the ban id, item 2 its
+  # path prefix (g_agents_list splits on the commas, so an item keeps its inner space).
+  g_agents_list "$CONFIG" bans_exempt | awk -v id="$1" '$1==id {print $2}'
 }
 
 only_selected() {

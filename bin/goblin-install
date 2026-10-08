@@ -220,6 +220,10 @@ fi
 # reports the old and new hash. It is unreachable from --upgrade and from goblin-verify, by
 # design: an automatic re-pin would be the silent edit the pin exists to catch.
 # See docs/CONTRACTS.md, "An edited standard is not a dead end".
+# The write's own failure output is captured (not discarded) so the fail-closed branch below can
+# name it: a g_agents_write that could not land used to vanish into >/dev/null and the pipe still
+# exited 0 (the sed inside writes via mktemp+mv, and only the mv reports).
+RE_PIN_WRITE_LOG=""
 if [ "$RE_PIN" -eq 1 ]; then
   [ -f "$CONFIG" ] || { g_err "nothing to re-pin: $CONFIG is absent (install first)"; exit 2; }
   PIN_PATH=$(g_expand_tilde "$(g_agents_read "$CONFIG" practice)")
@@ -242,15 +246,19 @@ if [ "$RE_PIN" -eq 1 ]; then
   fi
   # One key, in place: g_agents_write rewrites only the marker block, and the rewrite keeps
   # every OTHER key by reading the current block first (the `owned` contract holds for
-  # everything except the single value just asked for).
+  # everything except the single value just asked for). The write's failure output is captured,
+  # not discarded: a g_agents_write that could not land used to vanish into >/dev/null and only
+  # the generic fail-closed message remained.
+  RE_PIN_WRITE_LOG=$(mktemp "${TMPDIR:-/tmp}/gob-repin.XXXXXX")
   {
     while IFS=$'\t' read -r k v; do
       [ "$k" = "practice_sha256" ] && continue
       printf '%s\t%s\n' "$k" "$v"
     done < <(g_agents_pairs "$CONFIG")
     printf 'practice_sha256\t%s\n' "$NEW_SHA"
-  } | g_agents_write "$CONFIG" >/dev/null \
-    || { g_err "could not rewrite the pin in $CONFIG"; exit 1; }
+  } | g_agents_write "$CONFIG" > "$RE_PIN_WRITE_LOG" 2>&1 \
+    || { g_err "could not rewrite the pin in $CONFIG"; sed -n '1,3p' "$RE_PIN_WRITE_LOG" >&2 2>/dev/null; rm -f "$RE_PIN_WRITE_LOG"; exit 1; }
+  rm -f "$RE_PIN_WRITE_LOG"
   # Fail closed: never report a re-pin that did not land.
   [ "$(g_agents_read "$CONFIG" practice_sha256)" = "$NEW_SHA" ] \
     || { g_err "the new pin did not land in $CONFIG"; exit 1; }
@@ -641,6 +649,22 @@ put ".gob/bans/layer-check.sh" "$SRC/bans/layer-check.sh"
 render "$SRC/templates/AGENTS.md.tmpl" CLASS "$CLASS" DATE "$STAMP" > "$TMP/agents-body"
 put_once "AGENTS.md" "$TMP/agents-body"
 if [ "$DRY_RUN" -eq 0 ] && [ -f "$CONFIG" ]; then
+  # The install-once contract for the project's own answers: on a RE-install (the previous
+  # record exists), the block rewrite carries forward the existing practice pin instead of the
+  # freshly hashed one - an --upgrade must never re-pin the standard by itself, because a pin
+  # that silently follows the file defeats the only check that guards it (IN-02). A FIRST
+  # install (no previous record) has nothing to carry forward: the rendered value is the pin.
+  # The block file here is the RENDERED template ("key: value" lines, no tabs), so the match
+  # anchors on the key prefix, not on a tab field ($1 == "practice" never fired under the
+  # rendered shape and the freshly rendered NEW hash flowed straight through — an --upgrade
+  # re-pinned the standard silently, exactly what IN-02 exists to catch).
+  if [ -n "$PREV_FILES" ]; then
+    KEEP_PRACTICE=$(g_agents_read "$CONFIG" practice)
+    KEEP_PRACTICE_SHA=$(g_agents_read "$CONFIG" practice_sha256)
+    if [ -n "$KEEP_PRACTICE" ]; then
+      sed -i "s#^practice: .*\$#practice: $KEEP_PRACTICE#; s#^practice_sha256: .*\$#practice_sha256: $KEEP_PRACTICE_SHA#" "$TMP/agents-block"
+    fi
+  fi
   g_agents_write "$CONFIG" < "$TMP/agents-block" >/dev/null \
     || { g_err "could not write the gob block into $CONFIG"; exit 1; }
 fi
