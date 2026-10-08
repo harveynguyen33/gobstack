@@ -37,6 +37,8 @@ SRC=$(cd "$SELF_DIR/.." && pwd)
 # shellcheck source=goblin-lib.sh
 . "$SELF_DIR/goblin-lib.sh"
 VERSION=$(cat "$SRC/VERSION" 2>/dev/null || printf 'unknown')
+# The extras catalogue (overridable for tests, the same env var goblin-extras reads).
+CATALOGUE_TSV="${GOB_EXTRAS_CATALOGUE:-$SRC/extras-catalogue/catalogue.tsv}"
 
 g_info() { printf '%s\n' "$*"; }
 
@@ -61,6 +63,7 @@ done
 for dep in git awk sed grep; do
   command -v "$dep" >/dev/null 2>&1 || { g_err "missing dependency: $dep"; exit 2; }
 done
+command -v python3 >/dev/null 2>&1 || { g_err "missing dependency: python3 (the extras .mcp.json merge needs it)"; exit 2; }
 [ -f "$SRC/VERSION" ] || { g_err "no VERSION at $SRC — is this a gobstack checkout?"; exit 2; }
 TARGET="${TARGET:-$PWD}"
 TARGET=$(g_expand_tilde "$TARGET")
@@ -120,7 +123,47 @@ back one proposal file. Do this now:
    - gate_commit_cmd: ONE command that proves the repo is healthy and must stay green
      (a real test/lint command from package.json — never a placeholder)
 
-3. WRITE the proposal file exactly in the SCHEMA below, at a path you choose (for
+3. THE CATALOGUE — `catalogue_suggestions` (init SUGGESTS, it never installs):
+
+   Read the bundled catalogue (`gob extras list` shows it; the file is
+   `extras-catalogue/catalogue.tsv` in the package). From it, build the
+   `catalogue_suggestions:` list for this repo:
+
+   - rows whose `matches:` column names this repo's detected stack (the words you
+     found in step 1 — react, vue, playwright, godot, unity, node, postgres, …);
+   - RECOMMEND rows are pre-ticked (write `- id` with `[x]`); MAYBE rows are
+     listed but NOT pre-ticked (`[ ]`) — they are visible choices, never defaults;
+   - a row whose `conflicts:` names an id you also picked: pick at most one of them;
+   - SKIP rows are never suggested and refuse install; leave them out entirely.
+
+   Record the picks in the proposal's summary section under `catalogue_suggestions:`
+   (one `- [x] <id>  # <why>` line each). NOTHING installs at init: installing is a
+   separate, explicit step the human runs —
+
+       npx @techgoblin/gobstack extras install <id...>
+
+4. DISCOVER — `discover_extras` (proposals only, nothing auto-installs):
+
+   ALSO search the web with your own tools for agent skills / MCP servers / workflows
+   that match this repo's stack and are NOT in the bundled catalogue. For each
+   discovery, propose one entry in the summary under `discover_extras:` with exactly
+   these keys:
+
+       discover_extras:
+         - id: <short-kebab-id>
+           source_url: <the repo or docs URL you actually fetched>
+           license: <spdx or "unknown — verify">
+           rationale: <one line — what it adds to THIS repo>
+           suggested_kind: <skill|mcp|workflow>
+
+   Rules: verify the URL is live before proposing it; state the license you found;
+   never propose anything you did not actually read. Proposals are INERT — nothing
+   auto-installs from discovery, and no discovery reaches this repo from the CLI.
+   A human reviews the proposals, then the curator (Harvey) promotes accepted
+   discoveries into catalogue.tsv by PR or direct edit. Until a row exists in the
+   catalogue, `gob extras install` refuses it — the catalogue is the allowlist.
+
+5. WRITE the proposal file exactly in the SCHEMA below, at a path you choose (for
    example .gob-init-proposal.md), then run:
 
        npx @techgoblin/gobstack init --write <proposal-path>
@@ -145,6 +188,15 @@ sync_platforms: <optional array — the agent platform ids the sync reads>
 
 - <one bullet per decision: what you scanned, what you chose, why>
 - <framework / package manager / test command found>
+- catalogue_suggestions:
+    - [x] <catalogue id>  # <one line why — RECOMMEND rows pre-ticked>
+    - [ ] <catalogue id>  # <a MAYBE row: visible, never pre-ticked>
+- discover_extras:
+    - id: <kebab-id>
+      source_url: <live URL>
+      license: <spdx or "unknown — verify">
+      rationale: <one line>
+      suggested_kind: <skill|mcp|workflow>
 ============================================================================== ==
 BRIEF
 }
@@ -169,6 +221,40 @@ print_heuristic() {
   for d in app pages routes src; do
     [ -d "$TARGET/$d" ] && printf 'route/entry root candidate: %s/\n' "$d"
   done
+  # The catalogue_suggestions fallback: rows whose `matches:` cell names a token the
+  # heuristic scan actually saw in this repo (package.json deps + lockfile + config
+  # files). The SAME matches column the agent brief reads — the fallback suggests from
+  # the catalogue, never from its own private list. Verdicts are respected: only
+  # RECOMMEND rows pre-tick; MAYBE rows print unticked; SKIP rows never appear.
+  if [ -f "$CATALOGUE_TSV" ]; then
+    local scan
+    scan=$(cat "$TARGET/package.json" "$TARGET"/*.lock "$TARGET"/pnpm-lock.yaml \
+              "$TARGET"/vue.config.* "$TARGET"/nuxt.config.* "$TARGET"/godot/project.godot \
+              "$TARGET"/unity/ProjectSettings/ProjectVersion.txt 2>/dev/null | tr 'A-Z' 'a-z')
+    if [ -n "$scan" ]; then
+      local ticked="" maybe=""
+      while IFS=$'\t' read -r cid ccat ckind cname crepo cpath chmd clic cstars cpush \
+                          cmatches cconf creq chint cverdict cby cdate; do
+        [ -n "$cid" ] || continue
+        case "$cverdict" in RECOMMEND|MAYBE) ;; *) continue ;; esac
+        local hit=0 tok
+        for tok in $cmatches; do
+          case "$scan" in *"$tok"*) hit=1; break ;; esac
+        done
+        [ "$hit" -eq 1 ] || continue
+        case "$cverdict" in
+          RECOMMEND) ticked="$ticked    - [x] $cid  # matches this repo ($cmatches)"$'\n' ;;
+          MAYBE)     maybe="$maybe    - [ ] $cid  # matches, verdict MAYBE (not pre-ticked)"$'\n' ;;
+        esac
+      done < "$CATALOGUE_TSV"
+      if [ -n "$ticked$maybe" ]; then
+        printf 'catalogue_suggestions (heuristic — verify the matches before trusting):\n'
+        printf '%s' "$ticked"
+        printf '%s' "$maybe"
+        printf 'install later with: gob extras install <id...> (init itself installs nothing)\n'
+      fi
+    fi
+  fi
   if [ "$got" -eq 0 ] && [ ! -d "$TARGET/src" ]; then
     printf 'no package.json, no src/ — the scan above is empty; say so in the summary\n'
   fi
@@ -233,10 +319,17 @@ EMAIL=$(g_agents_read "$PROP" owner_email)
 [ -n "$EMAIL" ] || EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
 [ -n "$EMAIL" ] || EMAIL="you@example.com"
 SYNC_SEL=$(g_agents_list "$PROP" sync_platforms | tr '\n' ' ')
+# The extras the proposal's human approved (catalogue_suggestions tick lines in the
+# summary). Only TICKED ids count — an unticked MAYBE line is a visible choice the
+# human did not make. Every id is re-resolved through the catalogue's own allowlist
+# gate in goblin-extras (unknown id -> refusal; SKIP verdict -> refusal): a proposal
+# cannot install anything the catalogue does not carry.
+EXTRAS_SEL=$(sed -n '/catalogue_suggestions:/,/^[^ -]/{s/^[[:space:]]*-[[:space:]]*\[x\][[:space:]]*\([A-Za-z0-9_-]*\).*/\1/p;}' "$PROP" | sort -u | tr '\n' ' ')
 
 if [ "$DRYRUN" -eq 1 ]; then
   g_info "gob init --write --dry-run: validated OK (class $CLASS, branch $BRANCH, owner $EMAIL, 1+ gate)"
   g_info "  sync: ${SYNC_SEL:-none}"
+  g_info "  extras: ${EXTRAS_SEL:-none}"
   g_info "  would write: AGENTS.md (body + gob block), .gob/engine/, HANDOFF.md"
   exit 0
 fi
@@ -310,10 +403,26 @@ for p in $SYNC_SEL; do
     RC=$?; g_err "sync $p failed (exit $RC)"; exit "$RC"; }
 done
 
-# ------------------------------------------------------------- mcp config -----
-# The --write mode lands the same .mcp.json (ask-once, never overwrite).
+# ------------------------------------------------------------- extras ----------
+# The proposal's TICKED catalogue_suggestions install through the goblin-extras
+# allowlist itself — one code path, one set of refusals (unknown id, SKIP verdict,
+# missing payload). init --write never copies an extra by its own hand: the catalogue
+# is the allowlist, and the CLI is the only installer. A refusal fails the whole
+# --write (the human re-ticks).
+#
+# ORDER MATTERS: --with-mcp-config writes the gob registration FIRST, then the mcp-kind
+# extras merge INTO it — the other order would leave .mcp.json carrying only the extra
+# and do_mcp_config would refuse it (the generated-bytes ask-once check). Extras mcp
+# merges are themselves ask-once: an entry you customized is never overwritten.
 if [ "$WITH_MCP" -eq 1 ]; then
   do_mcp_config || exit 1
+fi
+if [ -n "$EXTRAS_SEL" ]; then
+  for xid in $EXTRAS_SEL; do
+    printf 'gob init [run] extras install %s\n' "$xid"
+    bash "$SRC/bin/goblin-extras" install "$xid" --target "$TARGET" || {
+      RC=$?; g_err "extras install $xid failed (exit $RC) — fix the proposal's catalogue_suggestions and re-run"; exit "$RC"; }
+  done
 fi
 
 # --------------------------------------------------------------------- done ----
