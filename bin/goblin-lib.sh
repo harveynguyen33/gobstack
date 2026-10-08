@@ -265,6 +265,115 @@ g_part_disabled() {
 }
 
 # ------------------------------------------------------------- class data ----
+# ------------------------------------------------------------- agents.md -----
+# v2 config engine: the project config lives in AGENTS.md FRONTMATTER, delimited by
+# fixed markers. There is no goblin.yaml. One file is the single source of truth:
+#
+#   <!-- gob:begin (gobstack config) -->
+#   class: software
+#   branch: main
+#   ratchet.ceiling: 160          # one nested level = a dotted key
+#   bans: [BN-01, BN-02]          # a list is a one-line JSON-ish array
+#   gate_commit_cmd: git rev-parse --verify --quiet HEAD
+#   <!-- gob:end -->
+#
+# The parser is the same flat, line-oriented reader the yaml subset used (no YAML
+# library, no network, no npm) — it just reads ONLY the lines between the markers, so
+# the rest of AGENTS.md (the prose the agent reads) is invisible to it. Rules:
+#   * a value is the rest of the line after `key:` — never quoted, never folded
+#   * one nested level: `block.key: value` (read with the dotted spelling)
+#   * a list: `key: [a, b, c]` on ONE line (g_agents_list splits it)
+#   * gates: one key per gate, `gate_<name>_cmd: <cmd>` (g_agents_gates)
+#   * comments on their own line, `#` first; blank lines allowed
+
+# The literal markers (grep -F targets; the begin marker carries no closing paren so a
+# future annotation after it cannot break the reader).
+GOB_AGENTS_BEGIN='<!-- gob:begin'
+GOB_AGENTS_END='<!-- gob:end -->'
+
+# g_agents_block <file> — the config lines between the markers (empty if no block).
+g_agents_block() {
+  sed -n "/^$GOB_AGENTS_BEGIN/,/^$GOB_AGENTS_END/p" "$1" 2>/dev/null | sed '1d;$d'
+}
+
+# g_agents_read <file> <key> — value of one key (dotted spelling for the nested level),
+# empty if the block or the key is absent.
+g_agents_read() {
+  g_agents_block "$1" | sed -n "s/^$2:[[:space:]]*//p" | head -n 1
+}
+
+# g_agents_keys <file> — every declared key, one per line, in file order.
+g_agents_keys() {
+  g_agents_block "$1" | sed -n 's/^\([A-Za-z_][A-Za-z0-9_.-]*\):.*/\1/p'
+}
+
+# g_agents_gates <file> — one "name<TAB>cmd" line per DECLARED gate. A gate is the key
+# `gate_<name>_cmd:`; the declaration and its command are one line, so a gate cannot
+# lose its cmd and survive the count (the G8-3 failure mode has no shape here).
+g_agents_gates() {
+  g_agents_block "$1" | sed -n 's/^gate_\([A-Za-z0-9_-]*\)_cmd:[[:space:]]*/\1\t/p'
+}
+
+# g_agents_gate_names <file> — one declared gate NAME per line.
+g_agents_gate_names() {
+  g_agents_gates "$1" | cut -f1
+}
+
+# g_agents_list <file> <key> — the items of a one-line `[a, b, c]` array, one per line.
+# Empty output = the key is absent or the array is empty. An item keeps its inner text
+# verbatim (trimmed); a comma inside an item cannot be expressed — split the key.
+g_agents_list() {
+  local v
+  v=$(g_agents_read "$1" "$2")
+  case "$v" in
+    ""|"[]") return 0 ;;
+    \[*\]) ;;
+    *) return 0 ;;   # a malformed array reads as absent, never as one garbage item
+  esac
+  v=${v#\[}; v=${v%\]}
+  printf '%s\n' "$v" | tr ',' '\n' \
+    | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$' || true
+}
+
+# g_agents_disabled <file> — the disabled: array, one part per line.
+g_agents_disabled() { g_agents_list "$1" disabled; }
+
+# g_part_disabled <agents-file> <part>
+g_agents_part_disabled() {
+  g_agents_disabled "$1" | grep -qx "$2"
+}
+
+# g_agents_write <file> — rewrite ONLY the marker block from `key<TAB>value` lines on
+# stdin, preserving every line of the body. Idempotent: a second identical write leaves
+# the file byte-identical (it prints "unchanged", not "written"). No block + a body:
+# the block is inserted before the first line. No file: it is created.
+g_agents_write() {
+  local f="$1" tmp newbody
+  [ -f "$f" ] || : > "$f"
+  tmp=$(mktemp "${TMPDIR:-/tmp}/gob-agents.XXXXXX") || return 1
+  {
+    printf '%s (gobstack config — edit in place; the parser reads only this block) -->\n' "$GOB_AGENTS_BEGIN"
+    awk -F'\t' 'NF>=1 && $1!="" { v=$2; for (i=3; i<=NF; i++) v=v "\t" $i; print $1 ": " v }'
+    printf '%s\n' "$GOB_AGENTS_END"
+  } > "$tmp"
+  newbody=$(cat "$tmp")
+  # Replace the existing block, or insert the block before the first body line.
+  if grep -q "^$GOB_AGENTS_BEGIN" "$f"; then
+    awk -v begin="^$GOB_AGENTS_BEGIN" -v end="^$GOB_AGENTS_END" -v repl="$newbody" '
+      $0 ~ begin { inb = 1; printf "%s\n", repl; next }
+      $0 ~ end   { inb = 0; next }
+      !inb       { print }
+    ' "$f" > "$tmp.out" || { rm -f "$tmp" "$tmp.out"; return 1; }
+  else
+    { printf '%s\n' "$newbody"; cat "$f"; } > "$tmp.out"
+  fi
+  if cmp -s "$tmp.out" "$f"; then
+    rm -f "$tmp" "$tmp.out"; printf 'unchanged\n'; return 0
+  fi
+  cp "$tmp.out" "$f" && rm -f "$tmp" "$tmp.out" && { printf 'written\n'; return 0; }
+  rm -f "$tmp" "$tmp.out"; return 1
+}
+
 # g_class_canon <spelling> -> the canonical class NAME
 #   software | service | game | research | fleet
 # The taxonomy is five domain-named classes. The letters A-E and the older taught domain names
@@ -421,6 +530,77 @@ YAML
   [ "$got" = ".goblin/state.json," ] || { g_err "list: got '$got'"; rc=1; }
   got=$(g_yaml_disabled "$tmp/g.yaml" | tr '\n' ',')
   [ "$got" = "spec,tokens," ] || { g_err "disabled: got '$got'"; rc=1; }
+
+  # ---- the v2 AGENTS.md frontmatter engine (the same RED control, new file) ----
+  cat > "$tmp/AGENTS.md" <<'EOF'
+# AGENTS.md
+
+House rules the agent reads. The block below is machine-read.
+
+<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->
+class: software
+branch: main
+archive: false
+owner_email: team@example.com
+disabled: [spec, tokens]
+ratchet.name: hex
+ratchet.ceiling: 160
+gate_typecheck_cmd: npx tsc --noEmit
+gate_commit_cmd: git rev-parse --verify --quiet HEAD
+<!-- gob:end -->
+
+Body prose continues here. A line like `class: decoy` outside the block must stay
+invisible to the parser.
+EOF
+  printf 'class: decoy\n' >> "$tmp/AGENTS.md"
+  got=$(g_agents_read "$tmp/AGENTS.md" class)
+  [ "$got" = "software" ] || { g_err "agents scalar: expected software, got '$got'"; rc=1; }
+  got=$(g_agents_read "$tmp/AGENTS.md" nosuchkey)
+  [ -z "$got" ] || { g_err "agents scalar: absent key should be empty, got '$got'"; rc=1; }
+  got=$(g_agents_read "$tmp/AGENTS.md" ratchet.ceiling)
+  [ "$got" = "160" ] || { g_err "agents dotted key: expected 160, got '$got'"; rc=1; }
+  got=$(g_agents_read "$tmp/AGENTS.md" ratchet.name)
+  [ "$got" = "hex" ] || { g_err "agents dotted key: expected hex, got '$got'"; rc=1; }
+  got=$(g_agents_gates "$tmp/AGENTS.md" | tr '\t' ':')
+  [ "$got" = "typecheck:npx tsc --noEmit
+commit:git rev-parse --verify --quiet HEAD" ] \
+    || { g_err "agents gates: got '$got'"; rc=1; }
+  got=$(g_agents_gate_names "$tmp/AGENTS.md" | tr '\n' ',')
+  [ "$got" = "typecheck,commit," ] || { g_err "agents gate-names: got '$got'"; rc=1; }
+  got=$(g_agents_list "$tmp/AGENTS.md" disabled | tr '\n' ',')
+  [ "$got" = "spec,tokens," ] || { g_err "agents list: got '$got'"; rc=1; }
+  got=$(g_agents_keys "$tmp/AGENTS.md" | head -n 1)
+  [ "$got" = "class" ] || { g_err "agents keys: got '$got'"; rc=1; }
+  # g_agents_write: stdin IS the whole new block (key<TAB>value lines); it rewrites
+  # ONLY the block and preserves the body. Idempotent on a second identical write.
+  {
+    printf '%s\tsoftware\n' class
+    printf '%s\tmain\n' branch
+    printf '%s\t42\n' max_dirty
+  } | g_agents_write "$tmp/AGENTS.md" >/dev/null
+  grep -q '^max_dirty: 42$' "$tmp/AGENTS.md" || { g_err "agents write: the new key is absent"; rc=1; }
+  grep -qF 'Body prose continues here' "$tmp/AGENTS.md" \
+    || { g_err "agents write: the body was not preserved"; rc=1; }
+  grep -qF 'class: decoy' "$tmp/AGENTS.md" \
+    || { g_err "agents write: the body below the block was not preserved"; rc=1; }
+  W1=$(g_agents_read "$tmp/AGENTS.md" class)
+  [ "$W1" = "software" ] || { g_err "agents write: the block was destroyed ($W1)"; rc=1; }
+  {
+    printf '%s\tsoftware\n' class
+    printf '%s\tmain\n' branch
+    printf '%s\t42\n' max_dirty
+  } | g_agents_write "$tmp/AGENTS.md" > "$tmp/w2"
+  grep -q unchanged "$tmp/w2" || { g_err "agents write: the second identical write is not a no-op"; rc=1; }
+  # A fresh file: the block is created, and a body-less write stays parseable.
+  printf '%s\ttrue\n' "electron" | g_agents_write "$tmp/fresh.md" >/dev/null
+  [ "$(g_agents_read "$tmp/fresh.md" electron)" = "true" ] \
+    || { g_err "agents write: a fresh file was not created parseable"; rc=1; }
+  # A body-only file: the block is inserted before the first line.
+  printf 'the body\n' > "$tmp/bodyonly.md"
+  printf '%s\tmain\n' "branch" | g_agents_write "$tmp/bodyonly.md" >/dev/null
+  [ "$(g_agents_read "$tmp/bodyonly.md" branch)" = "main" ] \
+    && grep -qx 'the body' "$tmp/bodyonly.md" \
+    || { g_err "agents write: insertion into a body-only file failed"; rc=1; }
 
   rm -rf "$tmp"
   if [ "$rc" -eq 0 ]; then
