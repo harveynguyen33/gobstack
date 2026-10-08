@@ -1,42 +1,42 @@
 id	category	kind	name	source_repo	path_within_repo	has_skill_md	license	stars	last_push	matches	conflicts	requires	install_hint	verdict	reviewed_by	reviewed_date
 taste-skill	frontend	skill	taste-skill	Leonxlnx/taste-skill	.	yes	MIT	93730	2026-10-07	react nextjs vue nuxt frontend ui design	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
-vercel-agent-skills	frontend	skill	vercel-labs agent skills (react pack)	vercel-labs/agent-skills	skills/	pack	none (verify per-skill)	32078	2026-08-28	react nextjs frontend ui design	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
+vercel-agent-skills	frontend	skill	vercel-labs agent skills (react pack)	vercel-labs/agent-skills	skills/	skill	none (verify per-skill)	32078	2026-08-28	react nextjs frontend ui design	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
 anthropic-frontend-design	frontend	skill	frontend-design (anthropics/skills)	anthropics/skills	frontend-design	yes	none (verify per-skill)	180150	2026-10-05	frontend ui react vue design	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
-vuejs-skills	frontend	skill	vuejs-ai skills (vue 3 pack)	vuejs-ai/skills	skills/	pack	MIT	2889	2026-05-30	vue nuxt frontend	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
-ux-ui-agent-skills	frontend	skill	ux-ui agent skills (design tokens, WCAG)	plugin87/ux-ui-agent-skills	skills/	pack	MIT	1551	2026-10-08	frontend ui design accessibility	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
-impeccable	frontend	skill	impeccable (design language)	pbakaus/impeccable	.claude/	pack	Apache-2.0	78552	2026-10-07	frontend ui design	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
+vuejs-skills	frontend	skill	vuejs-ai skills (vue 3 pack)	vuejs-ai/skills	skills/	skill	MIT	2889	2026-05-30	vue nuxt frontend	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
+ux-ui-agent-skills	frontend	skill	ux-ui agent skills (design tokens, WCAG)	plugin87/ux-ui-agent-skills	skills/	skill	MIT	1551	2026-10-08	frontend ui design accessibility	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
+impeccable	frontend	skill	impeccable (design language)	pbakaus/impeccable	.claude/	skill	Apache-2.0	78552	2026-10-07	frontend ui design	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
 playwright-mcp	testing	mcp	Playwright MCP (Microsoft, official)	microsoft/playwright-mcp	-	no	Apache-2.0	37929	2026-10-08	playwright e2e testing browser automation	-	node >= 18	npx @playwright/mcp@latest	RECOMMEND	harvey	2026-10-08
 chrome-devtools-mcp	testing	mcp	Chrome DevTools MCP (official)	ChromeDevTools/chrome-devtools-mcp	-	no	Apache-2.0	53117	2026-10-08	browser debugging cdp e2e performance	-	node >= 18	npx chrome-devtools-mcp@latest	RECOMMEND	harvey	2026-10-08
 playwright-skill	testing	skill	playwright-skill (no MCP registration)	lackeyjb/playwright-skill	.	yes	MIT	3180	2026-10-01	playwright e2e testing	-	playwright installed	copy-folder	RECOMMEND	harvey	2026-10-08
 webapp-testing	testing	skill	webapp-testing (anthropics/skills)	anthropics/skills	webapp-testing	yes	none (verify per-skill)	180150	2026-10-05	e2e testing browser playwright	-	playwright installed	copy-folder	RECOMMEND	harvey	2026-10-08
 godot-ai	game	mcp	Godot AI (hi-godot)	hi-godot/godot-ai	-	no	MIT	2862	2026-10-08	godot game	-	see repo README	see repo README	RECOMMEND	harvey	2026-10-08
 godot-mcp	game	mcp	Godot MCP (community default)	Coding-Solo/godot-mcp	-	no	MIT	5976	2026-04-16	godot game	godot-ai	see repo README	see repo README	RECOMMEND	harvey	2026-10-08
-godotprompter	game	skill	GodotPrompter (66 godot skills)	jame581/GodotPrompter	skills/	pack	MIT	798	2026-10-06	godot game	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
+godotprompter	game	skill	GodotPrompter (66 godot skills)	jame581/GodotPrompter	skills/	skill	MIT	798	2026-10-06	godot game	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
 unity-mcp	game	mcp	Unity MCP (CoplayDev)	CoplayDev/unity-mcp	-	no	MIT	14767	2026-10-07	unity game	-	unity editor + see repo README	see repo README	RECOMMEND	harvey	2026-10-08
-awesome-gamedev-skills	game	skill	awesome gamedev agent skills (74 skills, harvest source)	gamedev-skills/awesome-gamedev-agent-skills	skills/	pack	Apache-2.0	1365	2026-09-27	game godot unity unreal phaser threejs bevy pygame	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
-supabase-agent-skills	node	skill	Supabase agent skills (official)	supabase/agent-skills	skills/	pack	MIT	2708	2026-10-02	node backend supabase database auth	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
+awesome-gamedev-skills	game	skill	awesome gamedev agent skills (74 skills, harvest source)	gamedev-skills/awesome-gamedev-agent-skills	skills/	skill	Apache-2.0	1365	2026-09-27	game godot unity unreal phaser threejs bevy pygame	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
+supabase-agent-skills	node	skill	Supabase agent skills (official)	supabase/agent-skills	skills/	skill	MIT	2708	2026-10-02	node backend supabase database auth	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
 pg-aiguide	node	mcp	pg-aiguide (Timescale, postgres)	timescale/pg-aiguide	-	no	Apache-2.0	1860	2026-10-07	node postgres database backend	-	see repo README	see repo README	RECOMMEND	harvey	2026-10-08
-hono-skills	node	skill	Hono agent skills (official)	honojs/skills	skills/	pack	MIT	13	2026-10-08	node hono backend api	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
+hono-skills	node	skill	Hono agent skills (official)	honojs/skills	skills/	skill	MIT	13	2026-10-08	node hono backend api	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
 superdesign-skill	frontend	skill	superdesign-skill (design iteration loop)	superdesigndev/superdesign-skill	.	yes	MIT	633	2026-08-21	frontend ui design	taste-skill vercel-agent-skills	none	copy-folder	MAYBE	harvey	2026-10-08
-garden-skills	frontend	skill	garden-skills (collection, harvest source)	ConardLi/garden-skills	skills/	pack	MIT	12771	2026-07-12	frontend ui design	-	none	copy-folder	MAYBE	harvey	2026-10-08
+garden-skills	frontend	skill	garden-skills (collection, harvest source)	ConardLi/garden-skills	skills/	skill	MIT	12771	2026-07-12	frontend ui design	-	none	copy-folder	MAYBE	harvey	2026-10-08
 dev-browser	testing	skill	dev-browser (general web browser skill)	SawyerHood/dev-browser	.	yes	MIT	6656	2026-09-05	browser e2e testing	playwright-mcp	none	copy-folder	MAYBE	harvey	2026-10-08
 currents-playwright-best-practices	testing	skill	playwright best practices (Currents.dev)	currents-dev/playwright-best-practices-skill	.	yes	MIT	393	2026-07-21	playwright e2e testing	testdino-playwright-skill	none	copy-folder	MAYBE	harvey	2026-10-08
 testdino-playwright-skill	testing	skill	playwright best practices (TestDino)	testdino-hq/playwright-skill	.	yes	MIT	389	2026-09-06	playwright e2e testing	currents-playwright-best-practices	none	copy-folder	MAYBE	harvey	2026-10-08
 unity-mcp-alt	game	mcp	Unity-MCP (IvanMurzak, skills + CLI)	IvanMurzak/Unity-MCP	-	no	Apache-2.0	4400	2026-10-04	unity game	unity-mcp	unity editor + see repo README	see repo README	MAYBE	harvey	2026-10-08
-claude-code-game-studios	game	workflow	Claude-Code-Game-Studios (49 agents, 72 skills)	Donchitos/Claude-Code-Game-Studios	.	pack	MIT	25900	2026-10-08	game godot unity	-	none	copy-folder	MAYBE	harvey	2026-10-08
+claude-code-game-studios	game	workflow	Claude-Code-Game-Studios (49 agents, 72 skills)	Donchitos/Claude-Code-Game-Studios	.	skill	MIT	25900	2026-10-08	game godot unity	-	none	copy-folder	MAYBE	harvey	2026-10-08
 godot-ui-integration	game	skill	godot-ui-integration (design to godot UI)	zimo-xiao-zheng/godot-ui-integration	.	yes	MIT	275	2026-08-23	godot game ui	-	none	copy-folder	MAYBE	harvey	2026-10-08
-agent-nestjs-skills	node	skill	NestJS agent skills	Kadajett/agent-nestjs-skills	skills/	pack	none (verify)	289	2026-07-23	node nestjs backend api	-	none	copy-folder	MAYBE	harvey	2026-10-08
-openapi-to-skills	node	skill	openapi-to-skills (spec to skills generator)	neutree-ai/openapi-to-skills	.	pack	Apache-2.0	342	2026-06-23	node api openapi	-	none	copy-folder	MAYBE	harvey	2026-10-08
-do-app-platform-skills	node	skill	DigitalOcean App Platform skills	digitalocean-labs/do-app-platform-skills	skills/	pack	MIT	37	2026-10-04	node deployment database	-	none	copy-folder	MAYBE	harvey	2026-10-08
-agent-skills-standard	node	skill	agent-skills-standard (per-framework best practice)	HoangNguyen0403/agent-skills-standard	skills/	pack	MIT	572	2026-10-08	node backend typescript	-	none	copy-folder	MAYBE	harvey	2026-10-08
-frontend-design-toolkit	frontend	workflow	Claude-Code-Frontend-Design-Toolkit (list, harvest source)	wilwaldon/Claude-Code-Frontend-Design-Toolkit	.	pack	none	1176	2026-04-11	frontend ui design	-	none	copy-folder	SKIP	harvey	2026-10-08
-nuxt-skills	frontend	skill	nuxt-skills (vue/nuxt/nuxthub)	onmax/nuxt-skills	skills/	pack	none	719	2026-10-06	vue nuxt frontend	-	none	copy-folder	SKIP	harvey	2026-10-08
+agent-nestjs-skills	node	skill	NestJS agent skills	Kadajett/agent-nestjs-skills	skills/	skill	none (verify)	289	2026-07-23	node nestjs backend api	-	none	copy-folder	MAYBE	harvey	2026-10-08
+openapi-to-skills	node	skill	openapi-to-skills (spec to skills generator)	neutree-ai/openapi-to-skills	.	skill	Apache-2.0	342	2026-06-23	node api openapi	-	none	copy-folder	MAYBE	harvey	2026-10-08
+do-app-platform-skills	node	skill	DigitalOcean App Platform skills	digitalocean-labs/do-app-platform-skills	skills/	skill	MIT	37	2026-10-04	node deployment database	-	none	copy-folder	MAYBE	harvey	2026-10-08
+agent-skills-standard	node	skill	agent-skills-standard (per-framework best practice)	HoangNguyen0403/agent-skills-standard	skills/	skill	MIT	572	2026-10-08	node backend typescript	-	none	copy-folder	MAYBE	harvey	2026-10-08
+frontend-design-toolkit	frontend	workflow	Claude-Code-Frontend-Design-Toolkit (list, harvest source)	wilwaldon/Claude-Code-Frontend-Design-Toolkit	.	skill	none	1176	2026-04-11	frontend ui design	-	none	copy-folder	SKIP	harvey	2026-10-08
+nuxt-skills	frontend	skill	nuxt-skills (vue/nuxt/nuxthub)	onmax/nuxt-skills	skills/	skill	none	719	2026-10-06	vue nuxt frontend	-	none	copy-folder	SKIP	harvey	2026-10-08
 design-audit	frontend	skill	design-audit (UI/UX checklist)	wonjyou/design-audit	.	yes	none	8	2026-03-28	frontend ui design	-	none	copy-folder	SKIP	harvey	2026-10-08
 vibe-coded-website-review	frontend	skill	vibe-coded-website-review (YC design review)	zuocharles/vibe-coded-website-review	.	yes	none	0	2026-03-29	frontend ui design	-	none	copy-folder	SKIP	harvey	2026-10-08
-qa-skills	testing	workflow	qa-skills (e2e generation pipeline)	neonwatty/qa-skills	.	pack	MIT	33	2026-05-03	e2e testing	-	none	copy-folder	SKIP	harvey	2026-10-08
-agentmantis-test-skills	testing	skill	test-skills (playwright e2e pack)	agentmantis/test-skills	skills/	pack	MIT	12	2026-04-08	playwright e2e testing	-	none	copy-folder	SKIP	harvey	2026-10-08
+qa-skills	testing	workflow	qa-skills (e2e generation pipeline)	neonwatty/qa-skills	.	skill	MIT	33	2026-05-03	e2e testing	-	none	copy-folder	SKIP	harvey	2026-10-08
+agentmantis-test-skills	testing	skill	test-skills (playwright e2e pack)	agentmantis/test-skills	skills/	skill	MIT	12	2026-04-08	playwright e2e testing	-	none	copy-folder	SKIP	harvey	2026-10-08
 invisible-playwright-mcp	testing	mcp	invisible_playwright_mcp (anti-detect)	feder-cr/invisible_playwright_mcp	-	no	none	2660	2026-10-08	browser e2e playwright	-	see repo README	see repo README	SKIP	harvey	2026-10-08
 mcp-unity	game	mcp	mcp-unity (CoderGamester, superseded)	CoderGamester/mcp-unity	-	no	MIT	1922	2026-09-03	unity game	unity-mcp	unity editor + see repo README	see repo README	SKIP	harvey	2026-10-08
 godot-mcp-native	game	mcp	Godot-MCP-Native (duplicate function)	yurineko73/Godot-MCP-Native	-	no	MIT	836	2026-08-03	godot game	godot-mcp	see repo README	see repo README	SKIP	harvey	2026-10-08
-fastify-skills	node	skill	fastify-skills (undocumented)	TheCodePace/fastify-skills	skills/	pack	none	12	2026-10-08	node fastify backend	-	none	copy-folder	SKIP	harvey	2026-10-08
+fastify-skills	node	skill	fastify-skills (undocumented)	TheCodePace/fastify-skills	skills/	skill	none	12	2026-10-08	node fastify backend	-	none	copy-folder	SKIP	harvey	2026-10-08
 drizzle-orm-skill	node	skill	drizzle-orm-skill (no credible alternative exists)	oldirty/drizzle-orm-skill	.	yes	none	0	2026-02-24	node drizzle orm database	-	none	copy-folder	SKIP	harvey	2026-10-08
