@@ -30,7 +30,7 @@
 # `git revert` of this command's own two commits (W3-SPEC §5).
 set -uo pipefail
 
-GOBLIN_UPGRADE_VERSION="0.5.0"
+GOBLIN_UPGRADE_VERSION="0.6.0-alpha.1"
 
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 

@@ -123,12 +123,12 @@ check "no shipped doc or skill claims a fresh install is not automatically green
   "$([ -z "$FALSE_CLAIM" ] && echo 0 || echo 1)"
 
 # The three prose docs and the shipped bootstrap skill must carry the measured line; the other
-# shipped skills do not discuss a verify run and are not required to. W6 neutral-first: the
-# measured green path is the DEFAULT install's (skills opt-in, 38/0/11/33) — the pre-W6 default
-# measured 43/0/11/28 and its copies are gone.
+# shipped skills do not discuss a verify run and are not required to. v2: the measured green
+# path is the DEFAULT install's (37/0/11/34 — the CI payload is gone, so PG-06 SKIPs where it
+# passed vacuously; before that W6 neutral-first moved 43/0/11/28 -> 38/0/11/33).
 GREEN_CLAIM=""
 for f in README.md docs/CONTRACTS.md docs/ADOPTION.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '38 passed, 0 failed, 11 advisory, 33 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '37 passed, 0 failed, 11 advisory, 34 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, CONTRACTS, ADOPTION and the shipped bootstrap skill state the measured green path" \
@@ -143,26 +143,30 @@ for f in README.md docs/GUIDE.md; do
   norm_text "$f" | grep -q 'agent skills are opt-in'
   check "$f states agent skills are opt-in (W6 neutral-first)" "$?"
 done
-norm_text README.md | grep -q 'gob sync --platform'
-check "README names gob sync --platform as the opt-in path (wizard v2 renamed the verb)" "$?"
-norm_text README.md | grep -qE 'gob emit .{0,4}platform <p> is the same'
-check "README states gob emit is the same command under its original name (wizard v2)" "$?"
-# The wizard's step order: seven screens (wizard v2 added the ci step and renamed emit to
-# sync). The doc sentence and this pin move together.
-norm_text README.md | grep -q 'detect . class . identity . health check . ci . sync . done'
-check "README states the wizard's 7-step order (wizard v2)" "$?"
-norm_text docs/GUIDE.md | grep -q 'health check, class,'
-check "docs/GUIDE.md names the health-check screen first (wizard v2)" "$?"
-norm_text docs/GUIDE.md | grep -q 'the ci opt-in, which platforms to sync'
-check "docs/GUIDE.md names the ci screen and the sync rename (wizard v2)" "$?"
-# The ci default-no shape: the wizard's unanswered default is an explicit no (nothing under
-# .github/ without consent); the installer flag's own default stays the class contract.
-norm_text README.md | grep -q 'the ci step defaults to no'
-check "README states the ci default (no unless opted in) (wizard v2)" "$?"
-norm_text docs/GUIDE.md | grep -q 'nothing lands under .github/ unless you opt in'
-check "docs/GUIDE.md states the ci default (no unless opted in) (wizard v2)" "$?"
-norm_text docs/GUIDE.md | grep -q 'no is recorded as an opt-out'
-check "docs/GUIDE.md states the explicit no is a recorded opt-out (wizard v2)" "$?"
+# v2: the per-platform sync surface is UNWIRED. The docs name it as a later alpha, never as a
+# working verb — the shim refuses emit/sync today (t-shim SH1), and a doc teaching it would
+# send a reader into exit 2.
+SYNC_TAUGHT=""
+for f in README.md docs/GUIDE.md; do
+  norm_text "$f" | grep -qE 'gob (sync|emit) --platform' && SYNC_TAUGHT="$SYNC_TAUGHT $f"
+done
+[ -z "$SYNC_TAUGHT" ] || note "still teaches the unwired sync verb:$SYNC_TAUGHT"
+check "no doc teaches gob sync/emit as a working verb (v2: the surface is unwired)" \
+  "$([ -z "$SYNC_TAUGHT" ] && echo 0 || echo 1)"
+norm_text README.md | grep -q 'the per-platform emit surface returns in a later alpha'
+check "README states the emit surface is a later alpha (v2 unwired)" "$?"
+# v2 installs no CI: no doc may teach a ci opt-in that does not exist, and the absence must be
+# STATED (the strongest form of the old default-no pin).
+norm_text README.md | grep -q 'not a ci product: nothing is installed under .github/'
+check "README states the no-CI contract (v2)" "$?"
+norm_text docs/GUIDE.md | grep -q 'v2 installs no ci'
+check "docs/GUIDE.md states the no-CI contract (v2)" "$?"
+CI_TAUGHT=""
+for f in README.md docs/GUIDE.md; do
+  norm_text "$f" | grep -qE 'ci[- ]gate|--ci-gate|workflows/goblin-gate' && CI_TAUGHT="$CI_TAUGHT $f"
+done
+[ -z "$CI_TAUGHT" ] || note "still teaches a ci opt-in:$CI_TAUGHT"
+check "no doc teaches a ci opt-in (v2: CI is out of the product)" "$([ -z "$CI_TAUGHT" ] && echo 0 || echo 1)"
 # The stale claim, normalised like every matcher above: 'install' as subject of copying skills.
 STALE_INSTALL_SKILLS=""
 for f in README.md docs/GUIDE.md docs/CONTRACTS.md docs/ADOPTION.md; do
@@ -172,9 +176,6 @@ done
 [ -z "$STALE_INSTALL_SKILLS" ] || note "still claims the install copies skills:$STALE_INSTALL_SKILLS"
 check "no user-facing doc claims the install copies skills by default (W6 neutral-first)" \
   "$([ -z "$STALE_INSTALL_SKILLS" ] && echo 0 || echo 1)"
-# The contracts doc documents the migration contract (an upgrade keeps recorded skills).
-norm_text docs/CONTRACTS.md | grep -q 'skills: yes keeps them'
-check "docs/CONTRACTS.md states the upgrade-keeps-recorded-skills contract (W6 neutral-first)" "$?"
 
 # ---- W4-A: the CI lane's blind spots are stated where a run will see them --------------------
 # The lane's own finding is that a workflow file is not a gate: GitHub reports a SKIPPED job as
@@ -195,13 +196,15 @@ check "docs/CI.md carries the Electron perf deviation, both metrics named" "$?"
 
 # ---- W4-B / W6: the class matrix is rendered from manifest/classes.tsv ------------------------
 # The part/class table is where a reader decides what a class owes, so it is the one place a class
-# can rot in silence: the row set moved to `ci-gate R/-/O/-/O/R` at W4, and W6 merged the sixth
-# (desktop/F) class into `software` - five domain-named columns now, with A-E as read-time aliases.
-# The tsv is one row per (class, part) pair - `class<TAB>part<TAB>need` - and the doc renders a
-# missing part as an em dash, so normalise. docs/ADOPTION.md's matrix is prose ("SPEC before
-# change", "Design tokens"), so it is checked for its COLUMNS, not cell by cell.
+# can rot in silence. W6 merged the sixth (desktop/F) class into `software` - five domain-named
+# columns now, with A-E as read-time aliases. The tsv is one row per (class, part) pair -
+# `class<TAB>part<TAB>need` - and the doc renders a missing part as an em dash, so normalise.
+# v2: the `ci-gate` rows stay in the tsv as the recorded W4 remnant (every class `-`, CI is out of
+# the product), and the DOC intentionally renders no ci-gate row — its absence IS the statement,
+# made in prose right under the table. So the loop walks the tsv parts MINUS ci-gate, and the
+# prose note is pinned separately below.
 CLASS_DRIFT=""
-CLS=$(awk -F'\t' 'NR>1 { if (!seen[$2]++) print $2 }' manifest/classes.tsv)
+CLS=$(awk -F'\t' 'NR>1 { if (!seen[$2]++) print $2 }' manifest/classes.tsv | grep -v '^ci-gate$')
 for part in $CLS; do
   want=$(for c in software service game research fleet; do
            need=$(awk -F'\t' -v c="$c" -v p="$part" '$1==c && $2==p { print $3 }' manifest/classes.tsv)
@@ -214,6 +217,12 @@ done
 [ -z "$CLASS_DRIFT" ] || note "class matrix drifted from manifest/classes.tsv:$CLASS_DRIFT"
 check "docs/ENFORCEMENT.md renders the class matrix from manifest/classes.tsv (W4-B)" \
   "$([ -z "$CLASS_DRIFT" ] && echo 0 || echo 1)"
+# The ci-gate remnant is pinned BOTH ways: every class off in the tsv, and the doc says why the
+# row is not rendered (so the absence reads as a decision, not a rendering gap).
+[ "$(awk -F'\t' '$2=="ci-gate" { print $3 }' manifest/classes.tsv | sort -u | tr -d '\n')" = "-" ]
+check "manifest/classes.tsv carries ci-gate as off for EVERY class (the v2 remnant shape)" "$?"
+grep -q 'ci-gate' docs/ENFORCEMENT.md && grep -q 'v2 installs no CI' docs/ENFORCEMENT.md
+check "  and the doc states in prose why ci-gate renders no row (v2 installs no CI)" "$?"
 # W6 review guard: the matrix loop above iterates the tsv's PARTS, so it cannot see a re-added
 # CLASS - a silently restored sixth class passed the whole suite. Pin the class SET itself.
 CLS_SET=$(awk -F'\t' 'NR>1 { if (!seen[$1]++) print $1 }' manifest/classes.tsv | sort | tr '\n' ' ')
@@ -226,10 +235,17 @@ grep -q '^| \*\*software\*\* (A) |' docs/ADOPTION.md
 check "docs/ADOPTION.md names the software class (W6: the F class merged in)" "$?"
 grep -qi 'electron opt-in' docs/ADOPTION.md
 check "  and states the electron opt-in that replaced the sixth class (W6)" "$?"
-grep -qi '^| CI lane |' docs/ADOPTION.md
-check "  and gives it a CI-lane row in the preset matrix" "$?"
-grep -q 'docs/CI.md' README.md
-check "README's document table names the CI lane (W4-B)" "$?"
+# W4-B, v2: the CI lane is OUT of the product — no workflow is written, docs/CI.md is a LIMITS
+# candidate, not a promise in the doc table, and ADOPTION's preset matrix carries no CI-lane row.
+# The controls assert the ABSENCE (the W4-B pin as it now reads) plus the LIMITS note that keeps
+# the decision from looking like an accident, and the verifier footer still says what the old
+# lane could not see (the prose survives even though the lane does not).
+! grep -q 'docs/CI.md' README.md
+check "README's document table does NOT promise a CI doc (v2: CI is out of the product)" "$?"
+! grep -qi '^| CI lane |' docs/ADOPTION.md
+check "  and the preset matrix carries no CI-lane row (the part is off for every class)" "$?"
+grep -q 'docs/CI.md' docs/LIMITS.md
+check "  and docs/LIMITS.md records CI.md as a v2 LIMITS candidate" "$?"
 
 # ---- W6: desktop/F is a legacy ALIAS, never a class a reader picks ----------------------------
 # W6 merged the sixth (desktop/F) class into software — their classes.tsv need columns were
@@ -344,8 +360,8 @@ grep -q '@techgoblin/gobstack' README.md
 check "README names the npm package @techgoblin/gobstack (W5-D)" "$?"
 grep -q 'npm install -g @techgoblin/gobstack' README.md
 check "  and states the npm install path (npm install -g @techgoblin/gobstack)" "$?"
-grep -q 'gob install' README.md
-check "  and names gob install as the npm CLI's install command (W5-D)" "$?"
+grep -q 'gob init' README.md
+check "  and names gob init as the npm CLI's install command (W5-D, the v2 surface)" "$?"
 if grep -q 'bin/goblin-install' README.md; then
   note "FAIL README still presents bin/goblin-install as an install instruction (W5-D)"
   fail=1
@@ -365,8 +381,8 @@ fi
 # is gone: npm is the only route it gives, in §2, §3, §10 and the appendix.
 grep -q 'npm i -g @techgoblin/gobstack' docs/GUIDE.md
 check "docs/GUIDE.md names the npm route (W5-D)" "$?"
-grep -q 'gob install --target . --class software' docs/GUIDE.md
-check "  and gives the npm CLI's Step-1 command (W5-D)" "$?"
+grep -q 'gob init --write' docs/GUIDE.md
+check "  and gives the npm CLI's Step-1 command (W5-D, the v2 init path)" "$?"
 if grep -q 'bin/goblin-install' docs/GUIDE.md || grep -qi 'route b' docs/GUIDE.md \
    || grep -qF '"$GS' docs/GUIDE.md; then
   note "FAIL docs/GUIDE.md still carries route-B / clone-install text (W5-D)"
@@ -417,15 +433,15 @@ done
 # rows stay opt-in through the feature_map: declaration — generating a map never forces
 # the rows on. Each asserted sentence is the pin for its own edit; the generator
 # behaviour itself is t-map.sh and the shim's SH9.
-norm_text README.md | grep -q 'gob map | generate a starter feature map for this repo (standalone; no install needed)'
-check "README's command table carries the gob map row (standalone)" "$?"
-norm_text README.md | grep -q 'never clobbers . an existing map refuses until --force , which regenerates the index only'
+norm_text README.md | grep -q 'gob map . the feature-map prompt . schema'
+check "README's command table carries the gob map row" "$?"
+norm_text README.md | grep -q 'never clobbers . an existing map refuses until --force'
 check "README's gob map row states the never-clobber contract" "$?"
 norm_text docs/GUIDE.md | grep -q 'feature maps: generate with gob map , then opt in'
 check "docs/GUIDE.md has the feature-map section" "$?"
-norm_text docs/GUIDE.md | grep -q 'no .goblin/ install, no goblin.yaml'
-check "the GUIDE section states the standalone contract (no install, no goblin.yaml)" "$?"
-norm_text docs/GUIDE.md | grep -q 'that declaration is the ci/verify opt-in, never forced'
+norm_text docs/GUIDE.md | grep -q 'no install needed'
+check "the GUIDE section states the standalone contract (no install)" "$?"
+norm_text docs/GUIDE.md | grep -q 'that declaration is the verify opt-in, never forced'
 check "the GUIDE section states FM-01/FM-02 stay opt-in (the declaration decides)" "$?"
 norm_text docs/GUIDE.md | grep -q 'verified: never-driven'
 check "the GUIDE section teaches the never-driven verified form is not a drive claim" "$?"

@@ -3,7 +3,7 @@
 A step-by-step guide for your first week. **Read this before the README.** The README tells you
 what the pieces are; this tells you what to *do*, in order, and what you should see when it works.
 
-Version: `0.5.0` · Last measured: 2026-10-05 · Every command and every output below was run on a
+Version: `0.6.0-alpha.1` · Last measured: 2026-10-08 · Every command and every output below was run on a
 real repository while writing this guide.
 
 ---
@@ -38,16 +38,16 @@ installed, three things change:
 
 - A file called `HANDOFF.md` sits at the root. It is the note from the last session to the next one.
   Any agent — or you, a month later — reads it first.
-- A command called `goblin-verify` exists in that project. Run it and it checks the project against
-  a table of rules and prints `PASS` / `FAIL` / `SKIP` for each one.
-- The rules table is a real file (`.goblin/manifest/enforcement.tsv`). Every row either names a
-  command that can fail, or is labelled `advisory`. **Nothing in between.** That is what stops the
-  rules turning into decoration.
+- A command called `goblin-verify` exists in that project (vendored at `.gob/bin/`). Run it and it
+  checks the project against a table of rules and prints `PASS` / `FAIL` / `SKIP` for each one.
+- The config and the rules table are real files: the config is the `<!-- gob:begin --> …
+  <!-- gob:end -->` block at the top of `AGENTS.md`, and the rules table is
+  `.gob/manifest/enforcement.tsv`. Every row either names a command that can fail, or is labelled
+  `advisory`. **Nothing in between.** That is what stops the rules turning into decoration.
 
 It is not a framework, not a service, and not a runtime. It has no server and no dependencies
 beyond `bash`, `git`, `awk`, `sed`, `grep` and `python3`. It makes **no network call at verify
-time** — the one command in the toolbox that reaches the network is `goblin-audit`, which you run
-deliberately, and §8 and §11 say why.
+time** — nothing in the v2 surface touches the network at all.
 
 ### The one idea worth holding onto
 
@@ -60,7 +60,7 @@ ships a file of things it *cannot* check (`docs/LIMITS.md`).
 
 **Words this guide uses** — gate, ratchet, class, part, replay and the rest are defined in one
 sentence each in `docs/GLOSSARY.md` (rendered from the glossary table the install ships:
-`.goblin/manifest/glossary.tsv`).
+`.gob/manifest/glossary.tsv`).
 
 ---
 
@@ -76,9 +76,14 @@ sentence each in `docs/GLOSSARY.md` (rendered from the glossary table the instal
 
 You need node ≥ 18 (for the npm shim only), beyond the row above.
 
-**You do *not* need:** network access at verify time, or an agent running.
+**You do *not* need:** network access at verify time, or an agent running — though the `init`
+brief is written for an agent to answer, you can fill the proposal in by hand.
 
 **Get gobstack:**
+
+    npx @techgoblin/gobstack init     # the one-shot path; installs nothing globally
+
+or, if you want the CLI on your PATH:
 
     npm i -g @techgoblin/gobstack
 
@@ -93,48 +98,55 @@ scripts.
 **Do not install into a real project yet.** You want to see what it does before it touches
 something you care about.
 
-The guided path is `gob init` — one screen per question (health check, class,
-identity (branch/email), the health check, the CI opt-in, which platforms to sync), every question also
-answerable by flag, `--dry-run` to see the plan first:
+The v2 flow is **`init`**: it prints an AGENT BRIEF (what to scan, what to decide) plus the
+schema of the proposal file, the agent (or you) writes the proposal, and `--write` validates it
+and installs:
 
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
     git init -b main
     git config user.email "you@example.com"
     git config user.name "you"
 
-    gob init --target . --class software --branch main --email "you@example.com" \
-        --gate "bash tests/run-tests.sh" --yes
+    gob init --heuristic                 # the brief + schema; --heuristic adds scanned hints
 
-The wizard's ci step asks whether the gate should also run in CI
-(`.github/workflows/goblin-gate.yml`). The wizard's default is **no** — nothing lands under `.github/` unless you opt in. (Outside the wizard, `gob install`'s own default is the class decides: a class whose
-contract requires or permits the ci-gate part gets the workflow, one that forbids it never does.)
-`--ci-gate yes|no` overrides: an explicit `no` is recorded as an opt-out (so verify reports the
-opt-out, never a silent absence), and an explicit `yes` is refused for a class that forbids the
-part.
+The brief asks for exactly four decisions — class, branch, owner email, and ONE gate command
+that proves the repo is healthy. Write them into the proposal file (the brief names the schema;
+a hand-written one works fine):
 
-or the plain installer this wizard drives, if you prefer the one-shot shape:
+    <!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->
+    class: software
+    branch: main
+    owner_email: you@example.com
+    gate_check_cmd: bash tests/run-tests.sh
+    <!-- gob:end -->
 
-    gob install --target . --class software
+    ## gob init summary
+
+    - scan: bare repo, no package.json — the brief was answered by hand
+    - chose: class software, branch main, gate `bash tests/run-tests.sh`
+
+then install it:
+
+    gob init --write .gob-init-proposal.md --yes
 
 Expected output (this is a real transcript, trimmed):
 
-    created 24 · updated 0 · unchanged 0 · skipped 0
-    recorded opt-out: ci-gate
+    created 23 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
-      2. .goblin/bin/goblin-verify   # or add .goblin/bin to PATH
-      3. edit .goblin/goblin.yaml: replace the default gate with your real commands (P8 step 3)
-      4. agent skills are opt-in: gob sync --platform <p>   # hermes, claude, copilot, cursor, opencode, codex, gemini
+      2. .gob/bin/goblin-verify   # or add .gob/bin to PATH
+      3. edit AGENTS.md: replace the default gate with your real commands (P8 step 3)
+      4. agent skills are opt-in (the per-platform emit surface returns in a later alpha)
 
-**`created 24`** is the installer's count of the files it **tracks** — one fewer than the plain
-installer's 25, because the wizard's unanswered ci screen defaults to an explicit **no**, which is
-recorded as an opt-out and suppresses `.github/workflows/goblin-gate.yml`. It writes **25**: the
-25th is `.goblin/installed.json`, the record it keeps for itself, which it writes but does not
-count. It has written nothing outside this directory. The default install ships **no agent
-skills** — the harness is neutral, and `gob sync --platform <p>` is the per-platform opt-in
-(`gob emit` is the same command under its original name; the old `--skills yes` default is
-still there for repos that want the Hermes project tier vendored).
+**`created 23`** is the installer's count of the files it **tracks**. It writes **24**: the 24th
+is `.gob/installed.json`, the record it keeps for itself, which it writes but does not count. It
+has written nothing outside this directory — and nothing under `.github/`: **v2 installs no
+CI, ever.** The default install ships **no agent skills** — the harness is neutral.
+
+**The config is the AGENTS.md frontmatter.** There is no separate config file: every key the
+harness reads lives in the `<!-- gob:begin --> … <!-- gob:end -->` marker block at the top of
+`AGENTS.md`. Edit it in place; the parser reads only that block.
 
 ### Why `git init -b main` matters
 
@@ -144,8 +156,8 @@ branch is `master` and the config says `main`, verify fails on the very first ru
     FAIL  PT-02  declared main, actual master
 
 That is not a bug — it is the harness refusing to guess, which is the same reason it fails instead
-of silently skipping a repo whose branch it got wrong. **Fix it in step 3, not by renaming your
-branch** (unless you want to).
+of silently skipping a repo whose branch it got wrong. **Fix it in the AGENTS.md block, not by
+renaming your branch** (unless you want to).
 
 ---
 
@@ -153,20 +165,19 @@ branch** (unless you want to).
 
     cd /tmp/gs-try
     git add -A && git commit -m "chore: install gobstack"
-    .goblin/bin/goblin-verify
+    .gob/bin/goblin-verify
 
 You will see one line per rule. The shape:
 
     PASS  IN-01  the install record exists and names its version
     PASS  IN-02  15 installed files hashed
     FAIL  HP-05  HANDOFF.md names no commit that exists in this repo
-    FAIL  GT-02  gate commit: bash tests/run-tests.sh -> exit 127
     SKIP  HS-02  no pinned pre-change commit yet - the REPLAY is not provable
     ADV   HP-04  A stale sentence is corrected in place... (advisory)
 
 and a summary line at the bottom:
 
-    35 passed, 2 failed, 11 advisory, 34 skipped     # HP-05 and GT-02, below
+    36 passed, 1 failed, 11 advisory, 34 skipped     # HP-05, below
 
 ### How to read that output
 
@@ -178,28 +189,28 @@ and a summary line at the bottom:
 | `ADV` | advisory — a rule with no runnable check, **counted** | nothing, but know it is not enforced |
 
 **`SKIP` is not success and not failure.** It is the harness telling you the truth: "this rule has
-nothing to read yet." On a brand-new install, two dozen rows skip — because there is no `src/` for a
+nothing to read yet." On a brand-new install, three dozen rows skip — because there is no `src/` for a
 ban to scan, no feature map, no loop record, no pinned pre-change commit. That is correct on day
 one. The list of what is still skipping *is* your onboarding checklist.
 
 ### Feature maps: generate with `gob map`, then opt in
 
-The feature-map rows (`FM-01`, `FM-02`) are opt-in by declaration: while `feature_map:` in
-`.goblin/goblin.yaml` is empty, both rows SKIP. When you are ready to keep a map honest, the flow
+The feature-map rows (`FM-01`, `FM-02`) are opt-in by declaration: while `feature_map:` in the
+AGENTS.md gob block is empty, both rows SKIP. When you are ready to keep a map honest, the flow
 is:
 
-1. **Generate a starter.** `gob map` works in any git repo — no `.goblin/` install, no goblin.yaml.
-   It scans the repo (Next.js app/pages router, Nuxt, route files, or top-level `src/`/`lib/`
+1. **Generate a starter.** `gob map --heuristic` works in any git repo — no install needed. It
+   scans the repo (Next.js app/pages router, Nuxt, route files, or top-level `src/`/`lib/`
    module dirs as TODO placeholders) and writes `features/README.md` plus one file per detected
    feature. It never clobbers: an existing `features/` refuses until `--force`, which regenerates
    only the index and adds new slugs — your hand-edited feature files are never rewritten.
 2. **Hand-pass every file.** The generated files say so themselves: a `verified: never-driven
    (generated <date>)` line is not a drive claim. Edit each one into a real feature description
    with concrete entry paths and driving steps.
-3. **Then, optionally, declare it.** Set `feature_map: features/README.md` in `.goblin/goblin.yaml`
-   and `FM-01`/`FM-02` start reading it on every verify — that declaration is the CI/verify opt-in,
-   never forced. A repo that wants the generator but not the rows can run `gob map` and never
-   declare anything.
+3. **Then, optionally, declare it.** Set `feature_map: features/README.md` in the AGENTS.md gob
+   block and `FM-01`/`FM-02` start reading it on every verify — that declaration is the
+   verify opt-in, never forced. A repo that wants the generator but not the rows can run
+   `gob map` and never declare anything.
 
 **Read the failure messages.** They are written to be actionable, not decorative. `HP-05` above is
 telling you the HANDOFF does not yet name a commit — fix it by naming your HEAD in the `State`
@@ -209,17 +220,16 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the wizard ran | `gob init ... --yes` | `31 passed, 6 failed, 11 advisory, 34 skipped` | the install is uncommitted (`CM-03`), `HP-05`, `GT-02` exit 127, and the identity/branch rows if you skipped the flags |
-| 2. the first commit | `git add -A && git commit` | `35 passed, 2 failed, 11 advisory, 34 skipped` | `HP-05` (the placeholder) and `GT-02` |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `36 passed, 1 failed, 11 advisory, 34 skipped` | `GT-02` only |
-| 4. your real gate | edit `gates:` in `.goblin/goblin.yaml` (§5) | `36 passed, 0 failed, ...` | none — green |
+| 1. the install ran | `gob init --write ... --yes` | `35 passed, 2 failed, 11 advisory, 34 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
+| 2. the first commit | `git add -A && git commit` | `36 passed, 1 failed, 11 advisory, 34 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `37 passed, 0 failed, 11 advisory, 34 skipped` | none — green |
 
-Two of those deserve their name spelled out:
+One of those deserves its name spelled out:
 
-- **`GT-02` exit 127 is the guide's own teaching point, not a defect.** The default gate is
-  `bash tests/run-tests.sh`, and a throwaway repo has no `tests/` — the shell's own
-  *command not found*. It stays red until §5's most valuable edit (your real `gates:`) replaces
-  it. The failure line tells you this: `gate commit: bash tests/run-tests.sh -> exit 127`.
+- **`GT-02` exit 127 is the guide's own teaching point, not a defect.** The gate you wrote in the
+  proposal (`bash tests/run-tests.sh`) does not exist in a throwaway repo — the shell's own
+  *command not found*. Replace it with a command that can run (or create the script). The failure
+  line tells you this: `gate check: bash tests/run-tests.sh -> exit 127`.
 - **Step 3 is two steps on purpose.** Naming a real HEAD in `HANDOFF.md` without committing it
   re-reds `CM-03` (`1 dirty entr(y|ies)`) — commit-as-you-go starts on minute one. Edit, commit,
   then verify.
@@ -230,8 +240,8 @@ If you ran step 1 without `-b main`, or with the wrong git identity, you will se
 
 | FAIL | Cause | Fix |
 |---|---|---|
-| `PT-02 declared main, actual master` | branch name mismatch | set `branch:` in `.goblin/goblin.yaml` |
-| `CM-01` (commit identity) | the repo's commit email ≠ the declared `owner_email:` | set `owner_email:` in the config |
+| `PT-02 declared main, actual master` | branch name mismatch | set `branch:` in the AGENTS.md gob block |
+| `CM-01` (commit identity) | the repo's commit email ≠ the declared `owner_email:` | set `owner_email:` in the gob block |
 | `HP-05` | `HANDOFF.md` still names the scaffold placeholder `` `0000000` `` | replace it with your real short HEAD |
 
 **All three are configuration, not defects.** The harness is reporting your repo's actual state
@@ -240,33 +250,27 @@ against a declared expectation. That is exactly what you want it to do.
 `HP-05` deserves one sentence more, because it surprises people: the scaffold ships
 `HEAD when this file was written: `0000000``, and `HP-05` **rejects that placeholder on purpose**.
 A file that names a commit which does not exist is worse than one that names none — it looks like a
-record. Commit first, then write the real short SHA in. Measured on this walk: with the placeholder
-left in, verify reports `35 passed, 2 failed`; with the real SHA (and the edit committed),
-`36 passed, 1 failed` — the one FAIL being the `GT-02` exit 127 above.
+record. Commit first, then write the real short SHA in.
 
 ---
 
-## 5. Step 3 — Make it yours: the one config file
+## 5. Step 3 — Make it yours: the one config block
 
-Everything you configure lives in **one file**, created once and then never overwritten:
+Everything you configure lives in **one place**, created once and then never overwritten
+by the installer:
 
-    .goblin/goblin.yaml
+    AGENTS.md   — the `<!-- gob:begin --> ... <!-- gob:end -->` block
 
 Open it. The keys that matter on day one:
 
-    class: software                       # software|service|game|research|fleet (A-E are aliases) - what kind of project this is (step 6)
+    class: software                       # software|service|game|research|fleet (A-E are aliases)
     branch: main                          # DECLARED, never assumed
     owner_email: you@example.com          # the commit identity this repo expects
     practice: /path/to/your-standard.md   # optional: your own house rules, hash-pinned
     models_file: /path/to/fleet-model.yaml # the ONE machine-specific input
+    gate_<name>_cmd: <one command>        # YOUR real commands, one line each
 
-    gates:                                # <- replace these with YOUR real commands
-      - name: commit
-        cmd: git rev-parse --verify --quiet HEAD
-      - name: todo_ceiling
-        cmd: test "$(grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' . | wc -l)" -le 160
-
-**The single most valuable edit you will make:** replace the default `gates:` with the commands you
+**The single most valuable edit you will make:** replace the gate line(s) with the commands you
 actually run to know your project is healthy. `tsc --noEmit`, `npm run build`, your test command —
 whichever three or four you would run before saying "this is fine."
 
@@ -278,7 +282,7 @@ without you remembering to. And the gate numbers are recorded with a date, so a 
 
 If you already have a house standard — a `CONTRIBUTING.md`, a `PROJECT-PRACTICE.md`, anything
 written down — point `practice:` at it. gobstack does **not** copy its text. It records a
-**hash** of the file and re-checks that hash on every verify.
+**hash** of the file (`practice_sha256:`) and re-checks that hash on every verify.
 
 That buys you one specific, valuable thing: **if someone edits your standard, every project that
 pins it goes red.** You find out immediately instead of discovering six months later that half your
@@ -288,8 +292,8 @@ When *you* legitimately edit your own standard:
 
     gob install --target . --re-pin
 
-It re-records the hash and prints the old and new value. Nothing re-pins automatically — an
-edited standard is never a silent no-op.
+It re-records the hash and prints the old and new value. Nothing re-pins automatically — not even
+a re-install — an edited standard is never a silent no-op.
 
 ---
 
@@ -313,10 +317,10 @@ gate, not a sixth class. The old `F` letter still resolves there as an install a
 
 - A repo that holds *output* while the code lives elsewhere → **research**, not **software**. Gating
   it like an application gates the wrong artifact.
-- A plain input directory that is not a build target → **research** with `--archive`, which tells
+- A plain input directory that is not a build target → **research** with `archive: true`, which tells
   verify to expect no HANDOFF and no gates, and to say so.
 
-Switch class later by editing `class:` in the config and re-running install. The parts you no longer
+Switch class later by editing `class:` in the gob block and re-running install. The parts you no longer
 need are recorded as **disabled** and will report `SKIP (opt-out)` rather than failing.
 
 ---
@@ -343,7 +347,7 @@ Step by step:
     # 2. make your change, committing in small steps
 
     # 3. run the gate
-    .goblin/bin/goblin-verify
+    .gob/bin/goblin-verify
 
     # 4. write the handoff: state / gates / next steps / NOT verified
 
@@ -364,16 +368,16 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the **16 files it
-tracks** — not the 8 it `owns` (including `.goblin/goblin.yaml`, which §5 has you editing) and not
-`.goblin/installed.json`; edit one of the 16 — the exercise below uses `.goblin/bans/README.md`.
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 15 files it
+tracks — not the ones it `owns` (including `AGENTS.md`, whose gob block §5 has you editing) and not
+`.gob/installed.json`; edit one of the tracked — the exercise below uses `.gob/bans/README.md`.
 
     # REPLAY-BEGIN (this exact block is run by tests/t-doc-guide.sh - keep the two copies identical)
-    .goblin/bin/goblin-verify --only IN-02                 # expect PASS
-    printf '\n<!-- a deliberate edit -->\n' >> .goblin/bans/README.md
-    .goblin/bin/goblin-verify --only IN-02                 # expect FAIL
-    git stash push -- .goblin/bans/README.md               # path-limited: your own edits stay put
-    .goblin/bin/goblin-verify --only IN-02                 # expect PASS
+    .gob/bin/goblin-verify --only IN-02                    # expect PASS
+    printf '\n<!-- a deliberate edit -->\n' >> .gob/bans/README.md
+    .gob/bin/goblin-verify --only IN-02                    # expect FAIL
+    git stash push -- .gob/bans/README.md                  # path-limited: your own edits stay put
+    .gob/bin/goblin-verify --only IN-02                    # expect PASS
     git stash drop                                         # the break was deliberate: discard it
     # REPLAY-END
 
@@ -382,10 +386,10 @@ That is the whole habit — the change you *undo* is a deliberate break, not a f
 measures the shipped files rather than your work.
 
 `GT-02` is the row most readers reach for first, and it will **not** work as a REPLAY demo on the
-shipped configuration: it runs the gates you declared (`commit`, `todo_ceiling`), and stashing a
+shipped configuration: it runs the gates you declared, and stashing a
 local change does not change either command's exit status — so it prints `PASS` before and after,
 which is exactly the "green on both trees" result this rule exists to kill. REPLAY a gate of your
-own the same way, once that gate is real: declare it in `.goblin/goblin.yaml` and stash a change it
+own the same way, once that gate is real: declare it in the gob block and stash a change it
 can see.
 
 A check that is green on **both** the broken and the fixed tree proves nothing — it would have been
@@ -396,7 +400,7 @@ caught every real regression in this repository's own development history.
 
 ## 8. Step 6 — The daily loop, once you are settled
 
-Day to day, the harness should fade into four habits:
+Day to day, the harness should fade into three habits:
 
 **Starting work** — read `HANDOFF.md` first. It tells you the state, the gates, what is next, and —
 most importantly — **what is *not* verified**. Never trust a claim in it without running the
@@ -407,15 +411,7 @@ the harness nudges you to land things as they work rather than in one heroic com
 
 **Finishing** — update `HANDOFF.md`, then:
 
-    .goblin/bin/goblin-verify && git add -A && git commit -m "..."
-
-**Every so often** — audit your own claims against the artifact:
-
-    .goblin/bin/goblin-audit
-
-This is the *only* step that touches the network (rule `SC-07`), and it is deliberate: it is how a
-recorded claim ("this dependency is fine") gets checked against reality ("this dependency has a
-known advisory").
+    .gob/bin/goblin-verify && git add -A && git commit -m "..."
 
 ### Keeping `HANDOFF.md` honest
 
@@ -449,18 +445,18 @@ the next session.
 
 ## 9. What to expect on day one (so you do not misread it)
 
-A software-class install through the wizard lands on a specific shape. Two of the first reds are
-the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4), and
-`GT-02`, the default gate pointing at a test script a throwaway repo does not have. The walk in §4
-measured, step by step:
+A software-class install lands on a specific shape. The first reds are
+the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
+walk in §4 measured, step by step:
 
-    31 passed, 6 failed, 11 advisory, 34 skipped     # straight after the wizard, nothing committed
-    35 passed, 2 failed, 11 advisory, 34 skipped     # first commit: HP-05 and GT-02 left
-    36 passed, 1 failed, 11 advisory, 34 skipped     # real HEAD named and committed: GT-02 left
+    35 passed, 2 failed, 11 advisory, 34 skipped     # straight after the install (CM-03 + SP-02)
+    36 passed, 1 failed, 11 advisory, 34 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
+    37 passed, 0 failed, 11 advisory, 34 skipped     # real HEAD named and committed: green
 
-Name a real commit in `HANDOFF.md`, commit, and give `gates:` real commands (§5), and it is green:
+Name a real commit in `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is
+green:
 
-    36 passed, 0 failed, 11 advisory, 34 skipped     (on a real project; your numbers will differ)
+    37 passed, 0 failed, 11 advisory, 34 skipped     (on a real project; your numbers will differ)
 
 **Thirty-four rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
@@ -486,9 +482,9 @@ Two readings that are easy to get wrong:
 | Symptom | What it means | What to do |
 |---|---|---|
 | `refused to overwrite: HANDOFF.md`, exit 1 | your repo already had a HANDOFF | **do not `--force`** — reconcile it (below) |
-| `PT-02 declared main, actual master` | branch mismatch | set `branch:` in the config |
+| `PT-02 declared main, actual master` | branch mismatch | set `branch:` in the gob block |
 | `IN-02 ... practice EDITED` | someone changed the pinned standard | re-pin deliberately: `--re-pin` |
-| `gob install: unknown subcommand` (exit 2) | you ran a bare `gob install` without the npm package installed | install the npm package first: `npm i -g @techgoblin/gobstack`, then `gob install` |
+| `gob: unrecognized command: <verb>` (exit 2) | you ran a verb outside the v2 surface (`audit`, `doctor`, `emit`, `sync`, `upgrade`, `install`) | use the five wired verbs: `init`, `map`, `verify`, `bans`, `uninstall` — the unwired surface returns in a later alpha |
 | `IN-03` fails, "manifest is broken" | a row has a broken check column | fix the row; this is a source defect, not yours |
 | a `FAIL` you believe is wrong | the check may be weak, or your belief may be | run `--only <id>` and read the command it prints |
 | a changelog or matrix note says `W6` or `Z1-4` | that is a revision wave code | `docs/RECORD-NOTES.md` is the legend, one line per code |
@@ -498,37 +494,15 @@ replaces your project's own record with a blank scaffold — the exact act the r
 prevent. Reconcile instead: keep your file, and add the five sections it is missing. The measured
 cost of that edit, on a real 2450-line handoff, was **15 lines added, none removed**.
 
-**One engine, many repos:** the rule table does not have to live in every repo. A repo can
-point at a shared engine with one line in `.goblin/goblin.yaml`:
-
-    engine_dir: ~/.goblin/engine          # absolute or ~/-prefixed; absent = per-repo engine
-
-Declared but unusable (relative path, missing directory, no manifest inside) is verify **exit 2
-with no fallback** — a repo is never judged by an engine it did not declare. A repo whose record
-says `mode=global` keeps hashing whatever files it still holds; the engine's own identity prints in
-every run's footer (`engine: mode=… cli_sha256=… enforcement_tsv_sha256=…`). The same commands are
-available outside any repo through the npm CLI: `gob verify` / `gob bans` / `gob audit` /
-`gob doctor` / `gob sync` / `gob upgrade` / `gob --version`.
-
-**Migrating a repo to the global engine:**
-
-    gob upgrade            # 8 steps, two commits, one report
-
-It refuses on a dirty tree, a detached HEAD, a red repo, or a global engine holding different
-bytes — each refusal names the fix. What it does: verifies every recorded hash, lands the engine
-at `~/.goblin/engine` (or `--engine-dir <dir>`) from this repo's own verified bytes, commits the
-declaration + record rewrite + `checks/gate.sh` + CI re-point (commit A), proves the repo green
-with both engines present, then `git rm`s exactly the 18 engine files (commit B) and proves green
-again. Nothing is deleted before the engine is safely landed and the tree is green mid-sequence.
-
-**Rolling back a migration** — the two commits are pure git operations:
-
-    git revert <commit-A-sha> <commit-B-sha>
-
-reverses byte-for-byte: the vendored payload returns, the record drops its `engine:` block, and
-`gob verify` is the 43-green it was before. A second `gob upgrade` on a migrated repo is a
-no-op; `goblin-install` onto one refuses with the revert remedy (re-installing would re-shadow the
-engine and silently de-migrate the record).
+**One engine, many repos (declared, not wired in this alpha):** the rule table can live outside
+the repo — a declared `engine_dir:` line in the gob block names a shared engine. In v2 the
+**vendored engine wins by design**: a repo carrying both `.gob/` and an `engine_dir:` judges
+itself with the vendored manifest, because that is the manifest its install record hashes
+(`docs/LIMITS.md` #54). A declared but unusable `engine_dir:` is verify **exit 2 with no
+fallback** — a repo is never judged by an engine it did not declare. The engine's own identity
+prints in every run's footer (`engine: mode=vendored cli_sha256=… enforcement_tsv_sha256=…`). The
+same commands are available outside any repo through the npm CLI: `gob init` / `gob map` /
+`gob verify` / `gob bans` / `gob --version`.
 
 **Two exit-code contracts worth knowing:**
 
@@ -536,8 +510,7 @@ engine and silently de-migrate the record).
 |---|---|
 | `goblin-install` | `0` ok · `1` a refusal (with the path and the fix) · `2` bad input |
 | `goblin-verify` | `0` all checks passed · `1` a check failed · `2` could not run · `3` the manifest itself is broken |
-| `goblin` (npm CLI) | propagates the subcommand's codes verbatim — `verify`/`bans`/`audit`/`--version`; `install`/`uninstall`/`re-pin`/`upgrade` route into `goblin-install` (`upgrade` migrates to the global engine: `0` ok · `1` refusal · `2` bad input); `doctor`/`emit` carry the same contract: `doctor` exits `0` every probed platform DETECTED and clean · `1` any DRIFT · `2` nothing to probe, and `emit` exits `0` ok or no-op · `1` refusal (with the path and the fix) · `2` bad input or unknown platform; `sync` is the same verb renamed and propagates identically |
-| platforms (W4b) | `emit`/`doctor` cover seven: `claude`, `hermes`, `copilot`, `cursor`, `opencode`, `codex`, `gemini` — each detected via its own anchor (`~/.claude`, `~/.hermes`, `~/.copilot`, `~/.cursor`, `~/.config/opencode`, `~/.codex`, `~/.gemini`); codex and gemini carry `partial` command-blocking (see LIMITS #47) |
+| `gob` (npm CLI) | propagates the subcommand's codes verbatim; a verb outside the surface (`audit`/`doctor`/`emit`/`sync`/`upgrade`/`install`) is refused with exit 2 and the usage |
 
 `3` is the one to notice: it means gobstack's own rule table is malformed, not your project.
 
@@ -547,14 +520,13 @@ engine and silently de-migrate the record).
 
 ### Commands
 
-    gob install --target <dir> --class <software|service|game|research|fleet> [options]
-    gob install --target <dir> --uninstall
-    gob install --target <dir> --re-pin
-    gob install --target <dir> --upgrade
+    gob init [--heuristic] [--write <proposal>] [--target <dir>] [--dry-run] [--yes]
+    gob map [--heuristic [target]] [--write <dir>] [--force]
 
-    .goblin/bin/goblin-verify [--only <id[,id...]>] [--json] [--list]
-    .goblin/bin/goblin-audit        # the only network step
-    .goblin/bin/goblin-bans         # run the ban list
+    .gob/bin/goblin-verify [--only <id[,id...]>] [--json] [--list]
+    .gob/bin/goblin-bans           # run the ban list
+    gob install --target <dir> --uninstall   # the uninstall job
+    gob install --target <dir> --re-pin      # the deliberate re-pin
     bin/goblin-model <role>        # checkout-only; resolve a role to a profile (docs/ROLES.md)
 
 ### The 15 playbooks
@@ -584,7 +556,7 @@ Named procedures, installed as project-local skills. Each has a measurable verif
 | File | Read it for |
 |---|---|
 | `docs/DESIGN.md` | the thesis and every rejected alternative |
-| `docs/GLOSSARY.md` | every term of art in one table (rendered from `.goblin/manifest/glossary.tsv`) |
+| `docs/GLOSSARY.md` | every term of art in one table (rendered from `.gob/manifest/glossary.tsv`) |
 | `docs/RECORD-NOTES.md` | the wave codes the changelog uses, one line each |
 | `docs/FLOWS.md` | the playbooks in full, with reasons |
 | `docs/ENFORCEMENT.md` | the rule matrix, rendered for a human |
@@ -592,7 +564,7 @@ Named procedures, installed as project-local skills. Each has a measurable verif
 | `docs/RISKS.md` | the risk register and non-goals |
 | `docs/CONTRACTS.md` | exact interface, exit codes, uninstall |
 | `docs/ADOPTION.md` | classes, presets, adoption order |
-| `docs/CI.md`, `docs/LOOP.md`, `docs/GUARDRAILS.md` | the newer lanes |
+| `docs/LOOP.md`, `docs/GUARDRAILS.md` | the newer lanes |
 
 ---
 
@@ -611,64 +583,63 @@ Stated plainly, because a guide that oversells its tool is worse than no guide:
 - **It is not a product.** It is a repository of files, installed into other repositories.
   No service, no daemon, no support contract.
 
-The current status, if you want the honest number: a separate review pass verified the artifact at
-**9/10** (that was 0.4.2), and the point it withheld was not a missing feature — it was sentences
-in the record that a measurement contradicted. `docs/LIMITS.md` is the list of what the harness
-cannot see.
-
 ---
 
 ## 13. Where to go next
 
-**If you only do one thing:** install into your most active repo today, set your real `gates:`, and
-run `goblin-verify` once a day for a week. The habit, not the tool, is what produces the result.
+**If you only do one thing:** install into your most active repo today, set your real gate
+commands, and run `goblin-verify` once a day for a week. The habit, not the tool, is what produces
+the result.
 
 **Then, in order:**
 
 1. Point `practice:` at your existing house standard and pin it.
 2. Write one `AC:` item that a script could check, and make it pass.
 3. Add a ban for the one pattern you are tired of seeing in agent-written code
-   (`.goblin/manifest/bans.tsv` — a ban without a mechanism is a wish, so give it one).
+   (`.gob/manifest/bans.tsv` — a ban without a mechanism is a wish, so give it one).
 4. When you have a bug that a test could catch, walk P5 (`goblin-tdd-repro`) end to end once.
 
-**If you are sharing this with a team:** the parts that matter are `HANDOFF.md`, the `gates:` you
-declare, and the REPLAY habit. The rest is optional machinery you can switch off per class. Lead
-with *"prove it was broken first"* — it is the one practice that survives contact with a deadline.
+**If you are sharing this with a team:** the parts that matter are `HANDOFF.md`, the gate commands
+you declare, and the REPLAY habit. The rest is optional machinery you can switch off per class.
+Lead with *"prove it was broken first"* — it is the one practice that survives contact with a
+deadline.
 
 ---
 
 ## Appendix — a 45-minute first run, on one page
 
     # 0. get it
-    npm i -g @techgoblin/gobstack
+    npx @techgoblin/gobstack init          # or: npm i -g @techgoblin/gobstack
 
     # 1. try it somewhere disposable
     mkdir -p /tmp/gs-try && cd /tmp/gs-try
     git init -b main
-    gob install --target . --class software              # expect: created 25 (no skills — those are gob sync)
+    gob init --heuristic                   # the brief + schema; answer it in a proposal file
+    gob init --write .gob-init-proposal.md --yes
+                                           # expect: created 23 (no skills — those are opt-in)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"
-    .goblin/bin/goblin-verify                                # expect: mostly PASS, some SKIP
+    .gob/bin/goblin-verify                 # expect: mostly PASS, some SKIP
 
     # 3. make it yours
-    $EDITOR .goblin/goblin.yaml     # branch, owner_email, and YOUR real gates:
+    $EDITOR AGENTS.md               # branch, owner_email, and YOUR real gate commands (the gob block)
 
     # 4. prove a check can fail (the habit that matters) - the same block §7 runs
     # REPLAY-BEGIN (this exact block is run by tests/t-doc-guide.sh - keep the two copies identical)
-    .goblin/bin/goblin-verify --only IN-02                 # expect PASS
-    printf '\n<!-- a deliberate edit -->\n' >> .goblin/bans/README.md
-    .goblin/bin/goblin-verify --only IN-02                 # expect FAIL
-    git stash push -- .goblin/bans/README.md               # path-limited: your own edits stay put
-    .goblin/bin/goblin-verify --only IN-02                 # expect PASS
+    .gob/bin/goblin-verify --only IN-02                    # expect PASS
+    printf '\n<!-- a deliberate edit -->\n' >> .gob/bans/README.md
+    .gob/bin/goblin-verify --only IN-02                    # expect FAIL
+    git stash push -- .gob/bans/README.md                  # path-limited: your own edits stay put
+    .gob/bin/goblin-verify --only IN-02                    # expect PASS
     git stash drop                                         # the break was deliberate: discard it
     # REPLAY-END
 
     # 5. do it for real, in a repo you care about
     cd ~/projects/your-project
-    gob install --target . --class software
+    gob init --write .gob-init-proposal.md --yes
     git add -A && git commit -m "chore: adopt gobstack"
-    .goblin/bin/goblin-verify
+    .gob/bin/goblin-verify
     $EDITOR HANDOFF.md              # state / gates (dated!) / next / NOT verified
 
 ---

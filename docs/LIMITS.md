@@ -607,3 +607,28 @@ the Node the gates ran under.
     repo gets the merge's declaration-time host-gate check only after hand-adding `electron: true`;
     its bans and host gate keep running either way, so nothing fails closed, and the CLI keeps
     accepting `desktop`/`F` as aliases.
+
+54. **The vendored engine wins over a global `engine_dir` by design, and in v2 that is the
+    whole story.** The resolution chain (goblin-verify §"engine resolution") puts
+    `$ROOT/.gob/...` at stage 2 and a declared `engine_dir:` at stage 3, so a repo carrying
+    BOTH judges itself with the vendored manifest — the thing `IN-02` hashes — and never with
+    the global one. That is not a leftover: the pre-v2 hazard (a machine-level upgrade
+    silently re-judging repos through a shadowing global engine) is closed the same way the
+    pin closes silent re-pinning — the rules a repo is judged by must be the rules its own
+    install record hashes, and any change to them is a diff the repo owner reviews. The
+    corresponding suite (`t-engine-dir.sh`) is deleted with the v2 surface cut rather than
+    migrated: v2 has no `upgrade` command to move a global engine under a repo, and the
+    global-engine lane itself is session-2/3 scope — when it returns it returns re-measured
+    against the AGENTS.md frontmatter shape.
+
+55. **CI is out of the v2 product, and `docs/CI.md` is its LIMITS candidate, not a kept promise.**
+    v2 installs nothing under `.github/` — the `ci-gate` part carries `-` for every class in
+    `manifest/classes.tsv` (kept as the recorded W4 remnant), `PG-05`/`PG-06` SKIP with no
+    workflow to read, and no flag configures the lane. The file that carried the lane's contract
+    (`docs/CI.md`: the four forge settings that make a workflow a gate, the Electron perf
+    deviation) still exists in the checkout as REFERENCE — the argument it makes ("a required
+    check that reports Success after skipping its gate is a green light for a commit whose gate
+    never ran") is about CI in general and survives the cut — but no document the README's table
+    promises sends a reader there, and the lane returns with the CI surface in a later alpha or
+    not at all. What this admits: the verifier's "cannot see" footer still names the CI lane's
+    blind spots, for the day the lane comes back re-measured.

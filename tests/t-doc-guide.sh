@@ -12,19 +12,18 @@
 #       `# expect PASS|FAIL` annotation promises - verdict AND exit code. At d5424be the exercise
 #       promised a FAIL from `--only GT-02` that the shipped configuration cannot produce
 #       (measured: PASS rc 0), i.e. the guide taught the lesson backwards.
-#   D4  `created 25` is the installer's count of the files it TRACKS (W6 neutral-first: the
-#       DEFAULT install is skills=no — was `created 50`/51 with the Hermes tier vendored); it
-#       writes 26, because `.goblin/installed.json` is written but not counted. The number in
-#       the guide is checked against a real install and the gloss must say which file the
-#       counter omits.
+#   D4  `created 23` is the installer's count of the files it TRACKS (the v2 neutral-first
+#       default install is skills=no); it writes 24, because `.gob/installed.json` is written
+#       but not counted. The number in the guide is checked against a real install and the
+#       gloss must say which file the counter omits.
 #   D5  §1's network claim must be scoped the way every other copy of it is (GUARDRAILS: "No
 #       network at verify time"; README/CONTRACTS: under "Dependencies").
 #   §3/§9  the guide's own reproducible numbers, re-measured here on a fresh class-A install: the
-#       `created 25` line, the day-one line (`37 passed, 1 failed, 11 advisory, 33 skipped`) and the
-#       green-path line (`38 passed, 0 failed, 11 advisory, 33 skipped`) — the W6 neutral-first
-#       shapes (skills opt-in moved the pass count 43 -> 38 and the skip count 28 -> 33; before
-#       that the skipped count had moved 24 -> 28 when the four P15 rows landed). A number no run
-#       prints is the defect this half exists to catch.
+#       `created 23` line, the day-one line (`36 passed, 1 failed, 11 advisory, 34 skipped`) and the
+#       green-path line (`37 passed, 0 failed, 11 advisory, 34 skipped`) — the v2 shapes (the CI
+#       payload is gone, so PG-06 SKIPs where it passed vacuously: pass 38 -> 37, skip 33 -> 34;
+#       before that skills opt-in moved the pass count 43 -> 38 and the skip count 28 -> 33). A
+#       number no run prints is the defect this half exists to catch.
 #   AB3 §8's rule sentence names HOW MANY files `IN-02` covers, and §11 states a review score. The
 #       sentence said "hashes every file the installer wrote" - measured false (the installer writes
 #       51, the row's `files` map is 41), so the reader's counterexample file drifted nothing. The
@@ -142,17 +141,17 @@ fi
 # one-file delta and says which file the counter omits). Both counts are asserted against real
 # runs: the installer's here, the wizard's in t-doc-guide-init.sh.
 ONDISK=$(find . -path ./.git -prune -o -type f -print | wc -l)
-# W6 neutral-first: the DEFAULT install is skills=no, so the write set is the neutral harness
-# (26 files: 16 tracked + .goblin/installed.json + 8 owned + .gitignore) — was 51 with skills.
-[ "$ONDISK" = "26" ]
-check "a default class-A install writes 26 files, no skills (measured here: $ONDISK; created $CREATED)" "$?"
+# v2 neutral-first: the DEFAULT install is skills=no and ships no CI, so the write set is the
+# neutral harness (24 files: 15 tracked + .gob/installed.json + 7 owned + .gitignore).
+[ "$ONDISK" = "24" ]
+check "a default class-A install writes 24 files, no skills (measured here: $ONDISK; created $CREATED)" "$?"
 check "  and the guide quotes the plain installer's own count (created $CREATED)" \
-  "$(printf '%s' "$CREATED" | grep -qE '^25$' && echo 0 || echo 1)"
-grep -qF "created 24 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
-check "  and the guide's walked-path transcript is the wizard's created-24 line" "$?"
+  "$(printf '%s' "$CREATED" | grep -qE '^23$' && echo 0 || echo 1)"
+grep -qF "created 23 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
+check "  and the guide's walked-path transcript is the installer's created-23 line" "$?"
 ! grep -q 'means it wrote 50 files' "$GUIDE"
 check "  and the false gloss ('created 50 means it wrote 50 files') is gone (D4)" "$?"
-GLOSS_LINE=$(grep -n "created 24" "$GUIDE" | head -1 | cut -d: -f1)
+GLOSS_LINE=$(grep -n "created 23" "$GUIDE" | head -1 | cut -d: -f1)
 if [ -n "$GLOSS_LINE" ] && sed -n "${GLOSS_LINE},$((GLOSS_LINE + 12))p" "$GUIDE" | grep -q 'installed\.json'; then
   note "ok   the gloss names the file the counter does not count (.goblin/installed.json)"
 else
@@ -174,7 +173,7 @@ fi
 # reader sees is not the string the file holds. That is the same defeat-the-control-by-emphasis trap
 # t-doc-sync's F2-9 matcher documents.
 NORMTXT=$(sed 's/[*_`]/ /g' "$GUIDE" | tr '\n' ' ' | tr -s '[:space:]' ' ')
-FILESMAP=$(awk '/^  "files": \{/{f=1;next} f&&/^  \},$/{f=0} f&&/^    "/{n++} END{print n+0}' .goblin/installed.json)
+FILESMAP=$(awk '/^  "files": \{/{f=1;next} f&&/^  \},$/{f=0} f&&/^    "/{n++} END{print n+0}' .gob/installed.json)
 QUOTED=$(sed -n 's/.*hashes the [^0-9]*\([0-9][0-9]*\) files.*/\1/p' "$GUIDE" | head -1)
 check "the guide quotes the files-map length a real install writes ($QUOTED quoted vs $FILESMAP measured)" \
   "$([ -n "$QUOTED" ] && [ "$QUOTED" = "$FILESMAP" ] && echo 0 || echo 1)"
@@ -186,11 +185,16 @@ else
 fi
 
 # ---- AB3: the stated score must name the revision it describes ---------------------------------
-# §11 presented a previous revision's **9/10** as "the current status" in a file stamped with the
-# current version, so the next pass makes it false in silence. A score is a claim about a revision,
-# and the sentence has to carry which one. RED at 58a6fe6 (no revision anywhere near the number).
-awk '/9\/10/ { c = 2 } c > 0 { print; c-- }' "$GUIDE" | grep -qE '0\.4\.[0-9]'
-check "the guide's 9/10 score names the revision it was measured at (AB3)" "$?"
+# §12 previously presented a previous revision's **9/10** as "the current status". The v2 guide
+# carries no score at all — a score is a claim about a revision, and the honest v2 statement is
+# the LIMITS pointer. The control asserts the score stays absent-or-attributed: if a score comes
+# back, it must name the revision it was measured at.
+if grep -q '9/10' "$GUIDE"; then
+  awk '/9\/10/ { c = 2 } c > 0 { print; c-- }' "$GUIDE" | grep -qE '[0-9]\.[0-9][0-9]*\.[0-9]'
+  check "the guide's 9/10 score names the revision it was measured at (AB3)" "$?"
+else
+  note "ok   the guide carries no review score to go stale (the v2 shape)"
+fi
 
 # ---- AB4: the guide's own identity stamp must equal VERSION --------------------------------------
 # The `Version:` stamp at the top of the front door is a claim about the file's own identity, and
@@ -202,11 +206,14 @@ check "the guide's 9/10 score names the revision it was measured at (AB3)" "$?"
 # number off the label's line, which is the same trap the AB3 count control fell into above (a
 # matcher that assumes one line is green on a reflowed file it should catch). So the matcher joins
 # the first `Version:` line with the line after it and strips markdown emphasis before it looks for
-# `x.y.z`. It TOLERATES a re-wrapped header and emphasis (`Version: **0.4.4**`); it does NOT
-# tolerate a missing label, or a label whose number sits more than one line below it.
+# the version. It TOLERATES a re-wrapped header and emphasis (`Version: **0.4.4**`); it does NOT
+# tolerate a missing label, or a label whose number sits more than one line below it. The number
+# may carry a prerelease suffix since 0.6.0-alpha.1 (semver), so the match is ERE (`sed -E`) and
+# takes the optional `-<prerelease>` tail whole — a core-only match would read 0.6.0-alpha.1 as
+# 0.6.0 and pass a stamp that is NOT the source of truth.
 STAMP=$(awk '/Version:/{f=1} f{printf "%s ", $0; n++} n>=2{exit}' "$GUIDE" \
         | sed 's/[*_`]/ /g' \
-        | sed -n 's/.*Version:[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+        | sed -E -n 's/.*Version:[^0-9]*([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?).*/\1/p')
 VERSION_FILE=$(cat "$SRC/VERSION")
 check "the guide's own Version: stamp equals VERSION ($STAMP stamped vs $VERSION_FILE in VERSION) (AB4)" \
   "$([ -n "$STAMP" ] && [ "$STAMP" = "$VERSION_FILE" ] && echo 0 || echo 1)"
@@ -225,15 +232,15 @@ check "  and the same paragraph now scopes it to verify time" "$?"
 # The WALKED path is the wizard's (t-doc-guide-init.sh re-measures its 31/6 -> 35/2 -> 36/1
 # shapes against the guide); the plain installer path is re-measured here. The tight set control
 # below accepts BOTH paths' shapes — every line the guide quotes must be one EITHER run printed.
-DAYONE=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$DAYONE" | grep -qE '^37 passed, 1 failed, 11 advisory, 33 skipped$'
+DAYONE=$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
+printf '%s\n' "$DAYONE" | grep -qE '^36 passed, 1 failed, 11 advisory, 34 skipped$'
 check "the day-one run prints the shape the guide documents ($DAYONE)" "$?"
 
 HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
-GREEN=$(HOME="$HOMEDIR" bash .goblin/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$GREEN" | grep -qE '^38 passed, 0 failed, 11 advisory, 33 skipped$'
+GREEN=$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
+printf '%s\n' "$GREEN" | grep -qE '^37 passed, 0 failed, 11 advisory, 34 skipped$'
 check "naming a real commit makes it green ($GREEN)" "$?"
 
 # EVERY summary-shaped line in the guide must be one a real run printed — on this path or the
@@ -250,11 +257,14 @@ check "naming a real commit makes it green ($GREEN)" "$?"
 # and demanding the union in one file would freeze the doc's pedagogy, not its accuracy.)
 SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped' "$GUIDE" \
          | sed -n 's/^[[:space:]]*\([0-9]* passed, [0-9]* failed, [0-9]* advisory, [0-9]* skipped\).*/\1/p' | sort -u)
+# The wizard path's pre-commit shape (`gob init --write` leaves CM-03 + SP-02 red; its first
+# commit is already green because the installer fills the HANDOFF HEAD) is t-doc-guide-init.sh's
+# measurement — the plain installer this file walks never prints it. The guide teaches the wizard
+# path in §8's table, so the set this SUBSET accepts is both paths' union.
 WIZ_SHAPES=$(printf '%s\n' \
-  "31 passed, 6 failed, 11 advisory, 34 skipped" \
   "35 passed, 2 failed, 11 advisory, 34 skipped" \
-  "36 passed, 0 failed, 11 advisory, 34 skipped" \
-  "36 passed, 1 failed, 11 advisory, 34 skipped")
+  "36 passed, 1 failed, 11 advisory, 34 skipped" \
+  "37 passed, 0 failed, 11 advisory, 34 skipped")
 MEASURED=$(printf '%s\n%s\n%s\n' "$DAYONE" "$GREEN" "$WIZ_SHAPES" | sort -u)
 SUBSET=0
 while IFS= read -r s; do
@@ -276,13 +286,13 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
-printf '  # the reader-own edit §5 step 3 leaves behind\n' >> .goblin/goblin.yaml
+printf '  # the reader-own edit §5 step 3 leaves behind\n' >> AGENTS.md
 # The guard is not decoration: with no block extracted there is nothing to run, the edit survives
 # for free, and the assertion would be green on BOTH trees - which is the one thing a control here
 # may never be. Missing block = FAIL.
 if [ -s "$WORK/replay.1" ]; then
   run_replay "$WORK/replay.1" >/dev/null 2>&1
-  grep -q 'the reader-own edit' .goblin/goblin.yaml
+  grep -q 'the reader-own edit' AGENTS.md
   check "the guide's REPLAY exercise leaves the reader's own uncommitted edit in place" "$?"
 else
   note "FAIL no REPLAY block to run: 'your own edits stay put' is asserted by nothing"

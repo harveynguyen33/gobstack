@@ -23,7 +23,7 @@
 #      because an empty record reads to SC-07 as "clean" and that would be a fabricated pass
 set -uo pipefail
 
-GOBLIN_AUDIT_VERSION="0.5.0"
+GOBLIN_AUDIT_VERSION="0.6.0-alpha.1"
 
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 

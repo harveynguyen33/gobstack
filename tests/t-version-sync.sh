@@ -30,24 +30,32 @@ check() { # check <label> <rc>
 
 VERSION=$(cat VERSION 2>/dev/null || true)
 
-# ---- V1: the source of truth is well-formed ------------------------------------------------
-if [ -n "$VERSION" ] && printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+# ---- V1: the source of truth is well-formed (semver, prerelease allowed) --------------------
+# V2's alpha ladder (0.6.0-alpha.1) put a prerelease suffix on VERSION itself, so the old
+# ^[0-9]+\.[0-9]+\.[0-9]+$ core-only shape would have called the source of truth malformed.
+# The shape is semver 2.0.0 now: core, optionally followed by -<prerelease> of dot-separated
+# alphanumeric identifiers (the one ladder this repo has ever used: 0.4.4-beta.N on the
+# package, 0.6.0-alpha.N on the engine).
+if [ -n "$VERSION" ] && printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
   check "V1 VERSION is well-formed ($VERSION)" 0
 else
   check "V1 VERSION is well-formed (got: '${VERSION:-<empty>}')" 1
 fi
 
-# ---- V2: package.json.version shares VERSION's release core (python3, no jq) ----------------
-# The beta ladder (0.4.4-beta.1, commit 16333de) made package.json carry a prerelease suffix the
-# engine's VERSION must not: VERSION stays the ENGINE's one source (the gate line, the verify
-# footer, the bin constants — all 0.4.4), while npm needs a distinct number per beta publish.
-# The invariant that survives both ladders: the package's RELEASE CORE — everything before the
-# first '-' — equals VERSION exactly. A prerelease bump moves only the suffix; a release bump
-# (0.4.5-beta.1 off a 0.4.5 engine) still has to move BOTH files together.
+# ---- V2: package.json.version equals VERSION as a FULL STRING ------------------------------
+# The beta ladder (0.4.4-beta.1, commit 16333de) split the two numbers: VERSION stayed the
+# engine's core while npm got the suffixed ladder, so V2 compared RELEASE CORES (%%-*). The
+# alpha ladder (0.6.0-alpha.1) closes that gap: VERSION itself carries the prerelease, and a
+# core-strip compare would accept 0.7.0-beta.9 in package.json against a 0.6.0 engine — the
+# suffix is no longer the only thing that may differ, so the suffix is no longer ignored.
+# The invariant is byte equality of the whole version strings, both ladders:
+#   beta ladder:  VERSION=0.4.4      package.json=0.4.4-beta.8   -> FULL-STRING would REJECT
+#   (that is why the ladder moved to alpha: one number, one suffix, zero core-strip)
+#   alpha ladder: VERSION=0.6.0-alpha.1  package.json=0.6.0-alpha.1 -> full-string equal, GREEN
+# A prerelease bump moves BOTH files together, always. python3 reads the JSON (no jq).
 PKG_VER=$(python3 -c 'import json;print(json.load(open("package.json"))["version"])' 2>/dev/null || true)
-PKG_CORE=${PKG_VER%%-*}
-check "V2 package.json.version's release core equals VERSION ($PKG_VER vs $VERSION)" \
-  "$([ -n "$PKG_VER" ] && [ "$PKG_CORE" = "$VERSION" ] && echo 0 || echo 1)"
+check "V2 package.json.version equals VERSION byte-for-byte ($PKG_VER vs $VERSION)" \
+  "$([ -n "$PKG_VER" ] && [ "$PKG_VER" = "$VERSION" ] && echo 0 || echo 1)"
 
 # ---- V3: every bin version constant equals VERSION -----------------------------------------
 # Match only the declaration shape, same one the plan pins:  ^GOBLIN_[A-Z_]*_VERSION="x.y.z"

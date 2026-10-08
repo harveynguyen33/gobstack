@@ -32,7 +32,7 @@ disjoint from the author's (`JG-02`).
 ## The model-mapping contract
 
 The machine-specific mapping (`profile → provider/model/effort`) is read at run time from the
-file declared as `models_file:` in `.goblin/goblin.yaml`. That is **the single documented
+file declared as `models_file:` in `.gob/goblin.yaml`. That is **the single documented
 install-time machine input**, and goblin-stack **reads it and never writes it**.
 
 Why not ship a copy of the mapping: the mapping file is a live routing source owned and
@@ -47,10 +47,10 @@ Resolution:
     bin/goblin-model review-panel        # the panel: one line per lane
 
 `bin/goblin-model` is **checkout-only**. `goblin-install` copies four scripts into a target's
-`.goblin/bin/` — `goblin-verify`, `goblin-lib.sh`, `goblin-audit` and `goblin-bans` — so an
-adopted repo has no `goblin-model` command (`ls .goblin/bin/` →
+`.gob/bin/` — `goblin-verify`, `goblin-lib.sh`, `goblin-audit` and `goblin-bans` — so an
+adopted repo has no `goblin-model` command (`ls .gob/bin/` →
 `goblin-audit  goblin-bans  goblin-lib.sh  goblin-verify`). The installed path
-for the same resolution is the `resolve_role_models` helper inside `.goblin/bin/goblin-verify`,
+for the same resolution is the `resolve_role_models` helper inside `.gob/bin/goblin-verify`,
 which is what `MD-02` calls; `bin/goblin-model` exists for a human at a checkout, is covered only
 by `bash -n` in `tests/run-tests.sh`, and has no `enforcement.tsv` row because it enforces
 nothing — it prints. Naming it here is the alternative R6 §2.2 allows to shipping a row for it.
@@ -58,7 +58,7 @@ nothing — it prints. Naming it here is the alternative R6 §2.2 allows to ship
 Absent on this machine, every role resolves to `unknown` and the model-dependent checks report
 advisory. Absent is not an error — goblin-stack is portable, and another machine has no such
 file. That is the one documented exception to the portability rule, and `PT-01` enforces it:
-the path is a config *value* in `.goblin/goblin.yaml`, never a literal inside a rule.
+the path is a config *value* in `.gob/goblin.yaml`, never a literal inside a rule.
 
 ## The fan-out rule: role-pinned work goes through the kanban
 

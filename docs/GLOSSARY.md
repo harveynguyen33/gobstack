@@ -10,7 +10,7 @@ sentence). A term a new reader might trip on belongs here, not in a footnote.
 | archive | A class-D flag: verify requires no HANDOFF and no gates, and the summary says so. | R7 sec.2.4 |
 | class | A project category A-E that selects which parts are required, optional or off. See manifest/classes.tsv. | R7 sec.4 |
 | drift | A file whose current bytes no longer match the hash recorded at install time. IN-02 reports it; the remedy column says how to recover. | UX-review-2026-10-06 |
-| engine | The bash programs plus the manifest a verify run actually resolved: per-repo (.goblin/bin) or global (engine_dir:). Named in every run's footer. | UX-review-2026-10-06 |
+| engine | The bash programs plus the manifest a verify run actually resolved: per-repo (.gob/bin) or global (engine_dir:). Named in every run's footer. | UX-review-2026-10-06 |
 | forge | The hosting platform a repo pushes to (GitHub, GitLab, ...). PG-05 and PG-06 read the workflow text but can never see what the forge itself enforces. | UX-review-2026-10-06 |
 | foreman | The orchestrating agent that delegates work to the fleet; the role that reads HANDOFF.md first and writes it last. | UX-review-2026-10-06 |
 | gate | A declared command that must exit 0. Declared per project, never inferred from the stack. | PP sec.4 |
@@ -18,8 +18,8 @@ sentence). A term a new reader might trip on belongs here, not in a footnote.
 | harness | An asserting check file: a failures counter, an assert(name, ok, detail) printer, and a non-zero exit on failure. | PP sec.3 |
 | judge | A role that decides whether a PROCESS met its own predicate, from a command's output and a pointer it can resolve - never from a report. One lane per verdict; never the author's lane. | docs/LOOP.md |
 | lane | A family of rules that share a mechanism and a blind spot: the ban lane, the judge/loop lane, the CI lane, the reference lane. The cannot-see footer reports per lane. | UX-review-2026-10-06 |
-| loop | One unattended run over a predicate, recorded in the committed .goblin/loop/ (predicate, pin, first-run, budget, one decisions.tsv row per iteration). | docs/LOOP.md |
-| never-relax | The predicate's digest is recorded at loop start and never updates itself; relaxing it is closing this loop and opening another, with the old predicate archived under .goblin/loop/closed-<date>/. | docs/LOOP.md |
+| loop | One unattended run over a predicate, recorded in the committed .gob/loop/ (predicate, pin, first-run, budget, one decisions.tsv row per iteration). | docs/LOOP.md |
+| never-relax | The predicate's digest is recorded at loop start and never updates itself; relaxing it is closing this loop and opening another, with the old predicate archived under .gob/loop/closed-<date>/. | docs/LOOP.md |
 | opt-out | A part recorded in disabled: so its required checks report SKIP (opt-out) instead of failing. | R6 sec.6.3 |
 | overnight | P10: an unattended run over a checkable predicate written before iteration 1. | R6 sec.3 |
 | part | One installable unit a class requires or forbids: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, playbooks, tokens. | R7 sec.5 |

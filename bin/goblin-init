@@ -9,7 +9,7 @@
 #
 # The CLI calls NO AI API. A bare `gob init` prints:
 #   1. the AGENT BRIEF — a structured prompt telling whichever agent is already running
-#      in this repo (Claude Code / Cursor / Copilot / …) exactly what to scan
+#      in this repo (the coding agent the developer already uses) exactly what to scan
 #      (package.json, routes, tests, CI configs) and what to decide (class, branch,
 #      owner email, the first gate command);
 #   2. the SCHEMA of the proposal file the agent must write — AGENTS.md frontmatter
@@ -110,7 +110,7 @@ class: <software|service|game|research|fleet>
 branch: <default branch>
 owner_email: <commit identity>
 gate_<name>_cmd: <one shell command that must stay green>
-sync_platforms: <optional array — [claude, hermes, copilot, cursor, opencode, codex, gemini]>
+sync_platforms: <optional array — the agent platform ids the sync reads>
 <!-- gob:end -->
 
 ## gob init summary

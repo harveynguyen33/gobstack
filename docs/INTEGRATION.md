@@ -78,7 +78,7 @@ test that no shipped skill tells a worker to reach another profile with a bare s
 
 ## The referenced standard
 
-Referenced and hash-pinned, never moved, never superseded, never vendored. `.goblin/goblin.yaml`
+Referenced and hash-pinned, never moved, never superseded, never vendored. `.gob/goblin.yaml`
 carries `practice:` and `practice_sha256:`; `goblin-verify` compares. The `practice` skill's body
 is a pointer and a mandate — read the standard at the configured path before starting work; if
 the path is absent, say so and continue with the goblin-stack rules alone.

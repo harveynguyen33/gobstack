@@ -80,7 +80,7 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 
 - **When:** an unattended run over a predicate
 - **Steps:** 1 the exit condition is a checkable predicate written before iteration 1<br>- 2 it never gets relaxed<br>- 3 an escape hatch: a genuine dead end writes up why and stops<br>- 4 the morning audit reads the Attention section first
-- **Verification:** the predicate is a command, and its first run is recorded before iteration 1 (`LP-01`); the predicate is pinned and never relaxed (`LP-02`); `goal_max_turns` is set and at or under `loop_max_turns_ceiling` (`LP-03`); no three consecutive rows share an evidence pointer without reaching `predicate:green` (`LP-04`); a run that ends without its predicate green carries `.goblin/loop/stuck.md` naming it (`LP-05`); every landed change has a P7 verdict row; a verdict that says `done` cites a handle the repo resolves (`JG-01`) and comes from a lane disjoint from the author's (`JG-02`)
+- **Verification:** the predicate is a command, and its first run is recorded before iteration 1 (`LP-01`); the predicate is pinned and never relaxed (`LP-02`); `goal_max_turns` is set and at or under `loop_max_turns_ceiling` (`LP-03`); no three consecutive rows share an evidence pointer without reaching `predicate:green` (`LP-04`); a run that ends without its predicate green carries `.gob/loop/stuck.md` naming it (`LP-05`); every landed change has a P7 verdict row; a verdict that says `done` cites a handle the repo resolves (`JG-01`) and comes from a lane disjoint from the author's (`JG-02`)
 - **Profiles:** default + coder
 - **Role:** code + judge
 

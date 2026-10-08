@@ -16,10 +16,10 @@ Use when adopting goblin-stack in a repo, or starting one.
    no agent skills. Opt in per platform afterwards with `gob emit --platform <p>` (or vendor the
    Hermes project tier with `--skills yes`).
 3. **`goblin-verify`** — a default software-class install (no agent skills) verifies green:
-   `38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0, once `HANDOFF.md` names a commit that
+   `37 passed, 0 failed, 11 advisory, 34 skipped`, exit 0, once `HANDOFF.md` names a commit that
    exists; before that edit the
    scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`37 passed, 1 failed`).
-   Thirty-three rows skip with a reason, and the reason matters: the five skill rows
+   Thirty-four rows skip with a reason, and the reason matters: the five skill rows
    (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free install records,
    then `HS-02`
    (no pinned pre-change commit yet, so the REPLAY is not provable), `AU-02`/`AU-03` (no report

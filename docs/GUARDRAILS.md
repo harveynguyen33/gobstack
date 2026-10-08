@@ -2,7 +2,7 @@
 
 `manifest/enforcement.tsv` is the machine-readable form; this is the prose for the ten rows it
 gained in v0.2 (`SC-01`..`SC-09`, `PF-01`). Every one of them is **declared** in
-`.goblin/goblin.yaml` under `security:` and `perf:` - a stack-specific rule guessed from the
+`.gob/goblin.yaml` under `security:` and `perf:` - a stack-specific rule guessed from the
 files on disk is how a matrix starts lying, so nothing here infers a stack.
 
 ## The rung ladder, and the rule for choosing a rung
@@ -15,7 +15,7 @@ rung below must be *demonstrably unable* to see it - the reason is recorded in t
 
 1. **No network at verify time.** `docs/RISKS.md` K4: a network call at verify time breaks the
    offline dependency contract. So `SC-07` reads a **recorded** audit; recording is a separate,
-   deliberate command (`.goblin/bin/goblin-audit`). A row that needs the network is not a
+   deliberate command (`.gob/bin/goblin-audit`). A row that needs the network is not a
    verify-time row.
 2. **`enforced_by` is a closed enum** (`script`, `lint`, `gate`, `advisory`) and `check` is one of:
    a real command, the literal `advisory`, or `goblin-verify --only <ID>` for a multi-line body.
@@ -57,14 +57,14 @@ about the thing it was measuring.
 unwaived`), reusing `DS-02`'s annotation pattern, so **the debt is visible on every run** and the
 row can pass while the debt stays loud.
 
-`.goblin/bin/goblin-audit` is the one tool in the toolchain allowed to touch the network, and it
-is not a check: a human runs it, once, deliberately, and commits `.goblin/audit.tsv`. Its exit
+`.gob/bin/goblin-audit` is the one tool in the toolchain allowed to touch the network, and it
+is not a check: a human runs it, once, deliberately, and commits `.gob/audit.tsv`. Its exit
 codes are part of the contract:
 
 | exit | meaning |
 |---|---|
 | 0 | the record was written (clean or not) |
-| 2 | usage, or no `.goblin/goblin.yaml` to read `security.audit_cmd` from |
+| 2 | usage, or no `.gob/goblin.yaml` to read `security.audit_cmd` from |
 | 3 | the class declares no audit command - nothing to run |
 | 4 | the declared command could not run |
 | 5 | the output could not be parsed as an audit report, and it **refuses to write a record**: an empty record reads to `SC-07` as "clean", which would be a fabricated pass |

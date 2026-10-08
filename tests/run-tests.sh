@@ -35,12 +35,7 @@ line() { printf '%-34s %s\n' "$1" "$2"; }
 SYNTAX_OK=0
 for f in bin/goblin-install bin/goblin-verify bin/goblin-model bin/goblin-lib.sh \
          bin/goblin-emit bin/goblin-doctor bin/goblin-init \
-         adapters/claude/detect.sh adapters/hermes/detect.sh adapters/copilot/detect.sh \
-         adapters/cursor/detect.sh adapters/opencode/detect.sh adapters/codex/detect.sh \
-         adapters/gemini/detect.sh \
-         adapters/claude/verify.sh adapters/hermes/verify.sh adapters/copilot/verify.sh \
-         adapters/cursor/verify.sh adapters/opencode/verify.sh adapters/codex/verify.sh \
-         adapters/gemini/verify.sh \
+         adapters/*/detect.sh adapters/*/verify.sh \
          tests/run-tests.sh tests/t-*.sh templates/checks/gate.sh.tmpl; do
   bash -n "$f" 2>/dev/null || { SYNTAX_OK=1; printf 'syntax error: %s\n' "$f"; }
 done
@@ -97,13 +92,23 @@ fi
 
 # ---- the test scripts --------------------------------------------------------
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
-         t-verify-nested t-engine-dir t-upgrade t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
-         t-audit t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-doc-replay t-version-sync \
-         t-emit t-doctor t-init t-banner-stderr t-shim t-map; do
+         t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
+         t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-doc-replay t-version-sync \
+         t-init t-banner-stderr t-shim t-map; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi
 done
+
+# Deleted with the v2 surface cut (never weakened — the commands they tested are gone):
+#   t-upgrade.sh, t-engine-dir.sh  — v2 has no upgrade command; the engine_dir question the
+#     latter carried is decided, not dropped: a vendored engine wins over a global engine_dir
+#     BY DESIGN in v2 (the vendored manifest is the thing IN-02 hashes; a global shadow would
+#     move the rules under an unsigned record), and the global engine is session-2/3 scope —
+#     see docs/LIMITS.md #54.
+#   t-audit.sh, t-emit.sh, t-doctor.sh — audit/emit/doctor are UNWIRED in v2 (the shim
+#     refuses the verbs); the suites tested commands no reader can reach. They return with
+#     the commands in session 3, re-measured, or not at all.
 
 echo
 if [ "$FAIL" -eq 0 ]; then echo "run-tests: PASS"; else echo "run-tests: FAIL"; fi

@@ -46,7 +46,7 @@ files whose hash changed and prints `created C · updated U · unchanged N · sk
 | kind | recorded as | overwritten? | hash-checked? | removed by `--uninstall`? |
 |---|---|---|---|---|
 | installed artifact (bin, manifest, roles, opt-in skills, harness scaffold) | `files` | yes, on upgrade | yes — IN-02, SK-02 | yes |
-| created once, then yours (`.goblin/goblin.yaml`, `HANDOFF.md`, `AGENTS.md`, `*-SPEC.md`, `reviews/.gitkeep`) | `owned` | never | no — you are meant to edit them | no, except the config |
+| created once, then yours (`.gob/goblin.yaml`, `HANDOFF.md`, `AGENTS.md`, `*-SPEC.md`, `reviews/.gitkeep`) | `owned` | never | no — you are meant to edit them | no, except the config |
 | pre-existing, left alone | `refused` | never | no — IN-04 only proves it was not taken over | no |
 
 A `refused` path is not a dead end. For `HANDOFF.md` the remedy is the reconciliation in
@@ -60,13 +60,13 @@ repo. The remedy is the explicit re-pin below — not a hand-edit of the hash, a
 automatic one.
 
 `.gitignore` is not a file goblin-stack owns: it appends **one marked block** and never rewrites
-the rest. `.goblin/goblin.yaml` is generated once and is goblin-stack's own config, so
+the rest. `.gob/goblin.yaml` is generated once and is goblin-stack's own config, so
 `--uninstall` removes it; `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md` and `reviews/` are the
 project's record, not the harness's, and are left in place.
 
 ### An edited standard is not a dead end
 
-`.goblin/goblin.yaml` records `practice:` and `practice_sha256:`, and `IN-02` re-checks that hash.
+`.gob/goblin.yaml` records `practice:` and `practice_sha256:`, and `IN-02` re-checks that hash.
 The pin has exactly one purpose: to make a **silently** edited standard visible rather than
 assumed. The standard itself is a living document, corrected in place, so an edit that is
 *intended* needs a deliberate way to re-record the pin. That is all `--re-pin` is:
@@ -79,7 +79,7 @@ It rewrites one line of the config — nothing else — and prints both hashes:
       recorded 81612b17ac3483b9d613aeb86e236539fc17403e38bf7903af708d369cf7918f
       now      8334ac24f056c94c35fa97831253e7e12bace68ae5747c81ae3b696c42ddd33a
 
-`.goblin/bin/goblin-verify --only IN-02` then reports `practice pin ok`. Every other line of
+`.gob/bin/goblin-verify --only IN-02` then reports `practice pin ok`. Every other line of
 `goblin.yaml`, comments included, is untouched, so the `owned` contract holds for everything
 except the one value you just asked to re-record. Commit the config like any other change.
 `--dry-run` prints the plan and writes nothing; when there is nothing to do it prints
@@ -97,7 +97,7 @@ Four things it deliberately is not:
 - **not a re-point.** It re-records the hash of the path already in `practice:`. Pointing the repo
   at a *different* standard is a deliberate config edit, not a re-pin.
 
-Refusals are exit `2`, each naming the path: no `.goblin/goblin.yaml`, no `practice:` recorded, the
+Refusals are exit `2`, each naming the path: no `.gob/goblin.yaml`, no `practice:` recorded, the
 recorded path absent, or no `practice_sha256:` line to rewrite. A failed write is exit `1`, with
 the path — the command never reports a re-pin that did not land. One refusal guards the mode
 itself: `--uninstall --re-pin` is exit `2` with `--uninstall and --re-pin are different jobs; run
@@ -122,7 +122,7 @@ Output is one line per executed row, in manifest order, plus a summary line at t
 
 Those four lines are one row of each marking. The summary line of a green default software-class run is:
 
-          38 passed, 0 failed, 11 advisory, 33 skipped
+          37 passed, 0 failed, 11 advisory, 34 skipped
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -137,14 +137,15 @@ is counted and capped.
 tests the right path rather than merely passing; whether the forge is bound by the workflow
 `CL-01` found; whether a human
 read the diff; whether the model mapping names a family that actually differs; and whether
-`.goblin/installed.json` — the record every drift check trusts — was itself rewritten, since it
-is not signed (`docs/LIMITS.md` #18). The CI lane adds its own, and `docs/CI.md` is where the four
-settings that make a workflow a **gate** are written down.
+`.gob/installed.json` — the record every drift check trusts — was itself rewritten, since it
+is not signed (`docs/LIMITS.md` #18). The CI lane's blind spots are named there too, though in v2
+the lane itself is out of the product (`docs/LIMITS.md` records `docs/CI.md` as its LIMITS
+candidate) — the prose survives because the *reason* a workflow file is not a gate still does.
 
 ### A fresh install verifies green
 
 Measured on a fresh DEFAULT software-class install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0.** Thirty-three rows skip with
+hand edit: **`37 passed, 0 failed, 11 advisory, 34 skipped`, exit 0.** Thirty-four rows skip with
 a reason — the same not-yet rows as before, plus the five skill rows (`SK-01`..`SK-04`,
 `AU-04`) that skip on the `playbooks` opt-out a skills-free install records: `HS-02` — no pre-change commit
 is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `AU-02` and `AU-03`, which
@@ -159,7 +160,7 @@ must not be born RED — G1, `docs/LIMITS.md` #30) — `RC-01`..`RC-04`, which r
 reference corpus and a lab `manifests/` directory a fresh install has neither of
 (`reference_manifest:` and `quarantine_root:` ship empty on purpose: a repo with no corpus must
 not be born RED) — and `JG-01` with `LP-01`..`LP-05`, which have
-no `.goblin/loop/` record because no loop has run in this repo: the six judge/loop rows are
+no `.gob/loop/` record because no loop has run in this repo: the six judge/loop rows are
 **absent-state** rows, and a fresh install must not be born RED either. **Two** rows do
 **not** skip, both of them the CI lane's: `PG-05` and `PG-06` read the workflow this class installs.
 Two, not four — the four electron bans named in the skip list above do skip here, and a tree without
@@ -184,7 +185,7 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a class's `-` (off) real.
 - **The opt-out numbers are pinned (V3-3).** A software-class install with an explicit `--skills no`
-  verifies `38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0, and
+  verifies `37 passed, 0 failed, 11 advisory, 34 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
   at v0.2 when the ban rows landed, **15 → 18 on 2026-09-25 (G1)** — the feature-map rows,
@@ -197,9 +198,9 @@ verifier is reporting FAILs.
   recorded skill files; `--uninstall` removes everything recorded, as always.
   `tests/t-install-off-switch.sh` walks that migration: install `--skills yes`, upgrade flag-less,
   the skills survive byte-identical; uninstall, and they are all gone.
-- **Whole harness:** `--uninstall` deletes the `files` list plus `.goblin/goblin.yaml`, removes
+- **Whole harness:** `--uninstall` deletes the `files` list plus `.gob/goblin.yaml`, removes
   every directory that leaves empty (deepest first, after `installed.json` itself is gone — the
-  order that used to leave `.goblin/` and the sixteen `.hermes/skills/*` directories behind),
+  order that used to leave `.gob/` and the sixteen `.hermes/skills/*` directories behind),
   leaves `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md`, `reviews/` and the `.gitignore` block
   (with a `# goblin-stack uninstalled <date>` marker inside it), and prints what it removed and
   what it left.
@@ -207,7 +208,7 @@ verifier is reporting FAILs.
 ## The two commands, verbatim
 
     bash bin/goblin-install --target /path/to/repo --class software
-    .goblin/bin/goblin-verify
+    .gob/bin/goblin-verify
 
 From a checkout, without installing anything:
 
