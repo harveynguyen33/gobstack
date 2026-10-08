@@ -16,7 +16,7 @@
 #     - name: typecheck        four-space-indented second member of a list entry
 #       cmd: npx tsc --noEmit
 
-GOBLIN_LIB_VERSION="0.6.0-alpha.1"
+GOBLIN_LIB_VERSION="0.6.0-alpha.2"
 
 # ---------------------------------------------------------------- output -----
 # g_trunc <width> <text> — fold a long detail to one line at <width> columns, keeping the
