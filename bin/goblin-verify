@@ -391,20 +391,20 @@ export GOBLIN_CONFIG="$CONFIG"
 # Every one of these is DECLARED in .gob/goblin.yaml. A stack-specific rule guessed from the
 # files on disk is how a matrix starts lying; a declared key that is absent is a skip with a
 # reason, never a silent pass.
-SEC_GITIGNORE_FAMILY=$(g_agents_read "$CONFIG" security gitignore_family)
-SEC_BUILD_OUTPUT=$(g_agents_read "$CONFIG" security build_output)
-SEC_AUDIT_CMD=$(g_agents_read "$CONFIG" security audit_cmd)
-SEC_AUDIT_MAX_AGE=$(g_agents_read "$CONFIG" security audit_max_age_days)
-SEC_WAIVER_MAX_AGE=$(g_agents_read "$CONFIG" security waiver_max_age_days)
-SEC_WRITE_ROUTES=$(g_agents_read "$CONFIG" security write_routes)
+SEC_GITIGNORE_FAMILY=$(g_agents_read "$CONFIG" security.gitignore_family)
+SEC_BUILD_OUTPUT=$(g_agents_read "$CONFIG" security.build_output)
+SEC_AUDIT_CMD=$(g_agents_read "$CONFIG" security.audit_cmd)
+SEC_AUDIT_MAX_AGE=$(g_agents_read "$CONFIG" security.audit_max_age_days)
+SEC_WAIVER_MAX_AGE=$(g_agents_read "$CONFIG" security.waiver_max_age_days)
+SEC_WRITE_ROUTES=$(g_agents_read "$CONFIG" security.write_routes)
 [ -n "$SEC_AUDIT_MAX_AGE" ] || SEC_AUDIT_MAX_AGE=90
 [ -n "$SEC_WAIVER_MAX_AGE" ] || SEC_WAIVER_MAX_AGE=180
-PERF_METRIC=$(g_agents_read "$CONFIG" perf metric)
-PERF_CMD=$(g_agents_read "$CONFIG" perf cmd)
-PERF_BASELINE_COMMIT=$(g_unquote "$(g_agents_read "$CONFIG" perf baseline_commit)")
-PERF_BASELINE_VALUE=$(g_agents_read "$CONFIG" perf baseline_value)
-PERF_MEASURED=$(g_unquote "$(g_agents_read "$CONFIG" perf measured)")
-PERF_HOST_GATE=$(g_agents_read "$CONFIG" perf host_gate)
+PERF_METRIC=$(g_agents_read "$CONFIG" perf.metric)
+PERF_CMD=$(g_agents_read "$CONFIG" perf.cmd)
+PERF_BASELINE_COMMIT=$(g_unquote "$(g_agents_read "$CONFIG" perf.baseline_commit)")
+PERF_BASELINE_VALUE=$(g_agents_read "$CONFIG" perf.baseline_value)
+PERF_MEASURED=$(g_unquote "$(g_agents_read "$CONFIG" perf.measured)")
+PERF_HOST_GATE=$(g_agents_read "$CONFIG" perf.host_gate)
 # The electron opt-in (software class): true means the electron ban set stays on regardless of a
 # hand-edited bans: list, and a perf host gate must be declared (PF-01). Absent on a repo
 # installed before the merge — read as off, so a legacy class-F repo verifies with no rewrite.
@@ -633,7 +633,7 @@ check_in_02() {
 
 check_hp_03() {
   # Every gate-bearing line inside the HANDOFF's `Gates` section carries `measured <date>`.
-  # Anchored on the gate names `.gob/goblin.yaml` DECLARES (GT-01's source of truth), not on
+  # Anchored on the gate names the AGENTS.md gob block DECLARES (GT-01's source of truth), not on
   # a hardcoded keyword list: the shipped gates are named `commit` and `todo_ceiling`, and the
   # old list `(tsc|build|hex|safelist|n/n)` matched neither, so on a fresh install the only line
   # it could see was the template's own "Example of the required form" prose. Measured at
@@ -779,11 +779,11 @@ EOF_TAIL
   done < <(g_agents_gates "$CONFIG")
   if [ "$write_line" = "yes" ]; then
     local rname rcmd rval
-    rname=$(g_agents_read "$CONFIG" ratchet name)
-    rcmd=$(g_agents_read "$CONFIG" ratchet cmd)
+    rname=$(g_agents_read "$CONFIG" ratchet.name)
+    rcmd=$(g_agents_read "$CONFIG" ratchet.cmd)
     if [ -n "$rname" ] && [ -n "$rcmd" ]; then
       rval=$( cd "$ROOT" && bash -c "$rcmd" 2>/dev/null | tr -d '[:space:]' )
-      line="$line · $rname $rval (ceiling $(g_agents_read "$CONFIG" ratchet ceiling))"
+      line="$line · $rname $rval (ceiling $(g_agents_read "$CONFIG" ratchet.ceiling))"
     fi
     printf '%s · measured %s\n' "${line# }" "$(date +%F)" > "$ROOT/.gob/last-gate-line"
     cat "$ROOT/.gob/last-gate-line"
@@ -800,9 +800,9 @@ check_gt_02() {
 
 check_gt_04() {
   local n c ceil
-  n=$(g_agents_read "$CONFIG" ratchet name)
-  c=$(g_agents_read "$CONFIG" ratchet cmd)
-  ceil=$(g_agents_read "$CONFIG" ratchet ceiling)
+  n=$(g_agents_read "$CONFIG" ratchet.name)
+  c=$(g_agents_read "$CONFIG" ratchet.cmd)
+  ceil=$(g_agents_read "$CONFIG" ratchet.ceiling)
   [ -n "$n" ] || { printf 'ratchet.name missing\n'; return 1; }
   [ -n "$c" ] || { printf 'ratchet.cmd missing\n'; return 1; }
   case "$ceil" in ''|*[!0-9]*) printf 'ratchet.ceiling must be numeric, got %s\n' "$ceil"; return 1 ;; esac
@@ -812,9 +812,9 @@ check_gt_04() {
 
 check_gt_05() {
   local n c ceil val old prev="" note=""
-  n=$(g_agents_read "$CONFIG" ratchet name)
-  c=$(g_agents_read "$CONFIG" ratchet cmd)
-  ceil=$(g_agents_read "$CONFIG" ratchet ceiling)
+  n=$(g_agents_read "$CONFIG" ratchet.name)
+  c=$(g_agents_read "$CONFIG" ratchet.cmd)
+  ceil=$(g_agents_read "$CONFIG" ratchet.ceiling)
   [ -n "$n" ] && [ -n "$c" ] || { printf 'no ratchet declared for this class - skipped\n'; return 3; }
   val=$( cd "$ROOT" && bash -c "$c" 2>/dev/null | tr -d '[:space:]' )
   case "$val" in ''|*[!0-9]*) printf 'ratchet cmd produced a non-number: %s\n' "$val"; return 1 ;; esac
@@ -862,9 +862,9 @@ check_hs_01() {
 
 check_hs_02() {
   local env cmd commit d tmp bad=0 f rc base name qname pat
-  env=$(g_agents_read "$CONFIG" replay env)
-  cmd=$(g_agents_read "$CONFIG" replay cmd)
-  commit=$(g_unquote "$(g_agents_read "$CONFIG" replay commit)")
+  env=$(g_agents_read "$CONFIG" replay.env)
+  cmd=$(g_agents_read "$CONFIG" replay.cmd)
+  commit=$(g_unquote "$(g_agents_read "$CONFIG" replay.commit)")
   [ -n "$env" ] || { printf 'replay.env not declared\n'; return 1; }
   [ -n "$cmd" ] || { printf 'replay.cmd not declared\n'; return 1; }
   # Z1-4: the DECLARED command has to be what runs the harness. Until this fix it was read only
@@ -1683,7 +1683,7 @@ check_pf_01() {
   # - a skip with that reason, because a row that is RED on every fresh install teaches people
   # to ignore it.
   local rname bad=0
-  rname=$(g_agents_read "$CONFIG" ratchet name)
+  rname=$(g_agents_read "$CONFIG" ratchet.name)
   # The electron opt-in's done-definition: an Electron repo declares its host gate (the FPS /
   # main_thread_busy_pct number a hermetic rule cannot measure). `electron: true` with no host
   # gate is a repo missing half its definition — FAIL, before the baseline skip below can mask it.
@@ -1717,7 +1717,7 @@ check_pf_01() {
   # (ceiling 100000)` - the contradiction on its own passing line, seen by nothing. The ceiling
   # is anchored on the recorded baseline; raising it is what "I never measured again" looks like.
   local ceiling
-  ceiling=$(g_agents_read "$CONFIG" ratchet ceiling)
+  ceiling=$(g_agents_read "$CONFIG" ratchet.ceiling)
   case "$ceiling" in
     ''|*[!0-9]*) printf 'ratchet.ceiling is not a number: %s\n' "${ceiling:-<empty>}"; bad=1 ;;
     *)
@@ -1730,7 +1730,7 @@ check_pf_01() {
   [ "$bad" -eq 0 ] || return 1
   printf '%s = %s measured %s on %s (ceiling %s), host gate: %s\n' \
     "$PERF_METRIC" "$PERF_BASELINE_VALUE" "$PERF_MEASURED" "$PERF_BASELINE_COMMIT" \
-    "$(g_agents_read "$CONFIG" ratchet ceiling)" "${PERF_HOST_GATE:-none}"
+    "$(g_agents_read "$CONFIG" ratchet.ceiling)" "${PERF_HOST_GATE:-none}"
   return 0
 }
 
@@ -1839,8 +1839,8 @@ class_part_artifact() {
     handoff)      [ -f "$ROOT/HANDOFF.md" ] ;;
     spec)         ls "$ROOT"/*-SPEC.md >/dev/null 2>&1 ;;
     gate)         [ "$(g_agents_gates "$CONFIG" | grep -c . || true)" -ge 1 ] ;;
-    replay)       [ -n "$(g_agents_read "$CONFIG" replay env)" ] && [ -n "$(g_agents_read "$CONFIG" replay cmd)" ] ;;
-    ratchet)      [ -n "$(g_agents_read "$CONFIG" ratchet name)" ] ;;
+    replay)       [ -n "$(g_agents_read "$CONFIG" replay.env)" ] && [ -n "$(g_agents_read "$CONFIG" replay.cmd)" ] ;;
+    ratchet)      [ -n "$(g_agents_read "$CONFIG" ratchet.name)" ] ;;
     pr-gate)      [ -d "$ROOT/reviews" ] ;;
     review-panel) [ -d "$ROOT/reviews" ] ;;
     # The W4a re-point (W4A-SPEC §5.3): the artifact test accepts the goblin-mode skill
@@ -1883,10 +1883,13 @@ class_part_artifact() {
            "${GOBLIN_EMISSIONS:-${HOME:-}/.goblin-stack/emissions.tsv}" && return 0
       return 1 ;;
     tokens)       [ -f "$ROOT/.gob/tokens.yaml" ] ;;
+    # ci-gate: the part is GONE from the product (v2). Every class carries need="-" in
+    # classes.tsv, and the artifact can never be written again — so the probe is a
+    # constant ABSENT and the CL-01 "-" branch (forbids, artifact absent) always passes.
+    ci-gate)      return 1 ;;
     # The CI lane's artifact is the workflow goblin-stack WRITES, not the directory: a repo is
     # allowed to have its own workflows, and `-` on this part means "goblin-stack must not have
     # placed one here", not "this repo may not have CI" (G6 A.6).
-    ci-gate)      [ -f "$ROOT/.github/workflows/goblin-gate.yml" ] ;;
     *)            return 0 ;;
   esac
 }

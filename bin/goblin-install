@@ -65,6 +65,7 @@ UNINSTALL=0
 RE_PIN=0
 FORCE=0
 OPT_OUT=""
+GATE_NAME_ARG=""   # parsed by --gate <cmd> [name] below; reset before the loop
 # CI_GATE_OPT is gone with the CI lane (v2): no flag, no workflow file, no ci_gate field.
 # The electron opt-in (the merged desktop/F class): renders presets/electron-overlay.yaml over
 # the software preset. Auto-set when --class resolves via the desktop/F/f alias, so the alias
@@ -93,6 +94,7 @@ while [ $# -gt 0 ]; do
     --uninstall) UNINSTALL=1; shift ;;
     --re-pin)    RE_PIN=1; shift ;;
     --opt-out)   OPT_OUT="${2:-}"; shift 2 ;;
+    --gate)      GOB_GATE="${2:-}"; GATE_NAME_ARG="${3:-}"; shift 2; [ -n "${GATE_NAME_ARG:-}" ] && shift; shift ;;
     --force)     FORCE=1; shift ;;
     --yes)       shift ;;
     -h|--help)   usage; exit 0 ;;
@@ -310,6 +312,12 @@ SCAFFOLD=$(preset scaffold_checks); [ -n "$SCAFFOLD" ] || SCAFFOLD=no
 GATE_NAME=$(preset gate_name)
 # (GATE1/GATE2 render names are set in render_config; the preset keys are unchanged.)
 GATE_CMD=$(preset gate_cmd)
+# `--gate <cmd>` (gob init --write): the proposal's first gate REPLACES the class default.
+# `--gate <cmd> <name>` (optional 2nd word): the proposal may also name the gate — the
+# HANDOFF template renders THAT name, so HP-03 (anchored on the DECLARED names) sees the
+# gate line a fresh HANDOFF carries even when the name is not the class default.
+case "${GATE_NAME_ARG:-}" in "") ;; *) GATE_NAME="$GATE_NAME_ARG" ;; esac
+[ -n "${GOB_GATE:-}" ] && GATE_CMD="$GOB_GATE"
 RAT_NAME=$(preset ratchet_name)
 RAT_CMD=$(preset ratchet_cmd)
 RAT_CEIL=$(preset ratchet_ceiling)
@@ -693,7 +701,17 @@ if [ "$WANT_SPEC" -eq 1 ] && part_wanted spec; then
   put_once "ROUND-000-SPEC.md" "$TMP/spec"
 fi
 if [ "$ARCHIVE" != "true" ] && part_wanted handoff; then
-  render "$SRC/templates/HANDOFF.md.tmpl" CLASS "$CLASS" DATE "$STAMP" HEAD "$HEAD_SHORT" BRANCH "$BRANCH" GATE_NAME "$GATE_NAME" GATE_CMD "$GATE_CMD" > "$TMP/handoff"
+  # The HANDOFF names the gate the way GT-02 runs it: by the command's own name key
+  # (gate_<name>_cmd), so HP-03 anchors on a declared name even when --gate replaced the
+  # class default command. GATE2_LINE renders the class's second gate (if any) the same
+  # way — a Gates section that names only gate 1 while AGENTS.md declares two is the
+  # HP-03 day-one anchoring red. A class with no second gate renders an empty line.
+  if [ -n "$GATE2_NAME" ]; then
+    GATE2_LINE="- \`$GATE2_NAME\` = 0 · measured $STAMP"
+  else
+    GATE2_LINE=""
+  fi
+  render "$SRC/templates/HANDOFF.md.tmpl" CLASS "$CLASS" DATE "$STAMP" HEAD "$HEAD_SHORT" BRANCH "$BRANCH" GATE_NAME "$GATE_NAME" GATE_CMD "$GATE_CMD" GATE2_LINE "$GATE2_LINE" > "$TMP/handoff"
   put_once "HANDOFF.md" "$TMP/handoff"
 fi
 

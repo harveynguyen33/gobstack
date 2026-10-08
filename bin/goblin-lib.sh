@@ -353,7 +353,21 @@ g_agents_write() {
   tmp=$(mktemp "${TMPDIR:-/tmp}/gob-agents.XXXXXX") || return 1
   {
     printf '%s (gobstack config — edit in place; the parser reads only this block) -->\n' "$GOB_AGENTS_BEGIN"
-    awk -F'\t' 'NF>=1 && $1!="" { v=$2; for (i=3; i<=NF; i++) v=v "\t" $i; print $1 ": " v }'
+    # A marker line on stdin is a RENDERED TEMPLATE's own first line, not a key: skip
+    # it, so a caller may pipe a whole rendered block in. A line is EITHER "key<TAB>
+    # value" (the tsv form) OR already-rendered "key: value" (a template form): with a
+    # tab, field 1 is the key and the value is rebuilt; without one, the line's own
+    # "key: value" shape is kept verbatim (a rendered placeholder keeps its text).
+    awk -F'\t' '
+      /^<!-- gob:(begin|end)/ { next }
+      NF >= 2 {
+        v = $2; for (i = 3; i <= NF; i++) v = v "\t" $i
+        sub(/ -->$/, "", v)   # a template end-marker glued to a value line
+        print $1 ": " v
+        next
+      }
+      NF == 1 && $1 != "" { print $1 }' \
+      | sed 's/: $/:/'
     printf '%s\n' "$GOB_AGENTS_END"
   } > "$tmp"
   newbody=$(cat "$tmp")
