@@ -1435,5 +1435,22 @@ ADV_PRINTED=$(printf '%s\n' "$FINAL" | grep -cE '^ADV')
 printf '%s\n' "$FINAL" | grep -q "of those $ADV_PRINTED advisory: the matrix labels $ADV_LABELLED row(s) advisory"
 check "Z1-7: the summary prints the advisory arithmetic ($ADV_PRINTED ADV lines vs $ADV_LABELLED labelled)" "$?"
 
+# ---- UX-vi: the sign-off's red direction (locked v2 decision) ------------------------------
+# The mascot is a GREEN-run line only: every red run ends on the concrete first-FAIL remedy.
+# Pinned on a controlled red capture (a wrong owner, single row) plus the green FINAL run;
+# the green direction lives in t-verify-green.sh.
+sed -i 's/^owner_email: .*/owner_email: nobody@wrong.invalid/' AGENTS.md
+out=$(bash .gob/bin/goblin-verify --only CM-01 2>&1); UX6_RC=$?
+git checkout -q -- AGENTS.md 2>/dev/null || restore_all
+check "UX-6a the controlled capture is red (CM-01, exit 1)" "$([ "$UX6_RC" -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$out" | grep -qF 'start with the first FAIL above — its remedy line says the fix.'
+check "UX-6b the red run ends on the first-FAIL remedy tail" "$?"
+printf '%s' "$out" | grep -qF 'the goblin sees you'
+check "UX-6c and the mascot is gone from a red run" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+printf '%s' "$FINAL" | grep -qF '▙ the goblin sees you. keep the gate green.'
+check "UX-6d the green FINAL run carries the mascot instead" "$?"
+printf '%s' "$FINAL" | grep -qF 'start with the first FAIL above'
+check "UX-6e and no remedy tail on the green run" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
 if [ "$fail" -eq 0 ]; then note "t-verify-red: PASS"; else note "t-verify-red: FAIL"; fi
 exit "$fail"

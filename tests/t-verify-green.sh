@@ -157,5 +157,14 @@ check "R5d the aged probe still fails for the same planted reason (exit 1)" "$([
 printf '%s' "$FOUT4" | grep -q 'fresh clone detected'
 check "R5e the banner is SILENT on the aged repo after two GT-02 rewrites (mtime branch gone)" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 
+# ---- UX-vi: the sign-off is the mascot on green, the first-FAIL remedy on red -------------
+# (locked v2 decision, re-landed on the engine after the init rewrite dropped it): a GREEN
+# run ends on "the goblin sees you. keep the gate green." — a RED run replaces it with the
+# concrete first command. Pinned both directions: green here, red in t-verify-red.sh (UX-vi).
+printf '%s' "$OUT" | grep -qF '▙ the goblin sees you. keep the gate green.'
+check "UX-vi the green run ends on the mascot sign-off" "$?"
+printf '%s' "$OUT" | grep -qF 'start with the first FAIL above'
+check "  and no red tail on a green run" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+
 if [ "$fail" -eq 0 ]; then note "t-verify-green: PASS"; else note "t-verify-green: FAIL"; fi
 exit "$fail"
