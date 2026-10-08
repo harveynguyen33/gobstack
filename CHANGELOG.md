@@ -19,7 +19,7 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   promotes them into catalogue.tsv by PR or edit. `--write` honours only the proposal's TICKED
   rows, through `gob extras install` itself — one allowlist, one code path.
 
-## 0.6.0-alpha.1
+## 0.6.0-alpha.2
 
 The v2 breaking release: rules-first. The rules a repo is judged by move from a config file the
 installer generated into the file a new session already reads, the folder the engine is vendored
