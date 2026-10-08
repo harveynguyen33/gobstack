@@ -524,6 +524,7 @@ same commands are available outside any repo through the npm CLI: `gob init` / `
              [--with-mcp-config]
     gob map [--heuristic [target]] [--write <dir>] [--force]
     gob mcp                                  # the MCP stdio server (three tools, local only)
+    gob extras list | show <id> | install <id...>   # the curated extras catalogue
 
     .gob/bin/goblin-verify [--only <id[,id...]>] [--json] [--list]
     .gob/bin/goblin-bans           # run the ban list
@@ -569,6 +570,32 @@ Named procedures, installed as project-local skills. Each has a measurable verif
 | P13 | `goblin-bugreporter` | an event delivered a report |
 | P14 | `goblin-drift-audit` | a recorded claim disagrees with the artifact |
 | P15 | `goblin-re-mobile` | one shipped Android build must be understood as facts for study |
+
+### The extras catalogue (suggestions, not installs)
+
+`gob extras` browses and installs the curated extras catalogue — third-party agent skills,
+MCP servers and workflows the curator reviewed and carried in `extras-catalogue/catalogue.tsv`.
+The one rule to hold onto: **init suggests, the catalogue allows, you install.**
+
+    gob extras list                  # the whole catalogue, grouped by category
+    gob extras list testing          # one category: frontend | testing | game | node
+    gob extras show playwright-mcp   # one row, every field
+    gob extras install playwright-mcp --target .        # mcp: prints the mcp.json snippet
+    gob extras install taste-skill --target . --platform claude   # skill: .claude/skills/taste/
+    gob extras install taste-skill --target .                   # no platform: .gob/extras/taste/
+
+Verdicts: a `RECOMMEND` row is pre-ticked when `gob init` suggests; a `MAYBE` row is listed
+but never pre-ticked; a `SKIP` row refuses install (visible history, declined candidate).
+Nothing installs at init — `gob init --write` honours only the rows your proposal ticks, and
+it installs them by calling `gob extras install`, so the allowlist is one code path. An id
+that is not in the catalogue is refused; installs copy from the vendored payload in the
+package (no network), and an mcp row merges into `.mcp.json` only with `--with-mcp-config`,
+never overwriting an entry you customized.
+
+The brief also asks your agent to propose discoveries (`discover_extras:`): web-found skills
+that match the stack but are not in the catalogue, each with a live URL, a license and a
+rationale. Proposals are inert; the curator promotes accepted ones into `catalogue.tsv` by PR
+or edit, and only then can `gob extras install` name them.
 
 ### Where the real documentation lives
 

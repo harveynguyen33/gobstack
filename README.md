@@ -76,7 +76,7 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 
 ## The `gob` CLI
 
-The v2 surface is six verbs. Everything else — audit, doctor, emit/sync, upgrade, install —
+The v2 surface is seven verbs. Everything else — audit, doctor, emit/sync, upgrade, install —
 is unwired in this alpha: the shim refuses the verb by name and prints the usage.
 
 | command | what it does |
@@ -85,6 +85,7 @@ is unwired in this alpha: the shim refuses the verb by name and prints the usage
 | `gob map` | the feature-map prompt + schema (`--heuristic [target]` runs the starter scanner); `--write <dir> [--force]` validates an agent-written map and installs it; never clobbers — an existing map refuses until `--force` |
 | `gob verify` | run the rule matrix against the current repo — `PASS`/`FAIL`/`SKIP` per row, exit 0 pass · 1 a check failed · 2 could not run · 3 the manifest is broken |
 | `gob bans` | run the ban list (per-pattern red lines over the source tree) |
+| `gob extras` | the curated extras catalogue: `list [category]` / `show <id>` / `install <id...> [­-target <dir>] [--platform <id>] [--with-mcp-config]` — init only SUGGESTS; installs come from the catalogue (the allowlist rule), never the web |
 | `gob mcp` | serve the harness to your coding agent over MCP stdio — three tools (`gob_verify`, `gob_map_status`, `gob_init_status`), local only, no SDK, no network |
 | `gob uninstall` | remove everything an install wrote, byte-exactly (`gob install --target <dir> --uninstall` is the same job) |
 
@@ -127,6 +128,54 @@ get.
 checks and the `.gitignore` block; no skills directory, and no files belonging to any coding
 agent. The proposal schema's `sync_platforms:` line is where the platform choice is recorded
 when that surface lands.
+
+## Extras: the curated catalogue
+
+`gob extras` is the catalogue browser + installer for curated third-party agent skills, MCP
+servers and workflows — matched to your stack, suggested at init, installed only on an
+explicit command. The source of truth is `extras-catalogue/catalogue.tsv`, reviewed and
+carried by the curator (one row per candidate: source repo, license, stars, last push, which
+stacks it `matches`, what it `conflicts` with, and a verdict).
+
+    gob extras list [category]        # the catalogue, grouped: frontend | testing | game | node
+    gob extras show <id>              # one row, every field, + the install hint
+    gob extras install <id...>        # the only way an extra lands in your repo
+        [--target <dir>] [--platform <id>] [--with-mcp-config] [--dry-run]
+
+The verdict decides what each row can do: `RECOMMEND` rows are pre-ticked when `gob init`
+suggests, `MAYBE` rows are listed but never pre-ticked, and a `SKIP` row refuses install —
+it stays visible so the curation history is readable, but the curator declined it.
+
+**The catalogue is the allowlist.** An id that is not a row in `catalogue.tsv` is refused by
+name; nothing is ever installed from a URL, a repo name, or a web search. Installs are
+offline by contract: skill and workflow rows copy from the vendored payload the curator
+maintains under `extras-catalogue/payload/` (a row with no payload refuses, with the named
+fix — it is never downloaded); `mcp` rows print the `mcp.json` snippet, and
+`--with-mcp-config` merges it into the target's `.mcp.json` — ask-once, never overwriting an
+entry you customized. A `--platform <id>` skill install copies into that platform's project
+skills root (the same paths the sync adapters record); with no `--platform`, skills land in
+the repo-neutral `.gob/extras/<skill-name>/`, and workflow rows copy into
+`.gob/playbooks/<id>/`. An existing file with different content is never clobbered.
+
+**`gob init` suggests; it never installs.** The AGENT BRIEF carries a
+`catalogue_suggestions` section: rows whose `matches:` column names the stack the scan found,
+RECOMMEND rows pre-ticked and MAYBE rows visible but unticked. The heuristic fallback
+(`--heuristic`) suggests from the same `matches:` column. `init --write` honours the
+proposal's TICKED rows and only those — unticked MAYBE lines install nothing — and it does
+the honouring by calling `gob extras install` itself, so the allowlist, the verdict refusals
+and the payload contract are one code path.
+
+**The `discover_extras` tier is proposals only.** The brief also asks the agent to search the
+web — with its own tools — for skills/MCPs/workflows that match the stack and are NOT in the
+catalogue, and to propose them under `discover_extras:` with a live `source_url`, the
+`license` found, and a one-line `rationale`. Nothing auto-installs from discovery: a human
+reviews the proposals, and the curator promotes accepted discoveries into `catalogue.tsv` by
+PR or direct edit. Until a row exists in the catalogue, `gob extras install` refuses it.
+
+**How a row is added** (the curation surface): propose it by PR or edit
+`extras-catalogue/catalogue.tsv` directly — the columns are the row schema
+`gob extras show` prints. A row lands with a verdict, a reviewer and a date; the tests pin
+the file's shape so a malformed row cannot ship.
 
 ## What it is not
 

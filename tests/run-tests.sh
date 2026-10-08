@@ -34,7 +34,7 @@ line() { printf '%-34s %s\n' "$1" "$2"; }
 # ---- syntax ------------------------------------------------------------------
 SYNTAX_OK=0
 for f in bin/goblin-install bin/goblin-verify bin/goblin-model bin/goblin-lib.sh \
-         bin/goblin-emit bin/goblin-doctor bin/goblin-init \
+         bin/goblin-emit bin/goblin-doctor bin/goblin-init bin/goblin-extras \
          adapters/*/detect.sh adapters/*/verify.sh \
          tests/run-tests.sh tests/t-*.sh templates/checks/gate.sh.tmpl; do
   bash -n "$f" 2>/dev/null || { SYNTAX_OK=1; printf 'syntax error: %s\n' "$f"; }
@@ -51,17 +51,34 @@ if out=$(bash bin/goblin-lib.sh --self-test 2>&1); then line "goblin-lib --self-
 # hit at f23b371, 0 at b100b44, and PT-01 could not see it). tests/ is deliberately NOT added to
 # PT-01 itself: a target's own tests are its code, and a project may legitimately name its own
 # paths there.
+# extras-catalogue/ rides this scan SINCE W-extras with ONE deliberate exception: the catalogue's
+# `reviewed_by` column is governance metadata — every data row carries the literal curator token
+# (the whole point of the column), so the file is scanned with that one cell dropped, never with
+# the rule skipped. A tenant string anywhere else in the directory (payload prose, a new column,
+# the research notes) still fails here.
 PT=$(for d in skills manifest bin templates presets automations tests; do
        [ -d "$d" ] || continue
        grep -rniE '(h[a]rvey|tech-g[o]blin|/h[o]me/[a-z]+|g[o]blin-ui|op[e]n-door|sup[r]eme|bb[t]ech|c[l]v)' "$d"
-     done)
+     done
+     [ -f extras-catalogue/catalogue.tsv ] && \
+       awk -F'\t' 'NR>1 { $16="" ; print }' extras-catalogue/catalogue.tsv \
+       | grep -niE '(h[a]rvey|tech-g[o]blin|/h[o]me/[a-z]+|g[o]blin-ui|op[e]n-door|sup[r]eme|bb[t]ech|c[l]v)' \
+       | sed 's/^/extras-catalogue\/catalogue.tsv:/'
+     [ ! -d extras-catalogue/payload ] || \
+       grep -rniE '(h[a]rvey|tech-g[o]blin|/h[o]me/[a-z]+|g[o]blin-ui|op[e]n-door|sup[r]eme|bb[t]ech|c[l]v)' extras-catalogue/payload \
+       | sed 's/^/extras-catalogue\/payload\//')
 if [ -z "$PT" ]; then line "PR-04 portability (PT-01 body)" "ok (0 hits)"; else
   printf '%s\n' "$PT" | sed 's/^/    /'; line "PR-04 portability (PT-01 body)" "FAIL"; FAIL=1
 fi
 
-# ---- MD-01 over the source tree ---------------------------------------------
-MD=$(for d in skills manifest bin templates presets automations; do
-       [ -d "$d" ] || continue
+# ---- MD-01 over the source tree ----------------------------------------------
+# extras-catalogue/ rides this scan too: the catalogue's `source_repo`, `matches` and
+# `name` cells name real projects and stacks, and one of them is enough to trip a
+# model-name pattern the day a project is called like a model. The scan is the SAME
+# body over the new directory (no cell dropped — unlike PR-04's reviewed_by governance
+# column, nothing in a catalogue row legitimately needs a model name).
+MD=$(for d in skills manifest bin templates presets automations extras-catalogue/catalogue.tsv extras-catalogue/payload; do
+       [ -e "$d" ] || continue
        grep -rniE '(d[e]epseek|cl[a]ude|g[p]t-[0-9]|gr[o]k|g[e]mini|g[l]m-[0-9]|k[i]mi)[a-z0-9.:_-]*' "$d"
      done)
 if [ -z "$MD" ]; then line "MD-01 no hardcoded model name" "ok (0 hits)"; else
@@ -94,7 +111,7 @@ fi
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
          t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
          t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-doc-replay t-version-sync \
-         t-init t-banner-stderr t-shim t-map t-mcp; do
+         t-init t-banner-stderr t-shim t-map t-mcp t-extras; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi

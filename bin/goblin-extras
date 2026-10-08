@@ -1,0 +1,342 @@
+#!/usr/bin/env bash
+# goblin-extras — `gob extras`: the curated catalogue browser + installer (v2 W-extras).
+#
+#   gob extras list [category]                 the catalogue, grouped by category
+#   gob extras show <id>                       one row, every field, + the install hint
+#   gob extras install <id...> [--target <dir>] [--platform <id>]
+#                    [--with-mcp-config] [--dry-run]
+#
+# The ALLOWLIST RULE (non-negotiable): only ids that exist in catalogue.tsv are ever
+# installed. An id the catalogue does not carry is refused by name — there is no path from
+# a URL or a repo name on this command to a file write. `gob init` SUGGESTS rows and never
+# auto-installs; a human (or the proposal the human approves) names ids explicitly, and
+# the curator maintains the catalogue (add a row = PR or edit catalogue.tsv).
+#
+# Verdicts: RECOMMEND rows install; MAYBE rows install (an explicit choice, never
+# pre-ticked at init); SKIP rows refuse — the curator's verdict is the contract.
+#
+# NO NETWORK. Skill and workflow installs copy from a VENDORED PAYLOAD the curator
+# maintains under extras-catalogue/payload/<id>/ (payload/README.md is the layout
+# contract); a row whose payload is absent is refused with the named fix, never
+# downloaded. MCP installs are a printed mcp.json snippet plus — with
+# --with-mcp-config — a merge into the target's .mcp.json that never overwrites an
+# existing server entry (the ask-once rule .mcp.json has always had).
+#
+# Skill destinations follow the sync_platforms pattern: --platform <adapter-id> copies
+# each vendored skill dir under that adapter's project skills root (read from
+# adapters/<id>/adapter.tsv, column skills_path_project); with no --platform the skill
+# lands in the repo-neutral .gob/extras/<skill-name>/ (standalone repos). Workflows copy
+# the payload into .gob/playbooks/<id>/.
+#
+# Exit codes: 0 ok | 1 a refusal (named path + fix) | 2 bad input.
+# No npm, no jq, no yq, no network. bash/awk/sed/grep only (python3 only for the
+# .mcp.json merge, where a hand-rolled JSON edit would corrupt files it must not).
+
+set -uo pipefail
+
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SRC=$(cd "$SELF_DIR/.." && pwd)
+# shellcheck source=goblin-lib.sh
+. "$SELF_DIR/goblin-lib.sh"
+
+g_info() { printf '%s\n' "$*"; }
+
+usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+# ---- the catalogue source (overridable for tests) ------------------------------
+# The default is the shipped catalogue; GOB_EXTRAS_CATALOGUE points a test at a fixture.
+# Same for the payload root: a test vendors a fixture payload and aims the installer at it.
+CATALOGUE="${GOB_EXTRAS_CATALOGUE:-$SRC/extras-catalogue/catalogue.tsv}"
+PAYLOAD="${GOB_EXTRAS_PAYLOAD:-$SRC/extras-catalogue/payload}"
+
+die() { g_err "extras: $*"; exit "${2:-2}"; }
+
+# catalogue_row <id> — the whole data row (tab-separated), empty when absent.
+catalogue_row() {
+  awk -F'\t' -v id="$1" 'NR>1 && $1==id { print; exit }' "$CATALOGUE"
+}
+
+# catalogue_field <row> <n> — the nth tab field of a row.
+catalogue_field() { printf '%s' "$1" | awk -F'\t' -v n="$2" '{ print $n }'; }
+
+# catalogue_ids — every id, file order.
+catalogue_ids() { awk -F'\t' 'NR>1 && $1!="" { print $1 }' "$CATALOGUE"; }
+
+# category_order — the categories in catalogue file order of first appearance.
+category_order() { awk -F'\t' 'NR>1 && !seen[$2]++ { print $2 }' "$CATALOGUE"; }
+
+# ---- adapters (the platform enum is data, never literals) ----------------------
+# MD-01: agent-family names are read from adapters/<id>/adapter.tsv at run time, never
+# written here — the same discipline the sync engine's assembled platform list keeps.
+adapter_ids() {
+  for t in "$SRC"/adapters/*/adapter.tsv; do
+    [ -f "$t" ] || continue
+    awk -F'\t' '!/^#/ && NF>1 && $1!="id" { print $1 }' "$t"
+  done
+}
+
+# adapter_skills_root <id> — the PROJECT skills root (the pattern with its
+# `<name>/SKILL.md` tail stripped), one dot-dir per agent family. Read at run time;
+# the family names live in the adapter tables, never here (the MD-01 discipline).
+adapter_skills_root() {
+  local t="$SRC/adapters/$1/adapter.tsv" pat
+  [ -f "$t" ] || return 0
+  pat=$(awk -F'\t' '!/^#/ && NF>1 && $1!="id" { print $4 }' "$t")
+  [ -n "$pat" ] || return 0
+  printf '%s\n' "${pat%%<name>*}"
+}
+
+# ---- list ----------------------------------------------------------------------
+cmd_list() {
+  local want="${1:-}"
+  [ -f "$CATALOGUE" ] || die "catalogue not found: $CATALOGUE" 2
+  if [ -n "$want" ]; then
+    # An unknown category is bad input, not an empty table: a typo must not read as
+    # "the catalogue has nothing here". Captured, not piped: under pipefail a `grep -q`
+    # match closes the pipe early and SIGPIPE-kills the producer (pipeline 141), which
+    # would read as "unknown category" for a category the catalogue carries.
+    CATS=$(category_order)
+    printf '%s\n' "$CATS" | grep -qx "$want" || die "unknown category '$want' (want one of: $(printf '%s' "$CATS" | tr '\n' ' '))" 2
+  fi
+  local total
+  total=$(catalogue_ids | wc -l | tr -d ' ')
+  g_info "gob extras — the curated catalogue ($total rows; RECOMMEND pre-ticks at init, MAYBE is visible but never pre-ticked, SKIP refuses install)"
+  g_info "install: gob extras install <id...>   ·   one row: gob extras show <id>"
+  local cat
+  for cat in $(category_order); do
+    [ -z "$want" ] || [ "$cat" = "$want" ] || continue
+    printf '\n[%s]\n' "$cat"
+    printf '  %-34s %-8s %-7s %-24s %-10s %s\n' "id" "kind" "stars" "license" "verdict" "matches"
+    awk -F'\t' -v cat="$cat" 'NR>1 && $2==cat {
+      printf "  %-34s %-8s %-7s %-24s %-10s %s\n", $1, $3, $9, $8, $15, $11
+    }' "$CATALOGUE"
+  done
+  return 0
+}
+
+# ---- show ----------------------------------------------------------------------
+cmd_show() {
+  local id="${1:-}"
+  [ -n "$id" ] || die "show: an id is required (gob extras list)" 2
+  [ -f "$CATALOGUE" ] || die "catalogue not found: $CATALOGUE" 2
+  local row
+  row=$(catalogue_row "$id")
+  [ -n "$row" ] || die "unknown id '$id' — gob extras list names the catalogue" 2
+  local labels=(id category kind name source_repo path_within_repo has_skill_md license
+                stars last_push matches conflicts requires install_hint verdict
+                reviewed_by reviewed_date)
+  local i
+  for i in $(seq 1 17); do
+    printf '%-16s %s\n' "${labels[$((i-1))]}:" "$(catalogue_field "$row" "$i")"
+  done
+  return 0
+}
+
+# ---- install -------------------------------------------------------------------
+TARGET="" PLATFORM="" WITH_MCP=0 DRYRUN=0 IDS=()
+parse_install() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --target)          TARGET="${2:-}"; shift 2 ;;
+      --platform)        PLATFORM="${2:-}"; shift 2 ;;
+      --with-mcp-config) WITH_MCP=1; shift ;;
+      --dry-run)         DRYRUN=1; shift ;;
+      --yes)             shift ;;   # accepted for pipe parity; install is already explicit
+      -h|--help)         usage; exit 0 ;;
+      -*)                die "install: unknown option: $1" 2 ;;
+      *)                 IDS+=("$1"); shift ;;
+    esac
+  done
+  [ "${#IDS[@]}" -gt 0 ] || die "install: at least one id is required (gob extras list)" 2
+  [ -f "$CATALOGUE" ] || die "catalogue not found: $CATALOGUE" 2
+  TARGET="${TARGET:-$PWD}"
+  TARGET=$(g_expand_tilde "$TARGET")
+  [ -d "$TARGET" ] || die "--target is not a directory: $TARGET" 2
+  TARGET=$(cd "$TARGET" && pwd)
+  if [ -n "$PLATFORM" ]; then
+    # Captured, not piped (see cmd_list: pipefail + grep -q closes the pipe early and
+    # SIGPIPE-kills the producer — a valid platform id read as unknown).
+    ADAPTERS=$(adapter_ids)
+    printf '%s\n' "$ADAPTERS" | grep -qx "$PLATFORM" \
+      || die "unknown --platform '$PLATFORM' (the adapters this checkout ships: $(printf '%s' "$ADAPTERS" | tr '\n' ' '))" 2
+  fi
+}
+
+# resolve_one <id> — validates against the ALLOWLIST and the curator's verdicts; prints
+# the row. Every install path goes through here: no row, no install. That is the whole
+# allowlist rule, in one gate.
+resolve_one() {
+  local id="$1" row verdict
+  row=$(catalogue_row "$id")
+  # Captured, not piped (pipefail + grep -q early-exit trap — see cmd_list).
+  if [ -n "$row" ]; then
+    verdict=$(catalogue_field "$row" 15)
+  else
+    die "unknown id '$id' — nothing outside catalogue.tsv is ever installed (gob extras list names the allowlist)" 2
+  fi
+  case "$verdict" in
+    RECOMMEND|MAYBE) ;;
+    SKIP) die "id '$id' carries verdict SKIP — the curator declined it; it stays visible in the catalogue but refuses install" 1 ;;
+    *) die "id '$id' carries verdict '$verdict' — not an installable verdict (RECOMMEND|MAYBE|SKIP)" 2 ;;
+  esac
+  printf '%s\n' "$row"
+}
+
+# copy_tree <src> <dst> — byte-copy with the installer's ownership gate: an existing
+# file is left alone when identical (unchanged) and REFUSED when it differs (a file the
+# project wrote is never clobbered silently). Returns 0 ok, 1 on a refusal (named).
+COPY_REFUSALS=0
+copy_tree() {
+  local src="${1%/}" dst="$2" f rel sd dd
+  [ -d "$src" ] || die "payload missing: $src" 2
+  while IFS= read -r f; do
+    rel="${f#"$src"/}"
+    dd="$dst/$rel"
+    if [ "$DRYRUN" -eq 1 ]; then
+      g_info "plan: ${dd#"$TARGET"/}"
+      continue
+    fi
+    mkdir -p "$(dirname "$dd")" || die "cannot create $(dirname "$dd")" 1
+    if [ -f "$dd" ]; then
+      if [ "$(g_sha256_file "$dd")" = "$(g_sha256_file "$f")" ]; then
+        g_info "unchanged ${dd#"$TARGET"/}"
+      else
+        g_err "refusing to overwrite ${dd#"$TARGET"/}: it exists with different content and goblin-stack did not install it — remove or rename it first"
+        COPY_REFUSALS=$((COPY_REFUSALS + 1))
+      fi
+      continue
+    fi
+    cp "$f" "$dd" || die "cannot write $dd" 1
+    g_info "wrote ${dd#"$TARGET"/}"
+  done < <(find "$src" -type f | sort)
+  return 0
+}
+
+# install_skill <row> — copy the payload's skill dirs into the platform skills root
+# (per sync_platforms) or .gob/extras/ (standalone).
+install_skill() {
+  local row="$1" id name src_root dst_root d n=0
+  id=$(catalogue_field "$row" 1)
+  src_root="$PAYLOAD/$id"
+  [ -d "$src_root" ] \
+    || die "no vendored payload for '$id' at $src_root — extras install needs no network: vendor the accepted skill dirs there first (see extras-catalogue/payload/README.md)" 2
+  if [ -n "$PLATFORM" ]; then
+    dst_root="$TARGET/$(adapter_skills_root "$PLATFORM")"
+    dst_root="${dst_root%/}/"
+  else
+    dst_root="$TARGET/.gob/extras"
+  fi
+  [ -n "$(adapter_skills_root "$PLATFORM")" ] || [ -z "$PLATFORM" ] \
+    || die "adapter '$PLATFORM' carries no project skills path" 2
+  for d in "$src_root"/*/; do
+    [ -d "$d" ] || continue
+    name=$(basename "$d")
+    n=$((n + 1))
+    g_info "extras: skill $name -> ${dst_root#"$TARGET"/}$name/"
+    copy_tree "$d" "$dst_root/$name"
+  done
+  [ "$n" -gt 0 ] || die "payload for '$id' holds no skill dirs ($src_root/*/ with SKILL.md each) — see extras-catalogue/payload/README.md" 2
+  return 0
+}
+
+# install_workflow <row> — copy the payload into .gob/playbooks/<id>/.
+install_workflow() {
+  local row="$1" id src dst
+  id=$(catalogue_field "$row" 1)
+  src="$PAYLOAD/$id"
+  [ -d "$src" ] \
+    || die "no vendored payload for '$id' at $src — vendor the playbook files there first (see extras-catalogue/payload/README.md)" 2
+  dst="$TARGET/.gob/playbooks/$id"
+  g_info "extras: workflow $id -> ${dst#"$TARGET"/}/"
+  copy_tree "$src" "$dst"
+  return 0
+}
+
+# install_mcp <row> — print the mcp.json snippet; --with-mcp-config merges it into
+# the target's .mcp.json. The merge NEVER overwrites: an existing entry for the same
+# server name must match the generated bytes (no-op) or the merge refuses (ask-once).
+install_mcp() {
+  local row="$1" id hint cmd rest first_arg
+  id=$(catalogue_field "$row" 1)
+  hint=$(catalogue_field "$row" 14)
+  case "$hint" in
+    npx\ *|npm\ exec\ *)
+      read -r cmd rest <<< "$hint"
+      first_arg="$rest" ;;
+    *)
+      if [ "$WITH_MCP" -eq 1 ]; then
+        die "id '$id' carries install_hint '$hint' — only an 'npx <package>' hint can be merged into .mcp.json; follow the row's own hint by hand" 1
+      fi
+      g_info "extras: mcp $id — install per the row's own hint: $hint (no .mcp.json snippet is generated for it)"
+      return 0 ;;
+  esac
+  local snippet
+  snippet=$(python3 -c 'import json,sys; print(json.dumps({"mcpServers": {sys.argv[1]: {"command": sys.argv[2], "args": sys.argv[3].split()}}}, separators=(",",":")))' "$id" "$cmd" "$first_arg")
+  g_info "extras: mcp $id — mcp.json snippet:"
+  g_info "  $snippet"
+  [ "$WITH_MCP" -eq 1 ] || return 0
+  [ "$DRYRUN" -eq 0 ] || { g_info "plan: merge $id into ${TARGET#.}/.mcp.json"; return 0; }
+  MERGE_OUT=$(MCP_ID="$id" MCP_SNIPPET="$snippet" python3 - "$TARGET/.mcp.json" <<'PYEOF'
+import json, os, sys
+path = sys.argv[1]
+mcp_id = os.environ["MCP_ID"]
+snippet = json.loads(os.environ["MCP_SNIPPET"])
+server = snippet["mcpServers"][mcp_id]
+data = {}
+if os.path.exists(path):
+    raw = open(path).read().strip()
+    if raw:
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            sys.stderr.write("extras: refusing %s: it is not valid JSON - edit it by hand\n" % path)
+            sys.exit(1)
+servers = data.setdefault("mcpServers", {})
+if mcp_id in servers:
+    if servers[mcp_id] == server:
+        print("extras: unchanged %s (already carries the %s registration)" % (path, mcp_id))
+        sys.exit(0)
+    sys.stderr.write("extras: refusing to overwrite the existing %s entry in %s - an mcp registration you customized is the project's (ask-once)\n" % (mcp_id, path))
+    sys.exit(1)
+servers[mcp_id] = server
+with open(path, "w") as fh:
+    json.dump(data, fh, separators=(",", ":"))
+    fh.write("\n")
+print("extras: merged %s into %s" % (mcp_id, path))
+PYEOF
+  )
+  local rc=$?
+  [ -n "$MERGE_OUT" ] && printf '%s\n' "$MERGE_OUT"
+  [ "$rc" -eq 0 ] || exit 1
+  return 0
+}
+
+cmd_install() {
+  parse_install "$@"
+  [ "$DRYRUN" -eq 0 ] || g_info "extras: --dry-run (nothing is written)"
+  local id row
+  for id in "${IDS[@]}"; do
+    row=$(resolve_one "$id") || exit $?
+    case "$(catalogue_field "$row" 3)" in
+      skill)    install_skill "$row" ;;
+      workflow) install_workflow "$row" ;;
+      mcp)      install_mcp "$row" ;;
+      *)        die "row '$id' carries unknown kind '$(catalogue_field "$row" 3)' (want skill|mcp|workflow)" 2 ;;
+    esac
+  done
+  [ "$COPY_REFUSALS" -eq 0 ] || die "$COPY_REFUSALS file(s) refused (named above) — nothing overwritten" 1
+  return 0
+}
+
+# ---- dispatch ------------------------------------------------------------------
+CMD="${1:-}"
+[ -n "$CMD" ] || { usage; exit 2; }
+shift
+case "$CMD" in
+  list)    cmd_list "$@" ;;
+  show)    cmd_show "$@" ;;
+  install) cmd_install "$@" ;;
+  -h|--help|help) usage; exit 0 ;;
+  *) g_err "extras: unknown subcommand: $CMD"; usage >&2; exit 2 ;;
+esac
+exit 0

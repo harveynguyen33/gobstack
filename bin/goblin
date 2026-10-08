@@ -5,6 +5,8 @@
 #   gob map     [target] [--agent | --heuristic] [--write <dir>] [--force]
 #   gob verify  [--only <id[,id...]>] [--json] [--list] [--source <path>]
 #   gob bans    [--only <id[,id...]>] [--list]
+#   gob extras  list [category] | show <id> | install <id...> [--target <dir>]
+#                    [--platform <id>] [--with-mcp-config] [--dry-run]
 #   gob mcp                                     serve the harness over MCP stdio
 #   gob uninstall --target <dir>
 #   gob --version
@@ -48,6 +50,7 @@ gob — the gobstack command line.
   gob map     [target] [--agent | --heuristic] [--write <dir>] [--force]
   gob verify  [--only <id[,id...]>] [--json] [--list] [--source <path>]
   gob bans    [--only <id[,id...]>] [--list]
+  gob extras  list [category] | show <id> | install <id...>   # the curated extras catalogue
   gob mcp     serve the harness to your agent over MCP stdio (verify/map/init tools)
   gob uninstall --target <dir>
   gob --version
@@ -96,6 +99,12 @@ case "$CMD" in
     ;;
   bans)
     exec bash "$SRC/bin/goblin-bans" "$@"
+    ;;
+  extras)
+    # The curated catalogue browser + installer (bin/goblin-extras): list/show/install
+    # over extras-catalogue/catalogue.tsv. The catalogue is the ALLOWLIST: nothing is
+    # ever installed that a catalogue row does not name, and `gob init` only suggests.
+    exec bash "$SRC/bin/goblin-extras" "$@"
     ;;
   mcp)
     # The MCP stdio server (bin/goblin-mcp.js): JSON-RPC 2.0 over stdin/stdout, a LOCAL
