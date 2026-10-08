@@ -6,11 +6,11 @@
 #   gob extras install <id...> [--target <dir>] [--platform <id>]
 #                    [--with-mcp-config] [--dry-run]
 #
-# THE ALLOWLIST RULE (non-negotiable): only ids that exist in catalogue.tsv are ever
+# The ALLOWLIST RULE (non-negotiable): only ids that exist in catalogue.tsv are ever
 # installed. An id the catalogue does not carry is refused by name — there is no path from
 # a URL or a repo name on this command to a file write. `gob init` SUGGESTS rows and never
 # auto-installs; a human (or the proposal the human approves) names ids explicitly, and
-# Harvey curates what the catalogue carries (add a row = PR or edit catalogue.tsv).
+# the curator maintains the catalogue (add a row = PR or edit catalogue.tsv).
 #
 # Verdicts: RECOMMEND rows install; MAYBE rows install (an explicit choice, never
 # pre-ticked at init); SKIP rows refuse — the curator's verdict is the contract.
@@ -76,7 +76,8 @@ adapter_ids() {
 }
 
 # adapter_skills_root <id> — the PROJECT skills root (the pattern with its
-# `<name>/SKILL.md` tail stripped), e.g. `.claude/skills/`. Empty when unknown.
+# `<name>/SKILL.md` tail stripped), one dot-dir per agent family. Read at run time;
+# the family names live in the adapter tables, never here (the MD-01 discipline).
 adapter_skills_root() {
   local t="$SRC/adapters/$1/adapter.tsv" pat
   [ -f "$t" ] || return 0

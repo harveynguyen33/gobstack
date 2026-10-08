@@ -159,8 +159,8 @@ back one proposal file. Do this now:
    Rules: verify the URL is live before proposing it; state the license you found;
    never propose anything you did not actually read. Proposals are INERT — nothing
    auto-installs from discovery, and no discovery reaches this repo from the CLI.
-   A human reviews the proposals, then the curator (Harvey) promotes accepted
-   discoveries into catalogue.tsv by PR or direct edit. Until a row exists in the
+   A human reviews the proposals, then the curator promotes accepted discoveries
+   into catalogue.tsv by PR or direct edit. Until a row exists in the
    catalogue, `gob extras install` refuses it — the catalogue is the allowlist.
 
 5. WRITE the proposal file exactly in the SCHEMA below, at a path you choose (for

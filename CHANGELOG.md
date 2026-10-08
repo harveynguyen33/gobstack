@@ -3,6 +3,22 @@
 One line per released version. `goblin-install --upgrade` prints the delta between the
 version recorded in a target's `.goblin/installed.json` and the source `VERSION`.
 
+## Unreleased (feat/extras-catalogue)
+
+- **`gob extras`: the curated catalogue (the surface is seven verbs).** The catalogue
+  (`extras-catalogue/catalogue.tsv`, 41 researched rows in 17 columns: 18 RECOMMEND incl.
+  `impeccable`, MAYBE/SKIP carried with verdicts) is browsed (`list [category]`, `show <id>`)
+  and installed (`install <id...>` — skills per the sync_platforms pattern or `.gob/extras/`,
+  mcp rows as an ask-once `.mcp.json` merge, workflows into `.gob/playbooks/`). The catalogue
+  is the ALLOWLIST: an unknown id or a SKIP verdict refuses; installs copy from the vendored
+  `extras-catalogue/payload/` — no network, no download path.
+- **`gob init` suggests extras; it never installs them.** The AGENT BRIEF carries
+  `catalogue_suggestions` (matches-column rows; RECOMMEND pre-ticked, MAYBE visible and
+  unticked, SKIP never) and the `discover_extras` tier: web-found candidates proposed under a
+  fixed schema (`source_url`/`license`/`rationale`/`suggested_kind`), inert until the curator
+  promotes them into catalogue.tsv by PR or edit. `--write` honours only the proposal's TICKED
+  rows, through `gob extras install` itself — one allowlist, one code path.
+
 ## 0.6.0-alpha.1
 
 The v2 breaking release: rules-first. The rules a repo is judged by move from a config file the

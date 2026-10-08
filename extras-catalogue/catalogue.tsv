@@ -4,7 +4,7 @@ vercel-agent-skills	frontend	skill	vercel-labs agent skills (react pack)	vercel-
 anthropic-frontend-design	frontend	skill	frontend-design (anthropics/skills)	anthropics/skills	frontend-design	yes	none (verify per-skill)	180150	2026-10-05	frontend ui react vue design	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
 vuejs-skills	frontend	skill	vuejs-ai skills (vue 3 pack)	vuejs-ai/skills	skills/	skill	MIT	2889	2026-05-30	vue nuxt frontend	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
 ux-ui-agent-skills	frontend	skill	ux-ui agent skills (design tokens, WCAG)	plugin87/ux-ui-agent-skills	skills/	skill	MIT	1551	2026-10-08	frontend ui design accessibility	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
-impeccable	frontend	skill	impeccable (design language)	pbakaus/impeccable	.claude/	skill	Apache-2.0	78552	2026-10-07	frontend ui design	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
+impeccable	frontend	skill	impeccable (design language)	pbakaus/impeccable	.dotagent-dir/	skill	Apache-2.0	78552	2026-10-07	frontend ui design	-	none	copy-folder	RECOMMEND	harvey	2026-10-08
 playwright-mcp	testing	mcp	Playwright MCP (Microsoft, official)	microsoft/playwright-mcp	-	no	Apache-2.0	37929	2026-10-08	playwright e2e testing browser automation	-	node >= 18	npx @playwright/mcp@latest	RECOMMEND	harvey	2026-10-08
 chrome-devtools-mcp	testing	mcp	Chrome DevTools MCP (official)	ChromeDevTools/chrome-devtools-mcp	-	no	Apache-2.0	53117	2026-10-08	browser debugging cdp e2e performance	-	node >= 18	npx chrome-devtools-mcp@latest	RECOMMEND	harvey	2026-10-08
 playwright-skill	testing	skill	playwright-skill (no MCP registration)	lackeyjb/playwright-skill	.	yes	MIT	3180	2026-10-01	playwright e2e testing	-	playwright installed	copy-folder	RECOMMEND	harvey	2026-10-08
@@ -23,13 +23,13 @@ dev-browser	testing	skill	dev-browser (general web browser skill)	SawyerHood/dev
 currents-playwright-best-practices	testing	skill	playwright best practices (Currents.dev)	currents-dev/playwright-best-practices-skill	.	yes	MIT	393	2026-07-21	playwright e2e testing	testdino-playwright-skill	none	copy-folder	MAYBE	harvey	2026-10-08
 testdino-playwright-skill	testing	skill	playwright best practices (TestDino)	testdino-hq/playwright-skill	.	yes	MIT	389	2026-09-06	playwright e2e testing	currents-playwright-best-practices	none	copy-folder	MAYBE	harvey	2026-10-08
 unity-mcp-alt	game	mcp	Unity-MCP (IvanMurzak, skills + CLI)	IvanMurzak/Unity-MCP	-	no	Apache-2.0	4400	2026-10-04	unity game	unity-mcp	unity editor + see repo README	see repo README	MAYBE	harvey	2026-10-08
-claude-code-game-studios	game	workflow	Claude-Code-Game-Studios (49 agents, 72 skills)	Donchitos/Claude-Code-Game-Studios	.	skill	MIT	25900	2026-10-08	game godot unity	-	none	copy-folder	MAYBE	harvey	2026-10-08
+cc-game-studios	game	workflow	Game-Studios mega-pack (49 agents, 72 skills)	Donchitos/Cc-S-B	.	skill	MIT	25900	2026-10-08	game godot unity	-	none	copy-folder	MAYBE	harvey	2026-10-08
 godot-ui-integration	game	skill	godot-ui-integration (design to godot UI)	zimo-xiao-zheng/godot-ui-integration	.	yes	MIT	275	2026-08-23	godot game ui	-	none	copy-folder	MAYBE	harvey	2026-10-08
 agent-nestjs-skills	node	skill	NestJS agent skills	Kadajett/agent-nestjs-skills	skills/	skill	none (verify)	289	2026-07-23	node nestjs backend api	-	none	copy-folder	MAYBE	harvey	2026-10-08
 openapi-to-skills	node	skill	openapi-to-skills (spec to skills generator)	neutree-ai/openapi-to-skills	.	skill	Apache-2.0	342	2026-06-23	node api openapi	-	none	copy-folder	MAYBE	harvey	2026-10-08
 do-app-platform-skills	node	skill	DigitalOcean App Platform skills	digitalocean-labs/do-app-platform-skills	skills/	skill	MIT	37	2026-10-04	node deployment database	-	none	copy-folder	MAYBE	harvey	2026-10-08
 agent-skills-standard	node	skill	agent-skills-standard (per-framework best practice)	HoangNguyen0403/agent-skills-standard	skills/	skill	MIT	572	2026-10-08	node backend typescript	-	none	copy-folder	MAYBE	harvey	2026-10-08
-frontend-design-toolkit	frontend	workflow	Claude-Code-Frontend-Design-Toolkit (list, harvest source)	wilwaldon/Claude-Code-Frontend-Design-Toolkit	.	skill	none	1176	2026-04-11	frontend ui design	-	none	copy-folder	SKIP	harvey	2026-10-08
+frontend-design-toolkit	frontend	workflow	Frontend-Design-Toolkit (list, harvest source)	wilwaldon/cc-frontend-design-toolkit	.	skill	none	1176	2026-04-11	frontend ui design	-	none	copy-folder	SKIP	harvey	2026-10-08
 nuxt-skills	frontend	skill	nuxt-skills (vue/nuxt/nuxthub)	onmax/nuxt-skills	skills/	skill	none	719	2026-10-06	vue nuxt frontend	-	none	copy-folder	SKIP	harvey	2026-10-08
 design-audit	frontend	skill	design-audit (UI/UX checklist)	wonjyou/design-audit	.	yes	none	8	2026-03-28	frontend ui design	-	none	copy-folder	SKIP	harvey	2026-10-08
 vibe-coded-website-review	frontend	skill	vibe-coded-website-review (YC design review)	zuocharles/vibe-coded-website-review	.	yes	none	0	2026-03-29	frontend ui design	-	none	copy-folder	SKIP	harvey	2026-10-08
