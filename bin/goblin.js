@@ -10,6 +10,7 @@
 //   gob map    [...]                      -> bin/goblin-map (prompt+schema; --heuristic fallback)
 //   gob verify [...]                      -> bin/goblin-verify
 //   gob bans   [...]                      -> bin/goblin-bans
+//   gob mcp                               -> bin/goblin-mcp.js (the MCP stdio server)
 //   gob uninstall [--target <dir>]        -> bin/goblin-install --uninstall
 //   no args | -h/--help | any other first arg -> this file's short usage, exit 2.
 //
@@ -36,7 +37,7 @@ if (arg0 === "--version" || arg0 === "-V" || arg0 === "-v") {
   process.exit(0);
 }
 
-const SCRIPT = { init: "goblin-init", map: "goblin-map", verify: "goblin-verify", bans: "goblin-bans" };
+const SCRIPT = { init: "goblin-init", map: "goblin-map", verify: "goblin-verify", bans: "goblin-bans", mcp: "goblin-mcp.js" };
 const [cmd, ...rest] = process.argv.slice(2);
 
 // No args, a help flag, or an unrecognized first arg: short usage, exit 2. A bare
@@ -51,9 +52,11 @@ function usage() {
 "  gob verify    run the rule matrix against the current repo",
 "  gob bans      run the ban list (per-pattern red lines over the source tree)",
 "  gob map       print the feature-map prompt + schema; --heuristic scans instead",
+"  gob mcp       serve the harness to your agent over MCP stdio (verify/map/init tools)",
 "  gob uninstall --target .          remove exactly what an install wrote (preimages)",
 "",
 "start here: npx @techgoblin/gobstack init",
+"register the verify tool for your agent: claude mcp add gob -- npx -y @techgoblin/gobstack mcp",
 "uninstall: npm uninstall -g @techgoblin/gobstack",
 "",
 ].join("\n"));
@@ -79,6 +82,8 @@ if (cmd === "uninstall") {
 }
 const file = path.join(__dirname, "..", "bin", target);
 // execPath-independent: call bash explicitly so Windows-WSL/Git-Bash works and no
-// shebang resolution is needed.
-const r = spawnSync("bash", [file, ...extra, ...rest], { stdio: "inherit" });
+// shebang resolution is needed — except for the .js targets (the MCP server), which
+// run under node, the same runtime this shim already is.
+const runner = target.endsWith(".js") ? process.execPath : "bash";
+const r = spawnSync(runner, target.endsWith(".js") ? [file, ...rest] : [file, ...extra, ...rest], { stdio: "inherit" });
 process.exit(r.status ?? 2);
