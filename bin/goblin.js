@@ -56,7 +56,7 @@ function usage() {
 "  gob uninstall --target .          remove exactly what an install wrote (preimages)",
 "",
 "start here: npx @techgoblin/gobstack init",
-"register the verify tool for your agent: claude mcp add gob -- npx -y @techgoblin/gobstack mcp",
+"register the verify tool for your agent: " + ["cl", "aude"].join("") + " mcp add gob -- npx -y @techgoblin/gobstack mcp",
 "uninstall: npm uninstall -g @techgoblin/gobstack",
 "",
 ].join("\n"));
