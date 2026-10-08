@@ -19,8 +19,7 @@
 #   --opt-out <part>      record the part in disabled: so its required checks are skipped
 #   --uninstall           remove exactly the files in installed.json
 #   --re-pin              re-record practice_sha256: for an edited standard; nothing else changes
-#   --ci-gate yes|no      the CI lane opt-in (default: the class decides - ci-gate R/O places
-#                         .github/workflows/goblin-gate.yml, ci-gate '-' never does). An
+#   (the CI lane was REMOVED from the product in v2: no .github/workflows payload, the
 #                         explicit no opts the part out (recorded in disabled: so CL-01
 #                         reports the opt-out, never a silent absence); an explicit yes is
 #                         refused for a class that forbids the part.
@@ -66,11 +65,7 @@ UNINSTALL=0
 RE_PIN=0
 FORCE=0
 OPT_OUT=""
-# The CI lane opt-in (wizard v2). Empty = the class decides, exactly as before this flag
-# existed: every pre-existing invocation (and every pipe) keeps its byte-identical shape.
-# "no" is an explicit opt-out of the ci-gate part; "yes" is an explicit opt-in, refused for
-# a class that forbids the part (CL-01 would fail it on the very first verify).
-CI_GATE_OPT=""
+# CI_GATE_OPT is gone with the CI lane (v2): no flag, no workflow file, no ci_gate field.
 # The electron opt-in (the merged desktop/F class): renders presets/electron-overlay.yaml over
 # the software preset. Auto-set when --class resolves via the desktop/F/f alias, so the alias
 # behaves as the old class F did rather than silently installing weaker software.
@@ -98,7 +93,6 @@ while [ $# -gt 0 ]; do
     --uninstall) UNINSTALL=1; shift ;;
     --re-pin)    RE_PIN=1; shift ;;
     --opt-out)   OPT_OUT="${2:-}"; shift 2 ;;
-    --ci-gate)   CI_GATE_OPT="${2:-}"; shift 2 ;;
     --force)     FORCE=1; shift ;;
     --yes)       shift ;;
     -h|--help)   usage; exit 0 ;;
@@ -117,8 +111,8 @@ TARGET=$(cd "$TARGET" && pwd)
 
 VERSION=$(head -n 1 "$SRC/VERSION")
 CLASSES_TSV="$SRC/manifest/classes.tsv"
-INSTALLED="$TARGET/.goblin/installed.json"
-CONFIG="$TARGET/.goblin/goblin.yaml"
+INSTALLED="$TARGET/.gob/installed.json"
+CONFIG="$TARGET/AGENTS.md"
 STAMP=$(date +%F)
 
 # --uninstall and --re-pin are different jobs, and this guard has to sit ABOVE the uninstall
@@ -145,14 +139,20 @@ if [ "$UNINSTALL" -eq 1 ]; then
     # .github/ behind with nothing named (the shape t-uninstall.sh asserts against).
     d="$p"; while [ "${d%/*}" != "$d" ]; do d="${d%/*}"; PARENTS="$PARENTS$d"$'\n'; done
   done < <(g_installed_files "$INSTALLED")
-  # The config is goblin-stack's own file, so it goes too. HANDOFF/AGENTS/SPEC/reviews do not:
-  # they are the project's record, not the harness's.
-  if [ -f "$CONFIG" ]; then
-    [ "$DRY_RUN" -eq 1 ] || rm -f "$CONFIG"
-    g_info "removed .goblin/goblin.yaml (goblin-stack's own config)"
+  # The config lives in the AGENTS.md gob block: uninstall strips ONLY the marker block and
+  # keeps the file (the body prose is the project's). A file with no gob block is untouched.
+  if [ -f "$CONFIG" ] && grep -q "^$GOB_AGENTS_BEGIN" "$CONFIG" 2>/dev/null; then
+    if [ "$DRY_RUN" -eq 1 ]; then
+      g_info "would remove the gob block from $CONFIG (the body prose stays)"
+    else
+      awk -v begin="^$GOB_AGENTS_BEGIN" -v end="^$GOB_AGENTS_END" '
+        $0 ~ begin { inb = 1; next } $0 ~ end { inb = 0; next } !inb { print }
+      ' "$CONFIG" > "$CONFIG.nogob" && mv "$CONFIG.nogob" "$CONFIG"
+      g_info "removed the gob block from AGENTS.md (the body prose stays)"
+    fi
   fi
   # Runtime state goblin-stack's own checks wrote.
-  for f in .goblin/last-gate-line .goblin/ratchet-last .goblin/.ds-report; do
+  for f in .gob/last-gate-line .gob/ratchet-last .gob/.ds-report; do
     [ -f "$TARGET/$f" ] || continue
     [ "$DRY_RUN" -eq 1 ] || rm -f "$TARGET/$f"
     g_info "removed $f (runtime state)"
@@ -165,7 +165,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
   while IFS=$'\t' read -r p h; do
     [ -n "$p" ] || continue
     case "$p" in
-      .goblin/audit-waiver.tsv|.goblin/boundary-waivers|.goblin/install-hooks.allowlist) ;;
+      .gob/audit-waiver.tsv|.gob/boundary-waivers|.gob/install-hooks.allowlist) ;;
       *) continue ;;
     esac
     [ -e "$TARGET/$p" ] || continue
@@ -179,7 +179,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
       g_info "kept $p (you edited it: a decision record is the project's, not the harness's)"
     fi
   done < <(g_json_object "$INSTALLED" owned)
-  # installed.json goes BEFORE the directory pass. While it was still on disk, .goblin/ was
+  # installed.json goes BEFORE the directory pass. While it was still on disk, .gob/ was
   # never empty when it was tested, so the directory survived unnamed (D17 / F2-7).
   if [ "$DRY_RUN" -eq 0 ]; then
     rm -f "$INSTALLED"
@@ -189,7 +189,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
   fi
   # Empty directories goblin-stack created: the parents of the files just removed, plus the
   # harness roots. Deepest first, so a parent is only tested once its child has gone. The
-  # old fixed list never tried .hermes/skills/goblin-* and tested .goblin/ too early.
+  # old fixed list never tried .hermes/skills/goblin-* and tested .gob/ too early.
   nd=0
   while read -r d; do
     [ -n "$d" ] || continue
@@ -204,29 +204,28 @@ if [ "$UNINSTALL" -eq 1 ]; then
     fi
   done < <({
       printf '%s' "$PARENTS"
-      printf '.goblin\n.goblin/bin\n.goblin/manifest\n.goblin/bans\n.hermes\n.hermes/skills\n'
+      printf '.goblin\n.gob/bin\n.gob/manifest\n.gob/bans\n.hermes\n.hermes/skills\n'
     } | awk 'NF' | awk -F/ '{print NF " " $0}' | sort -rn | cut -d' ' -f2- | awk '!seen[$0]++')
   g_info "removed $n file(s) and $nd empty director(y|ies). Left in place: HANDOFF.md, AGENTS.md, ROUND-000-SPEC.md, reviews/, the .gitignore block${KEPT:+, and the decision record(s) you edited:$KEPT}."
   exit 0
 fi
 
 # ---------------------------------------------------------------- re-pin ------
-# The practice pin (practice_sha256: in .goblin/goblin.yaml, re-checked by IN-02) exists to catch
-# a SILENTLY edited standard. The standard itself is a living document edited in place, and
-# goblin.yaml is an `owned` file the installer never rewrites - so the remedy for an edit that IS
+# The practice pin (practice_sha256: in the AGENTS.md gob block, re-checked by IN-02) exists to
+# catch a SILENTLY edited standard. The standard itself is a living document edited in place, and
+# the block is `owned` content the installer never rewrites - so the remedy for an edit that IS
 # intended has to be explicit, printed and deliberate. This mode rewrites exactly one line and
 # reports the old and new hash. It is unreachable from --upgrade and from goblin-verify, by
 # design: an automatic re-pin would be the silent edit the pin exists to catch.
 # See docs/CONTRACTS.md, "An edited standard is not a dead end".
 if [ "$RE_PIN" -eq 1 ]; then
   [ -f "$CONFIG" ] || { g_err "nothing to re-pin: $CONFIG is absent (install first)"; exit 2; }
-  PIN_PATH=$(g_expand_tilde "$(g_yaml_scalar "$CONFIG" practice)")
+  PIN_PATH=$(g_expand_tilde "$(g_agents_read "$CONFIG" practice)")
   [ -n "$PIN_PATH" ] || { g_err "no practice: recorded in $CONFIG — nothing to re-pin"; exit 2; }
   [ -f "$PIN_PATH" ] || { g_err "the recorded standard is absent: $PIN_PATH"; exit 2; }
-  grep -q '^practice_sha256:' "$CONFIG" || { g_err "no practice_sha256: line in $CONFIG to rewrite"; exit 2; }
   # g_unquote, exactly as goblin-verify reads it: a hand-quoted value is accepted by the verifier,
   # so it must not read as "different" here and trigger a rewrite of a line that already matches.
-  OLD_SHA=$(g_unquote "$(g_yaml_scalar "$CONFIG" practice_sha256)")
+  OLD_SHA=$(g_unquote "$(g_agents_read "$CONFIG" practice_sha256)")
   NEW_SHA=$(g_sha256_file "$PIN_PATH")
   if [ "$OLD_SHA" = "$NEW_SHA" ]; then
     g_info "practice pin already current: $PIN_PATH"
@@ -239,23 +238,27 @@ if [ "$RE_PIN" -eq 1 ]; then
     g_info "  now      $NEW_SHA"
     exit 0
   fi
-  # One line, in place. Every other line of the config - comments included - is untouched, so
-  # the `owned` contract holds for everything except the single value just asked for.
-  g_sed_i "s|^practice_sha256:.*|practice_sha256: $NEW_SHA|" "$CONFIG" \
+  # One key, in place: g_agents_write rewrites only the marker block, and the rewrite keeps
+  # every OTHER key by reading the current block first (the `owned` contract holds for
+  # everything except the single value just asked for).
+  {
+    while IFS= read -r k; do
+      [ "$k" = "practice_sha256" ] && continue
+      printf '%s\t%s\n' "$k" "$(g_agents_read "$CONFIG" "$k")"
+    done < <(g_agents_keys "$CONFIG")
+    printf 'practice_sha256\t%s\n' "$NEW_SHA"
+  } | g_agents_write "$CONFIG" >/dev/null \
     || { g_err "could not rewrite the pin in $CONFIG"; exit 1; }
-  # Fail closed: never report a re-pin that did not land. The failure this command exists to
-  # remove is a hash nobody verified (measured at bf7e9c9: sed -i could not write to a read-only
-  # .goblin/, yet the branch printed "practice re-pinned" with both hashes and exited 0, leaving
-  # IN-02 RED and the config byte-identical).
-  grep -qxF "practice_sha256: $NEW_SHA" "$CONFIG" \
+  # Fail closed: never report a re-pin that did not land.
+  [ "$(g_agents_read "$CONFIG" practice_sha256)" = "$NEW_SHA" ] \
     || { g_err "the new pin did not land in $CONFIG"; exit 1; }
   g_info "practice re-pinned: $PIN_PATH"
   g_info "  recorded $OLD_SHA"
   g_info "  now      $NEW_SHA"
   g_info ""
   g_info "next:"
-  g_info "  1. cd $TARGET && git add .goblin/goblin.yaml && git commit   # the re-pin is a change like any other"
-  g_info "  2. .goblin/bin/goblin-verify --only IN-02   # practice pin ok"
+  g_info "  1. cd $TARGET && git add AGENTS.md && git commit   # the re-pin is a change like any other"
+  g_info "  2. .gob/bin/goblin-verify --only IN-02   # practice pin ok"
   exit 0
 fi
 
@@ -268,7 +271,6 @@ CLASS_RAW="$CLASS"
 CLASS=$(g_class_canon "$CLASS") \
   || { g_err "--class must be software|service|game|research|fleet (or A-E / app / agent / desktop), got '$CLASS_RAW'"; exit 2; }
 case "$SKILLS" in yes|no) ;; *) g_err "--skills must be yes or no"; exit 2 ;; esac
-case "$CI_GATE_OPT" in ""|yes|no) ;; *) g_err "--ci-gate must be yes or no, got '$CI_GATE_OPT'"; exit 2 ;; esac
 
 # W6 migration safety: on a --upgrade (or any re-install) of a repo whose record shows skills
 # were installed, an OMITTED --skills flag must READ that state, not silently strip it. The
@@ -306,6 +308,7 @@ preset() {
 HARNESS_DIR=$(preset harness_dir); [ -n "$HARNESS_DIR" ] || HARNESS_DIR=checks
 SCAFFOLD=$(preset scaffold_checks); [ -n "$SCAFFOLD" ] || SCAFFOLD=no
 GATE_NAME=$(preset gate_name)
+# (GATE1/GATE2 render names are set in render_config; the preset keys are unchanged.)
 GATE_CMD=$(preset gate_cmd)
 RAT_NAME=$(preset ratchet_name)
 RAT_CMD=$(preset ratchet_cmd)
@@ -343,7 +346,7 @@ need() { g_class_need "$CLASSES_TSV" "$CLASS" "$1"; }
 
 # parts that are OFF for this class become real opt-outs, not silent absences
 DISABLED=""
-for p in handoff spec gate replay ratchet pr-gate review-panel playbooks tokens ci-gate; do
+for p in handoff spec gate replay ratchet pr-gate review-panel playbooks tokens; do
   [ "$(need "$p")" = "-" ] && DISABLED="$DISABLED$p,"
 done
 [ "$SKILLS" = "no" ] && DISABLED="$DISABLED""playbooks,"
@@ -363,18 +366,9 @@ WANT_SPEC=1; [ "$(need spec)" = "-" ] && WANT_SPEC=0
 WANT_REVIEWS=0
 case "$(need pr-gate)$(need review-panel)" in *R*|*O*) WANT_REVIEWS=1 ;; esac
 WANT_RATCHET=1; [ "$(need ratchet)" = "-" ] && WANT_RATCHET=0
-# The CI lane (G6 A.6). Installed for a class that requires or permits it (A, C, E, F) and never
-# for one that forbids it (B, D) - where CL-01 then requires the file to be ABSENT, which is why
-# class_part_artifact keys off this exact path rather than off .github/workflows/.
-# Wizard v2 adds the explicit opt-in/out: the empty default keeps the class-driven shape
-# byte-identical for every existing invocation; `no` opts the part out (recorded in disabled:
-# so CL-01 reports the opt-out rather than a silent absence, the --skills no precedent); `yes`
-# is refused for a class that forbids the part, because the file could never survive verify.
-WANT_CI_GATE=1; [ "$(need ci-gate)" = "-" ] && WANT_CI_GATE=0
-case "$CI_GATE_OPT" in
-  no)  WANT_CI_GATE=0; OPT_OUT="${OPT_OUT:+$OPT_OUT,}ci-gate" ;;
-  yes) [ "$WANT_CI_GATE" -eq 1 ] || { g_err "--ci-gate yes: class $CLASS forbids the ci-gate part - CI is not in this class's contract (see docs/CI.md)"; exit 2; } ;;
-esac
+# The CI lane is GONE (v2 product decision): no .github/workflows file is written, the ci-gate
+# part is recorded as a class-level opt-out, and no flag configures it.
+WANT_CI_GATE=0
 [ "$ARCHIVE" = "true" ] && { WANT_SPEC=0; WANT_REVIEWS=0; SCAFFOLD=no; }
 
 OWNER_EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
@@ -393,7 +387,7 @@ else
   # has to say so - `practice: ~` with no line in the log is the "silent no-op" species.
   if [ -n "$PRACTICE_ARG" ]; then
     g_info "warning: --practice $PRACTICE_ARG does not exist - no standard is referenced"
-    g_info "         (practice: and practice_sha256: stay empty in .goblin/goblin.yaml)"
+    g_info "         (practice: and practice_sha256: stay empty in the AGENTS.md gob block)"
   fi
   PRACTICE=""
   PRACTICE_SHA=""
@@ -526,16 +520,13 @@ put_once() {
 # ------------------------------------------------------- generated content ---
 render_config() {
   local gates runtime
-  gates="  - name: $GATE_NAME
-    cmd: $GATE_CMD"
-  # A class may declare a second gate (A: the TODO ceiling that used to be the ratchet, G4 D2).
-  if [ -n "$GATE2_NAME" ] && [ -n "$GATE2_CMD" ]; then
-    gates="$gates
-  - name: $GATE2_NAME
-    cmd: $GATE2_CMD"
-  fi
-  runtime="  - $RUNTIME_DATA"
-  render "$SRC/templates/goblin.yaml.tmpl" \
+  # v2 gate shape: one flat key per gate (gate_<name>_cmd:). A class may declare a second
+  # gate (A: the TODO ceiling that used to be the ratchet, G4 D2); a class with none renders
+  # an empty gate name and the key line is dropped below.
+  GATE1_NAME="$GATE_NAME"; GATE1_CMD="$GATE_CMD"
+  GATE2_RENDER_NAME="$GATE2_NAME"; GATE2_RENDER_CMD="$GATE2_CMD"
+  runtime="$RUNTIME_DATA"
+  render "$SRC/templates/agents-block.tmpl" \
     CLASS "$CLASS" \
     ELECTRON "$( [ "$ELECTRON" -eq 1 ] && printf 'true' || printf 'false' )" \
     BRANCH "$BRANCH" \
@@ -566,7 +557,10 @@ render_config() {
     REFERENCE_MANIFEST "" \
     QUARANTINE_ROOT "" \
     LOOP_MAX_TURNS "$LOOP_MAX_TURNS" \
-    GATES "$gates" \
+    GATE1_NAME "$GATE1_NAME" \
+    GATE1_CMD "$GATE1_CMD" \
+    GATE2_NAME "$GATE2_RENDER_NAME" \
+    GATE2_CMD "$GATE2_RENDER_CMD" \
     RATCHET_NAME "$RAT_NAME" \
     RATCHET_CMD "$RAT_CMD" \
     RATCHET_CEILING "$RAT_CEIL" \
@@ -576,7 +570,9 @@ render_config() {
     LAYERS "$LAYERS_BLOCK" \
     REPLAY_ENV "$REPLAY_ENV" \
     REPLAY_CMD "$REPLAY_CMD" \
-    DISABLED "$DISABLED" > "$TMP/goblin.yaml"
+    DISABLED "$DISABLED" > "$TMP/agents-block.raw"
+  # A gate with no name renders a `gate__cmd:` line - dropped, not shipped.
+  grep -v '^gate__cmd: $' "$TMP/agents-block.raw" > "$TMP/agents-block"
 }
 
 render_config
@@ -610,33 +606,41 @@ if [ -f "$INSTALLED" ] && [ "$(g_install_engine_mode "$INSTALLED")" = "global" ]
       gsub(q, "", v); print v; exit
     }
   ' "$INSTALLED")
-  g_err "goblin-install: $TARGET is migrated to the global engine at ${g_rec_engine_dir:-<unknown>}. Re-installing would re-shadow it and rewrite its migration record. To return to a vendored engine: git revert the two W3 commits (see docs/GUIDE.md \"Rolling back a migration\"). To re-point at a different engine: edit .goblin/goblin.yaml's engine_dir line."
+  g_err "goblin-install: $TARGET is migrated to the global engine at ${g_rec_engine_dir:-<unknown>}. Re-installing would re-shadow it and rewrite its migration record. To return to a vendored engine: git revert the two W3 commits (see docs/GUIDE.md \"Rolling back a migration\"). To re-point at a different engine: edit AGENTS.md's engine_dir line."
   exit 1
 fi
 
-put ".goblin/bin/goblin-verify" "$SRC/bin/goblin-verify"
-put ".goblin/bin/goblin-lib.sh" "$SRC/bin/goblin-lib.sh"
+put ".gob/bin/goblin-verify" "$SRC/bin/goblin-verify"
+put ".gob/bin/goblin-lib.sh" "$SRC/bin/goblin-lib.sh"
 # The audit record is produced by a DELIBERATE, separate command - SC-07 reads the record and
 # never the network (RISKS.md K4: no network at verify time).
-put ".goblin/bin/goblin-audit" "$SRC/bin/goblin-audit"
-put ".goblin/roles.yaml" "$SRC/roles.yaml"
-put ".goblin/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
-put ".goblin/manifest/playbooks.tsv" "$SRC/manifest/playbooks.tsv"
-put ".goblin/manifest/classes.tsv" "$SRC/manifest/classes.tsv"
-put ".goblin/manifest/glossary.tsv" "$SRC/manifest/glossary.tsv"
+put ".gob/bin/goblin-audit" "$SRC/bin/goblin-audit"
+put ".gob/roles.yaml" "$SRC/roles.yaml"
+put ".gob/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
+put ".gob/manifest/playbooks.tsv" "$SRC/manifest/playbooks.tsv"
+put ".gob/manifest/classes.tsv" "$SRC/manifest/classes.tsv"
+put ".gob/manifest/glossary.tsv" "$SRC/manifest/glossary.tsv"
 # The ban list (G5): the table, the engine, and the two probes. A ban with no mechanism is a
 # wish, so the table and the engine install together or not at all.
-put ".goblin/manifest/bans.tsv" "$SRC/manifest/bans.tsv"
-put ".goblin/bin/goblin-bans" "$SRC/bin/goblin-bans"
-put ".goblin/bans/README.md" "$SRC/bans/README.md"
-put ".goblin/bans/grep-ban.sh" "$SRC/bans/grep-ban.sh"
-put ".goblin/bans/layer-check.sh" "$SRC/bans/layer-check.sh"
-put_once ".goblin/goblin.yaml" "$TMP/goblin.yaml"
+put ".gob/manifest/bans.tsv" "$SRC/manifest/bans.tsv"
+put ".gob/bin/goblin-bans" "$SRC/bin/goblin-bans"
+put ".gob/bans/README.md" "$SRC/bans/README.md"
+put ".gob/bans/grep-ban.sh" "$SRC/bans/grep-ban.sh"
+put ".gob/bans/layer-check.sh" "$SRC/bans/layer-check.sh"
+# The AGENTS.md frontmatter: the body prose is rendered once (put_once), then the marker
+# block is written into it through g_agents_write — the same path every later rewrite takes,
+# so the block is never a second copy of the file and the body is never machine-owned.
+render "$SRC/templates/AGENTS.md.tmpl" CLASS "$CLASS" DATE "$STAMP" > "$TMP/agents-body"
+put_once "AGENTS.md" "$TMP/agents-body"
+if [ "$DRY_RUN" -eq 0 ] && [ -f "$CONFIG" ]; then
+  g_agents_write "$CONFIG" < "$TMP/agents-block" >/dev/null \
+    || { g_err "could not write the gob block into $CONFIG"; exit 1; }
+fi
 # The security lane's two decision records and the audit allowlist are created once, then YOURS:
 # they are answers to questions only the project can answer (G4 B3).
-[ -f "$SRC/templates/audit-waiver.tsv.tmpl" ] && put_once ".goblin/audit-waiver.tsv" "$SRC/templates/audit-waiver.tsv.tmpl"
-[ -f "$SRC/templates/boundary-waivers.tmpl" ] && put_once ".goblin/boundary-waivers" "$SRC/templates/boundary-waivers.tmpl"
-[ -f "$SRC/templates/install-hooks.allowlist.tmpl" ] && put_once ".goblin/install-hooks.allowlist" "$SRC/templates/install-hooks.allowlist.tmpl"
+[ -f "$SRC/templates/audit-waiver.tsv.tmpl" ] && put_once ".gob/audit-waiver.tsv" "$SRC/templates/audit-waiver.tsv.tmpl"
+[ -f "$SRC/templates/boundary-waivers.tmpl" ] && put_once ".gob/boundary-waivers" "$SRC/templates/boundary-waivers.tmpl"
+[ -f "$SRC/templates/install-hooks.allowlist.tmpl" ] && put_once ".gob/install-hooks.allowlist" "$SRC/templates/install-hooks.allowlist.tmpl"
 
 if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
   for d in "$SRC"/skills/*/; do
@@ -654,7 +658,7 @@ if [ "$SKILLS_NAMED" -eq 1 ] && [ "$SKILLS" = "no" ] && [ -n "$PREV_FILES" ]; th
   while IFS= read -r rel; do
     case "$rel" in .hermes/skills/*) ;; *) continue ;; esac
     dst="$TARGET/$rel"
-    [ -f "$dst" ] || { rm -f "$TARGET/.goblin/$(basename "$rel")" 2>/dev/null; continue; }
+    [ -f "$dst" ] || { rm -f "$TARGET/.gob/$(basename "$rel")" 2>/dev/null; continue; }
     if [ "$DRY_RUN" -eq 1 ]; then
       g_info "plan: remove $rel (explicit --skills no)"
     else
@@ -677,10 +681,10 @@ if [ "$PLAYBOOKS_ON" -eq 1 ] && part_wanted playbooks; then
   for f in "$SRC"/automations/drift-audit.sh "$SRC"/automations/bugreporter-intake.sh \
            "$SRC"/automations/README.md "$SRC"/automations/report.schema.tsv; do
     [ -f "$f" ] || continue
-    put ".goblin/automations/$(basename "$f")" "$f"
+    put ".gob/automations/$(basename "$f")" "$f"
   done
   if [ -f "$SRC/templates/report.yaml.tmpl" ]; then
-    put ".goblin/automations/report.yaml.tmpl" "$SRC/templates/report.yaml.tmpl"
+    put ".gob/automations/report.yaml.tmpl" "$SRC/templates/report.yaml.tmpl"
   fi
 fi
 
@@ -692,21 +696,10 @@ if [ "$ARCHIVE" != "true" ] && part_wanted handoff; then
   render "$SRC/templates/HANDOFF.md.tmpl" CLASS "$CLASS" DATE "$STAMP" HEAD "$HEAD_SHORT" BRANCH "$BRANCH" GATE_NAME "$GATE_NAME" GATE_CMD "$GATE_CMD" > "$TMP/handoff"
   put_once "HANDOFF.md" "$TMP/handoff"
 fi
-render "$SRC/templates/AGENTS.md.tmpl" CLASS "$CLASS" DATE "$STAMP" > "$TMP/agents"
-put_once "AGENTS.md" "$TMP/agents"
 
 if [ "$WANT_REVIEWS" -eq 1 ]; then
   printf '# Review verdicts live here: reviews/<slug>-<head7>.md, each naming the SHA it reviewed.\n' > "$TMP/gitkeep"
   put_once "reviews/.gitkeep" "$TMP/gitkeep"
-fi
-
-# The CI lane (G6): one workflow, rendered and placed. The header of the template states what
-# makes a workflow a GATE (a required check, no admin bypass, a push identity that is not the
-# repo's sole admin) - because a workflow file nobody is bound by is decoration. The job carries
-# no `if:` at any level, so PG-05 passes on goblin-stack's own output.
-if [ "$WANT_CI_GATE" -eq 1 ] && part_wanted ci-gate && [ -f "$SRC/templates/ci/goblin-gate.yml.tmpl" ]; then
-  render "$SRC/templates/ci/goblin-gate.yml.tmpl" CLASS "$CLASS" BRANCH "$BRANCH" DATE "$STAMP" > "$TMP/gate.yml"
-  put ".github/workflows/goblin-gate.yml" "$TMP/gate.yml"
 fi
 
 if [ "$SCAFFOLD" = "yes" ]; then
@@ -725,7 +718,7 @@ else
     [ -f "$TARGET/.gitignore" ] && cat "$TARGET/.gitignore"
     printf '\n%s\n' "$GI_MARK"
     printf '# goblin-stack runtime state (gates write these; they are not fixture)\n'
-    printf '.goblin/last-gate-line\n.goblin/.ds-report\n.goblin/ratchet-last\n'
+    printf '.gob/last-gate-line\n.gob/.ds-report\n.gob/ratchet-last\n'
     if [ "$SEC_GITIGNORE_FAMILY" = "yes" ]; then
       # SC-02: the whole secret family, not one member of it. The row is behavioural - it asks
       # git's own matcher (`git check-ignore`) rather than reading this file - so a rule that
@@ -751,7 +744,7 @@ fi
   printf '  "source_sha": "%s",\n' "$( cd "$SRC" && git rev-parse HEAD 2>/dev/null || echo unknown )"
   printf '  "class": "%s",\n' "$CLASS"
   printf '  "installed_at": "%s",\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf '  "options": {"skills": "%s", "archive": %s, "parts": "%s", "ci_gate": "%s"},\n' "$SKILLS" "$ARCHIVE" "${PARTS:-all}" "${CI_GATE_OPT:-class}"
+  printf '  "options": {"skills": "%s", "archive": %s, "parts": "%s"},\n' "$SKILLS" "$ARCHIVE" "${PARTS:-all}"
   printf '  "files": {\n'
   awk -F'\t' 'NF==2 {printf "    \"%s\": \"%s\",\n", $1, $2}' "$TMP/files.tsv" | sed '$ s/,$//'
   printf '  },\n'
@@ -787,22 +780,23 @@ if [ "$DRY_RUN" -eq 0 ]; then
     fi
     g_info "created $CREATED · updated $UPDATED · unchanged $UNCHANGED · skipped $SKIPPED"
   fi
-  if [ -n "$OPT_OUT" ]; then
-    for p in $(printf '%s' "$OPT_OUT" | tr ',' ' '); do
-      if grep -q "^disabled:" "$CONFIG"; then
-        cur=$(g_yaml_scalar "$CONFIG" disabled)
-        cur=${cur#[}; cur=${cur%]}
-        new=$(printf '%s,%s' "$cur" "$p" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
-        g_sed_i "s|^disabled:.*|disabled: [$new]|" "$CONFIG"
-      fi
-    done
+  if [ -n "$OPT_OUT" ] && grep -q "^$GOB_AGENTS_BEGIN" "$CONFIG" 2>/dev/null; then
+    cur=$(g_agents_read "$CONFIG" disabled)
+    new=$(printf '%s,%s' "${cur#[]}" "${OPT_OUT}" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
+    {
+      while IFS= read -r k; do
+        [ "$k" = "disabled" ] && continue
+        printf '%s\t%s\n' "$k" "$(g_agents_read "$CONFIG" "$k")"
+      done < <(g_agents_keys "$CONFIG")
+      printf 'disabled\t[%s]\n' "$new"
+    } | g_agents_write "$CONFIG" >/dev/null
     g_info "recorded opt-out: $OPT_OUT"
   fi
   g_info ""
   g_info "next:"
   g_info "  1. cd $TARGET && git add -A && git commit   # the install is a change like any other"
-  g_info "  2. .goblin/bin/goblin-verify   # or add .goblin/bin to PATH"
-  g_info "  3. edit .goblin/goblin.yaml: replace the default gate with your real commands (P8 step 3)"
+  g_info "  2. .gob/bin/goblin-verify   # or add .gob/bin to PATH"
+  g_info "  3. edit AGENTS.md: replace the default gate with your real commands (P8 step 3)"
   if [ "$SKILLS" = "yes" ]; then
     g_info "  4. hermes skills trust $TARGET   # one-time, so the project-tier skills load"
   else
@@ -810,8 +804,8 @@ if [ "$DRY_RUN" -eq 0 ]; then
   fi
   g_info ""
   g_info "automations (optional; neither writes outside this repo, and A-02 has no agent in it):"
-  g_info "  bash $TARGET/.goblin/automations/drift-audit.sh --dry-run        # read the record first"
-  g_info "  cp $TARGET/.goblin/automations/drift-audit.sh ~/.hermes/scripts/"
+  g_info "  bash $TARGET/.gob/automations/drift-audit.sh --dry-run        # read the record first"
+  g_info "  cp $TARGET/.gob/automations/drift-audit.sh ~/.hermes/scripts/"
   g_info "  hermes cron create \"0 9 * * 1\" --name \"Drift audit - weekly\" --no-agent \\"
   g_info "      --script drift-audit.sh --deliver <channel>"
   g_info "  P13/P14 in docs/FLOWS.md; the whole model in automations/README.md"

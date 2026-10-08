@@ -2,7 +2,7 @@
 # goblin-model — resolve a ROLE to provider/model/effort, by reading one mapping file.
 #
 # Usage:
-#   goblin-model <role> [--models <file>] [--config <goblin.yaml>] [--roles <roles.yaml>] [--json]
+#   goblin-model <role> [--models <file>] [--config <AGENTS.md>] [--roles <roles.yaml>] [--json]
 #   goblin-model --list
 #
 # A role is what the work needs (code | judgment | review-panel | synthesis | investigate).
@@ -46,16 +46,16 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 
 # Config: explicit, else the installed one, else none.
 if [ -z "$CONFIG" ]; then
-  if [ -f "$ROOT/.goblin/goblin.yaml" ]; then CONFIG="$ROOT/.goblin/goblin.yaml"; fi
+  if [ -f "$ROOT/AGENTS.md" ]; then CONFIG="$ROOT/AGENTS.md"; fi
 fi
 if [ -n "$CONFIG" ] && [ -z "${MODELS_EXPLICIT:-}" ]; then
-  m=$(g_yaml_scalar "$CONFIG" models_file)
+  m=$(g_agents_read "$CONFIG" models_file)
   [ -n "$m" ] && MODELS="$m"
 fi
 MODELS=$(g_expand_tilde "$MODELS")
 
 if [ -z "$ROLES" ]; then
-  if [ -f "$ROOT/.goblin/roles.yaml" ]; then ROLES="$ROOT/.goblin/roles.yaml"
+  if [ -f "$ROOT/.gob/roles.yaml" ]; then ROLES="$ROOT/.gob/roles.yaml"
   else ROLES="$SELF_DIR/../roles.yaml"; fi
 fi
 [ -f "$ROLES" ] || { g_err "no roles file at $ROLES"; exit 2; }

@@ -16,7 +16,7 @@
 #
 # Exit codes:
 #   0  the record was written (whether or not it is clean)
-#   2  usage, or no .goblin/goblin.yaml to read `security.audit_cmd` from
+#   2  usage, or no AGENTS.md frontmatter to read `security.audit_cmd` from
 #   3  the class declares no audit command (security.audit_cmd is empty) - nothing to run
 #   4  the declared command could not run
 #   5  the output could not be parsed as an audit report - REFUSING to write an empty record,
@@ -40,22 +40,20 @@ done
 [ -n "$TARGET" ] || { printf 'goblin-audit: --target needs a directory\n' >&2; exit 2; }
 cd "$TARGET" || { printf 'goblin-audit: no such directory: %s\n' "$TARGET" >&2; exit 2; }
 
-CONFIG=".goblin/goblin.yaml"
-[ -f "$CONFIG" ] || { printf 'goblin-audit: %s has no %s - run goblin-install first\n' "$TARGET" "$CONFIG" >&2; exit 2; }
+CONFIG="AGENTS.md"
+[ -f "$CONFIG" ] && grep -q "^$GOB_AGENTS_BEGIN" "$CONFIG" 2>/dev/null \
+  || { printf 'goblin-audit: %s has no %s gob block - run gob init first\n' "$TARGET" "$CONFIG" >&2; exit 2; }
 
 # Self-contained on purpose: the audit runner must work even if goblin-lib.sh was edited or is
 # missing, because it is the one tool a human runs by hand.
-g_yaml_block_scalar() { # <file> <block> <key>
-  awk -v b="$2" -v k="$3" '
-    $0 ~ ("^" b ":[[:space:]]*$") { inb = 1; next }
-    inb && /^[^ ]/ { inb = 0 }
-    inb && $0 ~ ("^  " k ":") {
-      v = $0; sub("^  " k ":[[:space:]]*", "", v); print v; exit
-    }
-  ' "$1"
+g_agents_read_inline() { # <file> <dotted-key> — the one reader the audit needs, inline
+  local f="$1" k="$2" line
+  while IFS= read -r line; do
+    case "$line" in "$k:"*) printf '%s\n' "${line#"$k":}"; return 0 ;; esac
+  done < "$f"
 }
 
-AUDIT_CMD=$(g_yaml_block_scalar "$CONFIG" security audit_cmd)
+AUDIT_CMD=$(g_agents_read_inline "$CONFIG" security.audit_cmd)
 if [ -z "$AUDIT_CMD" ]; then
   printf 'goblin-audit: this class declares no audit command (security.audit_cmd is empty in\n'
   printf '  %s). Nothing to run, and no record to write.\n' "$CONFIG"

@@ -15,7 +15,7 @@ ratchet_cmd: ""
 ratchet_ceiling: 0
 replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs
-runtime_data: .goblin/state.json
+runtime_data: .gob/state.json
 # A knowledge repo has no client surface and no dependency manifest, so SC-03's build-output
 # clause, SC-05..SC-08 skip with a reason. The SECRET FAMILY is not one of those: a note file is
 # one `git add` away from a pasted token, so SC-02 is required here too and the installer writes

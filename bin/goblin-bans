@@ -49,7 +49,7 @@ done
 find_installed_root() {
   local d="$PWD"
   while :; do
-    if [ -f "$d/.goblin/goblin.yaml" ]; then printf '%s\n' "$d"; return 0; fi
+    if [ -f "$d/AGENTS.md" ] && grep -q "^$GOB_AGENTS_BEGIN" "$d/AGENTS.md" 2>/dev/null; then printf '%s\n' "$d"; return 0; fi
     [ "$d" = "/" ] && return 1
     d=$(dirname "$d")
   done
@@ -60,9 +60,9 @@ if [ -z "$ROOT" ]; then
   [ -n "$ROOT" ] || ROOT="$PWD"
 fi
 
-CONFIG="$ROOT/.goblin/goblin.yaml"
-if [ -f "$ROOT/.goblin/manifest/bans.tsv" ]; then
-  BANS="$ROOT/.goblin/manifest/bans.tsv"
+CONFIG="$ROOT/AGENTS.md"
+if [ -f "$ROOT/.gob/manifest/bans.tsv" ]; then
+  BANS="$ROOT/.gob/manifest/bans.tsv"
 else
   BANS="$SELF_DIR/../manifest/bans.tsv"
 fi
@@ -85,13 +85,11 @@ fi
 # ---- the config: which bans this project turns on, and its narrow exceptions --
 ENABLED=""
 if [ -f "$CONFIG" ]; then
-  ENABLED=$(g_yaml_scalar "$CONFIG" bans)
-  ENABLED=${ENABLED#[}; ENABLED=${ENABLED%]}
-  ENABLED=$(printf '%s' "$ENABLED" | tr ',' ' ' | tr -s ' ' ' ')
+  ENABLED=$(g_agents_list "$CONFIG" bans | tr '\n' ' ')
   # The electron opt-in (software class): `electron: true` turns the electron ban set ON even
   # when a hand-edited bans: list omits it — the declaration is the contract, and the engine
   # (not the LLM) is what makes a listed ban non-skippable. A repo without the key is unaffected.
-  if [ "$(g_yaml_scalar "$CONFIG" electron)" = "true" ]; then
+  if [ "$(g_agents_read "$CONFIG" electron)" = "true" ]; then
     for e in BN-06 BN-07 BN-08 BN-09; do
       case " $ENABLED " in *" $e "*) ;; *) ENABLED="$ENABLED $e" ;; esac
     done
@@ -113,7 +111,9 @@ enabled() {
 # keeps the old behaviour, which fails CLOSED, never open.
 exempt_paths() { # exempt_paths <id> -> path prefixes, one per line
   [ -f "$CONFIG" ] || return 0
-  g_yaml_list "$CONFIG" bans_exempt | awk -v id="$1" '$1==id {print $2}'
+  # v2 shape: one exemption per line, "<ban id> <path prefix>" — the id is the first
+  # field of a bans_exempt line (the yaml block-list shape has no flat spelling).
+  g_agents_read "$CONFIG" bans_exempt | awk -v id="$1" '$1==id {print $2}'
 }
 
 only_selected() {
@@ -131,7 +131,7 @@ while IFS=$'\t' read -r id ban globs detect replacement escape reviewer source; 
   SEL=$((SEL + 1))
 
   if ! enabled "$id"; then
-    SKIP=$((SKIP + 1)); g_skip "$id" "$ban (not enabled in bans: - add $id to .goblin/goblin.yaml to turn it on)"
+    SKIP=$((SKIP + 1)); g_skip "$id" "$ban (not enabled in bans: - add $id to the bans: array in AGENTS.md to turn it on)"
     continue
   fi
   # A ban whose globs match no file is a SKIP with a reason, not a pass and not a fail.

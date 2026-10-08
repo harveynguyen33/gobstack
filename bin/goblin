@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
-# goblin — the global CLI dispatcher (W1, PLAN-V1 §2.3 / W1-SPEC §3).
+# goblin — the CLI dispatcher.
 #
-#   gob verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
-#   gob bans   [--only <id[,id...]>] [--list]
-#   gob audit  [--target <dir>] [--print]
-#   gob doctor [--platform <p>]      # W4a
-#   gob emit   --platform <p> [...]  # W4a/W4b; `gob sync` is the same verb, renamed
-#   gob init   [...]                 # W6: the first-run wizard
-#   gob upgrade [--target .] [...]   # W3
+#   gob init    [--heuristic | --write <proposal>] [--target <dir>] [...]
+#   gob map     [target] [--agent | --heuristic] [--write <dir>] [--force]
+#   gob verify  [--only <id[,id...]>] [--json] [--list] [--source <path>]
+#   gob bans    [--only <id[,id...]>] [--list]
+#   gob uninstall [--target <dir>]
 #   gob --version
 #
+# v2 SURFACE (AI-driven development): the CLI calls no AI API. `gob init` and `gob map`
+# EMIT a prompt + schema that the agent already running in this repo fulfils with its own
+# tools; heuristic detection demotes to the --heuristic fallback.
+#
+# UNWIRED this session (code kept under bin/, deletion is session 3): doctor, audit,
+# upgrade, emit/sync. `sync` becomes an init-internal step (hidden --resync flag).
+#
 # Identity: the package is gobstack (npm @techgoblin/gobstack), the command is `gob`
-# (`goblin` remains as a legacy alias). W1 ships the DISPATCH
-# SHELL only — the node shim and npm packaging are W2, doctor/emit are W4a (exit-2
-# placeholders naming their workstream), upgrade is W3 (same). G3 forbids a runtime
-# rewrite: the engine stays bash, this file only routes and propagates.
+# (`goblin` remains as a legacy alias).
 #
 # The four-value verify contract is unchanged and non-negotiable (bin/goblin-verify:5-9):
 #   0  every executed check passed
@@ -22,11 +24,10 @@
 #   2  could not run
 #   3  the manifest itself is broken
 # Every subcommand propagates the engine's exit code verbatim; no wrapper translates a
-# 1 into a 0. A placeholder that silently exited 0 would be a green build doing nothing.
+# 1 into a 0.
 #
-# Root resolution: find_installed_root() at bin/goblin-verify:64-77 is preserved
-# BYTE-FOR-BYTE (walk up from $PWD to .goblin/goblin.yaml; fall back to git toplevel,
-# then $PWD — the D20 nested-repo fix). W1 changes nothing about its logic.
+# Root resolution: find_installed_root() walks up from $PWD to an AGENTS.md carrying the
+# gob marker block; fall back to git toplevel, then $PWD — the D20 nested-repo fix.
 #
 # No npm, no jq, no yq, no network. bash/awk/sed/grep only.
 
@@ -42,27 +43,29 @@ usage() {
   cat <<'USAGE'
 gob — the gobstack command line.
 
-  gob verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
-  gob bans   [--only <id[,id...]>] [--list]
-  gob audit  [--target <dir>] [--print]
-  gob doctor [--platform <p>] [--target <dir>]
-  gob emit   --platform <p> --scope project|global [...]   # alias: gob sync
-  gob sync   --platform <p> --scope project|global [...]   # the same verb, friendlier name
-  gob init   [--target <dir>] [--class app|A-F] [--dry-run]
-  gob map    [target] [--force]          # the standalone feature-map generator (no install needed)
-  gob upgrade [--target .] [--dry-run] [--yes] [--engine-dir <path>]
+  gob init    [--heuristic | --write <proposal>] [--target <dir>] [--class app|A-F] [--dry-run]
+  gob map     [target] [--agent | --heuristic] [--write <dir>] [--force]
+  gob verify  [--only <id[,id...]>] [--json] [--list] [--source <path>]
+  gob bans    [--only <id[,id...]>] [--list]
+  gob uninstall --target <dir>
   gob --version
+
+gob init and gob map are AI-DRIVEN: they print a prompt + schema for the agent already
+running in this repo, which writes the proposal file; `--write` validates and installs
+it. The heuristic detectors are the --heuristic fallback.
 
 Exit codes (verify): 0 pass | 1 a check failed | 2 could not run | 3 the manifest is
 broken. Every subcommand propagates the engine's exit code verbatim.
 USAGE
 }
 
-# ---- the repo-root locator, preserved byte-for-byte from bin/goblin-verify:64-77 ----
+# ---- the repo-root locator (an AGENTS.md gob block is the install marker) ----
 find_installed_root() {
   local d="$PWD"
   while :; do
-    if [ -f "$d/.goblin/goblin.yaml" ]; then printf '%s\n' "$d"; return 0; fi
+    if [ -f "$d/AGENTS.md" ] && grep -q '^<!-- gob:begin' "$d/AGENTS.md" 2>/dev/null; then
+      printf '%s\n' "$d"; return 0
+    fi
     [ "$d" = "/" ] && return 1
     d=$(dirname "$d")
   done
@@ -74,6 +77,15 @@ CMD="${1:-}"
 shift
 
 case "$CMD" in
+  init)
+    # The prompt+schema engine: prints the agent brief, or installs a proposal.
+    exec bash "$SRC/bin/goblin-init" "$@"
+    ;;
+  map)
+    # The standalone feature-map generator: `--agent` (default) prints prompt+schema;
+    # --heuristic runs the scanner. Routes and propagates its 0/1/2 contract verbatim.
+    exec bash "$SRC/bin/goblin-map" "$@"
+    ;;
   verify)
     # The engine is whatever the per-repo chain resolves (W1 §2.3): --source, vendored,
     # engine_dir:, GOBLIN_ENGINE_DIR, ~/.goblin/engine — all inside goblin-verify. The
@@ -83,38 +95,10 @@ case "$CMD" in
   bans)
     exec bash "$SRC/bin/goblin-bans" "$@"
     ;;
-  audit)
-    exec bash "$SRC/bin/goblin-audit" "$@"
-    ;;
-  doctor)
-    # W4a: one run, three platforms (the §7 report); the dispatcher routes and
-    # propagates the doctor's 0/1/2 verbatim, like every other subcommand.
-    exec bash "$SRC/bin/goblin-doctor" "$@"
-    ;;
-  emit)
-    # W4a: per-platform emission (the §4 contract); the 0/1/2 exit contract is the
-    # same three values verify's wrapper states, propagated verbatim.
-    exec bash "$SRC/bin/goblin-emit" "$@"
-    ;;
-  sync)
-    # Wizard v2: the friendlier name for the same emission engine. `emit` stays a
-    # first-class verb; this case only adds the alias and propagates identically.
-    exec bash "$SRC/bin/goblin-emit" "$@"
-    ;;
-  init)
-    # W6: the first-run wizard. It drives install/emit/verify and propagates their
-    # exit contract verbatim, like every other subcommand here.
-    exec bash "$SRC/bin/goblin-init" "$@"
-    ;;
-  map)
-    # The standalone feature-map generator: routes and propagates its 0/1/2 contract
-    # verbatim, like every other subcommand. It needs no .goblin/ install by design.
-    exec bash "$SRC/bin/goblin-map" "$@"
-    ;;
-  upgrade)
-    # W3: the migration lives in its own checkout-level script (W3-SPEC §1.1);
-    # the dispatcher routes and propagates the four-value contract verbatim.
-    exec bash "$SRC/bin/goblin-upgrade" "$@"
+  uninstall)
+    # Routes into the installer's uninstall job. `--uninstall` is appended FIRST so the
+    # user's own `--target <dir>` and options still parse.
+    exec bash "$SRC/bin/goblin-install" --uninstall "$@"
     ;;
   --version|-V|-v)
     printf '%s\n' "$VERSION"
@@ -123,6 +107,17 @@ case "$CMD" in
   -h|--help|help)
     usage
     exit 0
+    ;;
+  doctor|audit|upgrade|emit|sync|install)
+    # Unwired from usage in v2 (code kept; deletion is session 3). The refusal names
+    # what replaced each verb rather than silently executing the old path.
+    g_err "gob $CMD is unwired in v2."
+    case "$CMD" in
+      install|init-legacy) g_err "fix: gob init --write <proposal> installs a repo now." ;;
+      sync|emit)           g_err "fix: gob init --write <proposal> runs the sync step internally." ;;
+      doctor|audit|upgrade) g_err "fix: gob verify (audit stays a deliberate manual step; see docs/)." ;;
+    esac
+    exit 2
     ;;
   *)
     g_err "unknown subcommand: $CMD"

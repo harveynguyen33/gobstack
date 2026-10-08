@@ -3,9 +3,9 @@
 #
 #   gob map [target] [--force] [--target <dir>] [--help]
 #
-# Standalone by design (product decision, 2026-10): works in ANY git repo with NO .goblin/
-# install and NEVER reads goblin.yaml. The verify rows FM-01/FM-02 stay opt-in through a
-# `feature_map:` declaration in .goblin/goblin.yaml (empty = SKIP — unchanged); this command
+# Standalone by design (product decision, 2026-10): works in ANY git repo with NO .gob/
+# install and NEVER reads the AGENTS.md gob block. The verify rows FM-01/FM-02 stay opt-in
+# through a `feature_map:` declaration in AGENTS.md frontmatter (empty = SKIP — unchanged); this command
 # only writes the starter files the human pass then edits. See docs/GUIDE.md, the feature-map
 # section, and skills/goblin-feature-map/SKILL.md (the format contract this output follows).
 #
@@ -63,8 +63,8 @@ or — with no framework — top-level src/ and lib/ module dirs as TODO placeho
 package.json dev/build/test/lint scripts seed the Baseline preconditions section.
 
 The output is a STARTER: each feature file needs a human pass before its verified: date
-means anything. It never reads or writes .goblin/, and FM-01/FM-02 stay opt-in through a
-feature_map: declaration in goblin.yaml.
+means anything. It never reads or writes .gob/, and FM-01/FM-02 stay opt-in through a
+feature_map: declaration in the AGENTS.md gob block.
 
 Exit codes: 0 generated or nothing-to-do | 1 refusal (existing map, no --force) | 2 bad input.
 USAGE

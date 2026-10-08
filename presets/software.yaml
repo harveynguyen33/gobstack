@@ -24,7 +24,7 @@ ratchet_cmd: find .next/static dist/assets dist -type f -name '*.js' -exec cat {
 ratchet_ceiling: measure
 replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs
-runtime_data: .goblin/state.json
+runtime_data: .gob/state.json
 # SC-02 requires the whole secret family to be ignored; SC-03 clause 2 scans `sec_build_output`
 # for secret-shaped literals; SC-07 runs `sec_audit_cmd` once, deliberately, via goblin-audit.
 sec_gitignore_family: yes

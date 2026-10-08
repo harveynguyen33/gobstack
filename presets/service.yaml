@@ -14,7 +14,7 @@ ratchet_cmd: grep -rniE '\b(TODO|FIXME)\b' --include='*.ts' --include='*.tsx' --
 ratchet_ceiling: measure
 replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs
-runtime_data: .goblin/state.json
+runtime_data: .gob/state.json
 # A service has real inputs and real dependencies, so the security rows bite here.
 sec_gitignore_family: yes
 sec_build_output: dist
