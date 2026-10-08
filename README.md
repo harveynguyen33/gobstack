@@ -76,7 +76,7 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 
 ## The `gob` CLI
 
-The v2 surface is six verbs. Everything else — audit, doctor, emit/sync, upgrade, install —
+The v2 surface is seven verbs. Everything else — audit, doctor, emit/sync, upgrade, install —
 is unwired in this alpha: the shim refuses the verb by name and prints the usage.
 
 | command | what it does |
@@ -85,6 +85,7 @@ is unwired in this alpha: the shim refuses the verb by name and prints the usage
 | `gob map` | the feature-map prompt + schema (`--heuristic [target]` runs the starter scanner); `--write <dir> [--force]` validates an agent-written map and installs it; never clobbers — an existing map refuses until `--force` |
 | `gob verify` | run the rule matrix against the current repo — `PASS`/`FAIL`/`SKIP` per row, exit 0 pass · 1 a check failed · 2 could not run · 3 the manifest is broken |
 | `gob bans` | run the ban list (per-pattern red lines over the source tree) |
+| `gob extras` | the curated extras catalogue: `list [category]` / `show <id>` / `install <id...> [­-target <dir>] [--platform <id>] [--with-mcp-config]` — init only SUGGESTS; installs come from the catalogue (the allowlist rule), never the web |
 | `gob mcp` | serve the harness to your coding agent over MCP stdio — three tools (`gob_verify`, `gob_map_status`, `gob_init_status`), local only, no SDK, no network |
 | `gob uninstall` | remove everything an install wrote, byte-exactly (`gob install --target <dir> --uninstall` is the same job) |
 
