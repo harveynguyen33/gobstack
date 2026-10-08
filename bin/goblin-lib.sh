@@ -319,6 +319,17 @@ g_agents_gate_names() {
   g_agents_gates "$1" | cut -f1
 }
 
+# g_agents_pairs <file> — every block line as `key<TAB>value`, file order. The round-trip
+# reader: `g_agents_pairs | g_agents_write` rewrites a block byte-identically, including
+# values that contain tabs (a keys+read loop through g_agents_read mangles those — the
+# sed in the reader stops at the first colon and the value is rebuilt, so a raw tab inside
+# a gate command lost its place and the line drifted on every re-write). Use this for any
+# read-modify-write of the block; g_agents_keys is for membership tests only.
+g_agents_pairs() {
+  g_agents_block "$1" | awk -F': ' '
+    { k = $1; sub(/^[^:]*: /, "", $0); printf "%s\t%s\n", k, $0 }'
+}
+
 # g_agents_list <file> <key> — the items of a one-line `[a, b, c]` array, one per line.
 # Empty output = the key is absent or the array is empty. An item keeps its inner text
 # verbatim (trimmed); a comma inside an item cannot be expressed — split the key.
@@ -358,9 +369,14 @@ g_agents_write() {
     # value" (the tsv form) OR already-rendered "key: value" (a template form): with a
     # tab, field 1 is the key and the value is rebuilt; without one, the line's own
     # "key: value" shape is kept verbatim (a rendered placeholder keeps its text).
+    # A RENDERED line whose VALUE contains a tab would otherwise split at the value's
+    # own tab and corrupt it on the next rewrite ("a<TAB>b" became "a: b"), so a line
+    # whose pre-tab part already carries ": " is a rendered line: kept verbatim. A tsv
+    # key is a bare identifier and never contains ": ".
     awk -F'\t' '
       /^<!-- gob:(begin|end)/ { next }
       NF >= 2 {
+        if ($1 ~ /: /) { print; next }
         v = $2; for (i = 3; i <= NF; i++) v = v "\t" $i
         sub(/ -->$/, "", v)   # a template end-marker glued to a value line
         print $1 ": " v
@@ -372,9 +388,19 @@ g_agents_write() {
   } > "$tmp"
   newbody=$(cat "$tmp")
   # Replace the existing block, or insert the block before the first body line.
+  # All three values travel via ENVIRON, never -v: gawk (and mawk) process backslash
+  # escapes in -v assignment values (\b in a gate command became a backspace on every
+  # rewrite - through BOTH this splice and the render above it). ENVIRON passes the
+  # bytes raw with no escape processing on any awk.
   if grep -q "^$GOB_AGENTS_BEGIN" "$f"; then
-    awk -v begin="^$GOB_AGENTS_BEGIN" -v end="^$GOB_AGENTS_END" -v repl="$newbody" '
-      $0 ~ begin { inb = 1; printf "%s\n", repl; next }
+    GOB_BLOCK="$newbody" GOB_BEGIN="$GOB_AGENTS_BEGIN" GOB_END="$GOB_AGENTS_END" \
+      awk '
+      BEGIN {
+        begin = "^" ENVIRON["GOB_BEGIN"]
+        end   = "^" ENVIRON["GOB_END"]
+        repl  = ENVIRON["GOB_BLOCK"]
+      }
+      $0 ~ begin { inb = 1; print repl; next }
       $0 ~ end   { inb = 0; next }
       !inb       { print }
     ' "$f" > "$tmp.out" || { rm -f "$tmp" "$tmp.out"; return 1; }
