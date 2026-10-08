@@ -77,7 +77,7 @@ target + version + source store + anchor, and the **apk row itself**. This `.sha
 manifest is the sha256sum-format artifact: it is what `sha256sum -c` verifies and what
 `RC-03`/`RC-04` read. It is **not** what `RC-01`/`RC-02` consume - those rows parse a
 separate `reference-manifest/1` **JSON** (`generated_from`, `reference_app`, `entries[]`,
-`entry_count`), declared via `reference_manifest:` in `.goblin/goblin.yaml`. That JSON is an
+`entry_count`), declared via `reference_manifest:` in `.gob/goblin.yaml`. That JSON is an
 **optional** artifact, produced only if this lab ever ships a build output that could carry
 corpus bytes; a study-only lab never ships, so none is produced here - a deliberate
 omission, not a gap. Near-duplicate manifest rows are not linted - a known limitation.
@@ -113,14 +113,14 @@ still be scripts/notes/manifests/docs only, and no tracked file may hash to a ma
 ## Verifying the lab repo - the harness must be installed there first
 
 `goblin-verify` requires an **installed harness** in the repo it points at: against a bare
-lab repo it exits 2 with `not installed: <root>/.goblin/goblin.yaml is absent`. `--source`
+lab repo it exits 2 with `not installed: <root>/.gob/goblin.yaml is absent`. `--source`
 relocates the enforcement manifest, not the target's config requirement, so the bridge is a
 one-time install **into the lab repo itself**:
 
     goblin-install --target <lab-repo> --class A
 
 A class-A install is sufficient and violates nothing - the lab's own files are not touched;
-it only adds the harness scaffolding: `.goblin/` (config + the verifier), `checks/`,
+it only adds the harness scaffolding: `.gob/` (config + the verifier), `checks/`,
 `reviews/`, `.github/workflows/`, and the `HANDOFF.md` scaffolding. Note: `HANDOFF.md`'s
 placeholder commit gives `HP-05`'s one expected day-one red until a real commit is named.
 After that one-time install, `goblin-verify --only RC-03` / `RC-04` run against the lab repo

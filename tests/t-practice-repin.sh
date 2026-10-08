@@ -2,7 +2,7 @@
 # t-practice-repin.sh — the practice pin has a documented, explicit re-pin path (F4-followup).
 #
 # The gap this closes. `PROJECT-PRACTICE.md` is a living standard, corrected in place, while
-# `.goblin/goblin.yaml` is an `owned` file the installer never rewrites. So one legitimate edit
+# the AGENTS.md gob block is a `owned` file the installer never rewrites. So one legitimate edit
 # to the standard reddened `IN-02` (`practice EDITED`) in every installed repo, and nothing —
 # not the failure detail, not any file the installer wrote — named a way out.
 #
@@ -31,7 +31,7 @@
 # file fails exactly 5 of its 47 assertions (42 ok / 5 FAIL, exit 1), and all five are in the two
 # blocks that close the round-1 findings:
 #   * "a re-pin whose write cannot land exits non-zero" and "  and does not claim 'practice
-#     re-pinned'" — at bf7e9c9 a read-only .goblin/ made sed -i fail, yet the branch printed
+#     re-pinned'" — at bf7e9c9 a read-only .gob/ made sed -i fail, yet the branch printed
 #     "practice re-pinned" with both hashes and exited 0;
 #   * "--uninstall --re-pin is refused, exit 2", "  and says they are different jobs" and "  and
 #     the target was not uninstalled" — at bf7e9c9 the guard sat below the uninstall branch, so
@@ -77,11 +77,13 @@ bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --models "$WORK/mode
   --practice "$WORK/standard.md" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
 
-PIN_BEFORE=$(grep '^practice_sha256:' .goblin/goblin.yaml | awk '{print $2}')
-INSTALLED_BEFORE=$(sha .goblin/installed.json)
+# The one-block reader (the g_agents_read shape, inlined so the suite needs no lib sourcing).
+g_agents_read() { sed -n "/^<!-- gob:begin/,/^<!-- gob:end/p" "$1" 2>/dev/null | sed "1d;\$d" | sed -n "s/^$2:[[:space:]]*//p" | head -n 1; }
+PIN_BEFORE=$(g_agents_read "$TARGET/AGENTS.md" practice_sha256)
+INSTALLED_BEFORE=$(sha .gob/installed.json)
 
 # ---- baseline ----------------------------------------------------------------
-out=$(bash .goblin/bin/goblin-verify --only IN-02 2>&1); rc=$?
+out=$(bash .gob/bin/goblin-verify --only IN-02 2>&1); rc=$?
 check "the fixture starts IN-02 PASS, exit 0" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'practice pin ok'
 check "  and the detail says 'practice pin ok'" "$?"
@@ -90,7 +92,7 @@ check "  and the recorded pin is the fixture standard's hash" "$?"
 
 # ---- the legitimate edit, and the remedy it must name ------------------------
 printf '# a corrected sentence\n' >> "$WORK/standard.md"
-out=$(bash .goblin/bin/goblin-verify --only IN-02 2>&1); rc=$?
+out=$(bash .gob/bin/goblin-verify --only IN-02 2>&1); rc=$?
 check "one edited byte of the standard reds IN-02 (exit 1)" "$([ "$rc" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'practice EDITED'
 check "  and the detail says 'practice EDITED'" "$?"
@@ -98,7 +100,7 @@ printf '%s' "$out" | grep -q 'practice standard edited:'
 check "  and names the edited file" "$?"
 printf '%s' "$out" | grep -q -- '--re-pin'
 check "  and the failure detail names the re-pin remedy (CONTROL)" "$?"
-grep -q -- '--re-pin' .goblin/bin/goblin-verify
+grep -q -- '--re-pin' .gob/bin/goblin-verify
 check "  and the installed verifier names it (CONTROL)" "$?"
 grep -q -- '--re-pin' "$SRC/skills/practice/SKILL.md"
 check "  and the practice skill names it (CONTROL; the source copy — a default install ships no skills)" "$?"
@@ -111,67 +113,71 @@ check "the documented re-pin exits 0 (CONTROL: exit 2 pre-change)" \
   "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q "recorded $PIN_BEFORE"
 check "  and prints the OLD hash it replaced" "$?"
-PIN_AFTER=$(grep '^practice_sha256:' .goblin/goblin.yaml | awk '{print $2}')
+PIN_AFTER=$(g_agents_read "$TARGET/AGENTS.md" practice_sha256)
 [ "$PIN_AFTER" != "$PIN_BEFORE" ] && [ "$PIN_AFTER" = "$(sha "$WORK/standard.md")" ]
 check "  and the new pin is the standard's current hash" "$?"
 printf '%s' "$out" | grep -q "$PIN_AFTER"
 check "  and prints the NEW hash too" "$?"
 
-out=$(bash .goblin/bin/goblin-verify --only IN-02 2>&1); rc=$?
+out=$(bash .gob/bin/goblin-verify --only IN-02 2>&1); rc=$?
 check "IN-02 is PASS again (exit 0)" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'practice pin ok'
 check "  and the detail says 'practice pin ok'" "$?"
 
 # ---- the `owned` contract holds for every other line ------------------------
-[ "$(sha .goblin/installed.json)" = "$INSTALLED_BEFORE" ]
+[ "$(sha .gob/installed.json)" = "$INSTALLED_BEFORE" ]
 check "installed.json is byte-identical (GUARD: the record was not rewritten)" "$?"
-DIFF=$(git --no-pager diff --unified=0 -- .goblin/goblin.yaml)
+DIFF=$(git --no-pager diff --unified=0 -- AGENTS.md)
 [ "$(printf '%s\n' "$DIFF" | grep -cE '^[+-][^+-]')" -eq 2 ]
 check "exactly one config line removed and one added" "$?"
 printf '%s' "$DIFF" | grep -q '^-practice_sha256:'
 check "  the removed line is practice_sha256:" "$?"
 printf '%s' "$DIFF" | grep -q '^+practice_sha256:'
 check "  the added line is practice_sha256:" "$?"
-[ "$(git status --porcelain)" = " M .goblin/goblin.yaml" ]
+[ "$(git status --porcelain)" = " M AGENTS.md" ]
 check "  and no other path in the repo changed" "$?"
 
 # ---- the re-pin is stable, and the pin still bites afterwards ----------------
 git add -A && git commit -q -m "chore: re-pin the practice standard" >/dev/null 2>&1 || true
-CONFIG_AFTER=$(sha .goblin/goblin.yaml)
+CONFIG_AFTER=$(sha AGENTS.md)
 out=$(bash "$SRC/bin/goblin-install" --target "$TARGET" --re-pin 2>&1); rc=$?
 check "a second re-pin exits 0" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'already current'
 check "  and says the pin is already current" "$?"
-[ "$(sha .goblin/goblin.yaml)" = "$CONFIG_AFTER" ]
+[ "$(sha AGENTS.md)" = "$CONFIG_AFTER" ]
 check "  and the config is byte-identical (nothing rewritten)" "$?"
 
 printf '# a silent byte nobody asked for\n' >> "$WORK/standard.md"
-out=$(bash .goblin/bin/goblin-verify --only IN-02 2>&1); rc=$?
+out=$(bash .gob/bin/goblin-verify --only IN-02 2>&1); rc=$?
 check "an edit AFTER a re-pin reds IN-02 again (GUARD)" "$([ "$rc" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'practice EDITED'
 check "  with 'practice EDITED'" "$?"
-[ "$(grep '^practice_sha256:' .goblin/goblin.yaml | awk '{print $2}')" = "$PIN_AFTER" ]
+[ "$(g_agents_read "$TARGET/AGENTS.md" practice_sha256)" = "$PIN_AFTER" ]
 check "  and the pin was not re-recorded behind our back (GUARD)" "$?"
 
 # ---- --dry-run writes nothing ------------------------------------------------
-CONFIG_BEFORE_DRY=$(sha .goblin/goblin.yaml)
+CONFIG_BEFORE_DRY=$(sha AGENTS.md)
 out=$(bash "$SRC/bin/goblin-install" --target "$TARGET" --re-pin --dry-run 2>&1); rc=$?
 check "--re-pin --dry-run exits 0" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'would re-pin'
 check "  and prints the plan" "$?"
-[ "$(sha .goblin/goblin.yaml)" = "$CONFIG_BEFORE_DRY" ]
+[ "$(sha AGENTS.md)" = "$CONFIG_BEFORE_DRY" ]
 check "  and writes nothing (GUARD)" "$?"
 
 # ---- CONTROL: a re-pin whose one write does not land fails closed -------------
 # Before the fix the branch printed "practice re-pinned" with both hashes and exited 0 even when
-# sed -i could not write (measured at bf7e9c9: read-only .goblin/ -> "couldn't open temporary
-# file ... Permission denied", exit 0, config byte-identical, IN-02 still RED). That is the "hash
-# nobody verified" class this command exists to remove. The pin is stale here, so the branch
-# actually reaches the write.
-CONFIG_BEFORE_FAIL=$(sha .goblin/goblin.yaml)
-chmod 555 .goblin
+# the write could not land (measured at bf7e9c9: a read-only .gob/ -> sed -i "couldn't open
+# temporary file ... Permission denied", exit 0, config byte-identical, IN-02 still RED). That is
+# the "hash nobody verified" class this command exists to remove. The pin is stale here, so the
+# branch actually reaches the write.
+# v2 mechanism note: the yaml-era control made the REPO read-only, because sed -i creates its
+# temp file in the config's directory. g_agents_write writes through mktemp+cp: the temp lands
+# in $TMPDIR and cp only needs WRITE permission on the CONFIG FILE itself (open O_TRUNC on an
+# existing owned file needs no directory write). So the fault is injected on the file: 444.
+CONFIG_BEFORE_FAIL=$(sha AGENTS.md)
+chmod 444 AGENTS.md
 out=$(bash "$SRC/bin/goblin-install" --target "$TARGET" --re-pin 2>&1); rc=$?
-chmod 755 .goblin
+chmod 644 AGENTS.md
 check "a re-pin whose write cannot land exits non-zero (CONTROL)" \
   "$([ "$rc" -ne 0 ] && echo 0 || echo 1)"
 if printf '%s' "$out" | grep -q 'practice re-pinned'; then
@@ -179,9 +185,9 @@ if printf '%s' "$out" | grep -q 'practice re-pinned'; then
 else
   check "  and does not claim 'practice re-pinned' (CONTROL)" 0
 fi
-[ "$(sha .goblin/goblin.yaml)" = "$CONFIG_BEFORE_FAIL" ]
+[ "$(sha AGENTS.md)" = "$CONFIG_BEFORE_FAIL" ]
 check "  and the config is byte-identical (GUARD)" "$?"
-out=$(bash .goblin/bin/goblin-verify --only IN-02 2>&1); rc=$?
+out=$(bash .gob/bin/goblin-verify --only IN-02 2>&1); rc=$?
 check "  and the pin is still RED afterwards (GUARD)" "$([ "$rc" -eq 1 ] && echo 0 || echo 1)"
 
 # ---- the two refusals: no config, and no practice: recorded ------------------
@@ -215,17 +221,17 @@ out=$(bash "$SRC/bin/goblin-install" --target "$WORK/nostandard" --uninstall --r
 check "--uninstall --re-pin is refused, exit 2 (CONTROL)" "$([ "$rc" -eq 2 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'different jobs'
 check "  and says they are different jobs (CONTROL)" "$?"
-[ -f "$WORK/nostandard/.goblin/installed.json" ]
+[ -f "$WORK/nostandard/.gob/installed.json" ]
 check "  and the target was not uninstalled (CONTROL)" "$?"
 
 # ---- a plain --upgrade must never re-pin by itself ---------------------------
 cd "$TARGET"
-PIN_STALE=$(grep '^practice_sha256:' .goblin/goblin.yaml | awk '{print $2}')
+PIN_STALE=$(g_agents_read "$TARGET/AGENTS.md" practice_sha256)
 bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --upgrade --models "$WORK/models.yaml" \
   --practice "$WORK/standard.md" >/dev/null 2>&1
-[ "$(grep '^practice_sha256:' .goblin/goblin.yaml | awk '{print $2}')" = "$PIN_STALE" ]
+[ "$(g_agents_read "$TARGET/AGENTS.md" practice_sha256)" = "$PIN_STALE" ]
 check "--upgrade does not re-pin the standard by itself (GUARD)" "$?"
-out=$(bash .goblin/bin/goblin-verify --only IN-02 2>&1); rc=$?
+out=$(bash .gob/bin/goblin-verify --only IN-02 2>&1); rc=$?
 check "  and the stale pin is still RED after it (exit 1)" "$([ "$rc" -eq 1 ] && echo 0 || echo 1)"
 
 # ---- a hand-quoted pin is read the way goblin-verify reads it -----------------
@@ -235,15 +241,15 @@ check "  and the stale pin is still RED after it (exit 1)" "$([ "$rc" -eq 1 ] &&
 # one-line diff, against a config the verifier called `practice pin ok`. This block runs last
 # because it leaves the pin CURRENT, which the --upgrade guard above needs it not to be.
 bash "$SRC/bin/goblin-install" --target "$TARGET" --re-pin >/dev/null 2>&1
-sed -i 's/^practice_sha256: \(.*\)$/practice_sha256: "\1"/' .goblin/goblin.yaml
-QUOTED=$(sha .goblin/goblin.yaml)
-out=$(bash .goblin/bin/goblin-verify --only IN-02 2>&1); rc=$?
+sed -i 's/^practice_sha256: \(.*\)$/practice_sha256: "\1"/' AGENTS.md
+QUOTED=$(sha AGENTS.md)
+out=$(bash .gob/bin/goblin-verify --only IN-02 2>&1); rc=$?
 check "a hand-quoted pin still verifies green (exit 0)" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 out=$(bash "$SRC/bin/goblin-install" --target "$TARGET" --re-pin 2>&1); rc=$?
 check "  and --re-pin agrees: it exits 0 (CONTROL)" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'already current'
 check "  and reports the pin already current (CONTROL)" "$?"
-[ "$(sha .goblin/goblin.yaml)" = "$QUOTED" ]
+[ "$(sha AGENTS.md)" = "$QUOTED" ]
 check "  and rewrites nothing (GUARD)" "$?"
 
 if [ "$fail" -eq 0 ]; then note "t-practice-repin: PASS"; else note "t-practice-repin: FAIL"; fi

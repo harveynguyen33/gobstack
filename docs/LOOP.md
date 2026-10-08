@@ -58,18 +58,18 @@ One unattended run, one committed record. `templates/loop/` ships a copy-ready `
 `decisions.tsv` header; nothing installs them, because a fresh install must not be born with a
 loop record — every `LP-` row skips until a loop has actually run here.
 
-    .goblin/loop/predicate          one command; exits 0 == the loop is finished
-    .goblin/loop/predicate.sha256   its digest, recorded at loop start (the pin); after a close,
+    .gob/loop/predicate          one command; exits 0 == the loop is finished
+    .gob/loop/predicate.sha256   its digest, recorded at loop start (the pin); after a close,
                                     the chain follows on `previous: <digest>` lines
-    .goblin/loop/first-run          exit=<n> ts=<ISO8601>, run BEFORE iteration 1
-    .goblin/loop/budget             the turn budget this run declares
-    .goblin/loop/decisions.tsv      ts · phase · decision · why · evidence · result
-    .goblin/loop/stuck.md           the write-up when the run ended without predicate:green
-    .goblin/loop/closed-<date>/     a relaxed predicate AND the pin it was closed under, archived
+    .gob/loop/first-run          exit=<n> ts=<ISO8601>, run BEFORE iteration 1
+    .gob/loop/budget             the turn budget this run declares
+    .gob/loop/decisions.tsv      ts · phase · decision · why · evidence · result
+    .gob/loop/stuck.md           the write-up when the run ended without predicate:green
+    .gob/loop/closed-<date>/     a relaxed predicate AND the pin it was closed under, archived
 
 An iteration row's `evidence` is a **pointer that resolves**: `sha:<hex>` (a commit in
 `git rev-list --all`), `file:<path>` (a path under the root), `sha256:<hex>` (the digest of a file
-under `.goblin/loop/`). A `cmd:` token resolves **nothing** on purpose: the command ran, its
+under `.gob/loop/`). A `cmd:` token resolves **nothing** on purpose: the command ran, its
 output is not in the record, and a verdict resting on it is the self-report `JG-01` refuses.
 
 ## 4. The five rules
@@ -80,7 +80,7 @@ output is not in the record, and a verdict resting on it is the self-report `JG-
    green mean anything (`LP-01`).
 2. **Never relax.** The predicate's digest is recorded at loop start (`LP-02`). Changing it
    mid-loop is not an edit; it is closing this loop and opening another, with the old predicate
-   **and the pin it was closed under** archived under `.goblin/loop/closed-<date>/` and committed,
+   **and the pin it was closed under** archived under `.gob/loop/closed-<date>/` and committed,
    and the new `predicate.sha256` naming the archived digest on a `previous: <digest>` line. That
    chain is what `LP-02` checks: not that the new bar is as strong — no digest can say that
    (`docs/LIMITS.md` #39) — but that the supersession is **recorded**, so a silent relaxation is a
@@ -89,13 +89,13 @@ output is not in the record, and a verdict resting on it is the self-report `JG-
    "because a self-updating pin would be the silent edit it exists to catch"
    (`docs/CONTRACTS.md`).
 3. **The escape hatch is a write-up, not a silence.** A run whose last row's `result` is not
-   `predicate:green` carries `.goblin/loop/stuck.md` — at least three non-blank lines naming the
+   `predicate:green` carries `.gob/loop/stuck.md` — at least three non-blank lines naming the
    predicate (`LP-05`). Wording matters: the exits a worker can actually reach are `kanban_block`
    and `kanban_complete`; **there is no `kanban_edit` tool** in the worker toolset, so the remedy
    the rejection message names is not one a worker holds. `kanban_block` names the predicate, and
    the write-up makes the stop visible.
 4. **The budget.** `goal_max_turns` on the card, mirrored into the record, capped by
-   `loop_max_turns_ceiling` in `.goblin/goblin.yaml`, default **20** — the value measured at
+   `loop_max_turns_ceiling` in `.gob/goblin.yaml`, default **20** — the value measured at
    `hermes_cli/goals.py:31`. A ceiling that does not match the engine's own default is a number
    someone made up (`LP-03`).
 5. **The morning audit reads the rows that did not reach the goal, in order**, then the last five
@@ -123,7 +123,7 @@ repo can resolve and re-check tomorrow (`JG-01`).
 
 **What does a genuinely stuck loop do?** Today: it burns the budget and **blocks for review**,
 carrying only the last judge reason, which came from a self-report (`hermes_cli/goals.py:1692-1695`).
-Approved shape: write `.goblin/loop/stuck.md`, commit it, `kanban_block` naming the predicate.
+Approved shape: write `.gob/loop/stuck.md`, commit it, `kanban_block` naming the predicate.
 `LP-05` makes the write-up mandatory and therefore visible; **nothing can make it true.**
 
 ## 6. The judge's failure modes, and what is mechanical

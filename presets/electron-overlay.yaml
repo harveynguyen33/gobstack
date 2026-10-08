@@ -2,13 +2,13 @@
 #
 # The `desktop` class is gone; F was merged into software because their classes.tsv need
 # columns are IDENTICAL on all 10 parts (measured). Everything F added beyond software lives in
-# plain goblin.yaml config keys, so it is an OVERLAY, not a class: `gob install --class software
+# plain frontmatter config keys, so it is an OVERLAY, not a class: `gob install --class software
 # --electron` (or the `--class desktop` / `F` alias, which sets --electron) renders the keys
 # below OVER the software preset. An absent key falls through to presets/software.yaml; a key
 # present here — including an empty one like sec_write_routes: "" — wins.
 #
 # The prose F carried (label / done_means / notes) is preserved here for the record; it is not a
-# rendered template key, so it never reaches a target's goblin.yaml.
+# rendered template key, so it never reaches a target's gob block.
 label: Desktop shell
 done_means: the renderer is isolated from Node, the main process is not busy, and the packaged bundle ships no dev dependency
 # software's A-only second gate (the TODO ceiling) is NOT applied: F never had it.

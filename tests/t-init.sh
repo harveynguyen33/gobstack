@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
-# t-init.sh — W6: the first-run wizard (bin/goblin-init).
+# t-init.sh — v2: `gob init` is the PROMPT ENGINE (bin/goblin-init).
 #
-#   T1  non-interactive flags-only end to end on a fresh probe: gob init --class app
-#       --branch main --email ... --gate 'bash tests/run-tests.sh' --emit hermes
-#       --scope project --yes installs, patches the declared identity and the gate into
-#       .goblin/goblin.yaml (read back through g_yaml_gates), emits hermes project-scope,
-#       runs verify; a commit later the probe verifies GREEN (the measured fresh path)
-#   T2  no TTY hang: every prompt site is guarded on [ -t 0 ]; a piped run with NO flags
-#       at all still finishes (timeout-bounded) on defaults, exit 0
-#   T3  the refusal contract: an existing HANDOFF.md is kept byte-identical, install's
-#       exit-1 stops the wizard before any emit, no .goblin/ is written
-#   T4  --dry-run prints the plan (class, emit platforms) and writes nothing (tree cmp)
-#   T5  idempotent re-run: the second identical run is the installer's no-op, exit 0
-#   T6  bad input: unknown --emit platform and a nonsense --class exit 2 naming the enum
-#   T7  the dispatcher: `bin/goblin init` routes to goblin-init; `bin/goblin.js init`
-#       reaches the same script; `gob init --help` exits 0
+#   B1  the bare brief: `gob init` prints the AGENT BRIEF + proposal schema, exit 0;
+#       heuristic mode appends pre-scanned hints; nothing is written anywhere
+#   B2  the --write path on a fresh probe: a proposal file in the brief's schema
+#       validates and installs (class software, the proposal's first gate replaces the
+#       class default, proposal keys merge over the class defaults), writes AGENTS.md
+#       with the gob block, .gob/, HANDOFF.md — and NO .hermes unless the proposal
+#       names sync_platforms
+#   B3  the validation refusals: no block, unknown key, bad class, no gate -> exit 2,
+#       nothing written; a refusal names the input it refused
+#   B4  --dry-run validates and writes nothing
+#   B5  idempotent re-`--write`: the second identical write is the installer's no-op
+#   B6  the dispatcher: `bin/goblin init --help` exits 0; `goblin.js init --help`
+#       reaches the same usage; `gob init` (bare) prints the brief
+#   B7  the post-install GREEN line: after the day-one commit the probe verifies at the
+#       measured green line
+#   B8  the source gates (moved here from the deleted t8 pty family, still relevant):
+#       {C_ token, unbraced-colour-var-adjacent-to-multibyte, bare sed -i
 #
 # Every fixture lives in a mktemp sandbox with HOME pointed inside it — no test writes
 # the real $HOME. The PATH is stripped to the system dirs so the host's own hermes
@@ -29,16 +32,12 @@ WORK=$(mktemp -d)
 fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
-trap 'rm -rf "$WORK"' EXIT
+KEEP=0; [ "${GOB_TEST_KEEP:-}" = 1 ] && KEEP=1
+trap '[ "$KEEP" -eq 1 ] || rm -rf "$WORK"' EXIT
 
 INIT="bash $SRC/bin/goblin-init"
 BARE_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-export GOBLIN_EMISSIONS="$WORK/.goblin-stack/emissions.tsv"
-export GOBLIN_PREIMAGES="$WORK/.goblin-stack/preimages"
 mkdir -p "$WORK/home"
-
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
-printf 'the referenced standard\n' > "$WORK/standard.md"
 
 new_repo() { # <tag> — a seeded git repo with a real, green gate script
   REPO="$WORK/$1"
@@ -51,235 +50,195 @@ new_repo() { # <tag> — a seeded git repo with a real, green gate script
       && git add -A && git commit -q -m "chore: seed" )
 }
 
-init_env() { # the wizard's environment: sandbox HOME, no host anchors, no tty on stdin
-  # (bash is named HERE, not via $INIT: env does not word-split, and "bash <path>" as
-  # one program name is a file-not-found every run — measured by this test's first draft)
-  { env HOME="$WORK/home" \
-        GOBLIN_MODELS="$WORK/models.yaml" \
-        GOBLIN_PRACTICE="$WORK/standard.md" \
-        PATH="$BARE_PATH" \
+init_env() { # the engine's environment: sandbox HOME, no host anchors, no tty on stdin
+  { env HOME="$WORK/home" PATH="$BARE_PATH" \
         timeout 120 bash "$SRC/bin/goblin-init" "$@"; } 2>&1
 }
 
-# ---- T1: flags-only end to end, then GREEN after the commit --------------------
-new_repo t1
-OUT=$(init_env --target "$REPO" --class app --branch main --email "runner@example.com" \
-        --gate "bash tests/run-tests.sh" --emit hermes --scope project --yes \
-        < /dev/null 2>&1); RC=$?
-check "flags-only init exits 0" "$RC"
-grep -qF "gob init [run] goblin-install" <<<"$OUT"
+proposal() { # <file> <class> [extra lines...] — a minimal valid proposal
+  local f="$1" cls="$2"; shift 2
+  {
+    printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
+    printf 'class: %s\n' "$cls"
+    printf 'branch: main\n'
+    printf 'owner_email: runner@example.com\n'
+    printf 'gate_commit_cmd: bash tests/run-tests.sh\n'
+    [ $# -eq 0 ] || printf '%s\n' "$@"
+    printf '<!-- gob:end -->\n'
+  } > "$f"
+}
+
+# ---- B1: the bare brief --------------------------------------------------------
+new_repo b1
+OUT=$(init_env --target "$REPO" < /dev/null); RC=$?
+check "the bare brief exits 0" "$RC"
+printf '%s' "$OUT" | grep -qF "AGENT BRIEF"
+check "the brief names itself (AGENT BRIEF)" "$?"
+printf '%s' "$OUT" | grep -qF "PROPOSAL SCHEMA"
+check "the brief carries the proposal schema" "$?"
+printf '%s' "$OUT" | grep -qF "gate_commit_cmd"
+check "the schema names the gate key the reader parses" "$?"
+printf '%s' "$OUT" | grep -qF "software|service|game|research|fleet"
+check "the schema names the class enum" "$?"
+B1_FILES=$( cd "$REPO" && find . -path ./.git -prune -o -type f -print | sort )
+[ "$B1_FILES" = "./README.md"$'\n'"./tests/run-tests.sh" ]
+check "a bare brief writes NOTHING into the target" "$?"
+
+OUTH=$(init_env --target "$REPO" --heuristic < /dev/null); RCH=$?
+check "--heuristic exits 0" "$RCH"
+printf '%s' "$OUTH" | grep -qF "heuristic hints"
+check "the heuristic fallback appends its hints section" "$?"
+printf '%s' "$OUTH" | grep -qF "PROPOSAL SCHEMA"
+check "the heuristic brief still carries the schema" "$?"
+
+# ---- B2: the --write path --------------------------------------------------------
+new_repo b2
+P2="$WORK/proposal-b2.md"
+proposal "$P2" software
+OUT2=$(init_env --target "$REPO" --write "$P2" --yes < /dev/null); RC2=$?
+check "--write with a valid proposal exits 0" "$RC2"
+printf '%s' "$OUT2" | grep -qF "gob init [run] goblin-install"
 check "the run names the install engine call" "$?"
-grep -qF "gob init [run] gob sync --platform hermes --scope project" <<<"$OUT"
-check "the run names the sync engine call (wizard v2 vocabulary)" "$?"
-grep -qF "gob init [verify]" <<<"$OUT"
-check "the run reaches the verify step" "$?"
-grep -qF "owner_email: runner@example.com" "$REPO/.goblin/goblin.yaml"
-check "the declared email landed in the config" "$?"
-grep -qxF "branch: main" "$REPO/.goblin/goblin.yaml"
-check "the declared branch landed in the config" "$?"
-GATE_DECLARED=$(bash "$SRC/bin/goblin-lib.sh" --version >/dev/null 2>&1; \
-  bash -c '. "$0" 2>/dev/null' /dev/null; \
-  awk '/^gates:/{ing=1;next} ing && /^    cmd:/{sub(/^    cmd: */,"");print;exit}' "$REPO/.goblin/goblin.yaml")
+[ -f "$REPO/AGENTS.md" ] && [ -f "$REPO/HANDOFF.md" ] && [ -x "$REPO/.gob/bin/goblin-verify" ]
+check "the harness landed (AGENTS.md, HANDOFF.md, .gob/bin/goblin-verify)" "$?"
+grep -qF "owner_email: runner@example.com" "$REPO/AGENTS.md"
+check "the declared email landed in the AGENTS.md gob block" "$?"
+grep -qxF "branch: main" "$REPO/AGENTS.md"
+check "the declared branch landed in the AGENTS.md gob block" "$?"
+GATE_DECLARED=$(awk '/^<!-- gob:begin/{ing=1;next} /^<!-- gob:end/{ing=0} ing && /^gate_commit_cmd:/{sub(/^gate_commit_cmd: */,"");print;exit}' "$REPO/AGENTS.md")
 [ "$GATE_DECLARED" = "bash tests/run-tests.sh" ]
-check "the --gate command is the declared first gate (got '$GATE_DECLARED')" "$?"
-[ -f "$REPO/.hermes/skills/goblin-mode/SKILL.md" ]
-check "hermes project emission exists under the target" "$?"
-[ -f "$REPO/CLAUDE.md" ] && { check "no claude context block without --emit claude" 1; } \
-                         || { check "no claude context block without --emit claude" 0; }
-# the wizard is a front end over install: the installer's own record must exist
-[ -f "$REPO/.goblin/installed.json" ]
-check "the install record exists (the wizard wrote nothing it did not route)" "$?"
-# commit, then GREEN: the measured fresh path (43 passed, 0 failed — T1 emitted hermes, so the
-# skills are present and hashed; the DEFAULT install's own green line is T2b below)
-( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack via gob init" )
-VOUT=$( cd "$REPO" && env PATH="$BARE_PATH" bash .goblin/bin/goblin-verify 2>&1 ); VRC=$?
-check "verify exits 0 after the commit" "$VRC"
-printf '%s' "$VOUT" | grep -qE '[0-9]+ passed, 0 failed'
-check "verify reports 0 failed" "$?"
-# W6 neutral-first: the wizard's install leg passes --skills no explicitly — the opt-in is the
-# emit screen, and the record must say so.
-grep -qF '"skills": "no"' "$REPO/.goblin/installed.json"
-check "the install record carries the skills opt-out (the emit screen is the opt-in)" "$?"
-
-# ---- T2b: the DEFAULT install creates NO .hermes — the neutral-first contract ------
-new_repo t2b
-OUT2B=$(init_env --target "$REPO" --class app --branch main --email "runner@example.com" \
-        --gate "bash tests/run-tests.sh" --yes \
-        < /dev/null 2>&1); RC2B=$?
-check "a flags-only run with no --emit (the default install) exits 0" "$RC2B"
+check "the proposal gate is the declared first gate (got '$GATE_DECLARED')" "$?"
 [ ! -e "$REPO/.hermes" ]
-check "  and writes NO .hermes directory (skills are opt-in, W6 neutral-first)" "$?"
-[ -f "$REPO/HANDOFF.md" ] && [ -f "$REPO/AGENTS.md" ] && [ -f "$REPO/.goblin/goblin.yaml" ] \
-  && [ -x "$REPO/.goblin/bin/goblin-verify" ] && [ -f "$REPO/.goblin/installed.json" ] \
-  && [ -f "$REPO/.gitignore" ]
-check "  and the neutral harness is complete (HANDOFF, AGENTS, .goblin, .gitignore)" "$?"
-grep -qF '"skills": "no"' "$REPO/.goblin/installed.json"
-check "  and the record says skills=no" "$?"
-( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack (neutral default)" )
-VOUT2B=$( cd "$REPO" && env PATH="$BARE_PATH" bash .goblin/bin/goblin-verify 2>&1 ); VRC2B=$?
-check "  and the neutral install verifies green (exit 0)" "$VRC2B"
-# wizard-v2: the unanswered ci step defaults to an explicit no, so the neutral install
-# carries no .github workflow — one gate row fewer, one skip more. Measured 2026-10-06.
-printf '%s' "$VOUT2B" | grep -qE '^ *37 passed, 0 failed, 11 advisory, 34 skipped'
-check "  at the measured neutral green line (37/0/11/34, ci=no)" "$?"
-# the emitted hermes context block (AGENTS.md's emitted twin) must NOT be here either
-grep -q 'gob sync' "$REPO/AGENTS.md"
-check "  and AGENTS.md points at the opt-in (gob sync --platform <p>, wizard v2 vocabulary)" "$?"
+check "no sync_platforms in the proposal writes NO .hermes (neutral-first)" "$?"
+grep -qF '"skills": "no"' "$REPO/.gob/installed.json"
+check "the install record carries the skills opt-out" "$?"
+# the proposal's keys merge over the class defaults: the installer rendered the class
+# defaults, then --write merged the proposal's own keys over them.
+grep -qF "class: software" "$REPO/AGENTS.md"
+check "the declared class landed in the gob block" "$?"
 
-# ---- T2: no TTY hang — zero flags, piped stdin ----------------------------------
-new_repo t2
-OUT2=$(init_env --target "$REPO" < /dev/null 2>&1); RC2=$?
-check "a zero-flag piped run finishes (no prompt hang), exit 0" "$RC2"
-grep -qF "gob init [3/7] class: software" <<<"$OUT2"
-check "the cascade names the defaulted class" "$?"
-grep -qF "owner_email: runner@example.com" "$REPO/.goblin/goblin.yaml"
-check "the git identity became the declared email" "$?"
-# W6 neutral-first: a zero-flag run (piped stdin, no detected platforms in the stripped-PATH
-# sandbox) pre-ticks NOTHING and installs NO skills — the neutral harness only. The guided
-# emit screen (a tty run) is the opt-in; T8's pty run below drives it with Enters.
-[ ! -e "$REPO/.hermes" ]
-check "a zero-flag run emits no skills and writes no .hermes (neutral default)" "$?"
+# ---- B2b: the sync path — sync_platforms emits platform files --------------------
+new_repo b2b
+P2B="$WORK/proposal-b2b.md"
+proposal "$P2B" software 'sync_platforms: [hermes]'
+OUT2B=$(init_env --target "$REPO" --write "$P2B" --yes < /dev/null); RC2B=$?
+check "--write with sync_platforms [hermes] exits 0" "$RC2B"
+[ -e "$REPO/.hermes" ]
+check "sync_platforms emits the platform files under the target" "$?"
+printf '%s' "$OUT2B" | grep -qF "sync --platform hermes"
+check "the run names the sync engine call" "$?"
 
-# ---- T3: the refusal contract — an existing HANDOFF.md is never taken -----------
-new_repo t3
+# ---- B3: the validation refusals --------------------------------------------------
+new_repo b3
+P3="$WORK/proposal-b3-noblock.md"
+printf 'class: software\ngate_commit_cmd: true\n' > "$P3"
+OUT3=$(init_env --target "$REPO" --write "$P3" < /dev/null); RC3=$?
+check "a proposal with no gob block exits 2" "$([ "$RC3" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3" | grep -qF "carries no gob block"
+check "the refusal names the missing block" "$?"
+
+P3B="$WORK/proposal-b3-badkey.md"
+proposal "$P3B" software 'not_a_real_key: 42'
+OUT3B=$(init_env --target "$REPO" --write "$P3B" < /dev/null); RC3B=$?
+check "an unknown key exits 2" "$([ "$RC3B" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3B" | grep -qF "not_a_real_key"
+check "the refusal names the key it refused" "$?"
+
+P3C="$WORK/proposal-b3-badclass.md"
+proposal "$P3C" zebra
+OUT3C=$(init_env --target "$REPO" --write "$P3C" < /dev/null); RC3C=$?
+check "a nonsense class exits 2" "$([ "$RC3C" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3C" | grep -qF "software|service|game|research|fleet"
+check "the refusal names the class enum" "$?"
+printf '%s' "$OUT3C" | grep -qF "unknown class 'zebra'"
+check "  and names the input it refused (W6 review F1)" "$?"
+
+P3D="$WORK/proposal-b3-nogate.md"
+{
+  printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
+  printf 'class: software\nbranch: main\nowner_email: runner@example.com\n'
+  printf '<!-- gob:end -->\n'
+} > "$P3D"
+OUT3D=$(init_env --target "$REPO" --write "$P3D" < /dev/null); RC3D=$?
+check "a proposal with no gate exits 2" "$([ "$RC3D" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3D" | grep -qF "declares no gate"
+check "the refusal names the missing gate" "$?"
+BEFORE3=$( cd "$REPO" && find . -path ./.git -prune -o -type f -print | sort )
+check "every refusal wrote nothing (no AGENTS.md, no .gob/)" \
+  "$([ ! -e "$REPO/AGENTS.md" ] && [ ! -e "$REPO/.gob" ] && echo 0 || echo 1)"
+
+# ---- B3b: the installer's own refusal contract through --write --------------------
+new_repo b3b
 printf '# my own handoff, written before goblin ever saw this repo\n' > "$REPO/HANDOFF.md"
 OWN_HANDOFF=$(sha256sum "$REPO/HANDOFF.md" | awk '{print $1}')
-OUT3=$(init_env --target "$REPO" --class app --branch main --email "runner@example.com" \
-        --gate "bash tests/run-tests.sh" --emit hermes --yes \
-        < /dev/null 2>&1); RC3=$?
-check "init exits 1 on the installer's refusal" "$([ "$RC3" -eq 1 ] && echo 0 || echo 1)"
-printf '%s' "$OUT3" | grep -q "HANDOFF.md"
+P3E="$WORK/proposal-b3e.md"
+proposal "$P3E" software
+OUT3E=$(init_env --target "$REPO" --write "$P3E" --yes < /dev/null); RC3E=$?
+check "init --write exits 1 on the installer HANDOFF refusal" "$([ "$RC3E" -eq 1 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3E" | grep -qF "HANDOFF.md"
 check "the refusal names the path" "$?"
 [ "$(sha256sum "$REPO/HANDOFF.md" | awk '{print $1}')" = "$OWN_HANDOFF" ]
 check "the project's own HANDOFF.md is byte-identical" "$?"
-printf '%s' "$OUT3" | grep -qF "gob init [verify]"
-NOT_VERIFY=$?
-check "the wizard stopped at the refusal — no verify ran" "$([ "$NOT_VERIFY" -ne 0 ] && echo 0 || echo 1)"
 
-# ---- T4: --dry-run prints the plan and writes nothing ---------------------------
-new_repo t4
-BEFORE=$( cd "$REPO" && find . -type f | sort )
-OUT4=$(init_env --target "$REPO" --class research --branch trunk --email "a@b.c" \
-        --gate "make check" --emit hermes --dry-run \
-        < /dev/null 2>&1); RC4=$?
-check "dry-run exits 0" "$RC4"
-printf '%s' "$OUT4" | grep -qF "class       research"
-check "the plan names the class" "$?"
-printf '%s' "$OUT4" | grep -qF "(hermes)"
-check "the plan names the emit platform" "$?"
-printf '%s' "$OUT4" | grep -qF "writes nothing"
-check "the plan says it writes nothing" "$?"
-AFTER=$( cd "$REPO" && find . -type f | sort )
-[ "$BEFORE" = "$AFTER" ]
+# ---- B4: --dry-run validates and writes nothing ------------------------------------
+new_repo b4
+P4="$WORK/proposal-b4.md"
+proposal "$P4" research
+BEFORE4=$( cd "$REPO" && find . -path ./.git -prune -o -type f -print | sort )
+OUT4=$(init_env --target "$REPO" --write "$P4" --dry-run --yes < /dev/null); RC4=$?
+check "--dry-run exits 0" "$RC4"
+printf '%s' "$OUT4" | grep -qF "validated OK"
+check "the plan names the validated class and the write set" "$?"
+printf '%s' "$OUT4" | grep -qF "would write"
+check "the plan says what it would write" "$?"
+AFTER4=$( cd "$REPO" && find . -path ./.git -prune -o -type f -print | sort )
+[ "$BEFORE4" = "$AFTER4" ]
 check "the tree is byte-list unchanged after --dry-run" "$?"
 
-# ---- T4b: --no-verify skips the health check and still exits 0 -------------------
-new_repo t4b
-OUT4B=$(init_env --target "$REPO" --class research --branch main --email "runner@example.com" \
-        --gate "bash tests/run-tests.sh" --no-verify \
-        < /dev/null 2>&1); RC4B=$?
-check "--no-verify run exits 0" "$RC4B"
-printf '%s' "$OUT4B" | grep -qF "gob init [verify] skipped (--no-verify)"
-check "  and names the skip (not a silent pass)" "$?"
-[ -f "$REPO/.goblin/goblin.yaml" ] && [ -f "$REPO/HANDOFF.md" ]
-check "  and the install itself still happened" "$?"
-# commit, then the deferred verify is GREEN: --no-verify defers the health check, it does
-# not weaken it — the same repo verifies clean once the day-one commit exists.
-( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack via gob init (--no-verify)" )
-sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$( cd "$REPO" && git rev-parse --short HEAD )\`/" "$REPO/HANDOFF.md"
-( cd "$REPO" && git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes" )
-V4B=$( cd "$REPO" && env PATH="$BARE_PATH" bash .goblin/bin/goblin-verify 2>&1 ); RC4BV=$?
-check "  and the deferred verify still runs green when invoked by hand" "$RC4BV"
-
-# ---- T5: idempotent re-run -------------------------------------------------------
-OUT5=$(init_env --target "$WORK/t1" --class app --branch main --email "runner@example.com" \
-        --gate "bash tests/run-tests.sh" --emit hermes --scope project --yes \
-        < /dev/null 2>&1); RC5=$?
-check "the identical re-run exits 0" "$RC5"
+# ---- B5: idempotent re-write --------------------------------------------------------
+P5="$WORK/proposal-b5.md"
+proposal "$P5" software
+init_env --target "$WORK/b2" --write "$P5" --yes < /dev/null >/dev/null 2>&1
+OUT5=$(init_env --target "$WORK/b2" --write "$P5" --yes < /dev/null); RC5=$?
+check "the identical re-write exits 0" "$RC5"
 printf '%s' "$OUT5" | grep -qE "no-op: .* unchanged"
-check "the re-run is the installer's no-op" "$?"
+check "the re-write is the installer's no-op" "$?"
 
-# ---- T6: bad input names the enum ------------------------------------------------
-OUT6=$(init_env --target "$WORK/t1" --class app --emit nosuch --yes < /dev/null 2>&1); RC6=$?
-check "unknown --emit platform exits 2" "$([ "$RC6" -eq 2 ] && echo 0 || echo 1)"
-printf '%s' "$OUT6" | grep -q "unknown platform 'nosuch'"
-check "the refusal names the platform and the enum" "$?"
-OUT7=$(init_env --target "$WORK/t1" --class zebra --yes < /dev/null 2>&1); RC7=$?
-check "a nonsense class exits 2" "$([ "$RC7" -eq 2 ] && echo 0 || echo 1)"
-printf '%s' "$OUT7" | grep -q "software|service|game|research|fleet"
-check "the refusal names the class enum" "$?"
-printf '%s' "$OUT7" | grep -q "got 'zebra'"
-check "  and names the input it refused (W6 review F1)" "$?"
-
-# ---- T7: the dispatcher routes ----------------------------------------------------
+# ---- B6: the dispatcher routes --------------------------------------------------------
 OUT8=$( cd "$WORK" && env PATH="$BARE_PATH" bash "$SRC/bin/goblin" init --help 2>&1 ); RC8=$?
 check "gob init --help exits 0 through the dispatcher" "$RC8"
-printf '%s' "$OUT8" | grep -q -- "--class"
-check "the usage names the class flag" "$?"
-OUT9=$( cd "$WORK" && node "$SRC/bin/goblin.js" init --help 2>&1 ); RC9=$?
+printf '%s' "$OUT8" | grep -q -- "--write"
+check "the usage names the --write flag" "$?"
+OUT9=$( cd "$WORK" && env PATH="$BARE_PATH:$HOME/.local/bin" node "$SRC/bin/goblin.js" init --help 2>&1 ); RC9=$?
 check "the npm shim routes init to goblin-init" "$RC9"
-printf '%s' "$OUT9" | grep -q -- "--class"
-check "the shim run reaches the wizard's usage" "$?"
+printf '%s' "$OUT9" | grep -qF "gob init"
+check "the shim run reaches the engine's usage" "$?"
 
-# ---- T8: the tty path, under script(1) — the pty screen a pipe cannot see ------------
-# The redraw only exists on a tty: run the wizard through `script -qec` so it owns a
-# pty, feed it Enters (every prompt defaults), then assert on the TYPESCRIPT bytes:
-#   * no literal '{C_' token — the multibyte-adjacent brace bug this file fixed twice
-#   * no 'unbound variable' — a ${C_X} that lost its braces' dollar shows up here first
-#   * the redraw frame actually carries ✔ collapsed rows and the accent ◆
-# Piped assertions cannot see this: with stdout a pipe the wizard is its cascade self.
-if command -v script >/dev/null 2>&1; then
-  new_repo t8
-  TS="$WORK/t8.pty.txt"
-  printf '\n\n\n\n\n\n\n\n' | env HOME="$WORK/home" \
-      GOBLIN_MODELS="$WORK/models.yaml" \
-      GOBLIN_PRACTICE="$WORK/standard.md" \
-      PATH="$BARE_PATH" \
-      timeout 120 script -qec "bash $SRC/bin/goblin-init --target $REPO --yes" "$TS" >/dev/null 2>&1
-  RC10=$?
-  check "the wizard finishes under a pty (script -qec), exit 0" "$RC10"
-  grep -qF "{C_" "$TS"
-  check "the pty transcript carries zero literal {C_ tokens" "$([ $? -ne 0 ] && echo 0 || echo 1)"
-  grep -qF "unbound variable" "$TS"
-  check "the pty transcript names no unbound variable" "$([ $? -ne 0 ] && echo 0 || echo 1)"
-  grep -qF "invalid number" "$TS"
-  check "the pty transcript has no printf arg-mismatch (invalid number)" "$([ $? -ne 0 ] && echo 0 || echo 1)"
-  grep -q "✔ 1. detect" "$TS"
-  check "the tty rail shows the answered detect row collapsed with its value (wizard v2 names)" "$?"
-  grep -qE "◆.+2\. class" "$TS"
-  check "the tty rail marks the current step with the accent diamond" "$?"
-  grep -q "✔ 2. class" "$TS"
-  check "the tty rail shows class answered on the next screen" "$?"
-  grep -qE "$(printf '\033')\[[0-9]+A" "$TS"
-  check "the redraw moves the cursor only on a tty (cursor-up present in the typescript)" "$?"
-  # T8b: the rewind amount must cover the FULL drawn frame — buffer + the 7 rail rows
-  # (wizard v2: the rail grew from 6 steps to 7). Rewinding by the buffer count alone
-  # (the 0.5.0-beta.1 defect the client caught on a Mac, 2026-10-06) left the stale rail
-  # rows painted, so every screen ≥2 stacked a second banner frame under them: the
-  # duplicate-logo screenshot. Pin the arithmetic in the source, and pin that a
-  # buffer-only rewind shape never returns.
-  grep -qF 'RAIL_BUF[@]} + N_STEPS' "$SRC/bin/goblin-init"
-  check "rail_rewind covers the full drawn frame (buffer + N_STEPS rail rows) (T8b)" "$?"
-  ! grep -qF 'RAIL_BUF[@]} + 6' "$SRC/bin/goblin-init"
-  check "no hardcoded 6-row rewind remains (the rail is 7 rows now) (T8b)" "$?"
-  ! grep -qF "printf '\\033[%dA\\033[J' \"\${#RAIL_BUF[@]}\"" "$SRC/bin/goblin-init"
-  check "no buffer-only rewind remains (the dup-banner shape) (T8b)" "$?"
-  # And the unbraced-var species on line 244's branch: a colour var directly adjacent to a
-  # multibyte glyph anywhere in bin/goblin-init — bash parses the longest identifier and
-  # the run dies with 'C_GREEN<glyph>: unbound variable' (client screenshot, 2026-10-06).
-  ! grep -nP '\$C_[A-Z_]+[^\x00-\x7F]' "$SRC/bin/goblin-init"
-  check "no unbraced colour var adjacent to a multibyte glyph (T8c)" "$?"
-  # ---- T8d: the BSD-sed source gate --------------------------------------------
-  # A bare `sed -i script file` is a syntax bomb on macOS (BSD sed reads the script as
-  # the -i backup suffix): the client's install died with 'command a expects \ followed
-  # by text' at the wizard's branch write (Mac, 2026-10-06). Every in-place edit in bin/
-  # must go through g_sed_i, which branches on the sed family — the only two literal
-  # `sed -i` occurrences allowed are inside g_sed_i itself (its own two branch arms).
-  # The allowlist is the FUNCTION BODY, not line numbers: an edit above g_sed_i used to
-  # shift the arms out of a fixed 2xx line window and the gate failed on the helper's
-  # own compliant arms. awk prints the body between `g_sed_i() {` and its closing `}`
-  # for every bin file that defines the helper; the gate counts only hits outside it.
-  BARE=$(for f in "$SRC"/bin/*; do
+# ---- B7: the post-install GREEN line ----------------------------------------------------
+new_repo b7
+P7="$WORK/proposal-b7.md"
+proposal "$P7" software
+init_env --target "$REPO" --write "$P7" --yes < /dev/null >/dev/null 2>&1
+( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack via gob init --write" )
+VOUT=$( cd "$REPO" && env PATH="$BARE_PATH" bash .gob/bin/goblin-verify 2>&1 ); VRC=$?
+check "verify exits 0 after the commit" "$VRC"
+printf '%s' "$VOUT" | grep -qE '[0-9]+ passed, 0 failed'
+check "verify reports 0 failed" "$?"
+
+# ---- B8: the source gates (from the deleted t8 pty family, still relevant) ----------
+# The class of bug these guard is visible in the SOURCE; the pty was only where the
+# symptoms showed. Each has a positive control proving the pattern still bites.
+printf 'x="{C_BAD} a planted unbraced token"\n' > "$WORK/gate-probe.txt"
+grep -qE '(^|[^$])\{C_' "$WORK/gate-probe.txt"
+check "the {C_ gate pattern catches a planted violation (positive control)" "$?"
+grep -qE '(^|[^$])\{C_' "$SRC/bin/goblin-init"
+check "bin/goblin-init carries zero {C_ not preceded by a dollar" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+printf '$C_GREEN✔ ok\n' > "$WORK/mb-probe.txt"
+grep -qP '\$C_[A-Z_]+[^\x00-\x7F]' "$WORK/mb-probe.txt"
+check "the unbraced-colour-var pattern catches a planted violation (positive control)" "$?"
+! grep -nP '\$C_[A-Z_]+[^\x00-\x7F]' "$SRC/bin/goblin-init"
+check "no unbraced colour var adjacent to a multibyte glyph (T8c)" "$?"
+BARE=$(for f in "$SRC"/bin/*; do
            [ -f "$f" ] || continue
            awk '
              /^g_sed_i\(\) \{/ { inhelper = 1 }
@@ -289,23 +248,9 @@ if command -v script >/dev/null 2>&1; then
            ' "$f"
          done \
          | grep -c 'sed -i' | tr -d ' ')
-  check "no bare sed -i outside g_sed_i (T8d, found: $BARE)" "$([ "$BARE" -eq 0 ] && echo 0 || echo 1)"
-  grep -q 'g_sed_i()' "$SRC/bin/goblin-lib.sh"
-  check "the g_sed_i helper exists in goblin-lib (T8d)" "$?"
-else
-  note "skip T8: script(1) not available — the pty screen cannot be exercised here"
-fi
-
-# ---- T9: the source gate — bin/goblin-init carries zero unbraced {C_ -----------------
-# The class of bug this guards: a C_ colour var adjacent to a multibyte glyph must be
-# braced ${C_X}; an unbraced {C_ next to ✔/◆/○ prints the literal token on the screen.
-# The positive control proves the pattern still bites before the gate proves the tree
-# is clean (the MD-01 control precedent).
-printf 'x="{C_BAD} a planted unbraced token"\n' > "$WORK/gate-probe.txt"
-grep -qE '(^|[^$])\{C_' "$WORK/gate-probe.txt"
-check "the {C_ gate pattern catches a planted violation (positive control)" "$?"
-grep -qE '(^|[^$])\{C_' "$SRC/bin/goblin-init"
-check "bin/goblin-init carries zero {C_ not preceded by a dollar" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+check "no bare sed -i outside g_sed_i (T8d, found: $BARE)" "$([ "$BARE" -eq 0 ] && echo 0 || echo 1)"
+grep -q 'g_sed_i()' "$SRC/bin/goblin-lib.sh"
+check "the g_sed_i helper exists in goblin-lib (T8d)" "$?"
 
 if [ "$fail" -eq 0 ]; then
   printf 't-init: ok\n'

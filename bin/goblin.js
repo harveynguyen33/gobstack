@@ -1,36 +1,27 @@
 #!/usr/bin/env node
-// bin/goblin.js — the node shim over the bash engine (W2, PLAN-V1 §4.3).
+// bin/goblin.js — the node shim over the bash engine.
 //
-// The shebang is load-bearing: the §4.3 body always calls bash with the payload
-// explicitly, but npm's bin symlink executes THIS file directly (npx ./ --version),
-// and a marketplace packager stripping the executable bit breaks the symlink, not
-// the spawnSync path below.
+// The shebang is load-bearing: npm's bin symlink executes THIS file directly
+// (npx ./ --version), and a marketplace packager stripping the executable bit breaks
+// the symlink, not the spawnSync path below.
 //
-//   gob verify [--only <id,...>] ...      -> bin/goblin-verify
+// v2 SURFACE (AI-driven development):
+//   gob init    [...]                     -> bin/goblin-init (the prompt+schema engine)
+//   gob map    [...]                      -> bin/goblin-map (prompt+schema; --heuristic fallback)
+//   gob verify [...]                      -> bin/goblin-verify
 //   gob bans   [...]                      -> bin/goblin-bans
-//   gob audit  [...]                      -> bin/goblin-audit
-//   gob upgrade [...]                     -> bin/goblin-upgrade (W3)
-//   gob doctor [...]                      -> bin/goblin-doctor (W4a)
-//   gob emit   [...]                      -> bin/goblin-emit (W4a)
-//   gob init   [...]                      -> bin/goblin-init (W6, the first-run wizard)
-//   gob map    [target] [--force]         -> bin/goblin-map (the standalone feature-map generator)
 //   gob uninstall [--target <dir>]        -> bin/goblin-install --uninstall
-//   gob install [...]                     -> bin/goblin-install (the one legacy fallback)
-//   no args | -h/--help | any other unrecognized first arg
-//                                         -> this file's short usage, exit 2. A bare `goblin`
-//                                            used to fall through into the installer; a typo
-//                                            (`goblin inti`) silently installed too. Both now
-//                                            print the usage and stop.
+//   no args | -h/--help | any other first arg -> this file's short usage, exit 2.
 //
-// Non-negotiables (§4.3): args are passed as an ARRAY, never a shell string (no
-// injection surface); `bash` is named explicitly (a packager stripping the
-// executable bit must not break every command); the exit status is propagated
-// VERBATIM so the four-value verify contract survives the shim. No dependencies,
-// no async, CommonJS — this repo has no node tooling by design.
+// UNWIRED (code kept, deletion is session 3): audit, upgrade, doctor, emit, sync,
+// install. The usage() list is the product's contract: a verb absent from it is refused,
+// naming what replaced it — never silently executed.
 //
-// The payload/ re-point happens with packaging (W3/W5): the npm tarball moves the
-// bash payload under payload/, so this line becomes path.join(__dirname, "..", "payload", "bin", target).
-// Until then the shim runs straight out of the checkout layout.
+// Non-negotiables: args are passed as an ARRAY, never a shell string (no injection
+// surface); `bash` is named explicitly (a packager stripping the executable bit must not
+// break every command); the exit status is propagated VERBATIM so the four-value verify
+// contract survives the shim. No dependencies, no async, CommonJS — this repo has no
+// node tooling by design.
 "use strict";
 
 const { spawnSync } = require("node:child_process");
@@ -45,32 +36,24 @@ if (arg0 === "--version" || arg0 === "-V" || arg0 === "-v") {
   process.exit(0);
 }
 
-const SCRIPT = { verify: "goblin-verify", bans: "goblin-bans", audit: "goblin-audit", upgrade: "goblin-upgrade", doctor: "goblin-doctor", emit: "goblin-emit", sync: "goblin-emit", init: "goblin-init", map: "goblin-map" };
-// `sync` is the friendlier name for `emit` (wizard v2): same engine, same flags, same exit
-// contract. `emit` stays a first-class verb - nothing is removed, this row only adds an alias.
+const SCRIPT = { init: "goblin-init", map: "goblin-map", verify: "goblin-verify", bans: "goblin-bans" };
 const [cmd, ...rest] = process.argv.slice(2);
 
-// No args, a help flag, or an unrecognized first arg: short usage, exit 2. The one survivor of
-// the old catch-all fallback is the literal `install` first arg — bare `goblin` mapped to the
-// installer through npm's bin default, and a typo (`goblin inti`) silently installed into
-// whatever directory the shell sat in. A bare subcommand-less `gob install ...` keeps the
-// installer; everything else stops here and names the word it did not know.
+// No args, a help flag, or an unrecognized first arg: short usage, exit 2. A bare
+// subcommand-less `gob install ...` is REFUSED in v2 (init replaced it); a typo
+// (`gob inti`) stops here and names the word it did not know.
 function usage() {
   process.stderr.write(
 [
 "gob <command>",
 "",
-"  gob init      start here — the guided first step (health, class, gate, ci, sync, verify)",
+"  gob init      start here — prints the agent brief + proposal schema; --write installs it",
 "  gob verify    run the rule matrix against the current repo",
 "  gob bans      run the ban list (per-pattern red lines over the source tree)",
-"  gob audit     check recorded dependency claims against live advisory feeds",
-"  gob upgrade   migrate a repo to the shared global engine at ~/.goblin/engine",
-"  gob doctor    one detection/drift run across the agent platforms",
-"  gob sync      write the skills + context block for one platform (alias: gob emit)",
-"  gob map       generate a starter feature map for this repo (standalone; no install needed)",
+"  gob map       print the feature-map prompt + schema; --heuristic scans instead",
 "  gob uninstall --target .          remove exactly what an install wrote (preimages)",
 "",
-"start here: gob init",
+"start here: npx @techgoblin/gobstack init",
 "uninstall: npm uninstall -g @techgoblin/gobstack",
 "",
 ].join("\n"));
@@ -80,7 +63,7 @@ if (cmd === undefined || cmd.startsWith("-")) {
   usage();
   process.exit(2);
 }
-if (!SCRIPT[cmd] && cmd !== "install" && cmd !== "uninstall") {
+if (!SCRIPT[cmd] && cmd !== "uninstall") {
   process.stderr.write(`gob: unrecognized command: ${cmd}\n\n`);
   usage();
   process.exit(2);
@@ -88,13 +71,7 @@ if (!SCRIPT[cmd] && cmd !== "install" && cmd !== "uninstall") {
 
 let target;
 let extra = [];
-if (cmd === "install") {
-  target = "goblin-install"; // the one legacy fallback, kept verbatim
-} else if (cmd === "uninstall") {
-  // `gob uninstall --target <dir>` routes into the installer's uninstall job — the shape
-  // docs/GUIDE.md and README already promise. `--uninstall` is appended FIRST so the user's
-  // own `--target <dir>` and options still parse, and a stray literal `--uninstall` cannot
-  // appear twice.
+if (cmd === "uninstall") {
   target = "goblin-install";
   extra = ["--uninstall"];
 } else {

@@ -7,10 +7,10 @@
 ## ▶ START HERE (new session)
 
 - Working dir: the repo root.
-- Gate set: `{{GATE_NAME}}` — `{{GATE_CMD}}`, plus whatever you add in `.goblin/goblin.yaml`.
-- Run the gates and the manifest checks: `.goblin/bin/goblin-verify`
-- One line of measured numbers for the round: `.goblin/bin/goblin-verify --only GT-02` writes `.goblin/last-gate-line`.
-- Read before working: the referenced standard, if `.goblin/goblin.yaml` declares `practice:`.
+- Gate set: `{{GATE_NAME}}` — `{{GATE_CMD}}`, plus whatever you add in `AGENTS.md`.
+- Run the gates and the manifest checks: `.gob/bin/goblin-verify`
+- One line of measured numbers for the round: `.gob/bin/goblin-verify --only GT-02` writes `.gob/last-gate-line`.
+- Read before working: the referenced standard, if `AGENTS.md` declares `practice:`.
 
 ## State
 
@@ -25,7 +25,7 @@
 Every number here is a measurement with a date, never a copy from a previous round.
 
 - `{{GATE_NAME}}` = 0 · measured {{DATE}}
-- ratchet — declared in `.goblin/goblin.yaml`; re-measure it, do not copy it.
+{{GATE2_LINE}}
 - Example of the required form: `typecheck=0 · build=0 · ratchet <n> (ceiling <c>) · <n>/<n> harnesses green · measured {{DATE}}`
 
 ## Next steps

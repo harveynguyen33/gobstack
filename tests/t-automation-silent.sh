@@ -39,11 +39,11 @@ check "the fixture installs" "$?"
 git add -A && git commit -q -m "chore: install gobstack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
-bash .goblin/bin/goblin-verify >/dev/null 2>&1
+bash .gob/bin/goblin-verify >/dev/null 2>&1
 check "the installed fixture starts GREEN (nothing below is measured against a broken baseline)" "$?"
 
 mkdir -p "$WORK/projects/not-installed"
-printf 'no .goblin here\n' > "$WORK/projects/not-installed/README.md"
+printf 'no .gob here\n' > "$WORK/projects/not-installed/README.md"
 
 STATE="$WORK/state"
 
@@ -63,7 +63,7 @@ check "a clean run prints nothing on stdout ($(wc -c < "$WORK/out" | tr -d ' ') 
 check "and it says nothing on stderr either" "$([ ! -s "$WORK/err" ] && echo 0 || echo 1)"
 
 # ---- 2. the mutation: one installed file edited ------------------------------
-printf '\n# an unrecorded byte\n' >> "$WORK/projects/installed/.goblin/roles.yaml"
+printf '\n# an unrecorded byte\n' >> "$WORK/projects/installed/.gob/roles.yaml"
 drift_run
 RC=$?
 check "the same run with one installed file edited exits 1" "$([ "$RC" -eq 1 ] && echo 0 || echo 1)"
@@ -77,24 +77,24 @@ grep -q '^# coverage:' "$WORK/out"
 check "  and its own coverage (n of m, skipped named)" "$?"
 
 # ---- 3. restore: silent again -----------------------------------------------
-cd "$WORK/projects/installed" && git checkout -q -- .goblin/roles.yaml
+cd "$WORK/projects/installed" && git checkout -q -- .gob/roles.yaml
 clean_run
 check "restored, the run is silent again" "$([ ! -s "$WORK/out" ] && echo 0 || echo 1)"
 
 # ---- 4. the kill switch -----------------------------------------------------
 mkdir -p "$WORK/state-dir"
 printf 'enabled: false\n' > "$WORK/state-dir/drift-audit.state"
-printf '\n# an unrecorded byte\n' >> "$WORK/projects/installed/.goblin/roles.yaml"
+printf '\n# an unrecorded byte\n' >> "$WORK/projects/installed/.gob/roles.yaml"
 bash "$PRODUCER" --root "$WORK/projects/*" --state "$WORK/state-dir/drift-audit.state" > "$WORK/out" 2> "$WORK/err"
 RC=$?
 check "the kill switch suppresses the finding and exits 0" "$([ "$RC" -eq 0 ] && echo 0 || echo 1)"
 check "  it prints nothing on stdout" "$([ ! -s "$WORK/out" ] && echo 0 || echo 1)"
 grep -q 'enabled: false' "$WORK/err"
 check "  and it says WHY on stderr, so a silenced run is not a mystery" "$?"
-cd "$WORK/projects/installed" && git checkout -q -- .goblin/roles.yaml
+cd "$WORK/projects/installed" && git checkout -q -- .gob/roles.yaml
 
 # ---- 5. the ceiling: a capped run is a DIFFERENT line from a clean run -------
-printf '\n# an unrecorded byte\n' >> "$WORK/projects/installed/.goblin/roles.yaml"
+printf '\n# an unrecorded byte\n' >> "$WORK/projects/installed/.gob/roles.yaml"
 mkdir -p "$WORK/state-dir"
 printf 'enabled: true\nrun: %s\nrun: %s\n' "$(date -u +%F)" "$(date -u +%F)" > "$WORK/state-dir/drift-audit.state"
 bash "$PRODUCER" --root "$WORK/projects/*" --state "$WORK/state-dir/drift-audit.state" --limit 2 > "$WORK/out" 2>/dev/null
@@ -102,7 +102,7 @@ RC=$?
 check "a capped run exits 0" "$([ "$RC" -eq 0 ] && echo 0 || echo 1)"
 grep -q '^# capped: 2 of 2' "$WORK/out"
 check "  a capped run prints a capped line, never the silence of a clean one" "$?"
-cd "$WORK/projects/installed" && git checkout -q -- .goblin/roles.yaml
+cd "$WORK/projects/installed" && git checkout -q -- .gob/roles.yaml
 
 # ---- 6. the intake validator: the refusal carries no --assignee --------------
 mkdir -p "$WORK/reports/good" "$WORK/reports/bad"

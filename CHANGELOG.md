@@ -3,6 +3,41 @@
 One line per released version. `goblin-install --upgrade` prints the delta between the
 version recorded in a target's `.goblin/installed.json` and the source `VERSION`.
 
+## 0.6.0-alpha.1
+
+The v2 breaking release: rules-first. The rules a repo is judged by move from a config file the
+installer generated into the file a new session already reads, the folder the engine is vendored
+into gets a name that cannot collide with the global one, and every command a reader could not
+reach is cut from the surface rather than shipped half-wired. Nothing here is additive — a repo
+on 0.5.x does not silently keep working through this version; run `gob init` again in the repo.
+
+- **`goblin.yaml` is gone. AGENTS.md frontmatter is the single source of truth.** The gates, the
+  bans enablement and the model mapping all read the frontmatter block of the root `AGENTS.md`
+  (flat `gate_<name>_cmd:` keys beside the prose a teammate reads anyway). There is no second
+  config file to drift out of sync with the prose, and the file a new session reads first is the
+  file the rules live in. `gob init` prints the agent brief plus a proposal schema and the agent
+  fills the frontmatter; `--write` installs the validated result.
+- **`.goblin/` is renamed `.gob/`.** The vendored engine payload (`.gob/bin/`,
+  `.gob/manifest/`, `.gob/installed.json`) sits one level deep under a short name, and the
+  global `~/.goblin` tree no longer shares a prefix with it.
+- **The CI lane is cut.** No shipped workflow file, no CI toggle in the config — the gate hook
+  and `gob verify` are the enforcement paths.
+- **The surface is five verbs: `init`, `map`, `verify`, `bans`, `uninstall`.** The dispatcher
+  refuses everything else with exit 2 — `doctor`, `audit`, `upgrade`, `emit`, `sync` and
+  `install` are unwired (their code is deleted or unreachable; see `docs/LIMITS.md` #54 for the
+  engine-dir decision the upgrade command used to serve). `gob init` replaces `gob install`
+  entirely.
+- **npx-first, no global install.** The documented entry is
+  `npx @techgoblin/gobstack init`; `uninstall` is the npm one-liner. Nothing asks for `-g`.
+- **Remedy per FAIL.** A `FAIL` row prints its one-line `remedy:` at the point of failure and
+  again under the summary payload, so a red run says what to do next without a docs trip.
+- **Framed for the new teammate.** The docs lead with what a person joining the repo reads
+  first (`AGENTS.md`, `HANDOFF.md`), not with the toolchain that maintains them.
+
+`VERSION`, `package.json` and all six `GOBLIN_*_VERSION` constants in `bin/` are this version.
+No id, verdict or matrix cell moved in this release; the counts the docs quote are the ones
+measured on this tree.
+
 ## 0.4.4
 
 The five findings an independent verification of 0.4.3 left open (AB3). The blocker is the species

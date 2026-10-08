@@ -19,7 +19,7 @@
 
 set -uo pipefail
 
-GOBLIN_VERIFY_VERSION="0.5.0"
+GOBLIN_VERIFY_VERSION="0.6.0-alpha.1"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=goblin-lib.sh
 . "$SELF_DIR/goblin-lib.sh"
@@ -42,7 +42,7 @@ goblin-verify — prove a goblin-stack install is still what it says it is.
                         to a count; FAIL and ADV always print in full)
   --list                list the manifest rows and exit
   --json                machine-readable output
-  --source <path>       read the manifest from a goblin-stack checkout instead of .goblin/
+  --source <path>       read the manifest from a goblin-stack checkout instead of .gob/
 
 Exit codes: 0 pass | 1 a check failed | 2 could not run | 3 the manifest is broken.
 USAGE
@@ -71,7 +71,7 @@ done
 find_installed_root() {
   local d="$PWD"
   while :; do
-    if [ -f "$d/.goblin/goblin.yaml" ]; then printf '%s\n' "$d"; return 0; fi
+    if [ -f "$d/AGENTS.md" ] && grep -q "^$GOB_AGENTS_BEGIN" "$d/AGENTS.md" 2>/dev/null; then printf '%s\n' "$d"; return 0; fi
     [ "$d" = "/" ] && return 1
     d=$(dirname "$d")
   done
@@ -86,8 +86,8 @@ fi
 # Every engine-path lookup (enforcement.tsv, classes.tsv, bans.tsv, bans/*.sh, the ban
 # engine) resolves through this chain, first hit wins:
 #   1. --source <path>            (existing flag; highest, for tests and pinned CI)
-#   2. $ROOT/.goblin/...          (vendored per-repo engine — today's default)
-#   3. engine_dir: from $ROOT/.goblin/goblin.yaml
+#   2. $ROOT/.gob/...             (vendored per-repo engine — today's default)
+#   3. engine_dir: from $ROOT/AGENTS.md
 #   4. GOBLIN_ENGINE_DIR env, then ~/.goblin/engine
 #   5. nothing found -> exit 2, naming every path tried (the pre-W1 message when the
 #      vendored chain is the only one tried; the §2.4 message when engine_dir: fails).
@@ -97,12 +97,13 @@ fi
 # back to a vendored engine would judge the repo with a different rule table than the one
 # it declared. Absent key => the chain degrades to exactly today's behaviour (§1.3).
 
-CONFIG="$ROOT/.goblin/goblin.yaml"
+CONFIG="$ROOT/AGENTS.md"
 
-# engine_yaml_raw — the raw top-level engine_dir: value (the line-oriented parser reads
-# the line, so a non-string scalar is visible here as something that is not a path).
+# engine_yaml_raw — the raw engine_dir: value from the AGENTS.md frontmatter (the
+# line-oriented parser reads the line, so a non-string scalar is visible here as
+# something that is not a path).
 engine_yaml_raw() {
-  sed -n "s/^engine_dir:[[:space:]]*//p" "$CONFIG" | head -n 1
+  g_agents_read "$CONFIG" engine_dir
 }
 
 # resolve_engine_dir — validate the declared key (§1.2, fail closed at use time, stages
@@ -118,7 +119,7 @@ resolve_engine_dir() {
   ENGINE_FAIL=""
   ENGINE_DIR_DECLARED=""
   [ -f "$CONFIG" ] || return 0
-  grep -q '^engine_dir:' "$CONFIG" || return 0
+  [ -n "$(g_agents_keys "$CONFIG" | grep -qx engine_dir && echo 1)" ] || return 0
   local dir
   dir=$(engine_yaml_raw)
   if [ -z "$dir" ]; then
@@ -146,7 +147,7 @@ resolve_engine_dir() {
   esac
   # Stage 3: existence.
   if [ ! -d "$dir" ]; then
-    ENGINE_FAIL="engine_dir: $dir does not exist (declared in .goblin/goblin.yaml)"
+    ENGINE_FAIL="engine_dir: $dir does not exist (declared in AGENTS.md)"
     return 1
   fi
   # Stage 4: the payload — a directory without the rule table is not an engine.
@@ -159,14 +160,14 @@ resolve_engine_dir() {
 }
 
 resolve_engine_dir
-ENGINE_CHAIN_VENDORED="\$ROOT/.goblin/manifest/enforcement.tsv"
+ENGINE_CHAIN_VENDORED="\$ROOT/.gob/manifest/enforcement.tsv"
 GOBLIN_ENGINE=""                       # the resolved engine root, when NOT vendored/--source
 if [ -n "$SOURCE" ]; then
   MANIFEST="$SOURCE/manifest/enforcement.tsv"
   CLASSES="$SOURCE/manifest/classes.tsv"
-elif [ -f "$ROOT/.goblin/manifest/enforcement.tsv" ]; then
-  MANIFEST="$ROOT/.goblin/manifest/enforcement.tsv"
-  CLASSES="$ROOT/.goblin/manifest/classes.tsv"
+elif [ -f "$ROOT/.gob/manifest/enforcement.tsv" ]; then
+  MANIFEST="$ROOT/.gob/manifest/enforcement.tsv"
+  CLASSES="$ROOT/.gob/manifest/classes.tsv"
 elif [ -n "$ENGINE_DECLARED" ]; then
   GOBLIN_ENGINE="$ENGINE_DECLARED"
   MANIFEST="$GOBLIN_ENGINE/manifest/enforcement.tsv"
@@ -175,7 +176,7 @@ elif [ -n "$ENGINE_FAIL" ]; then
   # §2.4: an explicit engine_dir: that does not resolve is exit 2, and nothing falls
   # back. The refusal names the declared value and every path the chain tried.
   g_err "$ENGINE_FAIL"
-  g_err "no manifest at any of: \$SOURCE (${SOURCE:-unset}), $ROOT/.goblin/manifest/enforcement.tsv (absent),"
+  g_err "no manifest at any of: \$SOURCE (${SOURCE:-unset}), $ROOT/.gob/manifest/enforcement.tsv (absent),"
   g_err "  $ENGINE_DIR_DECLARED/manifest/enforcement.tsv (unusable - see above)"
   exit 2
 else
@@ -186,8 +187,8 @@ else
   _cli_default=""
   if [ -n "${GOBLIN_ENGINE_DIR:-}" ]; then
     _cli_default="$GOBLIN_ENGINE_DIR"
-  elif [ -d "$HOME/.goblin/engine" ]; then
-    _cli_default="$HOME/.goblin/engine"
+  elif [ -d "$HOME/.gob/engine" ]; then
+    _cli_default="$HOME/.gob/engine"
   fi
   if [ -n "$_cli_default" ] && [ -f "$_cli_default/manifest/enforcement.tsv" ]; then
     GOBLIN_ENGINE="$_cli_default"
@@ -204,7 +205,7 @@ fi
   exit 2
 }
 
-INSTALLED="$ROOT/.goblin/installed.json"
+INSTALLED="$ROOT/.gob/installed.json"
 
 # engine_block_field <key> — one field of installed.json's engine: block (empty if absent).
 engine_block_field() {
@@ -282,11 +283,11 @@ if [ ! -f "$CONFIG" ]; then
   exit 2
 fi
 
-# The class is read-time resolved: goblin.yaml records the canonical name on new installs, but
+# The class is read-time resolved: the gob block records the canonical name on new installs, but
 # every repo installed before the 5-class merge records a letter (A..F) or an old name
 # (app/agent/desktop). g_class_canon maps them all to the five canonical names; the tsv carries
 # the canonical names, so nothing else in this file has to know about letters. `desktop`/F -> software.
-CLASS_RAW=$(g_yaml_scalar "$CONFIG" class)
+CLASS_RAW=$(g_agents_read "$CONFIG" class)
 CLASS=$(g_class_canon "$CLASS_RAW") \
   || { g_err "unknown class '${CLASS_RAW:-<empty>}' in $CONFIG (expected software|service|game|research|fleet, or A-E / app / agent / desktop)"; exit 2; }
 
@@ -307,15 +308,15 @@ if [ -n "$GIT_TOP" ] && [ "$GIT_TOP" != "$ROOT_PHYS" ]; then
   exit 2
 fi
 
-BRANCH=$(g_yaml_scalar "$CONFIG" branch)
-ARCHIVE=$(g_yaml_scalar "$CONFIG" archive)
-MAX_DIRTY=$(g_yaml_scalar "$CONFIG" max_dirty)
-ADV_CEILING=$(g_yaml_scalar "$CONFIG" advisory_ceiling)
-HARNESS_DIR_RAW=$(g_yaml_scalar "$CONFIG" harness_dir)
-SCAFFOLD_CHECKS=$(g_yaml_scalar "$CONFIG" scaffold_checks)
-MODELS_FILE=$(g_expand_tilde "$(g_yaml_scalar "$CONFIG" models_file)")
-PRACTICE=$(g_expand_tilde "$(g_yaml_scalar "$CONFIG" practice)")
-PRACTICE_SHA=$(g_unquote "$(g_yaml_scalar "$CONFIG" practice_sha256)")
+BRANCH=$(g_agents_read "$CONFIG" branch)
+ARCHIVE=$(g_agents_read "$CONFIG" archive)
+MAX_DIRTY=$(g_agents_read "$CONFIG" max_dirty)
+ADV_CEILING=$(g_agents_read "$CONFIG" advisory_ceiling)
+HARNESS_DIR_RAW=$(g_agents_read "$CONFIG" harness_dir)
+SCAFFOLD_CHECKS=$(g_agents_read "$CONFIG" scaffold_checks)
+MODELS_FILE=$(g_expand_tilde "$(g_agents_read "$CONFIG" models_file)")
+PRACTICE=$(g_expand_tilde "$(g_agents_read "$CONFIG" practice)")
+PRACTICE_SHA=$(g_unquote "$(g_agents_read "$CONFIG" practice_sha256)")
 [ -n "$MAX_DIRTY" ] || MAX_DIRTY=0
 [ -n "$ADV_CEILING" ] || ADV_CEILING=10
 [ -n "$HARNESS_DIR_RAW" ] || HARNESS_DIR_RAW=checks
@@ -326,10 +327,10 @@ PRACTICE_SHA=$(g_unquote "$(g_yaml_scalar "$CONFIG" practice_sha256)")
 # The feature map (G1). feature_map: EMPTY is the meaningful state, not a broken config: a
 # fresh install has no map and the two FM rows must SKIP with that reason (the replay.commit:
 # "" shape, docs/LIMITS.md #11). source_root: is what an entry path resolves against.
-FEATURE_MAP=$(g_yaml_scalar "$CONFIG" feature_map)
-SOURCE_ROOT=$(g_unquote "$(g_yaml_scalar "$CONFIG" source_root)")
+FEATURE_MAP=$(g_agents_read "$CONFIG" feature_map)
+SOURCE_ROOT=$(g_unquote "$(g_agents_read "$CONFIG" source_root)")
 [ -n "$SOURCE_ROOT" ] || SOURCE_ROOT=.
-VERIFY_DOCTOR=$(g_unquote "$(g_yaml_scalar "$CONFIG" verify_doctor)")
+VERIFY_DOCTOR=$(g_unquote "$(g_agents_read "$CONFIG" verify_doctor)")
 export FEATURE_MAP SOURCE_ROOT VERIFY_DOCTOR
 
 # The reference corpus (P15, RC-01..RC-04). `reference_manifest:` is the ONE state that may SKIP
@@ -342,19 +343,19 @@ export FEATURE_MAP SOURCE_ROOT VERIFY_DOCTOR
 # `quarantine_root:` is the quarantine directory of the playbook's S5 - outside the repo by
 # design - and no row reads it; it is declared so the procedure has a machine-readable anchor
 # instead of a path in prose (it ships empty here, the way feature_map: does).
-REFERENCE_MANIFEST=$(g_unquote "$(g_yaml_scalar "$CONFIG" reference_manifest)")
+REFERENCE_MANIFEST=$(g_unquote "$(g_agents_read "$CONFIG" reference_manifest)")
 export REFERENCE_MANIFEST
 
 # The loop ceiling (G2, LP-03). The most turns ONE loop record may declare in its budget; 20 is
 # the engine's own default for a kanban goal loop, so a ceiling that disagreed with the engine
 # would be a number someone made up. A config written before this key existed keeps the default
 # (the SCAFFOLD_CHECKS shape): an absent key is not a broken config.
-LOOP_MAX_TURNS_CEILING=$(g_yaml_scalar "$CONFIG" loop_max_turns_ceiling)
+LOOP_MAX_TURNS_CEILING=$(g_agents_read "$CONFIG" loop_max_turns_ceiling)
 [ -n "$LOOP_MAX_TURNS_CEILING" ] || LOOP_MAX_TURNS_CEILING=20
 # The loop record (G2): a COMMITTED artifact of one unattended run. Nothing in this section
 # re-runs the predicate and nothing writes: the record IS the evidence, and what that costs is
 # stated in docs/LOOP.md and docs/LIMITS.md.
-LOOP_DIR="$ROOT/.goblin/loop"
+LOOP_DIR="$ROOT/.gob/loop"
 export LOOP_MAX_TURNS_CEILING LOOP_DIR
 
 if [ -d "$ROOT/$HARNESS_DIR_RAW" ]; then
@@ -387,27 +388,27 @@ export GOBLIN_ROOT="$ROOT"
 export GOBLIN_CONFIG="$CONFIG"
 
 # ---- the security surface (SC-01..SC-09) and the perf baseline (PF-01) -----------------------
-# Every one of these is DECLARED in .goblin/goblin.yaml. A stack-specific rule guessed from the
+# Every one of these is DECLARED in .gob/goblin.yaml. A stack-specific rule guessed from the
 # files on disk is how a matrix starts lying; a declared key that is absent is a skip with a
 # reason, never a silent pass.
-SEC_GITIGNORE_FAMILY=$(g_yaml_block_scalar "$CONFIG" security gitignore_family)
-SEC_BUILD_OUTPUT=$(g_yaml_block_scalar "$CONFIG" security build_output)
-SEC_AUDIT_CMD=$(g_yaml_block_scalar "$CONFIG" security audit_cmd)
-SEC_AUDIT_MAX_AGE=$(g_yaml_block_scalar "$CONFIG" security audit_max_age_days)
-SEC_WAIVER_MAX_AGE=$(g_yaml_block_scalar "$CONFIG" security waiver_max_age_days)
-SEC_WRITE_ROUTES=$(g_yaml_block_scalar "$CONFIG" security write_routes)
+SEC_GITIGNORE_FAMILY=$(g_agents_read "$CONFIG" security.gitignore_family)
+SEC_BUILD_OUTPUT=$(g_agents_read "$CONFIG" security.build_output)
+SEC_AUDIT_CMD=$(g_agents_read "$CONFIG" security.audit_cmd)
+SEC_AUDIT_MAX_AGE=$(g_agents_read "$CONFIG" security.audit_max_age_days)
+SEC_WAIVER_MAX_AGE=$(g_agents_read "$CONFIG" security.waiver_max_age_days)
+SEC_WRITE_ROUTES=$(g_agents_read "$CONFIG" security.write_routes)
 [ -n "$SEC_AUDIT_MAX_AGE" ] || SEC_AUDIT_MAX_AGE=90
 [ -n "$SEC_WAIVER_MAX_AGE" ] || SEC_WAIVER_MAX_AGE=180
-PERF_METRIC=$(g_yaml_block_scalar "$CONFIG" perf metric)
-PERF_CMD=$(g_yaml_block_scalar "$CONFIG" perf cmd)
-PERF_BASELINE_COMMIT=$(g_unquote "$(g_yaml_block_scalar "$CONFIG" perf baseline_commit)")
-PERF_BASELINE_VALUE=$(g_yaml_block_scalar "$CONFIG" perf baseline_value)
-PERF_MEASURED=$(g_unquote "$(g_yaml_block_scalar "$CONFIG" perf measured)")
-PERF_HOST_GATE=$(g_yaml_block_scalar "$CONFIG" perf host_gate)
+PERF_METRIC=$(g_agents_read "$CONFIG" perf.metric)
+PERF_CMD=$(g_agents_read "$CONFIG" perf.cmd)
+PERF_BASELINE_COMMIT=$(g_unquote "$(g_agents_read "$CONFIG" perf.baseline_commit)")
+PERF_BASELINE_VALUE=$(g_agents_read "$CONFIG" perf.baseline_value)
+PERF_MEASURED=$(g_unquote "$(g_agents_read "$CONFIG" perf.measured)")
+PERF_HOST_GATE=$(g_agents_read "$CONFIG" perf.host_gate)
 # The electron opt-in (software class): true means the electron ban set stays on regardless of a
 # hand-edited bans: list, and a perf host gate must be declared (PF-01). Absent on a repo
 # installed before the merge — read as off, so a legacy class-F repo verifies with no rewrite.
-ELECTRON=$(g_yaml_scalar "$CONFIG" electron)
+ELECTRON=$(g_agents_read "$CONFIG" electron)
 export SEC_GITIGNORE_FAMILY SEC_BUILD_OUTPUT SEC_AUDIT_CMD SEC_AUDIT_MAX_AGE SEC_WAIVER_MAX_AGE
 export SEC_WRITE_ROUTES PERF_METRIC PERF_CMD PERF_BASELINE_VALUE PERF_HOST_GATE ELECTRON
 
@@ -421,14 +422,14 @@ age_days() {
   printf '%s' "$(( (now_s - then_s) / 86400 ))"
 }
 
-# The source files a secret-shaped search should look at. The vendored harness (.goblin,
+# The source files a secret-shaped search should look at. The vendored harness (.gob,
 # .hermes), the build output and dependencies are excluded: SC-03 must not match the row text
 # that describes it.
 sc_sources() {
   ( cd "$ROOT" && grep -rniE "$1" \
       --include='*.ts' --include='*.tsx' --include='*.js' --include='*.jsx' \
       --include='*.mjs' --include='*.cjs' --include='*.vue' --include='*.svelte' . 2>/dev/null \
-      | grep -vE '(^|/)(\.next|node_modules|\.goblin|\.hermes|dist|build|out|coverage)/' || true )
+      | grep -vE '(^|/)(\.next|node_modules|\.gob|\.hermes|dist|build|out|coverage)/' || true )
 }
 
 only_selected() {
@@ -469,7 +470,7 @@ row_part() {
 # Each builtin prints its detail and returns 0 pass | 1 fail | 2 advisory | 3 skip.
 
 # The install-record rows (W1 §2.5). IN-01 and IN-04 were shell one-liners over
-# .goblin/installed.json; the engine.mode=global clause needs engine logic (a global,
+# .gob/installed.json; the engine.mode=global clause needs engine logic (a global,
 # declaration-only repo has NO install record and must SKIP with the reason, never be
 # born RED - the D8/FM-01 shape), so the one-liners move into builtins that keep the
 # same clauses and gain the mode check. In vendored mode they are exactly the old cells.
@@ -483,7 +484,7 @@ check_in_01() {
   # IN-01 recovery line (review 1, scope 4): the record is corrupt or missing; name the two
   # restores. The matrix's remedy: line rides under the payload via g_fail.
   printf 'installed.json is absent or records no version\n'
-  printf 'recover: gob install --upgrade, or git checkout -- .goblin/installed.json\n'
+  printf 'recover: gob install --upgrade, or git checkout -- .gob/installed.json\n'
   return 1
 }
 
@@ -551,8 +552,8 @@ check_in_02() {
   # the practice pin rides along - is byte-for-byte what this row has always done, and a
   # fresh install of any class keeps it (installed.json carries no engine: block).
   # Clause 2 - engine.mode=global with file entries remaining: hash what IS recorded;
-  # an entry under the engine paths (.goblin/bin, .goblin/manifest, .goblin/bans,
-  # .goblin/automations, .goblin/roles.yaml) that is still present is hashed too
+  # an entry under the engine paths (.gob/bin, .gob/manifest, .gob/bans,
+  # .gob/automations, .gob/roles.yaml) that is still present is hashed too
   # (harmless), and one that is MISSING is not drift - the engine is no longer the repo's.
   # Clause 3 - global with no file entries: the declaration + practice pin only; never
   # FAIL for absence of install artifacts (a declaration-only repo is not born RED).
@@ -564,7 +565,7 @@ check_in_02() {
     [ -n "$p" ] || continue
     if [ "$ENGINE_MODE" = "global" ]; then
       case "$p" in
-        .goblin/bin/*|.goblin/manifest/*|.goblin/bans/*|.goblin/automations/*|.goblin/roles.yaml)
+        .gob/bin/*|.gob/manifest/*|.gob/bans/*|.gob/automations/*|.gob/roles.yaml)
           [ -e "$ROOT/$p" ] || continue ;;   # engine removed by design: not drift
         # W4a (§5.3/§5.2): the procedure tier is EMITTED per platform, not carried in the
         # repo - a recorded .hermes/skills/ file absent from disk is the tier living at its
@@ -632,7 +633,7 @@ check_in_02() {
 
 check_hp_03() {
   # Every gate-bearing line inside the HANDOFF's `Gates` section carries `measured <date>`.
-  # Anchored on the gate names `.goblin/goblin.yaml` DECLARES (GT-01's source of truth), not on
+  # Anchored on the gate names the AGENTS.md gob block DECLARES (GT-01's source of truth), not on
   # a hardcoded keyword list: the shipped gates are named `commit` and `todo_ceiling`, and the
   # old list `(tsc|build|hex|safelist|n/n)` matched neither, so on a fresh install the only line
   # it could see was the template's own "Example of the required form" prose. Measured at
@@ -644,7 +645,7 @@ check_hp_03() {
   # template prose, not a gate number, and is skipped. n == 0 is a FAIL: a Gates section with no
   # gate line at all (which is what is left when only the example remains) is not a green row.
   local names out rc n detail
-  names=$(g_yaml_gates "$CONFIG" | cut -f1 | tr '\n' ' ')
+  names=$(g_agents_gates "$CONFIG" | cut -f1 | tr '\n' ' ')
   names=${names% }
   rc=0
   out=$(awk -v names="$names" '
@@ -732,7 +733,7 @@ check_gt_01() {
       printf 'declared gate "%s" has no cmd - it is declared and never runs\n' "$name"
       bad=1
     fi
-  done < <(g_yaml_gates_all "$CONFIG")
+  done < <(g_agents_gates "$CONFIG")
   [ "$n" -ge 1 ] || { printf 'no gate declared in %s\n' "$CONFIG"; return 1; }
   [ "$bad" -eq 0 ] || return 1
   printf '%d declared gate(s), each with a cmd\n' "$n"
@@ -775,17 +776,17 @@ EOF_TAIL
         GT02_TAIL="${GT02_TAIL}gate ${name} printed nothing on stdout or stderr before exit ${rc} (a silent failure - the command itself is the diagnostic)"
       fi
     fi
-  done < <(g_yaml_gates "$CONFIG")
+  done < <(g_agents_gates "$CONFIG")
   if [ "$write_line" = "yes" ]; then
     local rname rcmd rval
-    rname=$(g_yaml_block_scalar "$CONFIG" ratchet name)
-    rcmd=$(g_yaml_block_scalar "$CONFIG" ratchet cmd)
+    rname=$(g_agents_read "$CONFIG" ratchet.name)
+    rcmd=$(g_agents_read "$CONFIG" ratchet.cmd)
     if [ -n "$rname" ] && [ -n "$rcmd" ]; then
       rval=$( cd "$ROOT" && bash -c "$rcmd" 2>/dev/null | tr -d '[:space:]' )
-      line="$line · $rname $rval (ceiling $(g_yaml_block_scalar "$CONFIG" ratchet ceiling))"
+      line="$line · $rname $rval (ceiling $(g_agents_read "$CONFIG" ratchet.ceiling))"
     fi
-    printf '%s · measured %s\n' "${line# }" "$(date +%F)" > "$ROOT/.goblin/last-gate-line"
-    cat "$ROOT/.goblin/last-gate-line"
+    printf '%s · measured %s\n' "${line# }" "$(date +%F)" > "$ROOT/.gob/last-gate-line"
+    cat "$ROOT/.gob/last-gate-line"
   fi
   return $bad
 }
@@ -799,9 +800,9 @@ check_gt_02() {
 
 check_gt_04() {
   local n c ceil
-  n=$(g_yaml_block_scalar "$CONFIG" ratchet name)
-  c=$(g_yaml_block_scalar "$CONFIG" ratchet cmd)
-  ceil=$(g_yaml_block_scalar "$CONFIG" ratchet ceiling)
+  n=$(g_agents_read "$CONFIG" ratchet.name)
+  c=$(g_agents_read "$CONFIG" ratchet.cmd)
+  ceil=$(g_agents_read "$CONFIG" ratchet.ceiling)
   [ -n "$n" ] || { printf 'ratchet.name missing\n'; return 1; }
   [ -n "$c" ] || { printf 'ratchet.cmd missing\n'; return 1; }
   case "$ceil" in ''|*[!0-9]*) printf 'ratchet.ceiling must be numeric, got %s\n' "$ceil"; return 1 ;; esac
@@ -811,19 +812,19 @@ check_gt_04() {
 
 check_gt_05() {
   local n c ceil val old prev="" note=""
-  n=$(g_yaml_block_scalar "$CONFIG" ratchet name)
-  c=$(g_yaml_block_scalar "$CONFIG" ratchet cmd)
-  ceil=$(g_yaml_block_scalar "$CONFIG" ratchet ceiling)
+  n=$(g_agents_read "$CONFIG" ratchet.name)
+  c=$(g_agents_read "$CONFIG" ratchet.cmd)
+  ceil=$(g_agents_read "$CONFIG" ratchet.ceiling)
   [ -n "$n" ] && [ -n "$c" ] || { printf 'no ratchet declared for this class - skipped\n'; return 3; }
   val=$( cd "$ROOT" && bash -c "$c" 2>/dev/null | tr -d '[:space:]' )
   case "$val" in ''|*[!0-9]*) printf 'ratchet cmd produced a non-number: %s\n' "$val"; return 1 ;; esac
-  if [ -f "$ROOT/.goblin/ratchet-last" ]; then prev=$(cat "$ROOT/.goblin/ratchet-last"); fi
+  if [ -f "$ROOT/.gob/ratchet-last" ]; then prev=$(cat "$ROOT/.gob/ratchet-last"); fi
   if [ -n "$prev" ] && [ "$prev" -lt "$val" ]; then
     note="old $prev + $((val - prev)) new = $val"
   else
     note="$n $val (ceiling $ceil)"
   fi
-  printf '%s\n' "$val" > "$ROOT/.goblin/ratchet-last"
+  printf '%s\n' "$val" > "$ROOT/.gob/ratchet-last"
   if [ "$val" -gt "$ceil" ]; then printf '%s over ceiling %s\n' "$note" "$ceil"; return 1; fi
   printf '%s\n' "$note"
   return 0
@@ -861,9 +862,9 @@ check_hs_01() {
 
 check_hs_02() {
   local env cmd commit d tmp bad=0 f rc base name qname pat
-  env=$(g_yaml_block_scalar "$CONFIG" replay env)
-  cmd=$(g_yaml_block_scalar "$CONFIG" replay cmd)
-  commit=$(g_unquote "$(g_yaml_block_scalar "$CONFIG" replay commit)")
+  env=$(g_agents_read "$CONFIG" replay.env)
+  cmd=$(g_agents_read "$CONFIG" replay.cmd)
+  commit=$(g_unquote "$(g_agents_read "$CONFIG" replay.commit)")
   [ -n "$env" ] || { printf 'replay.env not declared\n'; return 1; }
   [ -n "$cmd" ] || { printf 'replay.cmd not declared\n'; return 1; }
   # Z1-4: the DECLARED command has to be what runs the harness. Until this fix it was read only
@@ -943,7 +944,7 @@ check_cm_03() {
 resolve_role_models() {
   # prints "role<TAB>profile<TAB>provider<TAB>model<TAB>effort" for each lane of a role
   local role="$1" f="$SELF_DIR/../roles.yaml"
-  [ -f "$f" ] || f="$ROOT/.goblin/roles.yaml"
+  [ -f "$f" ] || f="$ROOT/.gob/roles.yaml"
   local profiles
   profiles=$(g_yaml_block_scalar "$f" "role-$role" profiles)
   [ -n "$profiles" ] || profiles=$(g_yaml_block_scalar "$f" "$role" profiles)
@@ -1144,7 +1145,7 @@ check_pg_06() {
   # PG-06 (G6 section A.6, row 2) - "The gate CI runs is the gate the project declares." The
   # failure mode is R5 section 1.1 measured: review and CI and goblin-verify reporting different
   # truths about one SHA, so a green required check says nothing about the gate the project
-  # actually declares. The declared set comes from g_yaml_gates - GT-01's own reader, reused
+  # actually declares. The declared set comes from g_agents_gates - GT-01's own reader, reused
   # rather than re-derived, so a gate cannot vanish from the comparison in silence (G8-3).
   # A workflow satisfies the row when the whole declared set is RUN: either the verifier with no
   # `--only` (a full run executes every declared gate through GT-02), or each declared gate
@@ -1158,7 +1159,7 @@ check_pg_06() {
     [ -n "$gname" ] || continue
     ngates=$((ngates + 1))
     [ -n "$gcmd" ] && gates="$gates$gcmd"$'\n'
-  done < <(g_yaml_gates "$CONFIG")
+  done < <(g_agents_gates "$CONFIG")
   for f in "$ROOT"/.github/workflows/*.yml "$ROOT"/.github/workflows/*.yaml; do
     [ -e "$f" ] || continue
     n=$((n + 1))
@@ -1210,7 +1211,7 @@ hash_runtime_data() {
     [ -n "$p" ] || continue
     h=$(g_sha256_file "$ROOT/$p")
     out="$out$p=$h "
-  done < <(g_yaml_list "$CONFIG" runtime_data)
+  done < <(g_agents_list "$CONFIG" runtime_data)
   printf '%s' "${out% }"
 }
 
@@ -1222,11 +1223,11 @@ check_ds_01() {
     [ -n "$p" ] || continue
     ( cd "$ROOT" && git check-ignore -q -- "$p" ) \
       || { printf 'runtime_data path is not git-ignored: %s\n' "$p"; bad=1; }
-  done < <(g_yaml_list "$CONFIG" runtime_data)
+  done < <(g_agents_list "$CONFIG" runtime_data)
   before=$(hash_runtime_data)
   run_gates no >/dev/null 2>&1
   after=$(hash_runtime_data)
-  printf 'before=%s\nafter=%s\n' "$before" "$after" > "$ROOT/.goblin/.ds-report"
+  printf 'before=%s\nafter=%s\n' "$before" "$after" > "$ROOT/.gob/.ds-report"
   if [ "$before" != "$after" ]; then
     printf 'a gate run wrote runtime data: %s -> %s\n' "$before" "$after"
     return 1
@@ -1239,15 +1240,15 @@ check_ds_01() {
 }
 
 check_ds_02() {
-  [ -f "$ROOT/.goblin/.ds-report" ] || { printf 'no DS-01 report in this run\n'; return 1; }
+  [ -f "$ROOT/.gob/.ds-report" ] || { printf 'no DS-01 report in this run\n'; return 1; }
   local b a
-  b=$(sed -n 's/^before=//p' "$ROOT/.goblin/.ds-report")
-  a=$(sed -n 's/^after=//p' "$ROOT/.goblin/.ds-report")
+  b=$(sed -n 's/^before=//p' "$ROOT/.gob/.ds-report")
+  a=$(sed -n 's/^after=//p' "$ROOT/.gob/.ds-report")
   [ "$b" = "$a" ] || { printf 'before/after differ\n'; return 1; }
-  [ -f "$ROOT/.goblin/last-gate-line" ] || { printf 'no gate line to annotate\n'; return 0; }
+  [ -f "$ROOT/.gob/last-gate-line" ] || { printf 'no gate line to annotate\n'; return 0; }
   local line
-  line=$(tr -d '\n' < "$ROOT/.goblin/last-gate-line")
-  printf '%s · runtime_data %s\n' "$line" "${b:-<none declared>}" > "$ROOT/.goblin/last-gate-line"
+  line=$(tr -d '\n' < "$ROOT/.gob/last-gate-line")
+  printf '%s · runtime_data %s\n' "$line" "${b:-<none declared>}" > "$ROOT/.gob/last-gate-line"
   printf 'snapshot %s\n' "${b:-<none declared>}"
   return 0
 }
@@ -1397,7 +1398,7 @@ EOF
 
 check_sc_05() {
   # Every write handler (POST|PUT|PATCH|DELETE) in the declared route dirs must CALL a validator,
-  # or be named in .goblin/boundary-waivers. Partial by design: it proves a validator is called,
+  # or be named in .gob/boundary-waivers. Partial by design: it proves a validator is called,
   # not that the schema is right.
   local d f rel n=0 bad=0 w=0
   for d in $SEC_WRITE_ROUTES; do
@@ -1408,7 +1409,7 @@ check_sc_05() {
       n=$((n + 1))
       rel="${f#"$ROOT"/}"
       if grep -qE 'safeParse|zod|valibot|yup|ajv|superstruct|validate\(' "$f"; then continue; fi
-      if [ -f "$ROOT/.goblin/boundary-waivers" ] && grep -qE "^[[:space:]]*${rel}([[:space:]]|$)" "$ROOT/.goblin/boundary-waivers"; then
+      if [ -f "$ROOT/.gob/boundary-waivers" ] && grep -qE "^[[:space:]]*${rel}([[:space:]]|$)" "$ROOT/.gob/boundary-waivers"; then
         w=$((w + 1)); continue
       fi
       printf 'a write handler validates nothing and is not waived: %s\n' "$rel"; bad=1
@@ -1450,18 +1451,18 @@ check_in_03() {
 }
 
 check_sc_07() {
-  # Offline by construction: the record is written by .goblin/bin/goblin-audit, run ONCE,
+  # Offline by construction: the record is written by .gob/bin/goblin-audit, run ONCE,
   # deliberately. A verify-time network call would break the offline dependency contract
   # (docs/RISKS.md K4). The record and the waiver table are repo-local by design (W1 §2.5);
   # only the SKIP remedy names the runner, and global mode names the CLI verb - the record
   # is the repo's, the tool that produced it is wherever the engine resolves (chain §2.3).
   [ -n "$SEC_AUDIT_CMD" ] || { printf 'this class declares no audit command (security.audit_cmd is empty)\n'; return 3; }
-  local rec="$ROOT/.goblin/audit.tsv" wfile="$ROOT/.goblin/audit-waiver.tsv"
+  local rec="$ROOT/.gob/audit.tsv" wfile="$ROOT/.gob/audit-waiver.tsv"
   if [ ! -f "$rec" ]; then
     if [ "$ENGINE_MODE" = "global" ]; then
-      printf 'no audit record yet. Run `gob audit` once, deliberately, then commit\n.goblin/audit.tsv: SC-07 reads the record and never the network\n'
+      printf 'no audit record yet. Run `gob audit` once, deliberately, then commit\n.gob/audit.tsv: SC-07 reads the record and never the network\n'
     else
-      printf 'no audit record yet. Run .goblin/bin/goblin-audit once, deliberately, then commit\n.goblin/audit.tsv: SC-07 reads the record and never the network\n'
+      printf 'no audit record yet. Run .gob/bin/goblin-audit once, deliberately, then commit\n.gob/audit.tsv: SC-07 reads the record and never the network\n'
     fi
     return 3
   fi
@@ -1530,8 +1531,8 @@ check_sc_08() {
   ' "$lock" | sort -u)
   for p in $pkgs; do
     n=$((n + 1))
-    if [ -f "$ROOT/.goblin/install-hooks.allowlist" ] \
-       && grep -qxF "$p" "$ROOT/.goblin/install-hooks.allowlist"; then
+    if [ -f "$ROOT/.gob/install-hooks.allowlist" ] \
+       && grep -qxF "$p" "$ROOT/.gob/install-hooks.allowlist"; then
       ok=$((ok + 1))
     else
       printf 'an install-time script is not on the allowlist: %s\n' "$p"; bad=1
@@ -1555,7 +1556,7 @@ au01_globs() {
   if [ "$ENGINE_MODE" = "global" ]; then
     printf '%s\n' "$GOBLIN_ENGINE/automations/*.sh" "$ROOT/automations/*.sh" "$ROOT/automations/*/*.sh"
   else
-    printf '%s\n' "$ROOT/.goblin/automations/*.sh" "$ROOT/automations/*.sh" "$ROOT/automations/*/*.sh"
+    printf '%s\n' "$ROOT/.gob/automations/*.sh" "$ROOT/automations/*.sh" "$ROOT/automations/*/*.sh"
   fi
 }
 
@@ -1568,7 +1569,7 @@ check_au_01() {
   # declare none.
   local f n=0 own=0 glob
   # The repo's OWN producers: anything under a root automations/ directory (the engine's
-  # payload lives under .goblin/automations/ in vendored mode, engine_dir in global mode;
+  # payload lives under .gob/automations/ in vendored mode, engine_dir in global mode;
   # neither is a declaration by this repo).
   for f in "$ROOT"/automations/*.sh "$ROOT"/automations/*/*.sh; do
     [ -e "$f" ] || continue
@@ -1612,7 +1613,7 @@ check_bn_00() {
   # The ban table resolves through the engine chain (W1 §2.3): vendored first, then the
   # declared/global engine - the fallback slots into chain steps 2/3/4 where it used to
   # hardcode two of them.
-  bans="$ROOT/.goblin/manifest/bans.tsv"
+  bans="$ROOT/.gob/manifest/bans.tsv"
   [ -f "$bans" ] || bans="${GOBLIN_ENGINE:-$SELF_DIR/../..}/manifest/bans.tsv"
   [ -f "$bans" ] || bans="$SELF_DIR/../manifest/bans.tsv"
   [ -f "$bans" ] || { printf 'no ban table found (manifest/bans.tsv)\n'; return 1; }
@@ -1648,9 +1649,9 @@ check_bn_run() {
   # is still reported FAIL-closed here rather than silently skipped - the ban lane must
   # never read clean because a binary went missing.
   local id="$1" engine out rc detail
-  engine="$ROOT/.goblin/bin/goblin-bans"
+  engine="$ROOT/.gob/bin/goblin-bans"
   if [ ! -f "$engine" ] && [ -n "$GOBLIN_ENGINE" ]; then engine="$GOBLIN_ENGINE/bin/goblin-bans"; fi
-  [ -f "$engine" ] || { printf 'the ban engine is not installed: .goblin/bin/goblin-bans\n'; return 1; }
+  [ -f "$engine" ] || { printf 'the ban engine is not installed: .gob/bin/goblin-bans\n'; return 1; }
   out=$( cd "$ROOT" && bash "$engine" --only "$id" 2>&1 ); rc=$?
   detail=$(printf '%s\n' "$out" | grep -vE '^      [0-9]+ passed' \
              | sed 's/^\(PASS\|FAIL\|SKIP\|ADV\)  \{1,\}[A-Z0-9-]*  *//' | sed '/^$/d' \
@@ -1682,7 +1683,7 @@ check_pf_01() {
   # - a skip with that reason, because a row that is RED on every fresh install teaches people
   # to ignore it.
   local rname bad=0
-  rname=$(g_yaml_block_scalar "$CONFIG" ratchet name)
+  rname=$(g_agents_read "$CONFIG" ratchet.name)
   # The electron opt-in's done-definition: an Electron repo declares its host gate (the FPS /
   # main_thread_busy_pct number a hermetic rule cannot measure). `electron: true` with no host
   # gate is a repo missing half its definition — FAIL, before the baseline skip below can mask it.
@@ -1716,7 +1717,7 @@ check_pf_01() {
   # (ceiling 100000)` - the contradiction on its own passing line, seen by nothing. The ceiling
   # is anchored on the recorded baseline; raising it is what "I never measured again" looks like.
   local ceiling
-  ceiling=$(g_yaml_block_scalar "$CONFIG" ratchet ceiling)
+  ceiling=$(g_agents_read "$CONFIG" ratchet.ceiling)
   case "$ceiling" in
     ''|*[!0-9]*) printf 'ratchet.ceiling is not a number: %s\n' "${ceiling:-<empty>}"; bad=1 ;;
     *)
@@ -1729,7 +1730,7 @@ check_pf_01() {
   [ "$bad" -eq 0 ] || return 1
   printf '%s = %s measured %s on %s (ceiling %s), host gate: %s\n' \
     "$PERF_METRIC" "$PERF_BASELINE_VALUE" "$PERF_MEASURED" "$PERF_BASELINE_COMMIT" \
-    "$(g_yaml_block_scalar "$CONFIG" ratchet ceiling)" "${PERF_HOST_GATE:-none}"
+    "$(g_agents_read "$CONFIG" ratchet.ceiling)" "${PERF_HOST_GATE:-none}"
   return 0
 }
 
@@ -1837,9 +1838,9 @@ class_part_artifact() {
   case "$1" in
     handoff)      [ -f "$ROOT/HANDOFF.md" ] ;;
     spec)         ls "$ROOT"/*-SPEC.md >/dev/null 2>&1 ;;
-    gate)         [ "$(g_yaml_gates "$CONFIG" | grep -c . || true)" -ge 1 ] ;;
-    replay)       [ -n "$(g_yaml_block_scalar "$CONFIG" replay env)" ] && [ -n "$(g_yaml_block_scalar "$CONFIG" replay cmd)" ] ;;
-    ratchet)      [ -n "$(g_yaml_block_scalar "$CONFIG" ratchet name)" ] ;;
+    gate)         [ "$(g_agents_gates "$CONFIG" | grep -c . || true)" -ge 1 ] ;;
+    replay)       [ -n "$(g_agents_read "$CONFIG" replay.env)" ] && [ -n "$(g_agents_read "$CONFIG" replay.cmd)" ] ;;
+    ratchet)      [ -n "$(g_agents_read "$CONFIG" ratchet.name)" ] ;;
     pr-gate)      [ -d "$ROOT/reviews" ] ;;
     review-panel) [ -d "$ROOT/reviews" ] ;;
     # The W4a re-point (W4A-SPEC §5.3): the artifact test accepts the goblin-mode skill
@@ -1881,11 +1882,14 @@ class_part_artifact() {
         && awk -F'\t' -v r="$ROOT" 'NR>1 && index($3, r) == 1 { found=1 } END { exit !found }' \
            "${GOBLIN_EMISSIONS:-${HOME:-}/.goblin-stack/emissions.tsv}" && return 0
       return 1 ;;
-    tokens)       [ -f "$ROOT/.goblin/tokens.yaml" ] ;;
+    tokens)       [ -f "$ROOT/.gob/tokens.yaml" ] ;;
+    # ci-gate: the part is GONE from the product (v2). Every class carries need="-" in
+    # classes.tsv, and the artifact can never be written again — so the probe is a
+    # constant ABSENT and the CL-01 "-" branch (forbids, artifact absent) always passes.
+    ci-gate)      return 1 ;;
     # The CI lane's artifact is the workflow goblin-stack WRITES, not the directory: a repo is
     # allowed to have its own workflows, and `-` on this part means "goblin-stack must not have
     # placed one here", not "this repo may not have CI" (G6 A.6).
-    ci-gate)      [ -f "$ROOT/.github/workflows/goblin-gate.yml" ] ;;
     *)            return 0 ;;
   esac
 }
@@ -1903,7 +1907,7 @@ check_cl_01() {
       if [ "$present" -eq 0 ]; then printf 'class %s forbids part %s, artifact present\n' "$CLASS" "$part"; bad=1; fi
       continue
     fi
-    if g_part_disabled "$CONFIG" "$part"; then
+    if g_agents_part_disabled "$CONFIG" "$part"; then
       printf 'part %s: opt-out\n' "$part"
       continue
     fi
@@ -2066,15 +2070,15 @@ check_fm_02() {
   case "$sr" in /*) srpath="$sr" ;; *) srpath="$ROOT/$sr" ;; esac
   reldir=$(fm_dir_rel)
   # W5-4: the search must not be satisfiable by the HARNESS ITSELF. `source_root: .` walked the
-  # install, so a stub map (`entry_paths: [export]`) "resolved" to ./.goblin/bin/goblin-verify and
+  # install, so a stub map (`entry_paths: [export]`) "resolved" to ./.gob/bin/goblin-verify and
   # both FM rows passed a map that only echoed the template. The harness's own directories
-  # (.goblin/, .hermes/), git's, and the declared harness_dir are skipped by name, and the map's
+  # (.gob/, .hermes/), git's, and the declared harness_dir are skipped by name, and the map's
   # own directory is skipped by path - without that last one the map's own entry-path list
   # satisfies the search and the row could never go RED. What is still NOT excluded is stated in
   # docs/LIMITS.md #37: a token that occurs only in the target's own docs/, tests/ or build output
   # still reads as resolved, because those are the target's files and excluding them would be a
   # guess about a layout goblin-stack does not know.
-  local exd=(--exclude-dir=.git --exclude-dir=.goblin --exclude-dir=.hermes)
+  local exd=(--exclude-dir=.git --exclude-dir=.gob --exclude-dir=.hermes)
   case "$GOBLIN_HARNESS_REL" in
     ''|.|./) ;;
     *) exd+=(--exclude-dir="$(basename "$GOBLIN_HARNESS_REL")") ;;
@@ -2135,14 +2139,14 @@ check_va_01() {
 # ---- the judge and the loop (G2): JG-01..JG-03, LP-01..LP-05 --------------------------------
 # A loop record is the committed artifact of ONE unattended run:
 #
-#   .goblin/loop/predicate        one shell command - the loop's own exit condition
-#   .goblin/loop/predicate.sha256 its digest, recorded at loop start (the pin); after a close, the
+#   .gob/loop/predicate        one shell command - the loop's own exit condition
+#   .gob/loop/predicate.sha256 its digest, recorded at loop start (the pin); after a close, the
 #                                 chain follows on `previous: <digest>` lines (W5-7)
-#   .goblin/loop/first-run        "exit=<n> ts=<ISO8601>" - run BEFORE iteration 1
-#   .goblin/loop/budget           the turn budget the loop declared
-#   .goblin/loop/decisions.tsv    one row per iteration: ts phase decision why evidence result
-#   .goblin/loop/stuck.md         the write-up when the loop ended without its predicate green
-#   .goblin/loop/closed-<date>/   a relaxed predicate AND the pin it was closed under, archived;
+#   .gob/loop/first-run        "exit=<n> ts=<ISO8601>" - run BEFORE iteration 1
+#   .gob/loop/budget           the turn budget the loop declared
+#   .gob/loop/decisions.tsv    one row per iteration: ts phase decision why evidence result
+#   .gob/loop/stuck.md         the write-up when the loop ended without its predicate green
+#   .gob/loop/closed-<date>/   a relaxed predicate AND the pin it was closed under, archived;
 #                                 the live pin names its digest, so the close is auditable
 #
 # Nothing here re-runs the predicate and nothing here writes: the record is the evidence, and
@@ -2166,7 +2170,7 @@ loop_malformed_rows() {
 
 # Does ONE evidence token resolve? The typed handles are sha:<hex> (a commit `git rev-list
 # --all` knows), file:<path> (a path under the root) and sha256:<hex> (the digest of a file
-# under .goblin/loop/); a bare token resolves when it names an existing path. A `cmd:` token
+# under .gob/loop/); a bare token resolves when it names an existing path. A `cmd:` token
 # resolves NOTHING on purpose: the command ran, its output is not in the record, and a verdict
 # that rests on it is exactly the self-report JG-01 exists to refuse.
 loop_token_resolves() {
@@ -2226,7 +2230,7 @@ check_jg_01() {
     done
     if [ "$hit" -eq 0 ]; then
       printf 'row %s: %s cites no handle that resolves: "%s"\n' "$rn" "$dec" "${ev:-<empty>}"
-      printf '  a handle is sha:<hex> (a commit in this repo), file:<path>, sha256:<hex> (a file under .goblin/loop/), or an existing path\n'
+      printf '  a handle is sha:<hex> (a commit in this repo), file:<path>, sha256:<hex> (a file under .gob/loop/), or an existing path\n'
       bad=1
     fi
   done < <(loop_decision_rows)
@@ -2290,13 +2294,13 @@ check_jg_02() {
 check_lp_01() {
   if ! loop_present; then loop_no_record; return 3; fi
   local p="$LOOP_DIR/predicate" f="$LOOP_DIR/first-run" n fr fr_ts row1_ts a b
-  [ -f "$p" ] || { printf 'no .goblin/loop/predicate - the loop declared no exit condition\n'; return 1; }
+  [ -f "$p" ] || { printf 'no .gob/loop/predicate - the loop declared no exit condition\n'; return 1; }
   n=$(grep -cvE '^[[:space:]]*(#|$)' "$p")
   if [ "$n" -ne 1 ]; then
     printf 'the predicate must be exactly ONE command; found %s non-blank non-comment line(s)\n' "$n"
     return 1
   fi
-  [ -f "$f" ] || { printf 'no .goblin/loop/first-run - the predicate was never run before iteration 1\n'; return 1; }
+  [ -f "$f" ] || { printf 'no .gob/loop/first-run - the predicate was never run before iteration 1\n'; return 1; }
   fr=$(head -n 1 "$f")
   case "$fr" in
     "exit="[0-9]*" ts="*) ;;
@@ -2322,13 +2326,13 @@ check_lp_01() {
 check_lp_02() {
   if ! loop_present; then loop_no_record; return 3; fi
   local p="$LOOP_DIR/predicate" pin="$LOOP_DIR/predicate.sha256" want have bad=0
-  [ -f "$p" ] || { printf 'no .goblin/loop/predicate to pin\n'; return 1; }
-  [ -f "$pin" ] || { printf 'no .goblin/loop/predicate.sha256 - the predicate was never pinned at loop start\n'; return 1; }
+  [ -f "$p" ] || { printf 'no .gob/loop/predicate to pin\n'; return 1; }
+  [ -f "$pin" ] || { printf 'no .gob/loop/predicate.sha256 - the predicate was never pinned at loop start\n'; return 1; }
   want=$(head -n 1 "$pin" | tr -d '[:space:]')
   have=$(g_sha256_file "$p")
   if [ "$want" != "$have" ]; then
     printf 'the predicate changed after the loop was pinned\n  pinned %s\n  now    %s\n' "$want" "$have"
-    printf 'remedy: close this loop - commit the green state, archive the predicate AND its pin under .goblin/loop/closed-<date>/, then open a new loop and re-record the pin with a `previous: <archived digest>` line. Never automatic.\n'
+    printf 'remedy: close this loop - commit the green state, archive the predicate AND its pin under .gob/loop/closed-<date>/, then open a new loop and re-record the pin with a `previous: <archived digest>` line. Never automatic.\n'
     return 1
   fi
   # W5-7: the close-and-reopen path. The pin covers the predicate file on disk, so a loop could
@@ -2369,7 +2373,7 @@ check_lp_02() {
 check_lp_03() {
   if ! loop_present; then loop_no_record; return 3; fi
   local f="$LOOP_DIR/budget" b ceil n bad=0
-  [ -f "$f" ] || { printf 'no .goblin/loop/budget - the loop declared no turn budget\n'; return 1; }
+  [ -f "$f" ] || { printf 'no .gob/loop/budget - the loop declared no turn budget\n'; return 1; }
   b=$(head -n 1 "$f" | tr -d '[:space:]')
   case "$b" in
     ''|*[!0-9]*) printf 'budget must be a positive integer, got "%s"\n' "$b"; return 1 ;;
@@ -2436,7 +2440,7 @@ check_lp_05() {
     return 0
   fi
   s="$LOOP_DIR/stuck.md"
-  [ -f "$s" ] || { printf 'the loop ended at "%s" (row %s) and left no .goblin/loop/stuck.md\n' "${res:-<empty>}" "$rn"; return 1; }
+  [ -f "$s" ] || { printf 'the loop ended at "%s" (row %s) and left no .gob/loop/stuck.md\n' "${res:-<empty>}" "$rn"; return 1; }
   n=$(grep -c '[^[:space:]]' "$s")
   if [ "$n" -lt 3 ]; then
     printf 'stuck.md holds %s non-blank line(s); a write-up needs at least 3\n' "$n"
@@ -2641,10 +2645,10 @@ check_rc_03() {
       scripts/*|notes/*|manifests/*) continue ;;
       # The harness's own directories and the .gitignore block it appends are the install, not the
       # lab's content - the same exclusion FM-02 makes for the same reason (W5-4). That set is the
-      # one the class-A install contract creates: .goblin/, .hermes/, the .gitignore block, the
+      # one the class-A install contract creates: .gob/, .hermes/, the .gitignore block, the
       # declared harness_dir (checks/ by default), reviews/, and the CI scaffold .github/. A payload
       # hidden in any of them is still caught by clause 2 (the sha256 sweep below).
-      .goblin/*|.hermes/*|.gitignore|.github/*|reviews/*) continue ;;
+      .gob/*|.hermes/*|.gitignore|.github/*|reviews/*) continue ;;
       "${GOBLIN_HARNESS_REL:-checks}"/*) continue ;;
     esac
     case "$p" in
@@ -2730,9 +2734,9 @@ rc_hdr_field() {
 # ---- the day-one framing (review 1, scope 3) ----------------------------------
 # Two shapes are undeserved reds for a person who just cloned a repo. They are DETECTED and
 # framed — the verdict's exit semantics, the counts and every row's payload are untouched:
-#   (a) owner_email in goblin.yaml is not the current git identity -> the CM-01 red names
+#   (a) owner_email in AGENTS.md is not the current git identity -> the CM-01 red names
 #       whose email the repo actually expects (the remedy column says where to point it);
-#   (b) the repo looks freshly cloned (.goblin committed, but fewer than 3 commits) -> one
+#   (b) the repo looks freshly cloned (.gob committed, but fewer than 3 commits) -> one
 #       banner line after the verdict. Commit count only: an mtime comparison against the
 #       reflog fired after every ordinary GT-02 write, so the banner lingered on aged repos
 #       (the verify itself refreshes last-gate-line forever); a repo under 3 commits is the
@@ -2740,7 +2744,7 @@ rc_hdr_field() {
 owner_mismatch() {
   [ -f "$CONFIG" ] || return 1
   local declared cur
-  declared=$(grep '^owner_email:' "$CONFIG" | head -n 1 | sed 's/^owner_email:[[:space:]]*//' | tr -d '"')
+  declared=$(g_agents_read "$CONFIG" owner_email | tr -d '"')
   cur=$(cd "$ROOT" && git config user.email 2>/dev/null)
   [ -n "$declared" ] && [ -n "$cur" ] && [ "$declared" != "$cur" ]
 }
@@ -2806,7 +2810,7 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
     esac
     continue
   fi
-  if [ -n "$part" ] && g_part_disabled "$CONFIG" "$part"; then
+  if [ -n "$part" ] && g_agents_part_disabled "$CONFIG" "$part"; then
     SKIP=$((SKIP + 1)); emit "$id" SKIP "$rule (opt-out: $part)"; continue
   fi
   if [ "$ARCHIVE" = "true" ]; then
@@ -2839,7 +2843,7 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
         # ... -nt ...` invocation dump told the reader the mechanics and nothing about what
         # to do; the human line says both. The TSV remedy column carries the same sentence.
         if [ "$id" = "GT-03" ]; then
-          detail="GT-03 the gate line is older than the last commit — re-run gob verify to refresh it (it rewrites .goblin/last-gate-line)"
+          detail="GT-03 the gate line is older than the last commit — re-run gob verify to refresh it (it rewrites .gob/last-gate-line)"
         else
           detail="($check -> exit $rc)"
         fi
@@ -2865,7 +2869,7 @@ else
   # Day-one framing, part (a) (review 1, scope 3): the owner mismatch names whose email the
   # repo expects, under the verdict, before the row detail. One line, no exit semantics.
   if [ "$FAIL" -gt 0 ] && owner_mismatch; then
-    _owner_declared=$(grep '^owner_email:' "$CONFIG" | head -n 1 | sed 's/^owner_email:[[:space:]]*//' | tr -d '"')
+    _owner_declared=$(g_agents_read "$CONFIG" owner_email | tr -d '"')
     printf '      note: this repo records a different owner (you are probably new here) — commit with --author or update owner_email: %s\n' "$_owner_declared"
     unset _owner_declared
   fi
@@ -2892,7 +2896,7 @@ else
       merely passing; whether the forge is bound by the workflow CL-01 found; whether a human
       read the diff;
       whether the model mapping names a family that actually differs (MD-02 reports it
-      and cannot change it); and whether .goblin/installed.json — the record every drift
+      and cannot change it); and whether .gob/installed.json — the record every drift
       check trusts — was itself rewritten. It is not signed, so one edit to it (with the
       matching edit to the file it protects) defeats IN-02, SK-02 and HS-01 at once
       (docs/LIMITS.md #18). The ban lane carries the same blind spot and two of its own:
@@ -2924,7 +2928,7 @@ SEE
     # short form too: a doc pin (F2-3) reads it out of every run, not only verbose ones.
     cat <<'SEE'
       cannot see: whether a check tests the right path rather than merely passing; whether a
-      human read the diff; whether the unsigned install record (.goblin/installed.json — it is
+      human read the diff; whether the unsigned install record (.gob/installed.json — it is
       not signed) was rewritten; and the per-lane blind spots of the ban, judge/loop, CI and
       reference lanes. Full statement: `goblin-verify --verbose`, docs/LIMITS.md #18 #27 #28 #33 #43.
 SEE
@@ -2947,7 +2951,7 @@ SEE
     "$(g_sha256_file "$SELF_DIR/goblin-verify")" \
     "$(g_sha256_file "$MANIFEST")" >&2
   # ---- the shadow advisory (W3 §3.2) -------------------------------------------
-  # A vendored payload under .goblin/ while the record says mode=global: the chain's
+  # A vendored payload under .gob/ while the record says mode=global: the chain's
   # vendored step (2) beats the declared engine_dir (3) — W1's ordering, kept
   # deliberately — so a STALE vendored table judged this run while the footer above
   # still prints mode=global. This line names that split. It is deliberately a footer
@@ -2957,10 +2961,10 @@ SEE
   # mandate for. Detector, not prevention: the residue is LIMITS #45.
   if [ "$ENGINE_MODE" = "global" ]; then
     _shadow_n=0
-    for _f in "$ROOT"/.goblin/bin/goblin-verify "$ROOT"/.goblin/bin/goblin-lib.sh \
-              "$ROOT"/.goblin/bin/goblin-audit "$ROOT"/.goblin/bin/goblin-bans \
-              "$ROOT"/.goblin/manifest/* "$ROOT"/.goblin/bans/* \
-              "$ROOT"/.goblin/automations/* "$ROOT"/.goblin/roles.yaml; do
+    for _f in "$ROOT"/.gob/bin/goblin-verify "$ROOT"/.gob/bin/goblin-lib.sh \
+              "$ROOT"/.gob/bin/goblin-audit "$ROOT"/.gob/bin/goblin-bans \
+              "$ROOT"/.gob/manifest/* "$ROOT"/.gob/bans/* \
+              "$ROOT"/.gob/automations/* "$ROOT"/.gob/roles.yaml; do
       [ -e "$_f" ] || continue
       _shadow_n=$((_shadow_n + 1))
     done

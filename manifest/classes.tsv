@@ -44,8 +44,8 @@ service	tokens	-
 game	tokens	-
 research	tokens	-
 fleet	tokens	O
-software	ci-gate	R
+software	ci-gate	-
 service	ci-gate	-
-game	ci-gate	O
+game	ci-gate	-
 research	ci-gate	-
-fleet	ci-gate	O
+fleet	ci-gate	-

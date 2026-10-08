@@ -29,7 +29,7 @@ HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 
-OUT=$(bash .goblin/bin/goblin-verify 2>&1); RC=$?
+OUT=$(bash .gob/bin/goblin-verify 2>&1); RC=$?
 printf '%s\n' "$OUT" | sed 's/^/      /'
 check "verify exits 0" "$RC"
 printf '%s' "$OUT" | grep -qE '[0-9]+ passed, 0 failed, [0-9]+ advisory'
@@ -65,23 +65,26 @@ F_HEAD=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$F_HEAD\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 
-FOUT=$(bash .goblin/bin/goblin-verify 2>&1); FRC=$?
+FOUT=$(bash .gob/bin/goblin-verify 2>&1); FRC=$?
 check "software+electron verify exits 0" "$FRC"
 printf '%s' "$FOUT" | grep -qE '[0-9]+ passed, 0 failed, [0-9]+ advisory'
 check "  and its summary line reports passed/failed/advisory" "$?"
-awk '/^perf:/{p=1} p&&/^  host_gate: /{print; exit}' .goblin/goblin.yaml | grep -q 'Electron run' \
-  && awk '/^perf:/{p=1} p&&/^  host_gate: /{print; exit}' .goblin/goblin.yaml | grep -q 'main_thread_busy_pct'
+awk '/^perf\.host_gate:/{print; exit}' AGENTS.md | grep -q 'Electron run' \
+  && awk '/^perf\.host_gate:/{print; exit}' AGENTS.md | grep -q 'main_thread_busy_pct'
 check "  and the FPS number is DECLARED as a host gate, not silently absent" "$?"
-awk '/^ratchet:/{r=1} r&&/^  name: /{print; exit}' .goblin/goblin.yaml | grep -qE '^  name: [a-z_]+$' \
-  && grep -qE '^  name: app_bundle_bytes$' .goblin/goblin.yaml \
-  && ! grep -qE '^  name: (main_thread_busy_pct|fps|frame_time_ms)$' .goblin/goblin.yaml
+grep -qE '^ratchet\.name: [a-z_]+$' AGENTS.md \
+  && grep -qE '^ratchet\.name: app_bundle_bytes$' AGENTS.md \
+  && ! grep -qE '^ratchet\.name: (main_thread_busy_pct|fps|frame_time_ms)$' AGENTS.md
 check "  and the ratchet carries a hermetic metric of its own (the bundle bytes, not the FPS)" "$?"
-grep -q '^electron: true$' .goblin/goblin.yaml
+grep -q '^electron: true$' AGENTS.md
 check "  and electron: true is DECLARED in the config" "$?"
-[ -f .github/workflows/goblin-gate.yml ]
-check "  and the CI lane was placed for a class that permits it" "$?"
-printf '%s' "$FOUT" | grep -q 'PASS  PG-05' && printf '%s' "$FOUT" | grep -q 'PASS  PG-06'
-check "  and the shipped workflow passes PG-05 and PG-06" "$?"
+# v2: the CI lane is GONE from the product (no .github/workflows payload is written, the
+# part is a class-level opt-out) — the placement pin becomes its absence pin, and the
+# PG-05/PG-06 rows report SKIP on a repo with no workflow (never a vacuous pass).
+[ ! -e .github/workflows ]
+check "  and the v2 install ships no CI lane (the workflows dir stays untouched)" "$?"
+printf '%s' "$FOUT" | grep -q 'PASS  PG-05' && printf '%s' "$FOUT" | grep -q 'SKIP  PG-06'
+check "  and PG-05/PG-06 report their no-workflow lines (never a vacuous gate)" "$?"
 printf '%s' "$FOUT" | grep -q 'SKIP  BN-06'
 check "  and an electron ban the class lists still skips on a tree with no renderer" "$?"
 printf '%s' "$FOUT" | grep -qE 'ADV   PF-01|PASS  PF-01|SKIP  PF-01'
@@ -98,8 +101,8 @@ printf '# desktop shell\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target "$WORK/falias" --class desktop --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
 check "the desktop alias install exits 0" "$?"
-cmp -s "$WORK/f/.goblin/goblin.yaml" "$WORK/falias/.goblin/goblin.yaml" \
-  && grep -q '"class": "software"' "$WORK/falias/.goblin/installed.json"
+cmp -s "$WORK/f/AGENTS.md" "$WORK/falias/AGENTS.md" \
+  && grep -q '"class": "software"' "$WORK/falias/.gob/installed.json"
 check "  and its config is identical to software+electron (class recorded as software)" "$?"
 
 # ---- UX pass: remedy lines, day-one banners, recovery lines, GT-03's sentence --------------
@@ -138,9 +141,9 @@ git config user.email "runner@example.com"
 printf '# fresh\n' > README.md
 git add -A && git commit -q -m "seed"
 bash "$SRC/bin/goblin-install" --target . --class A --models "$WORK/models.yaml" >/dev/null 2>&1
-sed -i 's/^owner_email:.*/owner_email: other@owner.example/' .goblin/goblin.yaml
+sed -i 's/^owner_email:.*/owner_email: other@owner.example/' AGENTS.md
 git add -A && git commit -q -m "install gobstack"
-FOUT2=$(bash .goblin/bin/goblin-verify 2>&1); FRC2=$?
+FOUT2=$(bash .gob/bin/goblin-verify 2>&1); FRC2=$?
 check "R5a the 2-commit probe fails for the planted reason (CM-01, exit 1)" "$([ "$FRC2" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$FOUT2" | grep -q 'fresh clone detected: some of these fails are not yours'
 check "R5b the fresh-clone banner fires under 3 commits" "$?"
@@ -148,8 +151,8 @@ printf '%s' "$FOUT2" | grep -q 'note: this repo records a different owner'
 check "R5c the owner-mismatch note fires beside it (same red run)" "$?"
 git commit -q --allow-empty -m "third commit"
 git commit -q --allow-empty -m "fourth commit"
-FOUT3=$(bash .goblin/bin/goblin-verify 2>&1)
-FOUT4=$(bash .goblin/bin/goblin-verify 2>&1); FRC4=$?
+FOUT3=$(bash .gob/bin/goblin-verify 2>&1)
+FOUT4=$(bash .gob/bin/goblin-verify 2>&1); FRC4=$?
 check "R5d the aged probe still fails for the same planted reason (exit 1)" "$([ "$FRC4" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$FOUT4" | grep -q 'fresh clone detected'
 check "R5e the banner is SILENT on the aged repo after two GT-02 rewrites (mtime branch gone)" "$([ $? -ne 0 ] && echo 0 || echo 1)"

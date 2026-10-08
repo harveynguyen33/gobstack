@@ -39,7 +39,9 @@ Two placements worth arguing about:
 | Review panel | O | — | R | — | O |
 | Playbooks (the skills) | R | R | R | R | R |
 | Design tokens | O | — | — | — | O |
-| CI lane | R | — | O | — | O |
+
+(The `ci-gate` part is not a row here: v2 installs no CI, so the part is off for every class —
+the W4 preset matrix that carried it is recorded in `docs/LIMITS.md` as out of the v2 product.)
 
 **The electron opt-in, not a class**, added at W4: an Electron app is the **software** class with
 `electron: true`, which declares the Electron failure surface as bans (`BN-06`..`BN-09`) and
@@ -47,9 +49,8 @@ declares its FPS number as a **host gate** rather than a ratchet, because the pr
 it needs Playwright or Electron plus a display — neither of which a shipped rule may depend on. Its
 ratchet carries `app_bundle_bytes` instead. The old sixth class was merged into `software` (its need
 column measured identical on all ten parts), and the old `F` letter remains an install-time alias
-that selects `software` **with** the opt-in. `docs/CI.md` §3 argues it in full, including why frame
-time is the wrong number (measured flat at 16.70 ms while the main thread went from 1.8 % to 54.5 %
-busy).
+that selects `software` **with** the opt-in (frame time measured flat at 16.70 ms while the main
+thread went from 1.8 % to 54.5 % busy — the number is the argument).
 
 **`—` is a real, enforced option.** The installer records every off part in `disabled:`, so its
 rows report `SKIP (opt-out)`; `CL-01` fails if a forbidden part's artifact exists. A repo with
@@ -66,7 +67,7 @@ Four consequences that follow from measurement, not taste:
    inferred command is wrong for a repo with no runner, a repo that cannot run its own typecheck
    read-only, and a repo whose runner lives in a skill — all at once. The shipped gate is a
    **floor**, and `P8` step 3 is "replace it".
-4. **The default branch is not always `main`.** It is declared in `.goblin/goblin.yaml` and
+4. **The default branch is not always `main`.** It is declared in `.gob/goblin.yaml` and
    compared against the real branch by `PT-02`; a preset that assumes `main` silently skips a
    repo on `master`.
 
@@ -97,21 +98,20 @@ Each step is independently useful and the later ones build on the earlier:
 
 ## What a first install actually gives you
 
-`goblin-install` exits 0 and creates: `.goblin/` (the verifier, the manifest, the config),
+`goblin-install` exits 0 and creates: `.gob/` (the verifier, the manifest, the config),
 `.hermes/skills/` (the flows), `HANDOFF.md`, `AGENTS.md`, and — for classes that need them —
 `ROUND-000-SPEC.md`, `reviews/`, and the harness scaffold in `checks/`.
 
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .goblin/bin/goblin-verify         # 37 passed, 1 failed - HP-05, until HANDOFF names a commit
-    gob emit --platform <p>           # optional, per platform: the agent skills are an opt-in
+    .gob/bin/goblin-verify            # 35 passed, 2 failed - CM-03 + SP-02, until the install is committed
 
-A default software-class install (no agent skills) is **green** — `38 passed, 0 failed, 11 advisory,
-33 skipped`, exit 0 — once
+A default software-class install (no agent skills) is **green** — `37 passed, 0 failed, 11 advisory,
+34 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
-the one expected red (`37 passed, 1 failed`). Both numbers are measured, not assumed
-(`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Thirty-three rows skip with a reason: the
+the one expected red (`36 passed, 1 failed`). Both numbers are measured, not assumed
+(`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Thirty-four rows skip with a reason: the
 five skill rows (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free
 install records, plus the not-yet rows: `HS-02` (no
 pinned pre-change commit yet), `AU-02`/`AU-03` (no report has been filed, so there is nothing to
@@ -123,7 +123,7 @@ they skip as *not enabled* rather than as *unread*), `FM-01`/`FM-02`/`VA-01`
 (no feature map and no declared `verify_doctor:` yet), `RC-01`..`RC-04` (no reference corpus
 declared: `reference_manifest:` ships empty and a fresh repo has no lab `manifests/`) and `JG-01`
 with `LP-01`..`LP-05` (no
-`.goblin/loop/` record, because no loop has run here yet). The class's required parts that only a
+`.gob/loop/` record, because no loop has run here yet). The class's required parts that only a
 round can produce pass *vacuously* (zero `reviews/*.md` to check; the declared gate is still the
 shipped floor), so the first-step list is a list of work, not a list of FAILs.
 
@@ -163,9 +163,9 @@ The remedy is a reconciliation. The project's file stays the file of record; not
 5. **Commit, then verify:**
 
        git add -A && git commit
-       .goblin/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
+       .gob/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the class's full green path (`38 passed, 0 failed, 11 advisory, 33 skipped`, exit 0 for
+   Success is the class's full green path (`37 passed, 0 failed, 11 advisory, 34 skipped`, exit 0 for
    the software class) with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three

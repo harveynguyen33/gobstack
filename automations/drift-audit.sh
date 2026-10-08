@@ -72,17 +72,17 @@ DETAIL=""
 for d in $ROOT_GLOB; do
   [ -d "$d" ] || continue
   TARGETS=$((TARGETS + 1))
-  if [ ! -f "$d/.goblin/goblin.yaml" ]; then
+  if [ ! -f "$d/.gob/goblin.yaml" ] && [ ! -f "$d/AGENTS.md" ]; then
     SKIPPED="$SKIPPED $(basename "$d")"
     continue
   fi
-  if [ ! -f "$d/.goblin/bin/goblin-verify" ]; then
+  if [ ! -f "$d/.gob/bin/goblin-verify" ]; then
     SKIPPED="$SKIPPED $(basename "$d")(no-verifier)"
     continue
   fi
   # --only IN-02,HP-05 rather than a full run: both are builtins that write no runtime state,
   # so the audit never edits the tree it is auditing (design rule 2 of the honesty section).
-  OUT=$( cd "$d" && bash .goblin/bin/goblin-verify --json --only IN-02,HP-05 2>/dev/null )
+  OUT=$( cd "$d" && bash .gob/bin/goblin-verify --json --only IN-02,HP-05 2>/dev/null )
   RC=$?
   case "$RC" in
     0|1) ;;
@@ -91,7 +91,7 @@ for d in $ROOT_GLOB; do
   FAILED=$(printf '%s' "$OUT" | grep -o '"id":"[A-Z][A-Z0-9-]*","status":"FAIL"' | sed 's/"id":"//; s/","status":"FAIL"//')
   for id in $FAILED; do
     DRIFT="$DRIFT $d/$id"
-    DETAIL="$DETAIL$d	$id	cd $d && bash .goblin/bin/goblin-verify --only $id
+    DETAIL="$DETAIL$d	$id	cd $d && bash .gob/bin/goblin-verify --only $id
 "
   done
 done

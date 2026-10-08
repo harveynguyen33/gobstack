@@ -12,7 +12,7 @@
 # coverage - a green run that says nothing about what it did NOT read is the other half of the
 # species:
 #   * THE DOCUMENTS THE INSTALLER WRITES INTO A READER'S REPO. The write set is read from the
-#     record `goblin-install` itself writes - `.goblin/installed.json`, its `files` and `owned`
+#     record `goblin-install` itself writes - `.gob/installed.json`, its `files` and `owned`
 #     maps - and cross-checked against what is on disk in the class-A install this test makes.
 #     Every `.md` in it is walked; the shipped glossary is walked for the count family. Add a
 #     markdown document to the installer and it joins this walk with no edit here. A file the
@@ -25,13 +25,13 @@
 #
 #     The extractor walks every document above and takes every token whose DIRECTORY is a
 #     COMMAND directory:
-#         `.goblin/bin/<name>`  -> must exist in a real class-A install this test makes itself
+#         `.gob/bin/<name>`  -> must exist in a real class-A install this test makes itself
 #         `bin/<name>`          -> must exist in this checkout
 #     Both directories hold commands by construction, so no hand-list of shootable names is
 #     involved: whatever the docs print, this test resolves.
 #
 #     RED case (B1, measured on the un-fixed tree): `docs/GUIDE.md:447` told the reader to run
-#     `.goblin/bin/goblin-model <role>`. No install ships that path - a real class-A `.goblin/bin/`
+#     `.gob/bin/goblin-model <role>`. No install ships that path - a real class-A `.gob/bin/`
 #     holds exactly `goblin-audit`, `goblin-bans`, `goblin-lib.sh`, `goblin-verify` - and the tree
 #     asserts the opposite elsewhere: `docs/ROLES.md:49` says in bold that `bin/goblin-model` is
 #     checkout-only and `tests/t-uninstall.sh:36` asserts the install does not carry it. Running
@@ -40,7 +40,7 @@
 #
 #     DELIBERATELY NOT MATCHED, and why - read this before widening the extractor:
 #       * a bare command name with no directory (`goblin-verify`, `goblin-install`). It resolves on
-#         PATH or as `.goblin/bin/<name>`, and the docs use all three forms; the promise being
+#         PATH or as `.gob/bin/<name>`, and the docs use all three forms; the promise being
 #         checked is about a PATH, and a bare name makes no path claim.
 #       * a `.goblin/`-rooted path that is not a command. `.goblin/loop/...` is the loop's own
 #         committed record, and `.goblin/last-gate-line` / `.goblin/audit.tsv` are written by a
@@ -54,14 +54,14 @@
 #
 # (a0) THE TOKENISER'S WRAP RULE (AB6 C2) - a promise a soft wrap split across two physical lines
 #     is REJOINED before it is read, so it is asserted like any other instead of being lost. This
-#     file used to be line-oriented: `.goblin/bin/` at the end of a line with the name on the next
+#     file used to be line-oriented: `.gob/bin/` at the end of a line with the name on the next
 #     reported a PASS, which is a false green. Two forms are rejoined:
-#       * a command directory that ENDS a line (`.goblin/bin/`, `bin/`) takes the next line's
-#         leading token with NO separator, so `... .goblin/bin/` + `goblin-bans` reads as
-#         `.goblin/bin/goblin-bans` and is then asserted like any other path.
+#       * a command directory that ENDS a line (`.gob/bin/`, `bin/`) takes the next line's
+#         leading token with NO separator, so `... .gob/bin/` + `goblin-bans` reads as
+#         `.gob/bin/goblin-bans` and is then asserted like any other path.
 #       * a count phrase whose NUMBER ends a line (`this ships 13`) takes the next line's leading
 #         token WITH a space, so `This ships 13` + `playbooks today.` reads as one sentence.
-#     A logical line that ends on a command directory WITH its trailing slash (`.goblin/bin/`,
+#     A logical line that ends on a command directory WITH its trailing slash (`.gob/bin/`,
 #     `bin/`) and that the join could not repair is a FAIL, never a quiet pass. That is the
 #     sensitivity the count family already had (`doc none` is a FAIL) applied to paths, and both
 #     are stated in this header. The slash is load-bearing: the SAME directory written without it
@@ -70,13 +70,13 @@
 #
 #     STILL NOT REJOINED, named here rather than implied away:
 #       * a path broken BETWEEN its own directories (`.goblin/` + `bin/x`) or in the MIDDLE of a
-#         name (`.goblin/bin/gob` + `lin-bans`). One fragment still carries a NAME, so it is
+#         name (`.gob/bin/gob` + `lin-bans`). One fragment still carries a NAME, so it is
 #         asserted as an ordinary token and a fragment that is not a shipped command still FAILs -
-#         `bin/x` is read as a checkout path, `.goblin/bin/gob` as an installed one. A break that
+#         `bin/x` is read as a checkout path, `.gob/bin/gob` as an installed one. A break that
 #         leaves both fragments resolvable is not seen as one path. Neither the checkout nor any
 #         class-A install prints such a break today.
 #       * a path broken AT its own directory/name boundary - a line that ends on the command
-#         directory WITHOUT its trailing slash (`.goblin/bin`, `bin`) with the slash leading the
+#         directory WITHOUT its trailing slash (`.gob/bin`, `bin`) with the slash leading the
 #         next line (`/x`) or dropped (`x`). This one is NOT rejoined and NOT asserted: the first
 #         fragment stops at the directory, with no NAME for the grammar to read, and the second is
 #         not preceded by `bin/`, so NEITHER is a token, both are dropped, and a false path in that
@@ -149,8 +149,8 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 INSTALLED=$(HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . --class A 2>&1)
 check "the class-A install the path promises are resolved against exits 0" \
-  "$([ -f .goblin/installed.json ] && echo 0 || echo 1)"
-[ -d .goblin/bin ] || note "  (no .goblin/bin in the install: $(printf '%s' "$INSTALLED" | head -1))"
+  "$([ -f .gob/installed.json ] && echo 0 || echo 1)"
+[ -d .gob/bin ] || note "  (no .gob/bin in the install: $(printf '%s' "$INSTALLED" | head -1))"
 
 # ===============================================================================================
 # THE SUBJECT SET (C1). Derived twice from two independent sources and required to agree: what the
@@ -159,7 +159,7 @@ check "the class-A install the path promises are resolved against exits 0" \
 # ===============================================================================================
 # shellcheck source=goblin-lib.sh
 . "$SRC/bin/goblin-lib.sh"
-INSTALL_JSON="$WORK/target/.goblin/installed.json"
+INSTALL_JSON="$WORK/target/.gob/installed.json"
 RECORD_MD=$( { g_installed_files "$INSTALL_JSON" | cut -f1
                g_json_object "$INSTALL_JSON" owned | cut -f1
              } | grep -E '\.md$' | sort -u )
@@ -191,8 +191,8 @@ N_INSTALLED=$(( ${#WALK_PATH[@]} - N_CHECKOUT ))
 
 # The count family also reads the glossary - the definition of "playbook" a reader is handed - in
 # both copies: the checkout's and the one the installer writes.
-SCAN_LABEL=( "${WALK_LABEL[@]}" "manifest/glossary.tsv" ".goblin/manifest/glossary.tsv" )
-SCAN_PATH=( "${WALK_PATH[@]}" "$SRC/manifest/glossary.tsv" "$WORK/target/.goblin/manifest/glossary.tsv" )
+SCAN_LABEL=( "${WALK_LABEL[@]}" "manifest/glossary.tsv" ".gob/manifest/glossary.tsv" )
+SCAN_PATH=( "${WALK_PATH[@]}" "$SRC/manifest/glossary.tsv" "$WORK/target/.gob/manifest/glossary.tsv" )
 
 MISSING=""
 for i in "${!SCAN_PATH[@]}"; do
@@ -293,7 +293,7 @@ TOKENS=$(printf '%s\n' "$RECORDS" | awk -F'\t' '$3=="TOK" { print $4"|"$1"|"$2 }
 for rec in $TOKENS; do
   tok=${rec%%|*}; rest=${rec#*|}; label=${rest%%|*}; ln=${rest##*|}
   case "$tok" in
-    .goblin/bin/*)
+    .gob/bin/*)
       if [ -e "$tok" ]; then
         note "ok   $label:$ln hands the reader '$tok' and a real class-A install ships it"
       else
@@ -321,7 +321,7 @@ check "no walked document leaves a command directory dangling - an unreadable pa
 GUIDE_BARE_MANIFEST=$(grep -ohE '(^|[^A-Za-z0-9_./-])manifest/[A-Za-z0-9_.-]+' "$SRC/docs/GUIDE.md" \
                       | sed 's/^[^m]*//' | sort -u)
 if [ -z "$GUIDE_BARE_MANIFEST" ]; then
-  note "ok   docs/GUIDE.md names every manifest path as the reader has it (.goblin/manifest/...)"
+  note "ok   docs/GUIDE.md names every manifest path as the reader has it (.gob/manifest/...)"
 else
   note "FAIL docs/GUIDE.md names an installed table by the CHECKOUT's path, not the reader's:"
   printf '        %s\n' $GUIDE_BARE_MANIFEST
@@ -401,6 +401,12 @@ c_phantom=$(comm -23 <(printf '%s\n' "$c_ids") \
 c_nocontrol=$(comm -13 <(printf '%s\n' "$c_ids") \
               <(awk -F'\t' 'NR>1 && $2=="target" {print $1}' "$ENF_SRC" | grep -oE '[A-Z]{2,3}-[0-9]{2}' | sort -u) \
               | tr -d '[:space:]')
+# v2 (wave B): the CI lane is out of the product — PG-05/PG-06 have no subject to mutate (nothing
+# installs .github/workflows), so their controls are DELETED, not migrated (the same treatment
+# t-verify-green gave the CI family). They are target-scope rows that SKIP on a v2 install, so the
+# census excludes them BY NAME here — the exclusion list is the record that this was measured, not
+# an accident of the grep.
+C_EXCLUDE="PG-05 PG-06"
 
 c_line=$(grep -m1 -nE '[0-9]+ over [0-9]+ target rows' "$SRC/README.md")
 c_where=${c_line%%:*}
@@ -413,8 +419,13 @@ check "  and states it over the matrix's target rows that carry a control (doc $
   "$([ -n "$c_doc_rows" ] && [ "$c_doc_rows" = "$c_nids" ] && echo 0 || echo 1)"
 check "  and every id the control uses is a matrix row (phantom: '${c_phantom:-0}')" \
   "$([ -z "$c_phantom" ] && echo 0 || echo 1)"
-check "  and every target row in the matrix carries one (uncovered: '${c_nocontrol:-0}')" \
-  "$([ -z "$c_nocontrol" ] && echo 0 || echo 1)"
+c_uncovered=""
+for id in $(printf '%s' "$c_nocontrol" | sed 's/\([A-Z][A-Z0-9]-[0-9][0-9]\)/\1 /g'); do
+  case " $C_EXCLUDE " in *" $id "*) continue ;; esac
+  c_uncovered="$c_uncovered$id"
+done
+check "  and every target row in the matrix carries one (uncovered, exc. the v2 CI cut: '${c_uncovered:-0}')" \
+  "$([ -z "$c_uncovered" ] && echo 0 || echo 1)"
 
 if [ "$fail" -eq 0 ]; then note "t-doc-promises: PASS"; else note "t-doc-promises: FAIL"; fi
 exit "$fail"

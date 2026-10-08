@@ -14,7 +14,7 @@ ratchet_cmd: grep -rniE '\b(TODO|FIXME)\b' --include='*.cs' --include='*.ts' --i
 ratchet_ceiling: measure
 replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs
-runtime_data: .goblin/state.json
+runtime_data: .gob/state.json
 sec_gitignore_family: yes
 sec_build_output: Builds Library
 sec_audit_cmd: ""

@@ -35,14 +35,14 @@ note "$(printf '%s' "$OUT1" | grep -E '^created' || echo 'no created line')"
 INSTALLED_FILES=$(find . -path ./.git -prune -o -type f -print | wc -l | tr -d ' ')
 check "first install creates the harness ($INSTALLED_FILES files in the tree)" \
   "$([ "$INSTALLED_FILES" -gt 20 ] && echo 0 || echo 1)"
-check "the verifier landed" "$([ -x .goblin/bin/goblin-verify ] && echo 0 || echo 1)"
-# The installer's write set under .goblin/bin is exactly the four shipped scripts: bin/goblin-model
+check "the verifier landed" "$([ -x .gob/bin/goblin-verify ] && echo 0 || echo 1)"
+# The installer's write set under .gob/bin is exactly the four shipped scripts: bin/goblin-model
 # is checkout-only (docs/ROLES.md, F2-8), and the same fixture is what t-uninstall.sh asserts.
 # goblin-audit joined the set in v0.2 (G4/SC-07): it is the deliberate, network-touching half of
 # the dependency row, and the row that reads its record never runs it. goblin-bans joined it in
 # v0.3 (G5): the ban engine, installed with the table it reads.
-check ".goblin/bin holds exactly goblin-audit + goblin-bans + goblin-verify + goblin-lib.sh" \
-  "$([ "$(ls .goblin/bin | sort | tr '\n' ' ')" = "goblin-audit goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
+check ".gob/bin holds exactly goblin-audit + goblin-bans + goblin-verify + goblin-lib.sh" \
+  "$([ "$(ls .gob/bin | sort | tr '\n' ' ')" = "goblin-audit goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
 # W6 neutral-first: a DEFAULT install ships no agent skills — the harness is neutral. The
 # explicit opt-in (--skills yes) is what installs them, asserted in t-init.sh's flags run.
 check "a default install writes NO .hermes dir (skills are opt-in)" \
@@ -65,8 +65,31 @@ OUTSIDE_AFTER=$(ls -A "$WORK" | sort)
 check "the sentinel outside the target is byte-identical" "$([ "$SENT_BEFORE" = "$SENT_AFTER" ] && echo 0 || echo 1)"
 check "no new entry outside the target" "$([ "$OUTSIDE_BEFORE" = "$OUTSIDE_AFTER" ] && echo 0 || echo 1)"
 
+# ---- regression pin: the gawk -v escape bug ---------------------------------
+# gawk processes backslash escapes in -v assignment values, so a second rewrite of
+# the AGENTS.md block used to turn a literal \b inside a value into a backspace byte.
+# The block must now travel via ENVIRON (no escape processing) and round-trip the
+# written file BYTE-IDENTICALLY twice, escapes and tabs intact.
+BLOCK_FILE="$WORK/agents-block-pin.md"
+: > "$BLOCK_FILE"
+PIN_VALUE='grep -q "\bTODO\b" src && printf "a\tb\n"'
+. "$WORK/target/.gob/bin/goblin-lib.sh"
+g_agents_write "$BLOCK_FILE" < <(printf '%s\n' "gates_gate_cmd	$PIN_VALUE") >/dev/null
+cp "$BLOCK_FILE" "$BLOCK_FILE.snap1"
+g_agents_write "$BLOCK_FILE" < "$BLOCK_FILE" >/dev/null
+g_agents_write "$BLOCK_FILE" < "$BLOCK_FILE" >/dev/null
+check "the gob block round-trips twice byte-identically (gawk -v escape pin)" \
+  "$(cmp -s "$BLOCK_FILE.snap1" "$BLOCK_FILE" && echo 0 || echo 1)"
+check "a literal backslash-b survives the round-trip as text (no backspace byte)" \
+  "$(grep -qF '"\bTODO\b" src' "$BLOCK_FILE" && echo 0 || echo 1)"
+check "the block carries no control byte (0x08)" \
+  "$(grep -qP '\x08' "$BLOCK_FILE" && echo 1 || echo 0)"
+check "a tab escape inside a value survives the round-trip as text" \
+  "$(grep -qF 'a\tb' "$BLOCK_FILE" && echo 0 || echo 1)"
+grep 'gates_gate_cmd' "$BLOCK_FILE" | cat -A > /tmp/pin-line.txt 2>&1
+
 # ---- a re-install after a file is deleted restores it, and reports it as created
-rm -f "$WORK/target/.goblin/manifest/glossary.tsv"
+rm -f "$WORK/target/.gob/manifest/glossary.tsv"
 OUT3=$($INSTALL 2>&1)
 printf '%s' "$OUT3" | grep -qE '^created 1 '
 check "a deleted installed file is restored and reported as created" "$?"
