@@ -22,7 +22,7 @@ on 0.5.x does not silently keep working through this version; run `gob init` aga
   global `~/.goblin` tree no longer shares a prefix with it.
 - **The CI lane is cut.** No shipped workflow file, no CI toggle in the config — the gate hook
   and `gob verify` are the enforcement paths.
-- **The surface is five verbs: `init`, `map`, `verify`, `bans`, `uninstall`.** The dispatcher
+- **The surface is six verbs: `init`, `map`, `verify`, `bans`, `mcp`, `uninstall`.** The dispatcher
   refuses everything else with exit 2 — `doctor`, `audit`, `upgrade`, `emit`, `sync` and
   `install` are unwired (their code is deleted or unreachable; see `docs/LIMITS.md` #54 for the
   engine-dir decision the upgrade command used to serve). `gob init` replaces `gob install`

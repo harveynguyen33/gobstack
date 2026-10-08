@@ -5,7 +5,8 @@
 #   gob map     [target] [--agent | --heuristic] [--write <dir>] [--force]
 #   gob verify  [--only <id[,id...]>] [--json] [--list] [--source <path>]
 #   gob bans    [--only <id[,id...]>] [--list]
-#   gob uninstall [--target <dir>]
+#   gob mcp                                     serve the harness over MCP stdio
+#   gob uninstall --target <dir>
 #   gob --version
 #
 # v2 SURFACE (AI-driven development): the CLI calls no AI API. `gob init` and `gob map`
@@ -47,6 +48,7 @@ gob — the gobstack command line.
   gob map     [target] [--agent | --heuristic] [--write <dir>] [--force]
   gob verify  [--only <id[,id...]>] [--json] [--list] [--source <path>]
   gob bans    [--only <id[,id...]>] [--list]
+  gob mcp     serve the harness to your agent over MCP stdio (verify/map/init tools)
   gob uninstall --target <dir>
   gob --version
 
@@ -94,6 +96,12 @@ case "$CMD" in
     ;;
   bans)
     exec bash "$SRC/bin/goblin-bans" "$@"
+    ;;
+  mcp)
+    # The MCP stdio server (bin/goblin-mcp.js): JSON-RPC 2.0 over stdin/stdout, a LOCAL
+    # tool server over the vendored harness — no API call, no socket. node is the same
+    # runtime bin/goblin.js already needs; it is exec'd directly, args pass through.
+    exec node "$SRC/bin/goblin-mcp.js" "$@"
     ;;
   uninstall)
     # Routes into the installer's uninstall job. `--uninstall` is appended FIRST so the
