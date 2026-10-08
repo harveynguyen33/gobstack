@@ -2933,6 +2933,16 @@ SEE
       reference lanes. Full statement: `goblin-verify --verbose`, docs/LIMITS.md #18 #27 #28 #33 #43.
 SEE
   fi
+  # ---- the sign-off (locked v2 decision) ----------------------------------------
+  # The mascot is a GREEN-run line only. A red run ends on the concrete first command:
+  # the verdict IS the FAIL list, and the first row's remedy line says the fix — mascot
+  # noise on the run's one actionable moment is exactly what the red tail must not be.
+  # Human branch only: a --json run stays machine-clean.
+  if [ "$FAIL" -gt 0 ] || [ "$BAD" -eq 1 ]; then
+    printf '      start with the first FAIL above — its remedy line says the fix.\n'
+  else
+    printf '      ▙ the goblin sees you. keep the gate green.\n'
+  fi
   # ---- the engine footer (W1 §2.2, R-1's residue -> docs/LIMITS.md #43) --------
   # Every run states WHICH engine judged it: the sha256 of the running verifier and of
   # the manifest that judged this run, so a repo can name its judge. The statement is

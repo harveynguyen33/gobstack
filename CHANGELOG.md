@@ -30,7 +30,10 @@ on 0.5.x does not silently keep working through this version; run `gob init` aga
 - **npx-first, no global install.** The documented entry is
   `npx @techgoblin/gobstack init`; `uninstall` is the npm one-liner. Nothing asks for `-g`.
 - **Remedy per FAIL.** A `FAIL` row prints its one-line `remedy:` at the point of failure and
-  again under the summary payload, so a red run says what to do next without a docs trip.
+  again under the summary payload, so a red run says what to do next without a docs trip. The
+  mascot sign-off is a GREEN-run line only: a red run ends on
+  `start with the first FAIL above — its remedy line says the fix.` — the verdict IS the FAIL
+  list, and mascot noise on the run's one actionable moment is noise.
 - **Framed for the new teammate.** The docs lead with what a person joining the repo reads
   first (`AGENTS.md`, `HANDOFF.md`), not with the toolchain that maintains them.
 
