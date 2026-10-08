@@ -94,7 +94,7 @@ fi
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
          t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
          t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-doc-replay t-version-sync \
-         t-init t-banner-stderr t-shim t-map; do
+         t-init t-banner-stderr t-shim t-map t-mcp; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi

@@ -3,7 +3,7 @@
 A step-by-step guide for your first week. **Read this before the README.** The README tells you
 what the pieces are; this tells you what to *do*, in order, and what you should see when it works.
 
-Version: `0.6.0-alpha.1` · Last measured: 2026-10-08 · Every command and every output below was run on a
+Version: `0.6.0-alpha.1` · Last measured: 2026-10-09 · Every command and every output below was run on a
 real repository while writing this guide.
 
 ---
@@ -521,13 +521,32 @@ same commands are available outside any repo through the npm CLI: `gob init` / `
 ### Commands
 
     gob init [--heuristic] [--write <proposal>] [--target <dir>] [--dry-run] [--yes]
+             [--with-mcp-config]
     gob map [--heuristic [target]] [--write <dir>] [--force]
+    gob mcp                                  # the MCP stdio server (three tools, local only)
 
     .gob/bin/goblin-verify [--only <id[,id...]>] [--json] [--list]
     .gob/bin/goblin-bans           # run the ban list
     gob install --target <dir> --uninstall   # the uninstall job
     gob install --target <dir> --re-pin      # the deliberate re-pin
     bin/goblin-model <role>        # checkout-only; resolve a role to a profile (docs/ROLES.md)
+
+### Register the harness with your agent (MCP)
+
+Your agent can call the discipline gate itself instead of you pasting verify output into the
+chat. `gob mcp` is a local tool server (JSON-RPC over stdin/stdout — the Model Context
+Protocol shape); it exposes `gob_verify` (the gate, with the remedy line under every FAIL),
+`gob_map_status` (the feature map, read-only) and `gob_init_status` (is this repo under the
+harness). It calls no API and opens no socket.
+
+The one-liner, per user account:
+
+    claude mcp add gob -- npx -y @techgoblin/gobstack mcp
+
+or, committed with the repo so every teammate's agent picks it up (Claude Code and Cursor
+auto-detect it):
+
+    gob init --with-mcp-config        # writes .mcp.json; never overwrites one you customized
 
 ### The 15 playbooks
 
