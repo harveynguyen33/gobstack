@@ -249,14 +249,19 @@ CONFIG="$TARGET/AGENTS.md"
       fi
       continue ;;
     esac
-    printf '%s\t%s\n' "$k" "$(g_agents_read "$PROP" "$k")"
+    # An ABSENT key prints "key<TAB><TAB>", which renders as "key:: key:" - a key that
+    # reads back as its own name twice and fails IN-02/PF-01/FM-01 on a fresh install.
+    # A proposal line with an empty value carries no merge information (the class
+    # default the installer rendered already covers it): drop it here.
+    k_val=$(g_agents_read "$PROP" "$k")
+    [ -n "$k_val" ] && printf '%s\t%s\n' "$k" "$k_val"
   done <<< "$BLOCK_KEYS"
-  while IFS= read -r k; do
+  while IFS=$'\t' read -r k v; do
     [ -n "$k" ] || continue
     printf '%s\n' "$BLOCK_KEYS" | grep -qxF "$k" && continue
     case "$k" in gate_*_cmd) continue ;; esac
-    printf '%s\t%s\n' "$k" "$(g_agents_read "$CONFIG" "$k")"
-  done < <(g_agents_keys "$CONFIG")
+    printf '%s\t%s\n' "$k" "$v"
+  done < <(g_agents_pairs "$CONFIG")
 } | g_agents_write "$CONFIG" >/dev/null || { g_err "could not write the gob block into $CONFIG"; exit 1; }
 
 # Fail closed: the declared gate must read back through the engine's own reader.

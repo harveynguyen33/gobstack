@@ -51,14 +51,14 @@ check "the project's own .hermes skill survives (D1)" \
   "$([ "$(sha256sum .hermes/skills/goblin-mode/SKILL.md | awk '{print $1}')" = "$OWN_SKILL" ] && echo 0 || echo 1)"
 check "the project's own HANDOFF.md survives (D1)" \
   "$([ "$(sha256sum HANDOFF.md | awk '{print $1}')" = "$OWN_HANDOFF" ] && echo 0 || echo 1)"
-check "the installer still landed its own verifier" "$([ -x .goblin/bin/goblin-verify ] && echo 0 || echo 1)"
+check "the installer still landed its own verifier" "$([ -x .gob/bin/goblin-verify ] && echo 0 || echo 1)"
 check "the refusal is recorded in installed.json" \
-  "$(grep -q 'checks/assert.mjs' .goblin/installed.json && echo 0 || echo 1)"
+  "$(grep -q 'checks/assert.mjs' .gob/installed.json && echo 0 || echo 1)"
 check "the installer did not claim the refused file as installed" \
-  "$(awk '/"files"/{f=1} /"owned"/{f=0} f && /checks\/assert.mjs/{n=1} END{exit (n?1:0)}' .goblin/installed.json && echo 0 || echo 1)"
+  "$(awk '/"files"/{f=1} /"owned"/{f=0} f && /checks\/assert.mjs/{n=1} END{exit (n?1:0)}' .gob/installed.json && echo 0 || echo 1)"
 
 git add -A && git commit -q -m "chore: install (with refusals)"
-OUTV=$(bash .goblin/bin/goblin-verify --only IN-04 2>&1); RCV=$?
+OUTV=$(bash .gob/bin/goblin-verify --only IN-04 2>&1); RCV=$?
 printf '%s' "$OUTV" | grep -q 'pre-existing file(s) left untouched'
 check "IN-04 reports the refused files as left untouched" "$([ "$RCV" -eq 0 ] && echo 0 || echo 1)"
 

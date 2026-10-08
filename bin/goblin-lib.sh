@@ -325,9 +325,22 @@ g_agents_gate_names() {
 # sed in the reader stops at the first colon and the value is rebuilt, so a raw tab inside
 # a gate command lost its place and the line drifted on every re-write). Use this for any
 # read-modify-write of the block; g_agents_keys is for membership tests only.
+# A VALUE-LESS line is stored "key:" (no trailing space — the writer strips it), so the
+# ": "-split regex cannot fire: without the key fix below, k kept the trailing colon and
+# the pair read back "key:<TAB>key:" - on the next rewrite that rendered "key:: key:"
+# and every later read of the key returned its own name (IN-02/PF-01/FM-01 reds on a
+# fresh install that declares no practice/feature_map/measured).
 g_agents_pairs() {
-  g_agents_block "$1" | awk -F': ' '
-    { k = $1; sub(/^[^:]*: /, "", $0); printf "%s\t%s\n", k, $0 }'
+  # Split at the FIRST ": " (or a trailing bare ":" for a value-less line): index()
+  # drives the branch because the ": "-regex cannot fire on the stored "key:" form and
+  # a blind sub left k carrying its colon, so pairs read back "key:<TAB>key:".
+  g_agents_block "$1" | awk '{
+    p = index($0, ": ")
+    if (p > 0) { k = substr($0, 1, p - 1); v = substr($0, p + 2) }
+    else if ($0 ~ /:$/) { k = substr($0, 1, length($0) - 1); v = "" }
+    else { k = $0; v = "" }
+    printf "%s\t%s\n", k, v
+  }'
 }
 
 # g_agents_list <file> <key> — the items of a one-line `[a, b, c]` array, one per line.

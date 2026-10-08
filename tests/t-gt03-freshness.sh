@@ -2,7 +2,7 @@
 # t-gt03-freshness.sh — GT-03's freshness clause must be able to see a COMMIT (D2, AB2).
 #
 # At 0.4.2 the clause was
-#     test -f .goblin/last-gate-line && [ .goblin/last-gate-line -nt "$(git rev-parse --git-dir)/HEAD" ]
+#     test -f .gob/last-gate-line && [ .gob/last-gate-line -nt "$(git rev-parse --git-dir)/HEAD" ]
 # and `.git/HEAD` is rewritten by BRANCH OPERATIONS, never by a commit, so the row reported the
 # round GREEN after the round had moved on. Measured at d5424be (22:00:04 both before and after a
 # real commit; `.git/refs/heads/main` moved 22:00:11 -> 22:01:49; `--only GT-03` exit 0).
@@ -29,9 +29,9 @@ note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
 # gt03 — run the row and print "<verdict> <rc>"
-gt03() { local o r v; o=$(bash .goblin/bin/goblin-verify --only GT-03 2>&1); r=$?; v=?; [ "$r" = 0 ] && v=PASS; [ "$r" = 1 ] && v=FAIL; printf '%s %s' "$v" "$r"; }
-# measure — run the declared gates, which is what WRITES .goblin/last-gate-line (GT-02's body)
-measure() { bash .goblin/bin/goblin-verify --only GT-02 >/dev/null 2>&1; }
+gt03() { local o r v; o=$(bash .gob/bin/goblin-verify --only GT-03 2>&1); r=$?; v=?; [ "$r" = 0 ] && v=PASS; [ "$r" = 1 ] && v=FAIL; printf '%s %s' "$v" "$r"; }
+# measure — run the declared gates, which is what WRITES .gob/last-gate-line (GT-02's body)
+measure() { bash .gob/bin/goblin-verify --only GT-02 >/dev/null 2>&1; }
 # want <label> <expected verdict> — assert the row's verdict
 want() {
   local got; got=$(gt03)

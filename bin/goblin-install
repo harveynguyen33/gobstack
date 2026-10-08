@@ -244,10 +244,10 @@ if [ "$RE_PIN" -eq 1 ]; then
   # every OTHER key by reading the current block first (the `owned` contract holds for
   # everything except the single value just asked for).
   {
-    while IFS= read -r k; do
+    while IFS=$'\t' read -r k v; do
       [ "$k" = "practice_sha256" ] && continue
-      printf '%s\t%s\n' "$k" "$(g_agents_read "$CONFIG" "$k")"
-    done < <(g_agents_keys "$CONFIG")
+      printf '%s\t%s\n' "$k" "$v"
+    done < <(g_agents_pairs "$CONFIG")
     printf 'practice_sha256\t%s\n' "$NEW_SHA"
   } | g_agents_write "$CONFIG" >/dev/null \
     || { g_err "could not rewrite the pin in $CONFIG"; exit 1; }
@@ -787,7 +787,6 @@ fi
 
 
 if [ "$DRY_RUN" -eq 0 ]; then
-  mkdir -p "$TARGET/.goblin"
   if [ "$CREATED" -eq 0 ] && [ "$UPDATED" -eq 0 ] && [ "$PREV_VERSION" = "$VERSION" ] \
      && [ "$(printf '%s' "$RECORD_SKILLS_EFFECTIVE" )" = "$(printf '%s' "$SKILLS")" ]; then
     g_info "no-op: $UNCHANGED files unchanged (v$VERSION already installed)"
@@ -802,10 +801,10 @@ if [ "$DRY_RUN" -eq 0 ]; then
     cur=$(g_agents_read "$CONFIG" disabled)
     new=$(printf '%s,%s' "${cur#[]}" "${OPT_OUT}" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
     {
-      while IFS= read -r k; do
+      while IFS=$'\t' read -r k v; do
         [ "$k" = "disabled" ] && continue
-        printf '%s\t%s\n' "$k" "$(g_agents_read "$CONFIG" "$k")"
-      done < <(g_agents_keys "$CONFIG")
+        printf '%s\t%s\n' "$k" "$v"
+      done < <(g_agents_pairs "$CONFIG")
       printf 'disabled\t[%s]\n' "$new"
     } | g_agents_write "$CONFIG" >/dev/null
     g_info "recorded opt-out: $OPT_OUT"

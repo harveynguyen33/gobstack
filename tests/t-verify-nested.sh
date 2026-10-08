@@ -50,7 +50,7 @@ note "  ... $(git status --porcelain | wc -l | tr -d ' ') staged entries, none o
 cd "$WORK/outer/sub"
 note "git rev-parse --show-toplevel from the target -> $(git rev-parse --show-toplevel)"
 
-OUT=$(bash .goblin/bin/goblin-verify 2>&1); RC=$?
+OUT=$(bash .gob/bin/goblin-verify 2>&1); RC=$?
 note "verify from inside the nested target: exit $RC"
 printf '%s\n' "$OUT" | grep -E '^(FAIL|error)' | head -3 | sed 's/^/      /'
 check "a nested target with no .git of its own is refused (exit 2)" \
@@ -81,7 +81,7 @@ git add -A && git commit -q -m "chore: install gobstack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: the handoff names the head"
 
-OUT2=$(bash .goblin/bin/goblin-verify 2>&1); RC2=$?
+OUT2=$(bash .gob/bin/goblin-verify 2>&1); RC2=$?
 printf '%s\n' "$OUT2" | sed 's/^/      /'
 check "a nested target with its own .git verifies (exit 0)" "$([ "$RC2" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$OUT2" | grep -qE '^ *38 passed, 0 failed, 11 advisory, 33 skipped'
@@ -89,14 +89,14 @@ check "  and it is the class-A green path (38/0/11/33, the default skills=no ins
 
 # ---- W1 §5.1: an engine_dir declaration must not leak across the boundary ----------------
 # The OUTER repo declares engine_dir; the inner repo (sub2) must resolve its own engine and
-# must not inherit the outer declaration - the resolution chain reads $ROOT/.goblin/goblin.yaml,
+# must not inherit the outer declaration - the resolution chain reads $ROOT/.gob/goblin.yaml,
 # never the enclosing repo's, so the outer declaration is invisible to the inner verify.
 mkdir -p "$WORK/engine/manifest" "$WORK/engine/bin"
 cp "$SRC/manifest/enforcement.tsv" "$SRC/manifest/classes.tsv" "$SRC/manifest/bans.tsv" "$WORK/engine/manifest/"
 cp "$SRC/bin/goblin-bans" "$SRC/bin/goblin-lib.sh" "$WORK/engine/bin/"
-sed -i "s|^models_file:|engine_dir: $WORK/engine\nmodels_file:|" "$WORK/outer/.goblin/goblin.yaml"
+sed -i "s|^models_file:|engine_dir: $WORK/engine\nmodels_file:|" "$WORK/outer/.gob/goblin.yaml"
 git -C "$WORK/outer" add -A && git -C "$WORK/outer" commit -q -m "declare engine_dir in the outer repo"
-OUT3=$(bash .goblin/bin/goblin-verify 2>&1); RC3=$?
+OUT3=$(bash .gob/bin/goblin-verify 2>&1); RC3=$?
 check "an inner repo verify is unaffected by the OUTER repo's engine_dir (exit 0)" "$([ "$RC3" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$OUT3" | grep -qE '^ *38 passed, 0 failed'
 check "  and the inner run is still the class-A green path (default skills=no)" "$?"

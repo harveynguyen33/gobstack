@@ -30,9 +30,9 @@ check "no checks/ directory" "$([ ! -d checks ] && echo 0 || echo 1)"
 check "no HANDOFF.md" "$([ ! -f HANDOFF.md ] && echo 0 || echo 1)"
 check "no *-SPEC.md" "$(ls ./*-SPEC.md >/dev/null 2>&1 && echo 1 || echo 0)"
 check "no reviews/ directory" "$([ ! -d reviews ] && echo 0 || echo 1)"
-check "no .goblin/tokens.yaml" "$([ ! -f .goblin/tokens.yaml ] && echo 0 || echo 1)"
+check "no .gob/tokens.yaml" "$([ ! -f .gob/tokens.yaml ] && echo 0 || echo 1)"
 git add -A && git commit -q -m "chore: install (archive)"
-VERIFY_OUT=$(bash .goblin/bin/goblin-verify 2>&1); VERIFY_RC=$?
+VERIFY_OUT=$(bash .gob/bin/goblin-verify 2>&1); VERIFY_RC=$?
 note "verify exit=$VERIFY_RC"
 printf '%s' "$VERIFY_OUT" | grep -q 'SKIP  HP-01'
 check "HP-01 is skipped for an archive project" "$?"
@@ -47,7 +47,7 @@ mkfix "$WORK/notarchived"
 bash "$SRC/bin/goblin-install" --target "$WORK/notarchived" --class A --models "$WORK/models.yaml" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install (class A)"
 rm -f HANDOFF.md && git add -A && git commit -q -m "test: remove the HANDOFF"
-A_OUT=$(bash .goblin/bin/goblin-verify 2>&1); A_RC=$?
+A_OUT=$(bash .gob/bin/goblin-verify 2>&1); A_RC=$?
 note "class A without a HANDOFF: verify exit=$A_RC"
 printf '%s' "$A_OUT" | grep -q 'FAIL  HP-01'
 check "class A fails HP-01 when the HANDOFF is gone" "$?"
@@ -64,11 +64,11 @@ bash "$SRC/bin/goblin-install" --target "$WORK/noskills" --class A --skills no \
   --models "$WORK/models.yaml" >/dev/null 2>&1
 check "--skills no installs" "$?"
 check "  and writes no automation producers either" \
-  "$([ ! -d .goblin/automations ] && echo 0 || echo 1)"
+  "$([ ! -d .gob/automations ] && echo 0 || echo 1)"
 git add -A && git commit -q -m "chore: install (--skills no)"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
-NS_OUT=$(bash .goblin/bin/goblin-verify 2>&1); NS_RC=$?
+NS_OUT=$(bash .gob/bin/goblin-verify 2>&1); NS_RC=$?
 note "class A --skills no: verify exit=$NS_RC, $(printf '%s' "$NS_OUT" | grep -E '^ *[0-9]+ passed')"
 check "class A with --skills no verifies green" "$NS_RC"
 printf '%s' "$NS_OUT" | grep -q 'SKIP  AU-01  .*opt-out: playbooks'
@@ -95,7 +95,7 @@ bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills yes \
   --models "$WORK/models.yaml" >/dev/null 2>&1
 check "migration fixture: --skills yes installs" "$?"
 S_BEFORE=$(find .hermes/skills -name SKILL.md | sort)
-REC_BEFORE=$(sha256sum .goblin/installed.json | awk '{print $1}')
+REC_BEFORE=$(sha256sum .gob/installed.json | awk '{print $1}')
 git add -A && git commit -q -m "chore: install (--skills yes, the pre-W6 shape)"
 # the upgrade: the NEW default (no flag), same class — must keep every skill
 UP_OUT=$(bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --upgrade \
@@ -104,7 +104,7 @@ check "upgrade with the new default exits 0" "$UP_RC"
 S_AFTER=$(find .hermes/skills -name SKILL.md 2>/dev/null | sort)
 [ "$S_BEFORE" = "$S_AFTER" ] && [ -n "$S_AFTER" ]
 check "  and every previously-installed skill survives byte-identical (same list)" "$?"
-grep -q '"skills": "yes"' .goblin/installed.json
+grep -q '"skills": "yes"' .gob/installed.json
 check "  and the record still says skills=yes (the choice was read, not reset)" "$?"
 printf '%s' "$UP_OUT" | grep -q 'agent skills installed - they are kept'
 check "  and the run says so out loud (not a silent state change)" "$?"
@@ -120,7 +120,7 @@ bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills no \
 check "an explicit --skills no re-install exits 0" "$?"
 [ ! -e .hermes ]
 check "  and the explicit opt-out removes .hermes (no dead tree)" "$?"
-grep -q '"skills": "no"' .goblin/installed.json
+grep -q '"skills": "no"' .gob/installed.json
 check "  and the record follows the explicit choice" "$?"
 git add -A && git commit -q -m "chore: explicit skills opt-out"
 # rebuild the skills, then --uninstall removes everything recorded (the F2-7 contract)

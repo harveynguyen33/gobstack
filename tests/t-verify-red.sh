@@ -129,7 +129,7 @@ git add -A && git commit -q -m "chore: install gobstack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 
-bash .goblin/bin/goblin-verify >/dev/null 2>&1
+bash .gob/bin/goblin-verify >/dev/null 2>&1
 check "the fixture starts GREEN (nothing below is measured against a broken baseline)" "$?"
 
 # V3-1: the ban lane has to reach the WRITER, not only the post-mortem. AGENTS.md is the file a
@@ -141,7 +141,7 @@ check "the installed AGENTS.md names the ban engine (V3-1)" "$?"
 BK="$WORK/backup"
 mkdir -p "$BK"
 cp -a HANDOFF.md "$BK/HANDOFF.md"
-cp -a .goblin/goblin.yaml "$BK/goblin.yaml"
+cp -a AGENTS.md "$BK/goblin.yaml"
 cp -a .goblin/installed.json "$BK/installed.json"
 cp -a .goblin/manifest/enforcement.tsv "$BK/enforcement.tsv"
 cp -a .hermes/skills/goblin-mode/SKILL.md "$BK/SKILL.md"
@@ -179,7 +179,7 @@ cp -a .goblin/manifest "$BK/manifest"
 
 restore_all() {
   cp -a "$BK/HANDOFF.md" HANDOFF.md
-  cp -a "$BK/goblin.yaml" .goblin/goblin.yaml
+  cp -a "$BK/goblin.yaml" AGENTS.md
   cp -a "$BK/installed.json" .goblin/installed.json
   # W1: the IN-02 clause-2 control deletes .goblin/bin and .goblin/manifest wholesale,
   # so the restore rebuilds them from the backup before the per-file copies below.
@@ -232,8 +232,8 @@ function expect_red {
   local label="$1" id="$2" want="$3" mutate="$4" dir="${5:-}" restore="${6:-restore_all}"
   local out rc
   if [ -n "$dir" ]; then ( cd "$dir" && "$mutate" ); else "$mutate"; fi
-  if [ -n "$dir" ]; then out=$( cd "$dir" && bash .goblin/bin/goblin-verify --only "$id" 2>&1 ); rc=$?
-  else out=$(bash .goblin/bin/goblin-verify --only "$id" 2>&1); rc=$?; fi
+  if [ -n "$dir" ]; then out=$( cd "$dir" && bash .gob/bin/goblin-verify --only "$id" 2>&1 ); rc=$?
+  else out=$(bash .gob/bin/goblin-verify --only "$id" 2>&1); rc=$?; fi
   if [ "$rc" = "$want" ]; then
     note "ok   $label -> $id exit $rc ($(printf '%s' "$out" | grep -m1 -E '^FAIL|^error' | cut -c1-88))"
   else
@@ -252,8 +252,8 @@ function expect_green {
   local label="$1" id="$2" mutate="$3" dir="${4:-}" restore="${5:-restore_all}"
   local out rc
   if [ -n "$dir" ]; then ( cd "$dir" && "$mutate" ); else "$mutate"; fi
-  if [ -n "$dir" ]; then out=$( cd "$dir" && bash .goblin/bin/goblin-verify --only "$id" 2>&1 ); rc=$?
-  else out=$(bash .goblin/bin/goblin-verify --only "$id" 2>&1); rc=$?; fi
+  if [ -n "$dir" ]; then out=$( cd "$dir" && bash .gob/bin/goblin-verify --only "$id" 2>&1 ); rc=$?
+  else out=$(bash .gob/bin/goblin-verify --only "$id" 2>&1); rc=$?; fi
   if [ "$rc" = "0" ]; then
     note "ok   $label -> $id exit 0 ($(printf '%s' "$out" | grep -m1 -E '^PASS' | cut -c1-88))"
   else
@@ -324,23 +324,23 @@ m_drop_spec()     { rm -f ./*-SPEC.md; git add -A >/dev/null 2>&1; git commit -q
 m_untracked_spec() { printf '# a round nobody committed\n\n- AC1: `x` prints `y`\n' > ROUND-001-SPEC.md; }
 m_feely_ac()      { printf '\n- AC9: the panel feels right\n' >> ROUND-000-SPEC.md; }
 
-m_no_gates()      { sed -i '/^gates:/,/^$/{/^$/d; d}' .goblin/goblin.yaml; }
+m_no_gates()      { sed -i '/^gates:/,/^$/{/^$/d; d}' AGENTS.md; }
 # G8-3: a DECLARED gate that loses its `cmd:` used to survive as a silent drop from GT-01's
 # count (`1 declared gate(s)` for a config that declares two). Three forms, all of them a
 # one-line edit: the cmd line deleted, re-indented out of the gate block, and blanked.
-m_gate_no_cmd()   { sed -i '/^    cmd: test /d' .goblin/goblin.yaml; }
-m_gate_indent_cmd(){ sed -i 's/^    cmd: test /  cmd: test /' .goblin/goblin.yaml; }
-m_gate_blank_cmd(){ sed -i 's/^    cmd: test .*/    cmd:/' .goblin/goblin.yaml; }
-m_break_gate()    { sed -i 's|^    cmd: git rev-parse --verify --quiet HEAD|    cmd: false|' .goblin/goblin.yaml; }
+m_gate_no_cmd()   { sed -i '/^    cmd: test /d' AGENTS.md; }
+m_gate_indent_cmd(){ sed -i 's/^    cmd: test /  cmd: test /' AGENTS.md; }
+m_gate_blank_cmd(){ sed -i 's/^    cmd: test .*/    cmd:/' AGENTS.md; }
+m_break_gate()    { sed -i 's|^    cmd: git rev-parse --verify --quiet HEAD|    cmd: false|' AGENTS.md; }
 m_drop_gate_line(){ rm -f .goblin/last-gate-line; }
 # The class-A ratchet is the PERF metric (G4 D2): the TODO count moved into the `todo_ceiling`
 # gate. So m_no_ratchet strips the metric name and m_ratchet_rise grows the measured number.
-m_no_ratchet()    { sed -i 's/^  name: client_js_bytes/  name:/' .goblin/goblin.yaml; }
+m_no_ratchet()    { sed -i 's/^  name: client_js_bytes/  name:/' AGENTS.md; }
 m_ratchet_rise()  { mkdir -p dist/assets; printf 'console.log("a byte that was not there before")\n' > dist/assets/chunk.js; }
-m_todo_gate()     { sed -i 's/-le 160/-le 0/' .goblin/goblin.yaml; printf '// TODO: over the ceiling\n' > todo-marker.mjs; }
+m_todo_gate()     { sed -i 's/-le 160/-le 0/' AGENTS.md; printf '// TODO: over the ceiling\n' > todo-marker.mjs; }
 
-m_no_harness_dir() { sed -i 's|^harness_dir: .*|harness_dir: nowhere|' .goblin/goblin.yaml; }
-m_green_harness() { printf 'console.log("PASS  nothing\\n"); process.exit(0);\n' > checks/green.mjs; git add -A >/dev/null 2>&1; git commit -q -m "test: a harness green on both trees" >/dev/null 2>&1; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" .goblin/goblin.yaml; }
+m_no_harness_dir() { sed -i 's|^harness_dir: .*|harness_dir: nowhere|' AGENTS.md; }
+m_green_harness() { printf 'console.log("PASS  nothing\\n"); process.exit(0);\n' > checks/green.mjs; git add -A >/dev/null 2>&1; git commit -q -m "test: a harness green on both trees" >/dev/null 2>&1; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" AGENTS.md; }
 m_hs_03()         { m_row_fails HS-03; }
 # Z1-4: `replay.cmd` was read only to assert it was non-empty, and the row ran `node <file>`
 # itself - so the declared command and its `{name}` placeholder were decorative and `false`
@@ -351,8 +351,8 @@ m_hs_03()         { m_row_fails HS-03; }
 #                      (`node checks/{name}.mjs`) -> PASS, so the row is not always-red;
 #   m_replay_cmd_false the RED half: the same tree with `replay.cmd: false`, a command that
 #                      interpolates no `{name}` and so replayed nothing.
-m_replay_all_red()   { rm -f checks/*.mjs; printf 'process.exit(1)\n' > checks/red.mjs; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" .goblin/goblin.yaml; }
-m_replay_cmd_false() { m_replay_all_red; sed -i 's|^  cmd: node checks/{name}.mjs|  cmd: false|' .goblin/goblin.yaml; }
+m_replay_all_red()   { rm -f checks/*.mjs; printf 'process.exit(1)\n' > checks/red.mjs; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" AGENTS.md; }
+m_replay_cmd_false() { m_replay_all_red; sed -i 's|^  cmd: node checks/{name}.mjs|  cmd: false|' AGENTS.md; }
 # Z2-3: the harness FILE NAME is part of the command text the shell parses, because Z1-4 made the
 # row run the DECLARED command instead of `node "$f"`. The name is therefore substituted shell-
 # quoted, and this is the measurement: the file is named with `;` and `#`. Unquoted, the name
@@ -360,7 +360,7 @@ m_replay_cmd_false() { m_replay_all_red; sed -i 's|^  cmd: node checks/{name}.mj
 # file GREEN on the pre-change tree and FAILed - measured on 846c132's bin/goblin-verify: rc 1,
 # "z2;true;#.mjs was GREEN on the pre-change tree". Quoted, `node` receives ONE argument, the
 # harness runs, exits 1, and the row passes - which is what this control asserts.
-m_replay_meta_name() { rm -f checks/*.mjs; printf 'process.exit(1)\n' > 'checks/z2;true;#.mjs'; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" .goblin/goblin.yaml; }
+m_replay_meta_name() { rm -f checks/*.mjs; printf 'process.exit(1)\n' > 'checks/z2;true;#.mjs'; sed -i "s|^  commit: \"\"|  commit: \"$PRE_CHANGE\"|" AGENTS.md; }
 
 m_bad_author()    { git -c user.email=someone@else.test commit -q --allow-empty -m "test: ambient author"; }
 m_cm_02()         { m_row_fails CM-02; }
@@ -386,10 +386,10 @@ m_self_skip_wf()  { mkdir -p .github/workflows; printf 'jobs:\n  a:\n    steps:\
 # no step has nothing to guard, and an UNGUARDED step that decides whether the guarded gate step
 # runs makes the count 1-of-2. Each one reaches the end of the job without running the gate while
 # the required check reports Success (R5's trap, one level up).
-m_job_if_wf()     { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    if: ${{ github.event_name == '"'"'push'"'"' }}\n    steps:\n      - run: bash .goblin/bin/goblin-verify\n' > .github/workflows/jobif.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: a job-level if:" >/dev/null 2>&1; }
+m_job_if_wf()     { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    if: ${{ github.event_name == '"'"'push'"'"' }}\n    steps:\n      - run: bash .gob/bin/goblin-verify\n' > .github/workflows/jobif.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: a job-level if:" >/dev/null 2>&1; }
 m_nosteps_wf()    { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    runs-on: ubuntu-latest\n' > .github/workflows/nosteps.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: a job with no steps" >/dev/null 2>&1; }
 m_nojobs_wf()     { mkdir -p .github/workflows; printf 'name: nothing\non: push\n' > .github/workflows/nojobs.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: a workflow with no jobs" >/dev/null 2>&1; }
-m_decider_wf()    { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    steps:\n      - id: check\n        run: echo ready=true >> "$GITHUB_OUTPUT"\n      - if: steps.check.outputs.ready == '"'"'true'"'"'\n        run: bash .goblin/bin/goblin-verify\n' > .github/workflows/decider.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: an unguarded decider step" >/dev/null 2>&1; }
+m_decider_wf()    { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    steps:\n      - id: check\n        run: echo ready=true >> "$GITHUB_OUTPUT"\n      - if: steps.check.outputs.ready == '"'"'true'"'"'\n        run: bash .gob/bin/goblin-verify\n' > .github/workflows/decider.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: an unguarded decider step" >/dev/null 2>&1; }
 # The probe is a TEXT reading and the row says so: a `#` before the step keeps the words and
 # removes the step. This is the expect_green half - it proves the new strictness is not "any file
 # that mentions if:".
@@ -398,19 +398,19 @@ m_wf_comment_if() { sed -i '1i # the old shape, kept for reference: if: steps.ch
 m_wf_npm_test()   { rm -f .github/workflows/goblin-gate.yml; printf 'jobs:\n  gate:\n    steps:\n      - run: npm test\n' > .github/workflows/ci.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: CI runs npm test" >/dev/null 2>&1; }
 # PG-06, clause 1: the verifier IS called, but narrowed - a subset of the declared gates is a
 # different truth about the same SHA, which is the failure mode the row exists for.
-m_wf_only()       { sed -i 's|run: bash .goblin/bin/goblin-verify$|run: bash .goblin/bin/goblin-verify --only IN-02|' .github/workflows/goblin-gate.yml; }
+m_wf_only()       { sed -i 's|run: bash .gob/bin/goblin-verify$|run: bash .gob/bin/goblin-verify --only IN-02|' .github/workflows/goblin-gate.yml; }
 # PG-06: the call is COMMENTED OUT. The words are still in the file, so a probe that reads text
 # without blanking comments first would call this a run (HS-03's rule, applied to the CI lane).
-m_wf_commented()  { sed -i 's|^\( *\)run: bash .goblin/bin/goblin-verify|\1# run: bash .goblin/bin/goblin-verify|' .github/workflows/goblin-gate.yml; }
+m_wf_commented()  { sed -i 's|^\( *\)run: bash .gob/bin/goblin-verify|\1# run: bash .gob/bin/goblin-verify|' .github/workflows/goblin-gate.yml; }
 # PG-06, clause 2: the workflow runs each DECLARED gate command verbatim instead of the verifier.
-m_wf_verbatim()   { rm -f .github/workflows/goblin-gate.yml; { printf 'jobs:\n  gate:\n    steps:\n'; sed -n 's/^    cmd: /      - run: /p' .goblin/goblin.yaml; } > .github/workflows/ci.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: CI runs the declared gates verbatim" >/dev/null 2>&1; }
+m_wf_verbatim()   { rm -f .github/workflows/goblin-gate.yml; { printf 'jobs:\n  gate:\n    steps:\n'; sed -n 's/^    cmd: /      - run: /p' AGENTS.md; } > .github/workflows/ci.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: CI runs the declared gates verbatim" >/dev/null 2>&1; }
 # PG-06 is a SKIP (not a pass) when there is no workflow to compare: the HS-01 precedent.
 m_wf_none()       { rm -rf .github; git add -A >/dev/null 2>&1; git commit -q -m "test: no workflow" >/dev/null 2>&1; }
 # The do-nothing mutation, for the two expect_green controls whose point is the state the install
 # already produced (the shipped workflow passes, and PG-06 skips when there is nothing to read).
 m_wf_nothing()    { :; }
 
-m_tracked_runtime() { sed -i 's|^  - .goblin/state.json|  - README.md|' .goblin/goblin.yaml; }
+m_tracked_runtime() { sed -i 's|^  - .goblin/state.json|  - README.md|' AGENTS.md; }
 m_drop_ds_report()  { rm -f .goblin/.ds-report; }
 
 m_doc_01()        { m_row_fails DOC-01; }
@@ -438,17 +438,17 @@ m_sc_08()  { printf '{\n  "packages": {\n    "node_modules/esbuild": {\n      "v
 m_sc_08_minified()    { printf '{"name":"fixture","lockfileVersion":3,"packages":{"node_modules/esbuild":{"version":"0.1.0","hasInstallScript":true}}}\n' > package-lock.json; }
 m_sc_08_minified_ok() { m_sc_08_minified; printf 'esbuild\n' >> .goblin/install-hooks.allowlist; }
 m_sc_09()  { m_row_fails SC-09; }
-m_pf_01()  { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e 's/^  baseline_commit: .*/  baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^  baseline_value: .*/  baseline_value: 1/' -e 's/^  measured: .*/  measured: 2026-01-01/' .goblin/goblin.yaml; }
+m_pf_01()  { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e 's/^  baseline_commit: .*/  baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^  baseline_value: .*/  baseline_value: 1/' -e 's/^  measured: .*/  measured: 2026-01-01/' AGENTS.md; }
 # G8-6b: the budget and the measurement have to be the SAME number. Two controls - the honest
 # record passes, and a one-line `ceiling:` raise that leaves the baseline alone FAILs. Before the
 # fix both were GREEN: the passing line printed `baseline_value 0 ... (ceiling 100000)` and
 # nothing cross-checked it.
-m_pf_ceiling_match() { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e "s/^  baseline_commit: .*/  baseline_commit: $PRE_CHANGE/" -e 's/^  baseline_value: .*/  baseline_value: 0/' -e 's/^  measured: .*/  measured: 2026-01-01/' .goblin/goblin.yaml; }
-m_pf_ceiling_raise() { m_pf_ceiling_match; sed -i 's/^  ceiling: .*/  ceiling: 100000/' .goblin/goblin.yaml; }
+m_pf_ceiling_match() { sed -i -e 's/^  metric: .*/  metric: client_js_bytes/' -e "s/^  baseline_commit: .*/  baseline_commit: $PRE_CHANGE/" -e 's/^  baseline_value: .*/  baseline_value: 0/' -e 's/^  measured: .*/  measured: 2026-01-01/' AGENTS.md; }
+m_pf_ceiling_raise() { m_pf_ceiling_match; sed -i 's/^  ceiling: .*/  ceiling: 100000/' AGENTS.md; }
 # W6: the electron opt-in's done-definition. The class-A fixture records electron: false; turning
 # it on while the host gate is blank is a repo missing half its definition -> PF-01 FAILs (the
 # positive half - electron: true WITH a host gate - is exercised in tests/t-verify-green.sh).
-m_pf_electron_nohost() { sed -i -e 's/^electron: false/electron: true/' -e 's/^  host_gate: .*/  host_gate: /' .goblin/goblin.yaml; }
+m_pf_electron_nohost() { sed -i -e 's/^electron: false/electron: true/' -e 's/^  host_gate: .*/  host_gate: /' AGENTS.md; }
 
 # ---- the ban list (G5): BN-00..BN-03, BN-05 ------------------------------------------------
 # Every mutation is the exact move a ban forbids. The bans are TEXT probes (no npm, no AST), so
@@ -467,8 +467,8 @@ m_bn_exit1_detect() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "exit 1"
 # the defanging is caught, one row over, by the only row that can see it.
 m_bn_defang()      { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "true"; print }' .goblin/manifest/bans.tsv > .goblin/manifest/bans.tsv.n && mv .goblin/manifest/bans.tsv.n .goblin/manifest/bans.tsv; }
 m_bn_02()          { mkdir -p src; printf '// @ts-expect-error\nexport const b = 1;\n' > src/bn02.ts; }
-m_bn_03()          { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-03, BN-05]/' .goblin/goblin.yaml; mkdir -p src/components; printf 'export const P = () => { fetch("/api/x"); return null; };\n' > src/components/panel.tsx; }
-m_bn_05()          { printf '\nlayers:\n  - src/renderer src/main\n' >> .goblin/goblin.yaml; mkdir -p src/renderer src/main; printf "import { db } from '../main/db';\nexport const r = db;\n" > src/renderer/p.ts; }
+m_bn_03()          { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-03, BN-05]/' AGENTS.md; mkdir -p src/components; printf 'export const P = () => { fetch("/api/x"); return null; };\n' > src/components/panel.tsx; }
+m_bn_05()          { printf '\nlayers:\n  - src/renderer src/main\n' >> AGENTS.md; mkdir -p src/renderer src/main; printf "import { db } from '../main/db';\nexport const r = db;\n" > src/renderer/p.ts; }
 # A tree BN-05 can read (so its globs match) but with no `layers:` declared: the row must SKIP
 # with that reason, never pass vacuously.
 m_bn_05_nolayers() { mkdir -p src/renderer; printf 'export const r = 1;\n' > src/renderer/p.ts; }
@@ -478,11 +478,11 @@ m_bn_05_nolayers() { mkdir -p src/renderer; printf 'export const r = 1;\n' > src
 # control below is the other half) and writes the exact line the row exists to catch. The pattern
 # is the wrongEnough-shape: these are the keys Electron's own security checklist names, which is
 # why they are one-line rules rather than a dependency-graph run.
-m_bn_06()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-06]/' .goblin/goblin.yaml; mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
+m_bn_06()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-06]/' AGENTS.md; mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
 m_bn_06_unlisted() { mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
-m_bn_07()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-07]/' .goblin/goblin.yaml; mkdir -p src; printf 'export const prefs = { contextIsolation: false };\n' > src/isolate.ts; }
-m_bn_08()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-08]/' .goblin/goblin.yaml; mkdir -p src; printf 'export const prefs = { webSecurity: false };\n' > src/webs.ts; }
-m_bn_09()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-09]/' .goblin/goblin.yaml; mkdir -p src; printf 'const v = ipcRenderer.sendSync("chan", 1);\n' > src/ipc.ts; }
+m_bn_07()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-07]/' AGENTS.md; mkdir -p src; printf 'export const prefs = { contextIsolation: false };\n' > src/isolate.ts; }
+m_bn_08()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-08]/' AGENTS.md; mkdir -p src; printf 'export const prefs = { webSecurity: false };\n' > src/webs.ts; }
+m_bn_09()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-09]/' AGENTS.md; mkdir -p src; printf 'const v = ipcRenderer.sendSync("chan", 1);\n' > src/ipc.ts; }
 
 # ---- W5-1/W5-2: the two documented escapes, in BOTH directions ---------------------------------
 # `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` were documented in three places and
@@ -495,10 +495,10 @@ m_bn_09()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-09]/' .gobli
 # being red for the old reason. This comment claimed "every one of them is RED on the pre-fix
 # tree" without that distinction (Z2-4); the CHANGELOG's corrected sentence - in the 0.4.0 entry,
 # corrected by 0.4.1 - says which sense it means.
-m_bn_01_exempt()      { m_bn_01; awk '{ if ($0 ~ /^bans_exempt:/) { print; print "  - BN-01 src"; next } print }' .goblin/goblin.yaml > .goblin/goblin.yaml.n && mv .goblin/goblin.yaml.n .goblin/goblin.yaml; }
+m_bn_01_exempt()      { m_bn_01; awk '{ if ($0 ~ /^bans_exempt:/) { print; print "  - BN-01 src"; next } print }' AGENTS.md > AGENTS.md.n && mv AGENTS.md.n AGENTS.md; }
 # The other direction: the exception names a DIFFERENT path, so the same violation still counts.
 # Without this half, an engine that exempted everything would pass the control above.
-m_bn_01_exempt_else() { m_bn_01; awk '{ if ($0 ~ /^bans_exempt:/) { print; print "  - BN-01 app"; next } print }' .goblin/goblin.yaml > .goblin/goblin.yaml.n && mv .goblin/goblin.yaml.n .goblin/goblin.yaml; }
+m_bn_01_exempt_else() { m_bn_01; awk '{ if ($0 ~ /^bans_exempt:/) { print; print "  - BN-01 app"; next } print }' AGENTS.md > AGENTS.md.n && mv AGENTS.md.n AGENTS.md; }
 m_bn_01_banok()       { mkdir -p src; printf 'export const a: any = 1; // BAN-OK(BN-01): the value is narrowed at the boundary\n' > src/bn01.ts; }
 # The documented form carries a reason. A bare marker is not an escape, and the line stays RED.
 m_bn_01_banok_noreason() { mkdir -p src; printf 'export const a: any = 1; // BAN-OK(BN-01)\n' > src/bn01.ts; }
@@ -512,8 +512,8 @@ m_bn_01_banok_other() { mkdir -p src; printf 'export const a: any = 1; // BAN-OK
 # are the cluster with a real engine underneath". These are those three. Helpers rather than
 # copies, because every case needs the same `layers:` pair and an entry appended to the
 # `bans_exempt:` key the installer wrote.
-add_layers() { printf '\nlayers:\n  - src/renderer src/main\n' >> .goblin/goblin.yaml; mkdir -p src/renderer src/main; }
-add_exempt() { awk -v v="$1" '{ if ($0 ~ /^bans_exempt:/) { print; print "  - " v; next } print }' .goblin/goblin.yaml > .goblin/goblin.yaml.n && mv .goblin/goblin.yaml.n .goblin/goblin.yaml; }
+add_layers() { printf '\nlayers:\n  - src/renderer src/main\n' >> AGENTS.md; mkdir -p src/renderer src/main; }
+add_exempt() { awk -v v="$1" '{ if ($0 ~ /^bans_exempt:/) { print; print "  - " v; next } print }' AGENTS.md > AGENTS.md.n && mv AGENTS.md.n AGENTS.md; }
 # item 1 - `bans_exempt:` honoured by the LAYER probe. This is bans/layer-check.sh, a different
 # file from grep-ban.sh, which is the only probe the five W5-1/W5-2 controls above reach; and it
 # is the sibling of the probe whose regression (a documented escape that produced a permanent
@@ -541,10 +541,10 @@ set_bn01_probe() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "test \"$GO
 
 m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
-m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 7/' .goblin/goblin.yaml; }
+m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 7/' AGENTS.md; }
 # V1/G8-5: a ceiling that is not a number made `[ n -le ten ]` return 2, and the runner reads 2
 # as ADV - so the cap silently stopped capping and the run still exited 0. It is a FAIL now.
-m_adv_ceiling_bad() { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: ten/' .goblin/goblin.yaml; }
+m_adv_ceiling_bad() { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: ten/' AGENTS.md; }
 
 # ---- the automation rows (G3): AU-01..AU-04, SK-04 -------------------------------------------
 # These five rows are NEW, so there is no pre-change tree for their controls: what the control
@@ -561,9 +561,9 @@ m_sk_04()         { sed -i 's|^## What this cannot see$|## Not seen|' .hermes/sk
 # exactly that, does not scan tests/ - so the control was the leak it was meant to catch (F2-5).
 # $HOME expands to the same /home/<user>/projects the rule matches.
 m_tenant_leak()   { printf '\nsee %s/projects for the tenant list\n' "$HOME" >> .hermes/skills/goblin-mode/SKILL.md; }
-m_wrong_branch()  { sed -i 's/^branch: main/branch: trunk/' .goblin/goblin.yaml; }
+m_wrong_branch()  { sed -i 's/^branch: main/branch: trunk/' AGENTS.md; }
 
-m_archive_flip()  { sed -i 's/^archive: false/archive: true/' .goblin/goblin.yaml; }
+m_archive_flip()  { sed -i 's/^archive: false/archive: true/' AGENTS.md; }
 
 # ---- the class-B fixture: CL-01's "the class forbids this part" branch (D10) ----
 # Class B turns tokens off, so the installer records it in disabled:. Before the fix the
@@ -707,7 +707,7 @@ expect_red "a client-visible secret-shaped name"    SC-03 1 m_sc_03
 # string), so ONE matching line was reported as "the length of that line client-visible
 # secret-shaped name(s)". The half-done fix left these two lines behind.
 m_sc_03
-out=$(bash .goblin/bin/goblin-verify --only SC-03 2>&1)
+out=$(bash .gob/bin/goblin-verify --only SC-03 2>&1)
 printf '%s' "$out" | grep -q '1 client-visible secret-shaped name(s)'
 check "W5-11: SC-03 reports ONE hit, not the character count of the matching line" "$?"
 restore_all
@@ -803,7 +803,7 @@ expect_red   "AA1 §7-6: an exempt src/ok does not swallow a violation in src/ok
 # The alignment claim is about WHICH line survives the filter, not only about the exit code, so it
 # is asserted on the reported line as well: the exempted hit is dropped, the sibling's is printed.
 m_bn_05_exempt_align
-out=$(bash .goblin/bin/goblin-verify --only BN-05 2>&1)
+out=$(bash .gob/bin/goblin-verify --only BN-05 2>&1)
 printf '%s' "$out" | grep -q 'src/renderer/okay/y.ts'; hit=$?
 printf '%s' "$out" | grep -q 'src/renderer/ok/a.ts' && hit=1
 check "AA1 §7-6: the exempt subtree's hit is dropped, the sibling's is the one reported" "$hit"
@@ -871,7 +871,7 @@ Select a row. Run \`node -e 'process.stdout.write("1")'\`. The total updates.
 ## Gotchas
 - a row with no children shows no total
 MAPEOF
-  sed -i "s|^feature_map: .*|feature_map: $MAPDIR/README.md|" .goblin/goblin.yaml
+  sed -i "s|^feature_map: .*|feature_map: $MAPDIR/README.md|" AGENTS.md
   git add -A >/dev/null 2>&1; git commit -q -m "test: seed the feature map" >/dev/null 2>&1
 }
 # Every mutation below seeds the map first and then breaks exactly one clause.
@@ -883,7 +883,7 @@ m_fm_01_slug()      { plant_map; sed -i 's/^feature: panel$/feature: sidebar/' "
 m_fm_02_token()     { plant_map; printf 'route-renamed\n' > "$FM_SRC"; }
 m_fm_02_stale()     { plant_map; sed -i 's/^verified: .*/verified: 2020-01-01/' "$MAPDIR/panel.md"; }
 # W5-4: the STUB map. `entry_paths` naming a token that occurs only inside the harness (this one
-# occurs in .goblin/bin/goblin-verify and nowhere else in the fixture) passed both FM rows before
+# occurs in .gob/bin/goblin-verify and nowhere else in the fixture) passed both FM rows before
 # the fix, because `source_root: .` walked the install: the map merely echoed the template. The
 # token has to be one the harness demonstrably holds - the control below is measured, not assumed.
 m_fm_02_stub()      { plant_map; sed -i 's|^  - panel-root$|  - g_yaml_block_scalar|' "$MAPDIR/panel.md"; }
@@ -894,14 +894,14 @@ m_fm_02_stub()      { plant_map; sed -i 's|^  - panel-root$|  - g_yaml_block_sca
 m_fm_02_untracked() { plant_map; printf 'untracked-panel-root\n' > src/panel/late.ts; \
                       sed -i 's|^  - panel-root$|  - untracked-panel-root|' "$MAPDIR/panel.md"; \
                       sed -i 's|^verified: .*|verified: 2020-01-01|' "$MAPDIR/panel.md"; }
-m_va_01_fail()      { sed -i 's|^verify_doctor: .*|verify_doctor: false|' .goblin/goblin.yaml; }
+m_va_01_fail()      { sed -i 's|^verify_doctor: .*|verify_doctor: false|' AGENTS.md; }
 
 # The empty config is the fresh-install state: each row SKIPs (the builtin returns 3, which the
 # runner counts as a SKIP; the process still exits 0 - only FAIL or a broken manifest exits
 # non-zero), and the reason names WHY.
 for pair in "FM-01:no map is declared" "FM-02:no entry paths to resolve" "VA-01:no doctor is declared"; do
   rid=${pair%%:*}; want=${pair#*:}
-  out=$(bash .goblin/bin/goblin-verify --only "$rid" 2>&1); rc=$?
+  out=$(bash .gob/bin/goblin-verify --only "$rid" 2>&1); rc=$?
   printf '%s' "$out" | grep -q "^SKIP  $rid.*$want"; hit=$?
   check "$rid with an empty config SKIPs with its reason (not a vacuous pass)" \
     "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
@@ -1008,7 +1008,7 @@ m_lp_05_short()   { m_lp_05_nostuck; printf 'the marker never appeared\nthe pred
 for pair in "JG-01:no loop record" "LP-01:no loop has run" "LP-02:no loop has run" \
             "LP-03:no loop has run" "LP-04:no loop has run" "LP-05:no loop has run"; do
   rid=${pair%%:*}; want=${pair#*:}
-  out=$(bash .goblin/bin/goblin-verify --only "$rid" 2>&1); rc=$?
+  out=$(bash .gob/bin/goblin-verify --only "$rid" 2>&1); rc=$?
   printf '%s' "$out" | grep -q "^SKIP  $rid.*$want"; hit=$?
   check "$rid with no loop record SKIPs with its reason (not a vacuous pass)" \
     "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
@@ -1028,13 +1028,13 @@ expect_red   "the judge lane IS the author lane"              JG-02 1 m_jg_02_sh
 plant_judge()      { plant_judge_lane; }
 plant_judge_same() { plant_judge_lane; awk '{ if ($0 ~ /^  judge:$/) { print; getline; print "    model: model-code"; next } print }' "$WORK/models.yaml" > "$WORK/models.yaml.n" && mv "$WORK/models.yaml.n" "$WORK/models.yaml"; }
 plant_judge_same
-out=$(bash .goblin/bin/goblin-verify --only MD-02 2>&1); rc=$?
+out=$(bash .gob/bin/goblin-verify --only MD-02 2>&1); rc=$?
 printf '%s' "$out" | grep -q 'the SAME family as the code lane'; hit=$?
 check "W5-6: a judge mapped to the author's own model is reported as the same family" \
   "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
 restore_all
 plant_judge
-out=$(bash .goblin/bin/goblin-verify --only MD-02 2>&1); rc=$?
+out=$(bash .gob/bin/goblin-verify --only MD-02 2>&1); rc=$?
 printf '%s' "$out" | grep -q 'judge lane model-judge, code lane model-code - different family'; hit=$?
 check "W5-6: a judge on another model is reported as a different family" \
   "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
@@ -1085,11 +1085,11 @@ rc_manifest() {
 }
 # Declare the corpus, and a build output this fixture does not otherwise have.
 rc_declare() {
-  sed -i 's|^  build_output: .*|  build_output: dist|' .goblin/goblin.yaml
-  sed -i 's|^reference_manifest: .*|reference_manifest: reference-manifest.json|' .goblin/goblin.yaml
+  sed -i 's|^  build_output: .*|  build_output: dist|' AGENTS.md
+  sed -i 's|^reference_manifest: .*|reference_manifest: reference-manifest.json|' AGENTS.md
   rc_manifest reference-manifest.json
 }
-m_rc_key_empty() { sed -i 's|^reference_manifest: .*|reference_manifest:|' .goblin/goblin.yaml; }
+m_rc_key_empty() { sed -i 's|^reference_manifest: .*|reference_manifest:|' AGENTS.md; }
 # The declared-but-empty control: the corpus is declared and its manifest is well-shaped, but the
 # fixture has no build output for RC-01 to scan - RC-01 must still exit 0 (nothing to check), and
 # RC-02 must pass the well-shaped manifest. Declared as a function because expect_green invokes it.
@@ -1165,16 +1165,16 @@ expect_green "a well-formed acquisition record"                              RC-
 # measured in V1.md. The numbers come from the fixture, not from this file, so the control still
 # holds if a later card legitimately spends the slot.
 ADV_N=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' .goblin/manifest/enforcement.tsv)
-ADV_C=$(sed -n 's/^advisory_ceiling:[[:space:]]*//p' .goblin/goblin.yaml | head -n 1)
+ADV_C=$(sed -n 's/^advisory_ceiling:[[:space:]]*//p' AGENTS.md | head -n 1)
 : "${ADV_C:=10}"
-out=$(bash .goblin/bin/goblin-verify --only SK-03 2>&1)
+out=$(bash .gob/bin/goblin-verify --only SK-03 2>&1)
 printf '%s' "$out" | grep -qE "advisory $ADV_N of ceiling $ADV_C \((0 free slots: the next advisory row FAILs|[0-9]+ free slots?)\)"
 check "SK-03 reports the advisory count AND the remaining budget ($ADV_N of $ADV_C)" "$?"
-sed -i "s/^advisory_ceiling: .*/advisory_ceiling: $ADV_N/" .goblin/goblin.yaml
-out=$(bash .goblin/bin/goblin-verify --only SK-03 2>&1)
+sed -i "s/^advisory_ceiling: .*/advisory_ceiling: $ADV_N/" AGENTS.md
+out=$(bash .gob/bin/goblin-verify --only SK-03 2>&1)
 printf '%s' "$out" | grep -qE "advisory $ADV_N of ceiling $ADV_N \(0 free slots: the next advisory row FAILs\)"
 check "  at the ceiling it says so, and names what the next row does" "$?"
-sed -i "s/^advisory_ceiling: .*/advisory_ceiling: $ADV_C/" .goblin/goblin.yaml
+sed -i "s/^advisory_ceiling: .*/advisory_ceiling: $ADV_C/" AGENTS.md
 
 
 # ---- W1: the engine split, the chain, and the global-mode clauses -------------
@@ -1184,7 +1184,7 @@ sed -i "s/^advisory_ceiling: .*/advisory_ceiling: $ADV_C/" .goblin/goblin.yaml
 
 # The W1 footer: EVERY run names its judge - the running verifier and the manifest that
 # judged this run (LIMITS #43: the statement is unsigned, and that hole is recorded).
-W1_FOOTER=$(bash .goblin/bin/goblin-verify --only SK-03 2>&1 | grep -c 'cli_sha256=.*enforcement_tsv_sha256=')
+W1_FOOTER=$(bash .gob/bin/goblin-verify --only SK-03 2>&1 | grep -c 'cli_sha256=.*enforcement_tsv_sha256=')
 [ "$W1_FOOTER" -ge 1 ]
 check "W1: every run's footer names cli_sha256 and enforcement_tsv_sha256" "$?"
 
@@ -1291,7 +1291,7 @@ cp -r "$SRC/manifest" /tmp/w1-engine-gmode/manifest
   && git config user.name "Test Runner" && git config user.email "runner@example.com" \
   && printf '# gmode\n' > README.md \
   && bash "$SRC/bin/goblin-install" --target . --class B --models "$WORK/models.yaml" >/dev/null 2>&1 \
-  && sed -i "/^models_file:/a engine_dir: /tmp/w1-engine-gmode" .goblin/goblin.yaml \
+  && sed -i "/^models_file:/a engine_dir: /tmp/w1-engine-gmode" AGENTS.md \
   && python3 -c '
 import json
 rec = json.load(open(".goblin/installed.json"))
@@ -1314,11 +1314,11 @@ rm -rf /tmp/w1-engine-gmode
 # ---- F2-6: --only must refuse a selection that runs no target row -------------
 # A valid SOURCE-scope id selects nothing in an installed repo, so the run printed
 # "0 passed, 0 failed" and exited 0: a pipeline gate built on `--only PR-01` was a no-op.
-out=$(bash .goblin/bin/goblin-verify --only PR-01 2>&1); rc=$?
+out=$(bash .gob/bin/goblin-verify --only PR-01 2>&1); rc=$?
 check "--only <source-scope id> refuses instead of reporting 0 passed" "$([ "$rc" -eq 2 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'selects no target-scope row'
 check "  and the refusal says why" "$?"
-out=$(bash .goblin/bin/goblin-verify --only IN-01,PR-02 2>&1); rc=$?
+out=$(bash .gob/bin/goblin-verify --only IN-01,PR-02 2>&1); rc=$?
 check "--only <target id mixed with a source id> still runs the target row" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 
 # ---- UX pass: the RED direction of the five print contracts ---------------------------------
@@ -1333,19 +1333,19 @@ check "--only <target id mixed with a source id> still runs the target row" "$([
 m_ux_remark() {
   # the class-A fixture gates live in goblin.yaml: fail GT-02 via a gate that cannot run, and
   # give the row a remedy to print (the fixture TSV is restored from $BK afterwards)
-  sed -i 's#^    cmd: git rev-parse --verify --quiet HEAD#    cmd: false#' .goblin/goblin.yaml
+  sed -i 's#^    cmd: git rev-parse --verify --quiet HEAD#    cmd: false#' AGENTS.md
   awk -F'\t' -v OFS='\t' '$1=="GT-02" { $7 = "re-run the gate by hand: bash -c \047false\047, fix the tree, then gob verify again" } { print }' "$BK/enforcement.tsv" > .goblin/manifest/enforcement.tsv
 }
 expect_red "UX-1: a planted remedy prints with the FAIL" GT-02 1 m_ux_remark
 m_ux_remark
-out=$(bash .goblin/bin/goblin-verify --only GT-02 2>&1)
+out=$(bash .gob/bin/goblin-verify --only GT-02 2>&1)
 printf '%s' "$out" | grep -q '^remedy: re-run the gate by hand'
 check "UX-1a the planted remedy prints whole under --only" "$?"
-out=$(bash .goblin/bin/goblin-verify 2>&1)
+out=$(bash .gob/bin/goblin-verify 2>&1)
 printf '%s' "$out" | grep -q '^remedy: re-run the gate by hand'
 check "UX-1b the remedy prints in the default listing too (under the fold width, whole)" "$?"
 cp -a "$BK/enforcement.tsv" .goblin/manifest/enforcement.tsv
-cp -a "$BK/goblin.yaml" .goblin/goblin.yaml
+cp -a "$BK/goblin.yaml" AGENTS.md
 restore_all
 
 # UX-2: GT-02's failing-gate tail. A gate that prints to stdout AND stderr and fails must have
@@ -1357,12 +1357,12 @@ echo "ux stdout noise line"
 echo "ux stderr noise line" >&2
 exit 3
 EOF_NOISE
-  sed -i 's#^    cmd: git rev-parse --verify --quiet HEAD#    cmd: bash .goblin/ux-noise.sh#' .goblin/goblin.yaml
+  sed -i 's#^    cmd: git rev-parse --verify --quiet HEAD#    cmd: bash .goblin/ux-noise.sh#' AGENTS.md
 }
 r_ux_gate_noise() { restore_all; rm -f .goblin/ux-noise.sh; }
 expect_red "UX-2: a noisy gate's tail rides the FAIL" GT-02 1 m_ux_gate_noise "" r_ux_gate_noise
 m_ux_gate_noise
-out=$(bash .goblin/bin/goblin-verify --only GT-02 2>&1)
+out=$(bash .gob/bin/goblin-verify --only GT-02 2>&1)
 printf '%s' "$out" | grep -q 'gate commit output (last 20 lines):'
 check "UX-2a the tail header names the gate and the 20-line window" "$?"
 printf '%s' "$out" | grep -q '^  ux stdout noise line'
@@ -1376,11 +1376,11 @@ r_ux_gate_noise
 m_ux_owner() { git commit -q --allow-empty --author="Someone Else <other@person.example>" -m "not the owner"; }
 expect_red "UX-3: a foreign-author HEAD fails CM-01" CM-01 1 m_ux_owner
 m_ux_owner
-out=$(bash .goblin/bin/goblin-verify 2>&1)
+out=$(bash .gob/bin/goblin-verify 2>&1)
 printf '%s' "$out" | grep -q 'note: this repo records a different owner (you are probably new here)'
 check "UX-3a the owner-mismatch note prints under the red run" "$?"
-out2=$(bash .goblin/bin/goblin-verify --only CM-01 2>&1)
-printf '%s' "$out2" | grep -q 'or update owner_email: in .goblin/goblin.yaml'
+out2=$(bash .gob/bin/goblin-verify --only CM-01 2>&1)
+printf '%s' "$out2" | grep -q 'or update owner_email: in AGENTS.md'
 check "UX-3b the note names the owner-email update path (the cell's own tail, whole under --only)" "$?"
 git reset -q --hard HEAD~1
 restore_all
@@ -1395,9 +1395,9 @@ rm -rf "$UX4"; mkdir -p "$UX4"
   && git config user.name "Test Runner" && git config user.email "runner@example.com" \
   && printf '# ux4\n' > README.md && git add -A && git commit -qm seed \
   && bash "$SRC/bin/goblin-install" --target . --class A --models "$WORK/models.yaml" >/dev/null 2>&1 \
-  && sed -i 's/^owner_email:.*/owner_email: other@owner.example/' .goblin/goblin.yaml \
+  && sed -i 's/^owner_email:.*/owner_email: other@owner.example/' AGENTS.md \
   && git add -A && git commit -qm install )
-out=$( cd "$UX4" && bash .goblin/bin/goblin-verify 2>&1 ); rc=$?
+out=$( cd "$UX4" && bash .gob/bin/goblin-verify 2>&1 ); rc=$?
 check "UX-4a the 2-commit probe is RED" "$([ "$rc" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -q 'fresh clone detected: some of these fails are not yours'
 check "UX-4b the fresh-clone banner prints under the red run" "$?"
@@ -1408,12 +1408,12 @@ rm -rf "$UX4"
 # UX-5: GT-03's failure line is the sentence, not the raw test(1) dump. Measure, commit, and
 # the staleness the row exists to catch is on screen - as the reader-facing sentence with the
 # recovery verb, never the `(test -f .goblin/last-gate-line && [ ...` invocation text.
-m_ux_gt03() { bash .goblin/bin/goblin-verify --only GT-02 >/dev/null 2>&1; git commit -q --allow-empty -m "the commit that ages the gate line"; }
+m_ux_gt03() { bash .gob/bin/goblin-verify --only GT-02 >/dev/null 2>&1; git commit -q --allow-empty -m "the commit that ages the gate line"; }
 r_ux_gt03() { git reset -q --hard HEAD~1; restore_all; }
 expect_red "UX-5: an aged gate line fails GT-03" GT-03 1 m_ux_gt03 "" r_ux_gt03
-bash .goblin/bin/goblin-verify --only GT-02 >/dev/null 2>&1
+bash .gob/bin/goblin-verify --only GT-02 >/dev/null 2>&1
 git commit -q --allow-empty -m "the commit that ages the gate line"
-out=$(bash .goblin/bin/goblin-verify --only GT-03 2>&1)
+out=$(bash .gob/bin/goblin-verify --only GT-03 2>&1)
 printf '%s' "$out" | grep -q 'the gate line is older than the last commit — re-run gob verify to refresh it'
 check "UX-5a the staleness line is the reader-facing sentence" "$?"
 printf '%s' "$out" | grep -qF 'test -f .goblin/last-gate-line'
@@ -1421,7 +1421,7 @@ check "UX-5b the raw test(1) dump is gone from the failure line" "$([ $? -ne 0 ]
 git reset -q --hard HEAD~1
 restore_all
 
-FINAL=$(bash .goblin/bin/goblin-verify 2>&1); FINAL_RC=$?
+FINAL=$(bash .gob/bin/goblin-verify 2>&1); FINAL_RC=$?
 [ "$FINAL_RC" -eq 0 ] || printf '%s\n' "$FINAL" | grep -E '^(FAIL|SKIP|ADV)' | sed 's/^/        /'
 check "the fixture is GREEN again after every mutation was restored" "$FINAL_RC"
 

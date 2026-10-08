@@ -33,7 +33,7 @@ HOME="$HOMEDIR" node "$SRC/bin/goblin.js" install --target "$PROBE" --class A >/
 ( cd "$PROBE" && git init -q && git add -A && git commit -qm "install" ) >/dev/null 2>&1
 
 OUT="$WORK/stdout.txt"; ERR="$WORK/stderr.txt"
-( cd "$PROBE" && HOME="$HOMEDIR" bash .goblin/bin/goblin-verify ) >"$OUT" 2>"$ERR"
+( cd "$PROBE" && HOME="$HOMEDIR" bash .gob/bin/goblin-verify ) >"$OUT" 2>"$ERR"
 RC=$?
 
 # ---- S1: the banner is not on stdout, and is on stderr ------------------------
@@ -65,7 +65,7 @@ grep -qE '[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped' "$OUT"
 check "the run summary still lands on stdout (the parse contract of #49's consumers)" "$?"
 
 # ---- S3: a 2>&1 merge still names the banner ----------------------------------
-MERGED=$( ( cd "$PROBE" && HOME="$HOMEDIR" bash .goblin/bin/goblin-verify ) 2>&1 )
+MERGED=$( ( cd "$PROBE" && HOME="$HOMEDIR" bash .gob/bin/goblin-verify ) 2>&1 )
 printf '%s' "$MERGED" | grep -q 'engine: mode='
 check "a merged run still states which engine judged it (#43's statement survives)" "$?"
 

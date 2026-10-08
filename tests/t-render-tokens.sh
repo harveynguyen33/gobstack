@@ -2,7 +2,7 @@
 # t-render-tokens.sh — Z1-3's control: a RENDERED install carries no unsubstituted template token.
 #
 # The defect this exists for. `templates/goblin.yaml.tmpl` held a `{{GATE2}}` line that no
-# `render` call replaced, so every one of the classes' installed `.goblin/goblin.yaml`
+# `render` call replaced, so every one of the classes' installed `.gob/goblin.yaml`
 # carried a raw template token - visible to the operator in their own config, two waves after it
 # was first reported (W5-8). `grep -rl '{{GATE2}}' tests docs manifest bin` was 0 files, which is
 # exactly why nothing caught it: no test, no document, and no row read the rendered output.
@@ -51,8 +51,8 @@ for c in $CLASSES; do
   # The positive control: the scan below is over a tree that HAS the rendered gate block. Without
   # this, an install that wrote nothing (or a scan that read nothing) would pass the token check
   # vacuously - the shape this suite exists to refuse.
-  [ -s "$t/.goblin/goblin.yaml" ] && grep -q '^gates:' "$t/.goblin/goblin.yaml" \
-    && grep -q '^  - name: ' "$t/.goblin/goblin.yaml"
+  [ -s "$t/.gob/goblin.yaml" ] && grep -q '^gates:' "$t/.gob/goblin.yaml" \
+    && grep -q '^  - name: ' "$t/.gob/goblin.yaml"
   check "  and class $c's config carries a rendered gate block (so the scan reads a real file)" "$?"
 done
 t="$WORK/class-software-electron"
@@ -65,8 +65,8 @@ git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target "$t" --class software --electron \
   --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
 check "the electron opt-in renders an install" "$?"
-[ -s "$t/.goblin/goblin.yaml" ] && grep -q '^gates:' "$t/.goblin/goblin.yaml" \
-  && grep -q '^electron: true$' "$t/.goblin/goblin.yaml"
+[ -s "$t/.gob/goblin.yaml" ] && grep -q '^gates:' "$t/.gob/goblin.yaml" \
+  && grep -q '^electron: true$' "$t/.gob/goblin.yaml"
 check "  and its config carries a rendered gate block (so the scan reads a real file)" "$?"
 
 # The control. `{{` alone is not a token (a shell brace needs no partner), so the pattern is the
