@@ -476,7 +476,6 @@ same commands are available outside any repo through the npm CLI: `gob init` /
 ### Commands
 
     gob init [--heuristic] [--write <proposal>] [--target <dir>] [--dry-run] [--yes]
-             [--with-mcp-config]
     gob mcp                                  # the MCP stdio server (three tools, local only)
 
     .gob/bin/goblin-verify [--only <id[,id...]>] [--json] [--list]
@@ -496,10 +495,9 @@ The one-liner, per user account:
 
     claude mcp add gob -- npx -y @techgoblin/gobstack mcp
 
-or, committed with the repo so every teammate's agent picks it up (Claude Code and Cursor
-auto-detect it):
-
-    gob init --with-mcp-config        # writes .mcp.json; never overwrites one you customized
+or, committed with the repo so every teammate's agent picks it up: `gob init --write` writes
+a repo-root `.mcp.json` as part of the install (Claude Code and Cursor auto-detect it). It is
+ask-once, and never overwrites a `.mcp.json` you customized.
 
 ### The 15 playbooks
 

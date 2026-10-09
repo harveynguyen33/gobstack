@@ -39,8 +39,8 @@ const path = require("node:path");
 
 const VERSION = fs.readFileSync(path.join(__dirname, "..", "VERSION"), "utf8").trim();
 
-// The generated registration bytes (bin/goblin-install writes the same line into
-// .mcp.json for `init --with-mcp-config` — one source of truth for the shape, typed
+// The generated registration bytes (bin/goblin-init writes the same line into
+// .mcp.json as part of `init --write` — one source of truth for the shape, typed
 // once per file because bin/ may not import across files).
 // The agent CLI's family name is ASSEMBLED at run time, so no source in bin/ spells the
 // tool's own name literally; the printed line still reads the way the docs quote it.
@@ -361,7 +361,7 @@ function toolGobInitStatus() {
   lines.push("engine version: " + (engine || "<no vendored engine found>") + (engineSrc ? " (" + engineSrc + ")" : ""));
   const vendored = fs.existsSync(path.join(root, ".gob", "bin", "goblin-verify"));
   lines.push("vendored verify: " + (vendored ? ".gob/bin/goblin-verify" : "ABSENT (a global/declaration-mode repo — run gob verify through the engine chain)"));
-  lines.push("mcp registration: " + (fs.existsSync(path.join(root, ".mcp.json")) ? ".mcp.json present" : "no .mcp.json (gob init --with-mcp-config writes one)"));
+  lines.push("mcp registration: " + (fs.existsSync(path.join(root, ".mcp.json")) ? ".mcp.json present" : "no .mcp.json (gob init --write writes one)"));
   return text(lines.join("\n"));
 }
 
@@ -479,7 +479,7 @@ function usage() {
       "  verifier (.gob/bin/goblin-verify --json)",
       "",
       "register it: " + AGENT_CLI + " mcp add gob -- npx -y @techgoblin/gobstack mcp",
-      "or per-repo:  gob init --with-mcp-config   (writes .mcp.json; " + AGENT_CLI + " Code and Cursor",
+      "or per-repo:  gob init --write installs a repo-root .mcp.json (" + AGENT_CLI + " Code and Cursor",
       "              auto-detect it)",
       "",
     ].join("\n")
