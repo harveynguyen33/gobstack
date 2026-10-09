@@ -14,6 +14,11 @@
 #
 # Verdicts: RECOMMEND rows install; MAYBE rows install (an explicit choice, never
 # pre-ticked at init); SKIP rows refuse — the curator's verdict is the contract.
+# THE LICENSE GATE (W-license, hard): verdict RECOMMEND|MAYBE alone is not enough —
+# a row installs only when its catalogue license_status is `verified`. Rows with an
+# unresolved license carry verdict LICENSE-PENDING (never pre-ticked at init) and
+# refuse install with `license pending verification` until the curator flips the
+# DATA (license_status + license_check_date), never this file.
 #
 # NO NETWORK. Skill and workflow installs copy from a VENDORED PAYLOAD the curator
 # maintains under extras-catalogue/payload/<id>/ (payload/README.md is the layout
@@ -100,15 +105,15 @@ cmd_list() {
   fi
   local total
   total=$(catalogue_ids | wc -l | tr -d ' ')
-  g_info "gob extras — the curated catalogue ($total rows; RECOMMEND pre-ticks at init, MAYBE is visible but never pre-ticked, SKIP refuses install)"
+  g_info "gob extras — the curated catalogue ($total rows; RECOMMEND pre-ticks at init, MAYBE is visible but never pre-ticked, SKIP refuses install; LICENSE-PENDING rows refuse install until their license is verified)"
   g_info "install: gob extras install <id...>   ·   one row: gob extras show <id>"
   local cat
   for cat in $(category_order); do
     [ -z "$want" ] || [ "$cat" = "$want" ] || continue
     printf '\n[%s]\n' "$cat"
-    printf '  %-34s %-8s %-7s %-24s %-10s %s\n' "id" "kind" "stars" "license" "verdict" "matches"
+    printf '  %-34s %-8s %-7s %-24s %-10s %-16s %s\n' "id" "kind" "stars" "license" "verdict" "lic-status" "matches"
     awk -F'\t' -v cat="$cat" 'NR>1 && $2==cat {
-      printf "  %-34s %-8s %-7s %-24s %-10s %s\n", $1, $3, $9, $8, $15, $11
+      printf "  %-34s %-8s %-7s %-24s %-10s %-16s %s\n", $1, $3, $9, $8, $15, $18, $11
     }' "$CATALOGUE"
   done
   return 0
@@ -124,10 +129,10 @@ cmd_show() {
   [ -n "$row" ] || die "unknown id '$id' — gob extras list names the catalogue" 2
   local labels=(id category kind name source_repo path_within_repo has_skill_md license
                 stars last_push matches conflicts requires install_hint verdict
-                reviewed_by reviewed_date)
+                reviewed_by reviewed_date license_status license_check_date)
   local i
-  for i in $(seq 1 17); do
-    printf '%-16s %s\n' "${labels[$((i-1))]}:" "$(catalogue_field "$row" "$i")"
+  for i in $(seq 1 19); do
+    printf '%-18s %s\n' "${labels[$((i-1))]}:" "$(catalogue_field "$row" "$i")"
   done
   return 0
 }
@@ -162,22 +167,35 @@ parse_install() {
   fi
 }
 
-# resolve_one <id> — validates against the ALLOWLIST and the curator's verdicts; prints
-# the row. Every install path goes through here: no row, no install. That is the whole
-# allowlist rule, in one gate.
+# resolve_one <id> — validates against the ALLOWLIST, the curator's verdicts and the
+# LICENSE GATE; prints the row. Every install path goes through here: no row, no
+# install; no verified license, no install. That is the whole allowlist rule plus the
+# hard gate, in one gate.
 resolve_one() {
-  local id="$1" row verdict
+  local id="$1" row verdict lic
   row=$(catalogue_row "$id")
   # Captured, not piped (pipefail + grep -q early-exit trap — see cmd_list).
   if [ -n "$row" ]; then
     verdict=$(catalogue_field "$row" 15)
+    lic=$(catalogue_field "$row" 18)
   else
     die "unknown id '$id' — nothing outside catalogue.tsv is ever installed (gob extras list names the allowlist)" 2
   fi
   case "$verdict" in
-    RECOMMEND|MAYBE) ;;
+    RECOMMEND|MAYBE|LICENSE-PENDING) ;;
     SKIP) die "id '$id' carries verdict SKIP — the curator declined it; it stays visible in the catalogue but refuses install" 1 ;;
-    *) die "id '$id' carries verdict '$verdict' — not an installable verdict (RECOMMEND|MAYBE|SKIP)" 2 ;;
+    *) die "id '$id' carries verdict '$verdict' — not an installable verdict (RECOMMEND|MAYBE|SKIP|LICENSE-PENDING)" 2 ;;
+  esac
+  # THE LICENSE GATE (hard, data-driven): a row whose catalogue says its license is
+  # not verified never installs — the verdict alone is not consulted. A curator flips
+  # a row to installable by fixing the data (license_status=verified + a check date),
+  # never by touching this file.
+  case "$lic" in
+    verified) ;;
+    pending|proprietary-confirmed-ok|"")
+      die "id '$id' refuses install: license pending verification — see catalogue.tsv license_check_date" 1 ;;
+    *)
+      die "id '$id' carries license_status '$lic' — not a known status (verified|pending|proprietary-confirmed-ok)" 2 ;;
   esac
   printf '%s\n' "$row"
 }
