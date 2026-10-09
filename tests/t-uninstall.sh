@@ -80,6 +80,12 @@ check "reviews/ survives with its .gitkeep" "$([ -f reviews/.gitkeep ] && echo 0
 check "the .gitignore block is left, with the uninstalled marker" \
   "$(grep -q 'goblin-stack uninstalled' .gitignore && echo 0 || echo 1)"
 
+# QA issue 10 pin: the uninstall NAMES its by-design residues instead of implying a clean sweep
+printf '%s' "$OUT" | grep -qF 'the .gitignore ignore-rules block stays (by design'
+check "the output names the kept .gitignore block as by-design residue (QA10)" "$?"
+printf '%s' "$OUT" | grep -qF 'references are dead'
+check "the output warns that prose naming .gob/ paths is now dead (QA10)" "$?"
+
 note "directories before the install+uninstall cycle: $DIRS_BEFORE"
 
 if [ "$fail" -eq 0 ]; then note "t-uninstall: PASS"; else note "t-uninstall: FAIL"; fi

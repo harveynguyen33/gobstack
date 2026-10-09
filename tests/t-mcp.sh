@@ -152,6 +152,44 @@ check "M4 a repo with no engine is an isError result, not a crash" "$?"
 printf '%s' "$OUT" | grep -q 'gobstack init'
 check "M4 and the error names the first step" "$?"
 
+# ---- M4b: gob_verify honours `target` (QA fix v2-qa issue 7) --------------------
+# The QA sim called gob_verify with a bogus target from an installed cwd and got the
+# CWD's matrix back — an agent could report the wrong repo as verified. Three pins:
+# the resolved path is echoed, a real second fixture verifies by target, and a target
+# that is not a gobstack repo is a refusal naming the resolved path.
+new_fixture green
+GREEN_R="$R"
+new_fixture red
+printf '\ncode\n' > "$R/violation.js"
+# run from the RED fixture, verify the GREEN fixture by target: the verdict must be the
+# TARGET's, not the cwd's
+OUT=$(cd "$R" && printf '%s\n%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}' \
+  "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"gob_verify\",\"arguments\":{\"target\":\"$GREEN_R\"}}}" \
+  | python3 "$SRC/tests/mcp-client.py" "node $MCP")
+printf '%s' "$OUT" | grep -q "verified: $GREEN_R"
+check "M4b the result echoes the resolved verified path" "$?"
+printf '%s' "$OUT" | grep -q 'gate: PASS'
+check "M4b target=green-fixture verifies the TARGET, not the cwd" "$?"
+# a bogus target is a refusal, never a silent fall-back to the cwd's matrix
+OUT=$(cd "$R" && printf '%s\n%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"gob_verify","arguments":{"target":"/nonexistent-qa-target"}}}' \
+  | python3 "$SRC/tests/mcp-client.py" "node $MCP")
+printf '%s' "$OUT" | grep -q '"isError":true'
+check "M4b a bogus target is an isError refusal" "$?"
+printf '%s' "$OUT" | grep -q 'target is not a directory: /nonexistent-qa-target'
+check "M4b the refusal names the exact resolved path" "$?"
+printf '%s' "$OUT" | grep -q 'gate:'
+[ $? -eq 1 ]; check "M4b a refused target never returns the cwd's matrix" "$?"
+# an existing but non-gobstack directory is refused the same way
+OUT=$(cd "$R" && printf '%s\n%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"gob_verify","arguments":{"target":"'"$WORK"'"}}}' \
+  | python3 "$SRC/tests/mcp-client.py" "node $MCP")
+printf '%s' "$OUT" | grep -q 'target is not a gobstack repo'
+check "M4b a non-gobstack dir is refused by name (no .gob engine, no gob block)" "$?"
+
 # ---- M5: gob_map_status --------------------------------------------------------
 new_fixture maps
 # an undeclared map: the SKIP-with-reason shape

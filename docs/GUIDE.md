@@ -3,7 +3,7 @@
 A step-by-step guide for your first week. **Read this before the README.** The README tells you
 what the pieces are; this tells you what to *do*, in order, and what you should see when it works.
 
-Version: `0.6.0-alpha.2` · Last measured: 2026-10-09 · Every command and every output below was run on a
+Version: `0.6.0-alpha.3` · Last measured: 2026-10-09 · Every command and every output below was run on a
 real repository while writing this guide.
 
 ---
@@ -267,7 +267,8 @@ Open it. The keys that matter on day one:
     branch: main                          # DECLARED, never assumed
     owner_email: you@example.com          # the commit identity this repo expects
     practice: /path/to/your-standard.md   # optional: your own house rules, hash-pinned
-    models_file: /path/to/fleet-model.yaml # the ONE machine-specific input
+    models_file: /path/to/fleet-model.yaml # the ONE machine-specific input (per machine; a
+                                           # fresh install without --models leaves it empty)
     gate_<name>_cmd: <one command>        # YOUR real commands, one line each
 
 **The single most valuable edit you will make:** replace the gate line(s) with the commands you
@@ -290,7 +291,7 @@ repos follow an old version.
 
 When *you* legitimately edit your own standard:
 
-    gob install --target . --re-pin
+    goblin-install --target . --re-pin   # from the gobstack checkout / install tree
 
 It re-records the hash and prints the old and new value. Nothing re-pins automatically — not even
 a re-install — an edited standard is never a silent no-op.
@@ -528,8 +529,8 @@ same commands are available outside any repo through the npm CLI: `gob init` / `
 
     .gob/bin/goblin-verify [--only <id[,id...]>] [--json] [--list]
     .gob/bin/goblin-bans           # run the ban list
-    gob install --target <dir> --uninstall   # the uninstall job
-    gob install --target <dir> --re-pin      # the deliberate re-pin
+    gob uninstall --target <dir>             # the uninstall job
+    goblin-install --target <dir> --re-pin   # the deliberate re-pin (from the checkout/install tree)
     bin/goblin-model <role>        # checkout-only; resolve a role to a profile (docs/ROLES.md)
 
 ### Register the harness with your agent (MCP)

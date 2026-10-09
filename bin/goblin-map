@@ -45,7 +45,7 @@
 #
 # Never-clobber contract:
 #   features/ absent (or empty of .md)  -> generate README + one file per slug, exit 0
-#   features/ already a map, no --force -> write NOTHING, name the path and --force, exit 1
+#   features/ already a map, no --force -> validate only; the index is kept (never rewritten)
 #   --force                             -> regenerate ONLY README.md (indexing every existing
 #                                          feature file too) and add files for NEW slugs;
 #                                          existing feature files are never touched, exit 0
@@ -129,8 +129,9 @@ Notes:
      human pass has actually driven the feature once.
    - entry_paths tokens must be repo-relative paths that EXIST, and should occur in
      source text (a route literal, an import) so FM-02 can grep for them.
-   - An existing map is never overwritten without --force (the index only); if a map
-     already exists, hand-pass the files instead of regenerating them.
+   - --write validates and never rewrites: your hand-written README index is KEPT
+     (pass --force only if you want the index REGENERATED from the feature files);
+     existing feature files are never touched either way.
 
 == FEATURE-FILE SCHEMA =========================================================
 
@@ -201,13 +202,15 @@ if [ -n "$WRITE_DIR" ]; then
   WDIR=$(cd "$WRITE_DIR" && pwd) || { g_err "cannot enter: $WRITE_DIR"; exit 2; }
   # A map, for --write purposes, is the README index: --write never writes feature
   # files (they are its INPUT), so the only thing it could clobber is the index.
+  # QA fix (v2-qa issue 5): an existing index used to be a refusal ("pass --force") —
+  # but the AGENT BRIEF itself tells the agent to WRITE features/README.md before
+  # running --write, so the first --write of the brief's own prescribed flow demanded
+  # the scary flag. The coherent contract: --write VALIDATES and never rewrites the
+  # index without --force; an existing index is the author's own output and is kept,
+  # named in the done line. (The never-clobber promise is unchanged: --write still
+  # writes NOTHING without --force — the refusal was protecting an empty write.)
   HAVE_WMAP=0
   if [ -f "$WDIR/README.md" ]; then HAVE_WMAP=1; fi
-  if [ "$HAVE_WMAP" -eq 1 ] && [ "$FORCE" -ne 1 ]; then
-    g_err "refusing to overwrite an existing feature map: $WDIR"
-    printf 'error: map: pass --force to regenerate the README index and add NEW files only; existing files are never rewritten\n' >&2
-    exit 1
-  fi
   # Validation: the frontmatter + H2 + verified contract, per file, fail closed.
   BAD=0; N=0
   for f in "$WDIR"/*.md; do
@@ -264,7 +267,10 @@ if [ -n "$WRITE_DIR" ]; then
     for f in "$WDIR"/*.md; do
       [ -f "$f" ] || continue
       slug=$(basename "$f"); slug=${slug%.md}
-      case "$slug" in README.md) continue ;; esac
+      # QA fix (v2-qa issue 6): $slug is the STEM (README, not README.md) — the old
+      # pattern compared README against README.md, never matched, and the regenerated
+      # index listed the index itself as a feature.
+      case "$slug" in README) continue ;; esac
       printf '%s\t%s\n' "$slug" "$(printf '%s' "${f#"$WDIR"/}" | sed 's#^#./#')" >> "$SLUGS_TSV"
     done
     TODAY=$(date +%F)
@@ -509,7 +515,9 @@ MID
       for f in "$FEAT"/*.md; do
         [ -f "$f" ] || continue
         slug=$(basename "$f"); slug=${slug%.md}
-        case "$slug" in README.md) continue ;; esac
+        # QA fix (v2-qa issue 6): stem comparison, same bug as the --write index loop —
+        # the slug is README after .md is stripped, so the old README.md pattern never fired.
+        case "$slug" in README) continue ;; esac
         awk -F'\t' -v s="$slug" '$1 == s { found=1 } END { exit !found }' "$SLUGS_TSV" && continue
         title=$(file_title "$f" "$slug")
         printf '%s\n' "- [${title}](./${slug}.md) covers TODO — existing feature file kept by --force (not re-described)"
