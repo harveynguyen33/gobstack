@@ -250,12 +250,12 @@ install_skill() {
     [ -d "$d" ] || continue
     name=$(basename "$d")
     n=$((n + 1))
-    # QA fix (v2-qa): the display path joined $dst_root (which ends in /) with $name
-    # WITHOUT a separator-aware join — `.gob/extras` + `/` was printed as
-    # `.gob/extrastaste/`. The join below inserts the separator the string lacks.
-    case "$dst_root" in */) printf 'extras: skill %s -> %s%s/\n' "$name" "$dst_root" "$name" ;;
-      *)    printf 'extras: skill %s -> %s/%s/\n' "$name" "$dst_root" "$name" ;;
-    esac
+    # QA fix (v2-qa issue 9): the display path must carry exactly one separator between
+    # $dst_root and $name — the old single format printed `.gob/extras` + `taste` as
+    # `.gob/extrastaste/` (files landed in the right place, only the LOG lied). The
+    # platform branch normalizes $dst_root to end in /, the standalone branch does not,
+    # so the trailing slashes are stripped at print time and one / is always inserted.
+    printf 'extras: skill %s -> %s/%s/\n' "$name" "${dst_root%/}" "$name"
     copy_tree "$d" "$dst_root/$name"
   done
   [ "$n" -gt 0 ] || die "payload for '$id' holds no skill dirs ($src_root/*/ with SKILL.md each) — see extras-catalogue/payload/README.md" 2

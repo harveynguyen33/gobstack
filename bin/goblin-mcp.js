@@ -211,7 +211,29 @@ function remedyMap(root) {
 }
 
 function toolGobVerify(args) {
-  const root = process.cwd();
+  // QA fix (v2-qa issue 7): the tool honours an explicit `target` — an agent calling from
+  // an installed repo with a different repo named as target used to get the CWD's matrix
+  // with the bogus target silently dropped (wrong-repo-as-verified). Resolution rules:
+  //   - target absent/empty        -> process.cwd() (the documented default)
+  //   - target relative            -> resolved against process.cwd()
+  //   - resolved dir carries no .gob/engine and no AGENTS.md gob block -> REFUSAL (the
+  //     exact resolved path is named), never a silent fall-back to the CWD's matrix
+  // The result's first line names the verified path, so the agent sees WHICH repo was judged.
+  const cwd = process.cwd();
+  let root = cwd;
+  const target = args && typeof args.target === "string" ? args.target.trim() : "";
+  if (target) {
+    root = path.resolve(cwd, target);
+    if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
+      return errText("gob_verify: target is not a directory: " + root);
+    }
+    const blockText = readBlock(path.join(root, "AGENTS.md"));
+    if (!fs.existsSync(path.join(root, ".gob", "bin", "goblin-verify")) && !blockText) {
+      return errText(
+        "gob_verify: target is not a gobstack repo (no .gob/bin/goblin-verify, no AGENTS.md gob block): " + root
+      );
+    }
+  }
   const engine = path.join(root, ".gob", "bin", "goblin-verify");
   if (!fs.existsSync(engine)) {
     return errText(
@@ -235,7 +257,9 @@ function toolGobVerify(args) {
   const verdict = parsed.failed === 0 && r.status === 0 ? "PASS" : "FAIL";
   const lines = [];
   lines.push(
-    "gate: " + verdict + " — " + parsed.passed + " passed, " + parsed.failed + " failed, " +
+    // the resolved repo is named first: the consumer sees WHICH tree was judged
+    "verified: " + root +
+    "\ngate: " + verdict + " — " + parsed.passed + " passed, " + parsed.failed + " failed, " +
     parsed.advisory + " advisory, " + parsed.skipped + " skipped (exit " + r.status + ")"
   );
   for (const row of parsed.rows) {
@@ -358,7 +382,9 @@ const TOOLS = [
       type: "object",
       properties: {
         only: { type: "string", description: "optional comma-separated rule ids to run (e.g. FM-01,FM-02)" },
+        target: { type: "string", description: "optional repo root to verify (absolute, or relative to the CWD); defaults to the current working directory" },
       },
+      additionalProperties: false,
     },
   },
   {
