@@ -894,8 +894,16 @@ column holds a real command that `goblin-verify` runs, or the literal `advisory`
 `goblin-verify --only <ID>` for a check that needs more than one shell line (those are
 builtins in `bin/goblin-verify`, so the row stays self-describing and the matrix stays the
 single source of truth). `.gob/manifest/library.tsv` holds the **off-by-default** rows — the shipped
-rules that are not right for every repo — and `gob verify --library` lists each with the line
-that turns it on.
+rules that are not right for every repo — and `gob verify --library` lists each with the exact
+line that turns it on: paste that line into the repo-local, versioned
+`.gob/manifest/enforcement.local.tsv`, and the row joins the run exactly as if it were in the
+matrix — it can PASS, FAIL (with its `remedy:` line) or report itself *not applicable*. The
+override file is **optional**: absent, a run is the default set and says nothing about it. When it
+is present, the summary names the rows it added under `enabled-locally:`, so a reader can tell them
+apart from the default set. A local row that names no check the engine can run is **refused**
+(exit 3, with a named remedy) — a row id in neither the matrix nor the library, a
+`goblin-verify --only <ID>` marker whose builtin does not exist, a check that cannot execute, or a
+bare id with no check cell: a repo cannot add a rule that nothing verifies.
 
 Some `if_not_why` cells carry internal workstream tags — `W1`, `W5`, `W6` — recording which
 redesign of this toolkit last touched that rule's check (W1 the global-engine split, W5 the

@@ -216,6 +216,23 @@ MANIFEST_DIR=$(dirname "$MANIFEST")
 LIBRARY_FILE="$MANIFEST_DIR/library.tsv"
 [ -f "$LIBRARY_FILE" ] || LIBRARY_FILE=""
 
+# ---- the repo-local override (batch 3): .gob/manifest/enforcement.local.tsv ----
+# A repo turns a library row ON by writing that row's exact line (the snippet `gob verify
+# --library` prints) into .gob/manifest/enforcement.local.tsv, which is VERSIONED WITH THE REPO
+# (under $ROOT, not the engine). A local row behaves exactly like a matrix row: PASS, FAIL
+# (its remedy: line is printed from this file), or SKIP (reported not-applicable). The file is
+# OPTIONAL: absent means the default set only, and nothing is said about it.
+#
+# THE HONESTY GATE (the product's core rule: a repo must not be able to certify a rule nothing
+# verifies). A local entry is REFUSED - exit 3, with a named remedy - when it names a row id the
+# engine has no check for, or when its check cannot produce a verdict. Both are handled in
+# setup_local_override below, before any row runs: a false green is the one failure this
+# product must never produce. RUN_MANIFEST is $MANIFEST until a local override merges rows in.
+LOCAL_FILE="$ROOT/.gob/manifest/enforcement.local.tsv"
+[ -f "$LOCAL_FILE" ] || LOCAL_FILE=""
+LOCAL_IDS=""
+RUN_MANIFEST="$MANIFEST"
+
 INSTALLED="$ROOT/.gob/installed.json"
 
 # engine_block_field <key> — one field of installed.json's engine: block (empty if absent).
@@ -263,9 +280,13 @@ if [ "$LIBRARY_LIST" -eq 1 ]; then
     exit 2
   fi
   g_info "the library: $(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$LIBRARY_FILE") off-by-default row(s) - NOT run by a default verify."
-  g_info "enable one by writing its id on a line of .gob/manifest/enforcement.local.tsv."
+  g_info "enable a row by pasting its line below into .gob/manifest/enforcement.local.tsv (repo-local, committed with the repo)."
   printf '\n'
-  awk -F'\t' 'NR>1 && $1!="" {printf "%-7s %s\n          enable: %s -> .gob/manifest/enforcement.local.tsv\n", $1, $3, $8}' "$LIBRARY_FILE"
+  awk -F'\t' 'NR>1 && $1!="" {
+    printf "%-7s %s\n", $1, $3
+    printf "          paste this line into .gob/manifest/enforcement.local.tsv:\n"
+    printf "          %s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $5, $6, $7
+  }' "$LIBRARY_FILE"
   exit 0
 fi
 
@@ -275,10 +296,14 @@ if [ -n "$ONLY" ]; then
   UNKNOWN=""
   for want in $(printf '%s' "$ONLY" | tr ',' ' '); do
     [ -n "$want" ] || continue
-    awk -F'\t' -v x="$want" 'NR>1 && $1==x {f=1} END{exit !f}' "$MANIFEST" \
-      || UNKNOWN="$UNKNOWN $want"
+    _hit=0
+    awk -F'\t' -v x="$want" 'NR>1 && $1==x {f=1} END{exit !f}' "$MANIFEST" && _hit=1
+    if [ "$_hit" -eq 0 ] && [ -n "$LOCAL_FILE" ]; then
+      awk -F'\t' -v x="$want" '$1==x {f=1} END{exit !f}' "$LOCAL_FILE" && _hit=1
+    fi
+    [ "$_hit" -eq 1 ] || UNKNOWN="$UNKNOWN $want"
   done
-  [ -z "$UNKNOWN" ] || { g_err "--only names id(s) not in the manifest:$UNKNOWN"; exit 2; }
+  [ -z "$UNKNOWN" ] || { g_err "--only names id(s) in neither the manifest nor the local override:$UNKNOWN"; exit 2; }
   # A valid id that is SOURCE-scope (PR-01..PR-04) selects no target row: the run emits
   # nothing and exits 0, which is the same no-op gate D15 closed for a typo (F2-6).
   TARGET_ROWS=0
@@ -286,6 +311,10 @@ if [ -n "$ONLY" ]; then
     [ -n "$want" ] || continue
     awk -F'\t' -v x="$want" 'NR>1 && $1==x && $2=="target" {f=1} END{exit !f}' "$MANIFEST" \
       && TARGET_ROWS=1
+    if [ "$TARGET_ROWS" -eq 0 ] && [ -n "$LOCAL_FILE" ]; then
+      awk -F'\t' -v x="$want" '$1==x && $2=="target" {f=1} END{exit !f}' "$LOCAL_FILE" \
+        && TARGET_ROWS=1
+    fi
   done
   if [ "$TARGET_ROWS" -eq 0 ]; then
     g_err "--only $ONLY selects no target-scope row, so this run would execute nothing and"
@@ -1384,7 +1413,7 @@ check_sk_03() {
   # Count what the run counts: a row is advisory if its check column says so OR its enforced_by
   # does (an advisory-labelled row can carry a builtin marker in its check column). Counting only
   # the literal column printed 7 while the summary printed 8 (D13).
-  k=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "$MANIFEST")
+  k=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "${RUN_MANIFEST:-$MANIFEST}")
   # The REMAINING BUDGET is reported, not implied: the ceiling is the one scarce resource a rule
   # author spends. A count with
   # no arithmetic leaves the next author to work it out (G8-5).
@@ -1909,6 +1938,82 @@ fresh_clone() {
 
 # ================================================================ runner ======
 
+# ---- the repo-local override (batch 3) ---------------------------------------
+# Read .gob/manifest/enforcement.local.tsv, validate it (THE HONESTY GATE), and merge its rows
+# into the run. Placed here, after every builtin is defined, so a `goblin-verify --only <ID>`
+# marker cell can be checked against the builtins that actually exist.
+is_local_id() { case " $LOCAL_IDS " in *" $1 "*) return 0 ;; esac; return 1; }
+
+# LOCAL_NO_VERDICT — set at run time when a LOCAL row's check COULD NOT EXECUTE (exit 126/127/137:
+# not found / not executable / killed by a signal). Such a check "exited without producing a
+# verdict": it is REFUSED at the end of the run, never read as a pass.
+LOCAL_NO_VERDICT=""
+setup_local_override() {
+  [ -n "$LOCAL_FILE" ] || return 0
+  local tmp _n=0 _id _scope _rule _eby _art _check _why _nf _hit _fn _line
+  tmp=$(mktemp) || { g_err "mktemp failed"; exit 2; }
+  cp "$MANIFEST" "$tmp"
+  while IFS= read -r _line || [ -n "$_line" ]; do
+    _line=${_line%$'\r'}
+    case "$_line" in ''|'#'*) continue ;; esac
+    _nf=$(printf '%s' "$_line" | awk -F'\t' '{print NF}')
+    _id=${_line%%$'\t'*}
+    if [ "$_nf" -lt 7 ]; then
+      g_err "local override: '$_id' names a row id with no check."
+      g_err "  a local row must carry the full 7-cell line; get it with: gob verify --library"
+      g_err "  (an LX-* rule must supply its own check cell - a rule nothing verifies is refused)."
+      exit 3
+    fi
+    IFS=$'\t' read -r _id _scope _rule _eby _art _check _why <<< "$_line"
+    # the id must name a check the engine can run: a matrix row, a library row, or an LX-* rule.
+    _hit=0
+    awk -F'\t' -v x="$_id" 'NR>1 && $1==x {f=1} END{exit !f}' "$MANIFEST" && _hit=1
+    if [ "$_hit" -eq 0 ] && [ -n "$LIBRARY_FILE" ]; then
+      awk -F'\t' -v x="$_id" 'NR>1 && $1==x {f=1} END{exit !f}' "$LIBRARY_FILE" && _hit=1
+    fi
+    case "$_id" in LX-*) _hit=1 ;; esac
+    if [ "$_hit" -eq 0 ]; then
+      g_err "local override: '$_id' names no row the engine ships - it is in neither"
+      g_err "  .gob/manifest/enforcement.tsv nor .gob/manifest/library.tsv."
+      g_err "  a local row may only turn on a shipped row (see: gob verify --library) or declare"
+      g_err "  an LX-* rule with its own check cell."
+      exit 3
+    fi
+    # a builtin-marker check must have a builtin, or it can never produce a verdict.
+    case "$_check" in
+      "goblin-verify --only "*)
+        _fn="check_$(printf '%s' "$_id" | tr 'A-Z' 'a-z' | tr '-' '_')"
+        if ! declare -F "$_fn" >/dev/null 2>&1; then
+          g_err "local override: '$_id' names a check the engine has no builtin for ($_fn)."
+          g_err "  a local row cannot certify a rule nothing verifies."
+          exit 3
+        fi ;;
+      "")
+        case "$_eby" in
+          advisory) ;;
+          *) g_err "local override: '$_id' carries no check and is not advisory - nothing verifies it."
+             exit 3 ;;
+        esac ;;
+    esac
+    # a row the matrix already runs by default is a no-op here (never a duplicate).
+    if awk -F'\t' -v x="$_id" 'NR>1 && $1==x {f=1} END{exit !f}' "$MANIFEST"; then
+      g_info "local override: '$_id' is already on by default - ignored."
+      continue
+    fi
+    printf '%s\n' "$_line" >> "$tmp"
+    LOCAL_IDS="$LOCAL_IDS $_id"
+    _n=$((_n + 1))
+  done < "$LOCAL_FILE"
+  if [ "$_n" -gt 0 ]; then
+    RUN_MANIFEST="$tmp"
+    _GOB_MANIFEST="$tmp"
+    export _GOB_MANIFEST
+  else
+    rm -f "$tmp"
+  fi
+}
+setup_local_override
+
 PASS=0; FAIL=0; ADV=0; SKIP=0; BAD=0
 JSON_ROWS=""
 
@@ -1968,6 +2073,15 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
       ;;
     *)
       detail=$( cd "$ROOT" && bash -c "$check" 2>&1 ); rc=$?
+      # A LOCAL row whose check could not execute (126 not executable / 127 not found /
+      # 137 killed by a signal) exited WITHOUT producing a verdict: record it for the refusal
+      # at the end of the run, rather than folding it into a FAIL a reader could mistake for a
+      # verdict. A matrix row keeps the old fold (its checks are shipped and known).
+      if is_local_id "$id"; then
+        case "$rc" in
+          126|127|137) LOCAL_NO_VERDICT="$LOCAL_NO_VERDICT $id(exit $rc)" ;;
+        esac
+      fi
       # A shell check has no advisory state: anything non-zero is a FAIL. Only builtins
       # (the 'goblin-verify --only <ID>' marker rows) may return 2 = advisory or 3 = skip.
       if [ "$rc" -eq 0 ]; then
@@ -1993,7 +2107,19 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
     3) SKIP=$((SKIP + 1)); emit "$id" SKIP "$detail" ;;
     *) FAIL=$((FAIL + 1)); emit "$id" FAIL "$detail (exit $rc)" ;;
   esac
-done < "$MANIFEST"
+done < "$RUN_MANIFEST"
+
+# ---- the honesty gate, run-time half: a local check that produced no verdict ----------------
+# A local row's check that could not execute (exit 126/127/137) never produced a verdict, so it
+# is REFUSED - exit 3, with the ids named - rather than reported as the FAIL the fold above made
+# of it. Nothing about such a row is green.
+if [ -n "$LOCAL_NO_VERDICT" ]; then
+  g_err "local override: a check could not execute, so it produced NO verdict:$LOCAL_NO_VERDICT"
+  g_err "  a local row's check must be runnable - a command that is not found (127), not"
+  g_err "  executable (126), or killed by a signal (137) cannot verify the rule it names."
+  g_err "  fix the check cell, or remove the row from .gob/manifest/enforcement.local.tsv."
+  exit 3
+fi
 
 if [ "$JSON" -eq 1 ]; then
   _lib_n=0
@@ -2011,7 +2137,7 @@ else
   # not advisory-labelled can also report ADV by design when its lane cannot be resolved here.
   # SK-03 counts the labelled rows, the ADV lines on screen are both, so a reader comparing
   # `advisory N of ceiling C` with more ADV lines sees the arithmetic. Print it.
-  adv_labelled=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "$MANIFEST")
+  adv_labelled=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "${RUN_MANIFEST:-$MANIFEST}")
   if [ "$ADV" -ne "$adv_labelled" ]; then
     printf '      of those %d advisory: the matrix labels %d row(s) advisory; the difference is the non-advisory row(s) reporting ADV by design (an unresolved lane) and any labelled row skipped by an opt-out\n' \
       "$ADV" "$adv_labelled"
@@ -2026,6 +2152,12 @@ else
     _lib_n=$(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$LIBRARY_FILE")
     printf '      library: %d off-by-default row(s) held but NOT run - discover them with `gob verify --library`\n' \
       "$_lib_n"
+  fi
+  # The local-override census (batch 3): a row turned ON through .gob/manifest/enforcement.local.tsv
+  # is named here, so a reader can tell the locally-enabled rows apart from the default set.
+  if [ -n "$LOCAL_IDS" ]; then
+    printf '      enabled-locally: %d row(s) added by .gob/manifest/enforcement.local.tsv:%s\n' \
+      "$(printf '%s' "$LOCAL_IDS" | wc -w | tr -d ' ')" "$LOCAL_IDS"
   fi
   # The collapsed listing keeps one line per row (a SKIP's reason is the row's whole
   # point and scripts read them by id); the width discipline lives in the lib's printers.

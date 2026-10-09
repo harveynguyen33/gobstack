@@ -67,7 +67,11 @@ the PR-gate rows (`PG-01`..`PG-03`), the runtime-data rows (`DS-01`/`DS-02`), th
 (`DOC-01`/`DOC-02`), the security rows (`SC-02`..`SC-06`, `SC-09`), the perf baseline (`PF-01`),
 the reference corpus (`RC-01`..`RC-04`), the archive switch (`CL-02`), the portability row
 (`PT-01`) and the doctor row (`VA-01`). A default run states the library count in its summary, so
-a green run is never the whole story. Full inventory: `gob verify --library`. The
+a green run is never the whole story. Full inventory: `gob verify --library`. Turn one on by
+pasting the line `--library` prints into `.gob/manifest/enforcement.local.tsv` (repo-local,
+committed with the repo); the run then names it `enabled-locally` in its summary. The file is
+optional, and a local row that names no check the engine can run is refused (exit 3), never
+silently green. The
 parts that only a round can produce — a first review note, a gate that is not the shipped floor —
 pass *vacuously* rather than failing, and `P8` (`goblin-bootstrap`) still walks them as work to
 do. The measurement and the vacuous-pass reading are in `docs/GUIDE.md`.

@@ -14,6 +14,17 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   never executes a library row and its summary counts them, so a green run is never the whole
   story. No moved check lost its control: `t-verify-red.sh` enables a library row before running
   its negative control.
+- **A repo turns a library row on through a repo-local override.** `.gob/manifest/enforcement.local.tsv`
+  (versioned with the repo) is merged into the run alongside the matrix: a row pasted there behaves
+  exactly like a built-in row — PASS, FAIL with its `remedy:` line, or reported not-applicable — and
+  the summary names it `enabled-locally`. The file is optional (absent = the default set, no noise).
+  `gob verify --library` prints each off-by-default row's exact paste-ready line, not just its id.
+  **The honesty gate:** a local row that names no check the engine can run is refused (exit 3, with a
+  named remedy), never silently green — an id in neither the matrix nor the library, a
+  `goblin-verify --only <ID>` marker whose builtin does not exist, a check that cannot execute, or a
+  bare id with no check cell. `tests/t-extend.sh` proves the loop end to end through the real file:
+  a library row off, then on and green, then red under its violation with its remedy, then refused
+  when miswritten, then off again.
 
 ## Unreleased (feat/extras-catalogue)
 

@@ -481,6 +481,16 @@ the Node the gates ran under.
     check that reports Success after skipping its gate is a green light for a commit whose gate
     never ran) is about CI in general and is preserved in this entry. What this admits: the
     verifier's "cannot see" footer still names the CI lane's blind spots.
+56. **The repo-local override is a discovery surface, and a machine-trust boundary.** A row turned
+    on through `.gob/manifest/enforcement.local.tsv` runs exactly like a built-in row, and that file
+    is a repo's own data: it is not part of the shipped matrix, so `IN-03` (the matrix self-check)
+    does not read it, and nothing signs it — a repo can carry a local row whose check is a no-op, the
+    same blind spot `.gob/installed.json` has (docs/LIMITS.md #18, one table over). What the honesty
+    gate *does* hold is mechanical and narrow on purpose: a local row that names no check the engine
+    can run (an id in neither the matrix nor the library, a `goblin-verify --only <ID>` marker with no
+    builtin, a check that cannot execute, or a bare id with no check cell) is refused at exit 3, so a
+    repo cannot add a rule that *nothing* verifies. It cannot judge whether a local check tests the
+    right thing — no row here can.
 
 ---
 
