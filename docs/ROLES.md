@@ -46,10 +46,10 @@ Resolution:
     bin/goblin-model --list              # the roles and their capabilities
     bin/goblin-model review-panel        # the panel: one line per lane
 
-`bin/goblin-model` is **checkout-only**. `goblin-install` copies four scripts into a target's
-`.gob/bin/` — `goblin-verify`, `goblin-lib.sh`, `goblin-audit` and `goblin-bans` — so an
+`bin/goblin-model` is **checkout-only**. `goblin-install` copies three scripts into a target's
+`.gob/bin/` — `goblin-verify`, `goblin-lib.sh` and `goblin-bans` — so an
 adopted repo has no `goblin-model` command (`ls .gob/bin/` →
-`goblin-audit  goblin-bans  goblin-lib.sh  goblin-verify`). The installed path
+`goblin-bans  goblin-lib.sh  goblin-verify`). The installed path
 for the same resolution is the `resolve_role_models` helper inside `.gob/bin/goblin-verify`,
 which is what `MD-02` calls; `bin/goblin-model` exists for a human at a checkout, is covered only
 by `bash -n` in `tests/run-tests.sh`, and has no `enforcement.tsv` row because it enforces

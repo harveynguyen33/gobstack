@@ -26,12 +26,9 @@ replay_env: GOBLIN_PRE_COMMIT
 replay_cmd: node checks/{name}.mjs
 runtime_data: .gob/state.json
 # SC-02 requires the whole secret family to be ignored; SC-03 clause 2 scans `sec_build_output`
-# for secret-shaped literals; SC-07 runs `sec_audit_cmd` once, deliberately, via goblin-audit.
+# for secret-shaped literals.
 sec_gitignore_family: yes
 sec_build_output: .next/static dist/assets dist
-sec_audit_cmd: npm audit --json
-sec_audit_max_age_days: 90
-sec_waiver_max_age_days: 180
 sec_write_routes: app src/app
 perf_metric: client_js_bytes
 perf_cmd: find .next/static dist/assets dist -type f -name '*.js' -exec cat {} + 2>/dev/null | wc -c

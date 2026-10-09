@@ -115,8 +115,7 @@ the one expected red (`36 passed, 1 failed`). Both numbers are measured, not ass
 five skill rows (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free
 install records, plus the not-yet rows: `HS-02` (no
 pinned pre-change commit yet), `AU-02`/`AU-03` (no report has been filed, so there is nothing to
-dedup and no reporter run to audit), `SC-06`/`SC-07`/`SC-08` (no dependency manifest, no lockfile,
-no audit record), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-05` (no `src/` for a ban
+dedup and no reporter run to audit), `SC-06` (no dependency manifest, no lockfile), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-05` (no `src/` for a ban
 to read) and `BN-03` with the four
 electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` (not in this class's `bans: [BN-01, BN-02, BN-05]`, so
 they skip as *not enabled* rather than as *unread*), `FM-01`/`FM-02`/`VA-01`
@@ -165,7 +164,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .gob/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the class's full green path (`37 passed, 0 failed, 11 advisory, 34 skipped`, exit 0 for
+   Success is the class's full green path (`37 passed, 0 failed, 11 advisory, 32 skipped`, exit 0 for
    the software class) with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three

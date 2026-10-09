@@ -14,9 +14,7 @@ rung below must be *demonstrably unable* to see it - the reason is recorded in t
 `if_not_why` cell. Three constraints shaped the design, and all three are pre-existing:
 
 1. **No network at verify time.** `docs/RISKS.md` K4: a network call at verify time breaks the
-   offline dependency contract. So `SC-07` reads a **recorded** audit; recording is a separate,
-   deliberate command (`.gob/bin/goblin-audit`). A row that needs the network is not a
-   verify-time row.
+   offline dependency contract. A row that needs the network is not a verify-time row.
 2. **`enforced_by` is a closed enum** (`script`, `lint`, `gate`, `advisory`) and `check` is one of:
    a real command, the literal `advisory`, or `goblin-verify --only <ID>` for a multi-line body.
    Every row here obeys that, and `IN-03` fails the manifest otherwise.
@@ -44,34 +42,12 @@ proves the row would notice the day a hand edit narrows it.
 That is a design fact about the product, not a bug, and a matrix that failed on it would be wrong
 about the thing it was measuring.
 
-## T2 - input boundaries and dependencies (`SC-05`..`SC-08`)
+## T2 - input boundaries and dependencies (`SC-05`..`SC-06`)
 
 | row | what it proves | the limit it states |
 |---|---|---|
 | `SC-05` | every write route calls a validator, or is waived | it proves a validator is *called* (`safeParse\|zod\|valibot\|yup\|ajv\|superstruct\|validate(`), never that the schema is right - a schema that accepts everything passes |
 | `SC-06` | a lockfile exists and is tracked | it cannot see that the lockfile is *stale* relative to `package.json`: resolving that needs the package manager, which is a deliberate network-shaped step |
-| `SC-07` | the audit record exists, is dated, is fresh, and every high\|critical line is waived with its own dated reason | it cannot see an advisory the registry did not know on the day the record was taken, and it never calls the registry itself |
-| `SC-08` | no dependency runs an install-time script outside the allowlist | `pnpm`/`yarn` lockfiles carry no `hasInstallScript` field, so those repos get a SKIP with that reason rather than a vacuous pass |
-
-`SC-07` prints its waiver count on the gate line (`N high|critical line(s), W matched waiver(s), U
-unwaived`), reusing `DS-02`'s annotation pattern, so **the debt is visible on every run** and the
-row can pass while the debt stays loud.
-
-`.gob/bin/goblin-audit` is the one tool in the toolchain allowed to touch the network, and it
-is not a check: a human runs it, once, deliberately, and commits `.gob/audit.tsv`. Its exit
-codes are part of the contract:
-
-| exit | meaning |
-|---|---|
-| 0 | the record was written (clean or not) |
-| 2 | usage, or no `.gob/goblin.yaml` to read `security.audit_cmd` from |
-| 3 | the class declares no audit command - nothing to run |
-| 4 | the declared command could not run |
-| 5 | the output could not be parsed as an audit report, and it **refuses to write a record**: an empty record reads to `SC-07` as "clean", which would be a fabricated pass |
-
-`SC-08` is the lowest-value row of the ten and the first to cut if the matrix gets heavy: it is
-regression detection, not a live finding. It is in because an install hook is arbitrary code that
-runs on every `npm ci`.
 
 ## T3 - the performance budget (`PF-01`, plus the ratchet)
 
@@ -118,9 +94,4 @@ to ignore it. The skip names the command to run.
   `perf.host_gate` and in `gates:` - never hermetic ratchets.
 - **A perf budget cannot see a layout thrash or a re-render per keystroke.** Only a frame-time
   measurement can, and that is a host gate.
-- **No automation or audit has ever run against a real registry here.** Cost per run, and whether
-  the recorded waiver set matches the real advisory set, are unmeasured; the first real
-  `goblin-audit` is what produces those numbers.
-- **The record's parser reads npm's JSON by field name.** A different audit tool with a different
-  shape is refused (exit 5) rather than silently recorded as clean - which is the safe failure,
-  but it is still a failure.
+- **No automation has ever run against a real board here.** Cost per run is unmeasured.

@@ -130,17 +130,12 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     copies of one symptom give one key and a different symptom gives another, but whether a real
     report set normalises well enough is unknown. Its failure mode is a duplicate card, never a
     lost report.
-22. **No audit has ever run against a real registry here.** Everything `SC-07` does was measured
-    against a canned npm-audit report (`tests/t-audit.sh`), so the parse is proven, the *policy*
-    is not: whether the recorded waiver set matches the real advisory set is unknown until the
-    first real `goblin-audit`. Its skip-with-a-reason behaviour on a repo with no record is what
-    keeps that honest rather than silent.
-23. **The audit record is read by field name, not by a JSON parser.** `goblin-audit` recognises
-    npm's `vulnerabilities` / `via` shape (`source`, `name`, `url`, `range`) with awk and REFUSES
-    (exit 5) anything it cannot parse, rather than writing an empty record that `SC-07` would read
-    as clean. A different audit tool is therefore a refusal, not a silent pass.
-24. **The freshness rows need a GNU `date -d`.** `SC-07` parses the record's date that way; on a
-    host without it the row FAILS with the reason rather than assuming the record is fresh.
+22. **Cut in v3: the dependency-audit lane.** `goblin-audit`, `SC-07` and `SC-08` are removed —
+    the deliberate network-shaped audit and the lockfile install-hook reader are gone.
+23. **Cut in v3: the audit-record parse (#22's lane).** The field-name reader and its
+    refuse-unparseable (exit 5) contract retired with `goblin-audit`.
+24. **Cut in v3: the freshness date parse (#22's lane).** The GNU `date -d` dependency retired
+    with `SC-07`.
 25. **`SC-04` reads one statement, not one program.** A cookie write spread over three lines (or
     assembled through a helper) is not seen, and the row says so in its own cell.
 26. **The last advisory slot is an open decision, not a rule.** Measured (V1): the advisory rows
@@ -371,10 +366,8 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
         this file's #36, where the FAIL is measured.
       - item 7 — `BAN-OK` must sit on the offending line: the marker's *effect* is controlled, the
         on-this-line clause is not (a marker on another line does not clear the violation).
-      - items 8, 9 — `SC-05`'s `.goblin/boundary-waivers` and `SC-08`'s
-        `.goblin/install-hooks.allowlist`: both files are copied and both FAIL directions are
-        controlled; neither *honoured* direction is. (`SC-08`'s reader is the row the minified
-        lockfile defeated — Z2-2; that was a shape, not this item, and it is fixed and controlled.)
+      - item 8 — `SC-05`'s `.gob/boundary-waivers`: the file is copied and both FAIL directions
+        are controlled; the *honoured* direction is not.
       - item 10 — `SC-03` clause 2, `sec_build_output`: a literal in `dist/assets` FAILs; only the
         clause-1 path is controlled.
       - items 11, 12, 15 — `scaffold_checks:`'s SKIP branch, `perf_host_gate` (#35) and

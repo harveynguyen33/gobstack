@@ -128,7 +128,7 @@ check "no shipped doc or skill claims a fresh install is not automatically green
 # passed vacuously; before that W6 neutral-first moved 43/0/11/28 -> 38/0/11/33).
 GREEN_CLAIM=""
 for f in README.md docs/CONTRACTS.md docs/ADOPTION.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '37 passed, 0 failed, 11 advisory, 34 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '37 passed, 0 failed, 11 advisory, 32 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, CONTRACTS, ADOPTION and the shipped bootstrap skill state the measured green path" \

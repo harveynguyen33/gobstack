@@ -131,7 +131,7 @@ then install it:
 
 Expected output (this is a real transcript, trimmed):
 
-    created 23 · updated 0 · unchanged 0 · skipped 0
+    created 20 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
@@ -139,7 +139,7 @@ Expected output (this is a real transcript, trimmed):
       3. edit AGENTS.md: replace the default gate with your real commands (P8 step 3)
       4. agent skills are opt-in
 
-**`created 23`** is the installer's count of the files it **tracks**. It writes **24**: the 24th
+**`created 20`** is the installer's count of the files it **tracks**. It writes **21**: the 21st
 is `.gob/installed.json`, the record it keeps for itself, which it writes but does not count. It
 has written nothing outside this directory — and nothing under `.github/`: **v2 installs no
 CI, ever.** The default install ships **no agent skills** — the harness is neutral.
@@ -170,14 +170,14 @@ renaming your branch** (unless you want to).
 You will see one line per rule. The shape:
 
     PASS  IN-01  the install record exists and names its version
-    PASS  IN-02  15 installed files hashed
+    PASS  IN-02  14 installed files hashed
     FAIL  HP-05  HANDOFF.md names no commit that exists in this repo
     SKIP  HS-02  no pinned pre-change commit yet - the REPLAY is not provable
     ADV   HP-04  A stale sentence is corrected in place... (advisory)
 
 and a summary line at the bottom:
 
-    36 passed, 1 failed, 11 advisory, 34 skipped     # HP-05, below
+    36 passed, 1 failed, 11 advisory, 32 skipped     # HP-05, below
 
 ### How to read that output
 
@@ -220,9 +220,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `35 passed, 2 failed, 11 advisory, 34 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
-| 2. the first commit | `git add -A && git commit` | `36 passed, 1 failed, 11 advisory, 34 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `37 passed, 0 failed, 11 advisory, 34 skipped` | none — green |
+| 1. the install ran | `gob init --write ... --yes` | `35 passed, 2 failed, 11 advisory, 32 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
+| 2. the first commit | `git add -A && git commit` | `36 passed, 1 failed, 11 advisory, 32 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `37 passed, 0 failed, 11 advisory, 32 skipped` | none — green |
 
 One of those deserves its name spelled out:
 
@@ -369,7 +369,7 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 15 files it
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 14 files it
 tracks — not the ones it `owns` (including `AGENTS.md`, whose gob block §5 has you editing) and not
 `.gob/installed.json`; edit one of the tracked — the exercise below uses `.gob/bans/README.md`.
 
@@ -450,16 +450,16 @@ A software-class install lands on a specific shape. The first reds are
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    35 passed, 2 failed, 11 advisory, 34 skipped     # straight after the install (CM-03 + SP-02)
-    36 passed, 1 failed, 11 advisory, 34 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
-    37 passed, 0 failed, 11 advisory, 34 skipped     # real HEAD named and committed: green
+    35 passed, 2 failed, 11 advisory, 32 skipped     # straight after the install (CM-03 + SP-02)
+    36 passed, 1 failed, 11 advisory, 32 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
+    37 passed, 0 failed, 11 advisory, 32 skipped     # real HEAD named and committed: green
 
 Name a real commit in `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is
 green:
 
-    37 passed, 0 failed, 11 advisory, 34 skipped     (on a real project; your numbers will differ)
+    37 passed, 0 failed, 11 advisory, 32 skipped     (on a real project; your numbers will differ)
 
-**Thirty-four rows skipping is correct**, and each skip prints its reason. In plain terms: the
+**Thirty-two rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
 scolding.
 
@@ -636,7 +636,7 @@ deadline.
     git init -b main
     gob init --heuristic                   # the brief + schema; answer it in a proposal file
     gob init --write .gob-init-proposal.md --yes
-                                           # expect: created 23 (no skills — those are opt-in)
+                                           # expect: created 20 (no skills — those are opt-in)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"

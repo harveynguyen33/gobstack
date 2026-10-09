@@ -32,7 +32,7 @@
 #
 #     RED case (B1, measured on the un-fixed tree): `docs/GUIDE.md:447` told the reader to run
 #     `.gob/bin/goblin-model <role>`. No install ships that path - a real class-A `.gob/bin/`
-#     holds exactly `goblin-audit`, `goblin-bans`, `goblin-lib.sh`, `goblin-verify` - and the tree
+#     holds exactly `goblin-bans`, `goblin-lib.sh`, `goblin-verify` - and the tree
 #     asserts the opposite elsewhere: `docs/ROLES.md:49` says in bold that `bin/goblin-model` is
 #     checkout-only and `tests/t-uninstall.sh:36` asserts the install does not carry it. Running
 #     the guide's own line in a fresh class-A install exits 127. A front door that hands a new
@@ -43,8 +43,8 @@
 #         PATH or as `.gob/bin/<name>`, and the docs use all three forms; the promise being
 #         checked is about a PATH, and a bare name makes no path claim.
 #       * a `.goblin/`-rooted path that is not a command. `.goblin/loop/...` is the loop's own
-#         committed record, and `.goblin/last-gate-line` / `.goblin/audit.tsv` are written by a
-#         RUN (`GT-02`'s gate line, `goblin-audit`'s output). The docs promise that a run produces
+#         committed record, and `.goblin/last-gate-line` is written by a RUN (`GT-02`'s gate
+#         line). The docs promise that a run produces
 #         them, never that an install ships them, so "must exist right after install" is the wrong
 #         assertion. `.goblin/manifest/*.tsv` is an installed DATA table, not a command: the
 #         business half below and `tests/t-doc-sync.sh`'s cell comparison cover it.

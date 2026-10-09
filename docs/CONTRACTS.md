@@ -124,7 +124,7 @@ Output is one line per executed row, in manifest order, plus a summary line at t
 
 Those four lines are one row of each marking. The summary line of a green default software-class run is:
 
-          37 passed, 0 failed, 11 advisory, 34 skipped
+          37 passed, 0 failed, 11 advisory, 32 skipped
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -147,12 +147,12 @@ candidate) — the prose survives because the *reason* a workflow file is not a 
 ### A fresh install verifies green
 
 Measured on a fresh DEFAULT software-class install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`37 passed, 0 failed, 11 advisory, 34 skipped`, exit 0.** Thirty-four rows skip with
+hand edit: **`37 passed, 0 failed, 11 advisory, 32 skipped`, exit 0.** Thirty-two rows skip with
 a reason — the same not-yet rows as before, plus the five skill rows (`SK-01`..`SK-04`,
 `AU-04`) that skip on the `playbooks` opt-out a skills-free install records: `HS-02` — no pre-change commit
 is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `AU-02` and `AU-03`, which
-have no report to audit in a repo where no reporter has run — `SC-06`, `SC-07` and `SC-08`, which
-have no dependency manifest, no lockfile and no audit record to read yet — `PF-01`, which has
+have no report to audit in a repo where no reporter has run — `SC-06`, which
+has no dependency manifest or lockfile to read yet — `PF-01`, which has
 no measured perf baseline — `BN-01`/`BN-02`/`BN-05`, which have no `src/` tree for a ban to read,
 and `BN-03` with the four electron bans
 `BN-06`..`BN-09`, which this class does not enable (`bans: [BN-01, BN-02, BN-05]`), so they skip as
@@ -187,7 +187,7 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a class's `-` (off) real.
 - **The opt-out numbers are pinned (V3-3).** A software-class install with an explicit `--skills no`
-  verifies `37 passed, 0 failed, 11 advisory, 34 skipped`, exit 0, and
+  verifies `37 passed, 0 failed, 11 advisory, 32 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
   at v0.2 when the ban rows landed, **15 → 18 on 2026-09-25 (G1)** — the feature-map rows,

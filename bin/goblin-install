@@ -189,7 +189,7 @@ if [ "$UNINSTALL" -eq 1 ]; then
   while IFS=$'\t' read -r p h; do
     [ -n "$p" ] || continue
     case "$p" in
-      .gob/audit-waiver.tsv|.gob/boundary-waivers|.gob/install-hooks.allowlist) ;;
+      .gob/boundary-waivers) ;;
       *) continue ;;
     esac
     [ -e "$TARGET/$p" ] || continue
@@ -373,9 +373,6 @@ GATE2_CMD=$(preset gate2_cmd)
 # The security surface (SC-01..SC-09) and the perf baseline (PF-01).
 SEC_GITIGNORE_FAMILY=$(preset sec_gitignore_family); [ -n "$SEC_GITIGNORE_FAMILY" ] || SEC_GITIGNORE_FAMILY=no
 SEC_BUILD_OUTPUT=$(preset sec_build_output)
-SEC_AUDIT_CMD=$(preset sec_audit_cmd)
-SEC_AUDIT_MAX_AGE=$(preset sec_audit_max_age_days); [ -n "$SEC_AUDIT_MAX_AGE" ] || SEC_AUDIT_MAX_AGE=90
-SEC_WAIVER_MAX_AGE=$(preset sec_waiver_max_age_days); [ -n "$SEC_WAIVER_MAX_AGE" ] || SEC_WAIVER_MAX_AGE=180
 SEC_WRITE_ROUTES=$(preset sec_write_routes)
 PERF_METRIC=$(preset perf_metric)
 PERF_CMD=$(preset perf_cmd)
@@ -586,9 +583,6 @@ render_config() {
     ADVISORY_CEILING "$ADV_CEILING" \
     SEC_GITIGNORE_FAMILY "$SEC_GITIGNORE_FAMILY" \
     SEC_BUILD_OUTPUT "$SEC_BUILD_OUTPUT" \
-    SEC_AUDIT_CMD "$SEC_AUDIT_CMD" \
-    SEC_AUDIT_MAX_AGE "$SEC_AUDIT_MAX_AGE" \
-    SEC_WAIVER_MAX_AGE "$SEC_WAIVER_MAX_AGE" \
     SEC_WRITE_ROUTES "$SEC_WRITE_ROUTES" \
     PERF_METRIC "$PERF_METRIC" \
     PERF_CMD "$PERF_CMD" \
@@ -659,9 +653,6 @@ fi
 
 put ".gob/bin/goblin-verify" "$SRC/bin/goblin-verify"
 put ".gob/bin/goblin-lib.sh" "$SRC/bin/goblin-lib.sh"
-# The audit record is produced by a DELIBERATE, separate command - SC-07 reads the record and
-# never the network (RISKS.md K4: no network at verify time).
-put ".gob/bin/goblin-audit" "$SRC/bin/goblin-audit"
 put ".gob/roles.yaml" "$SRC/roles.yaml"
 put ".gob/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
 put ".gob/manifest/playbooks.tsv" "$SRC/manifest/playbooks.tsv"
@@ -699,11 +690,9 @@ if [ "$DRY_RUN" -eq 0 ] && [ -f "$CONFIG" ]; then
   g_agents_write "$CONFIG" < "$TMP/agents-block" >/dev/null \
     || { g_err "could not write the gob block into $CONFIG"; exit 1; }
 fi
-# The security lane's two decision records and the audit allowlist are created once, then YOURS:
-# they are answers to questions only the project can answer (G4 B3).
-[ -f "$SRC/templates/audit-waiver.tsv.tmpl" ] && put_once ".gob/audit-waiver.tsv" "$SRC/templates/audit-waiver.tsv.tmpl"
+# The security lane's decision record is created once, then YOURS: it is an answer to a question
+# only the project can answer (G4 B3).
 [ -f "$SRC/templates/boundary-waivers.tmpl" ] && put_once ".gob/boundary-waivers" "$SRC/templates/boundary-waivers.tmpl"
-[ -f "$SRC/templates/install-hooks.allowlist.tmpl" ] && put_once ".gob/install-hooks.allowlist" "$SRC/templates/install-hooks.allowlist.tmpl"
 
 if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
   for d in "$SRC"/skills/*/; do

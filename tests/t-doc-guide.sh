@@ -19,8 +19,8 @@
 #   D5  §1's network claim must be scoped the way every other copy of it is (GUARDRAILS: "No
 #       network at verify time"; README/CONTRACTS: under "Dependencies").
 #   §3/§9  the guide's own reproducible numbers, re-measured here on a fresh class-A install: the
-#       `created 23` line, the day-one line (`36 passed, 1 failed, 11 advisory, 34 skipped`) and the
-#       green-path line (`37 passed, 0 failed, 11 advisory, 34 skipped`) — the v2 shapes (the CI
+#       `created 23` line, the day-one line (`36 passed, 1 failed, 11 advisory, 32 skipped`) and the
+#       green-path line (`37 passed, 0 failed, 11 advisory, 32 skipped`) — the v2 shapes (the CI
 #       payload is gone, so PG-06 SKIPs where it passed vacuously: pass 38 -> 37, skip 33 -> 34;
 #       before that skills opt-in moved the pass count 43 -> 38 and the skip count 28 -> 33). A
 #       number no run prints is the defect this half exists to catch.
@@ -135,23 +135,22 @@ if [ "${n:-0}" -ge 1 ]; then
 fi
 
 # ---- D4: the file count, and the gloss the guide puts on it ------------------------------------
-# The WALKED path in the guide is `gob init` (review-UX pass), whose ci screen defaults to an
-# explicit no: `created 24`, no .github workflow, 25 files on disk. The plain installer this
-# wizard drives prints `created 25` and writes 26 (the gloss in §3 quotes both sides of the
-# one-file delta and says which file the counter omits). Both counts are asserted against real
-# runs: the installer's here, the wizard's in t-doc-guide-init.sh.
+# The WALKED path in the guide is `gob init` (review-UX pass), which ships no .github workflow
+# and no agent skills: `created 20`, 21 files on disk. The plain installer this wizard drives
+# writes the same set, and the gloss in §3 quotes both sides of the one-file delta and says
+# which file the counter omits. The count is asserted against a real run here.
 ONDISK=$(find . -path ./.git -prune -o -type f -print | wc -l)
 # v2 neutral-first: the DEFAULT install is skills=no and ships no CI, so the write set is the
-# neutral harness (24 files: 15 tracked + .gob/installed.json + 7 owned + .gitignore).
-[ "$ONDISK" = "24" ]
-check "a default class-A install writes 24 files, no skills (measured here: $ONDISK; created $CREATED)" "$?"
+# neutral harness (21 files: 14 tracked + .gob/installed.json + the owned files + .gitignore).
+[ "$ONDISK" = "21" ]
+check "a default class-A install writes 21 files, no skills (measured here: $ONDISK; created $CREATED)" "$?"
 check "  and the guide quotes the plain installer's own count (created $CREATED)" \
-  "$(printf '%s' "$CREATED" | grep -qE '^23$' && echo 0 || echo 1)"
-grep -qF "created 23 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
-check "  and the guide's walked-path transcript is the installer's created-23 line" "$?"
+  "$(printf '%s' "$CREATED" | grep -qE '^20$' && echo 0 || echo 1)"
+grep -qF "created 20 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
+check "  and the guide's walked-path transcript is the installer's created-20 line" "$?"
 ! grep -q 'means it wrote 50 files' "$GUIDE"
 check "  and the false gloss ('created 50 means it wrote 50 files') is gone (D4)" "$?"
-GLOSS_LINE=$(grep -n "created 23" "$GUIDE" | head -1 | cut -d: -f1)
+GLOSS_LINE=$(grep -n "created 20" "$GUIDE" | head -1 | cut -d: -f1)
 if [ -n "$GLOSS_LINE" ] && sed -n "${GLOSS_LINE},$((GLOSS_LINE + 12))p" "$GUIDE" | grep -q 'installed\.json'; then
   note "ok   the gloss names the file the counter does not count (.goblin/installed.json)"
 else
@@ -233,14 +232,14 @@ check "  and the same paragraph now scopes it to verify time" "$?"
 # shapes against the guide); the plain installer path is re-measured here. The tight set control
 # below accepts BOTH paths' shapes — every line the guide quotes must be one EITHER run printed.
 DAYONE=$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$DAYONE" | grep -qE '^36 passed, 1 failed, 11 advisory, 34 skipped$'
+printf '%s\n' "$DAYONE" | grep -qE '^36 passed, 1 failed, 11 advisory, 32 skipped$'
 check "the day-one run prints the shape the guide documents ($DAYONE)" "$?"
 
 HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$GREEN" | grep -qE '^37 passed, 0 failed, 11 advisory, 34 skipped$'
+printf '%s\n' "$GREEN" | grep -qE '^37 passed, 0 failed, 11 advisory, 32 skipped$'
 check "naming a real commit makes it green ($GREEN)" "$?"
 
 # EVERY summary-shaped line in the guide must be one a real run printed — on this path or the
@@ -262,9 +261,9 @@ SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0
 # measurement — the plain installer this file walks never prints it. The guide teaches the wizard
 # path in §8's table, so the set this SUBSET accepts is both paths' union.
 WIZ_SHAPES=$(printf '%s\n' \
-  "35 passed, 2 failed, 11 advisory, 34 skipped" \
-  "36 passed, 1 failed, 11 advisory, 34 skipped" \
-  "37 passed, 0 failed, 11 advisory, 34 skipped")
+  "35 passed, 2 failed, 11 advisory, 32 skipped" \
+  "36 passed, 1 failed, 11 advisory, 32 skipped" \
+  "37 passed, 0 failed, 11 advisory, 32 skipped")
 MEASURED=$(printf '%s\n%s\n%s\n' "$DAYONE" "$GREEN" "$WIZ_SHAPES" | sort -u)
 SUBSET=0
 while IFS= read -r s; do

@@ -84,8 +84,8 @@ git add -A && git commit -q -m "docs: the handoff names the head"
 OUT2=$(bash .gob/bin/goblin-verify 2>&1); RC2=$?
 printf '%s\n' "$OUT2" | sed 's/^/      /'
 check "a nested target with its own .git verifies (exit 0)" "$([ "$RC2" -eq 0 ] && echo 0 || echo 1)"
-printf '%s' "$OUT2" | grep -qE '^ *37 passed, 0 failed, 11 advisory, 34 skipped'
-check "  and it is the class-A green path (37/0/11/34, the default skills=no install)" "$?"
+printf '%s' "$OUT2" | grep -qE '^ *37 passed, 0 failed, 11 advisory, 32 skipped'
+check "  and it is the class-A green path (37/0/11/32, the default skills=no install)" "$?"
 
 # ---- W1 §5.1: an engine_dir declaration must not leak across the boundary ----------------
 # The OUTER repo declares engine_dir; the inner repo (sub2) must resolve its own engine and

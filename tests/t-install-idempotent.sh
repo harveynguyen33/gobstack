@@ -36,13 +36,11 @@ INSTALLED_FILES=$(find . -path ./.git -prune -o -type f -print | wc -l | tr -d '
 check "first install creates the harness ($INSTALLED_FILES files in the tree)" \
   "$([ "$INSTALLED_FILES" -gt 20 ] && echo 0 || echo 1)"
 check "the verifier landed" "$([ -x .gob/bin/goblin-verify ] && echo 0 || echo 1)"
-# The installer's write set under .gob/bin is exactly the four shipped scripts: bin/goblin-model
+# The installer's write set under .gob/bin is exactly the three shipped scripts: bin/goblin-model
 # is checkout-only (docs/ROLES.md, F2-8), and the same fixture is what t-uninstall.sh asserts.
-# goblin-audit joined the set in v0.2 (G4/SC-07): it is the deliberate, network-touching half of
-# the dependency row, and the row that reads its record never runs it. goblin-bans joined it in
-# v0.3 (G5): the ban engine, installed with the table it reads.
-check ".gob/bin holds exactly goblin-audit + goblin-bans + goblin-verify + goblin-lib.sh" \
-  "$([ "$(ls .gob/bin | sort | tr '\n' ' ')" = "goblin-audit goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
+# goblin-bans joined the set in v0.3 (G5): the ban engine, installed with the table it reads.
+check ".gob/bin holds exactly goblin-bans + goblin-verify + goblin-lib.sh" \
+  "$([ "$(ls .gob/bin | sort | tr '\n' ' ')" = "goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
 # W6 neutral-first: a DEFAULT install ships no agent skills — the harness is neutral. The
 # explicit opt-in (--skills yes) is what installs them, asserted in t-init.sh's flags run.
 check "a default install writes NO .hermes dir (skills are opt-in)" \

@@ -85,8 +85,8 @@ check "  and SK-02 is opt-out rather than FAIL (the pre-fix defect)" "$?"
 # passes with the zero count printed on the line). Pin the
 # line so the next silent shift is caught here. The number is measured, not copied: see the note
 # line the run prints above.
-printf '%s' "$NS_OUT" | grep -q '37 passed, 0 failed, 11 advisory, 34 skipped'
-check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 37/0/11/34)" "$?"
+printf '%s' "$NS_OUT" | grep -q '37 passed, 0 failed, 11 advisory, 32 skipped'
+check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 37/0/11/32)" "$?"
 
 # ---- W6 migration safety: an upgrade must not strip previously-installed skills ---------------
 # The pre-W6 default was --skills yes, so every existing install carries .hermes/skills recorded

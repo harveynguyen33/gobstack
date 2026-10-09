@@ -17,9 +17,6 @@ replay_cmd: node checks/{name}.mjs
 runtime_data: .gob/state.json
 sec_gitignore_family: yes
 sec_build_output: Builds Library
-sec_audit_cmd: ""
-sec_audit_max_age_days: 90
-sec_waiver_max_age_days: 180
 sec_write_routes: ""
 # The game's perf number is frame time on the target device - a HOST gate, declared and named,
 # never a hermetic ratchet (G4 C3.4). The engine's Editor run is already a host gate.

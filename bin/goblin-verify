@@ -393,12 +393,7 @@ export GOBLIN_CONFIG="$CONFIG"
 # reason, never a silent pass.
 SEC_GITIGNORE_FAMILY=$(g_agents_read "$CONFIG" security.gitignore_family)
 SEC_BUILD_OUTPUT=$(g_agents_read "$CONFIG" security.build_output)
-SEC_AUDIT_CMD=$(g_agents_read "$CONFIG" security.audit_cmd)
-SEC_AUDIT_MAX_AGE=$(g_agents_read "$CONFIG" security.audit_max_age_days)
-SEC_WAIVER_MAX_AGE=$(g_agents_read "$CONFIG" security.waiver_max_age_days)
 SEC_WRITE_ROUTES=$(g_agents_read "$CONFIG" security.write_routes)
-[ -n "$SEC_AUDIT_MAX_AGE" ] || SEC_AUDIT_MAX_AGE=90
-[ -n "$SEC_WAIVER_MAX_AGE" ] || SEC_WAIVER_MAX_AGE=180
 PERF_METRIC=$(g_agents_read "$CONFIG" perf.metric)
 PERF_CMD=$(g_agents_read "$CONFIG" perf.cmd)
 PERF_BASELINE_COMMIT=$(g_unquote "$(g_agents_read "$CONFIG" perf.baseline_commit)")
@@ -409,7 +404,7 @@ PERF_HOST_GATE=$(g_agents_read "$CONFIG" perf.host_gate)
 # hand-edited bans: list, and a perf host gate must be declared (PF-01). Absent on a repo
 # installed before the merge — read as off, so a legacy class-F repo verifies with no rewrite.
 ELECTRON=$(g_agents_read "$CONFIG" electron)
-export SEC_GITIGNORE_FAMILY SEC_BUILD_OUTPUT SEC_AUDIT_CMD SEC_AUDIT_MAX_AGE SEC_WAIVER_MAX_AGE
+export SEC_GITIGNORE_FAMILY SEC_BUILD_OUTPUT
 export SEC_WRITE_ROUTES PERF_METRIC PERF_CMD PERF_BASELINE_VALUE PERF_HOST_GATE ELECTRON
 
 # Whole days between an ISO date and today, or empty when the date does not parse on this host
@@ -1448,98 +1443,6 @@ check_in_03() {
   awk -F'\t' 'NR>1 && $4 !~ /^(script|lint|gate|advisory|test)$/ {print "row " $1 " has an enforced_by outside the closed enum: " $4; bad=1} END{exit bad}' "$MANIFEST" || bad=1
   [ "$bad" -eq 0 ] && { printf 'the manifest is complete: every rule carries a check or is advisory, inside the enum\n'; return 0; }
   return 1
-}
-
-check_sc_07() {
-  # Offline by construction: the record is written by .gob/bin/goblin-audit, run ONCE,
-  # deliberately. A verify-time network call would break the offline dependency contract
-  # (docs/RISKS.md K4). The record and the waiver table are repo-local by design (W1 §2.5);
-  # only the SKIP remedy names the runner, and global mode names the CLI verb - the record
-  # is the repo's, the tool that produced it is wherever the engine resolves (chain §2.3).
-  [ -n "$SEC_AUDIT_CMD" ] || { printf 'this class declares no audit command (security.audit_cmd is empty)\n'; return 3; }
-  local rec="$ROOT/.gob/audit.tsv" wfile="$ROOT/.gob/audit-waiver.tsv"
-  if [ ! -f "$rec" ]; then
-    if [ "$ENGINE_MODE" = "global" ]; then
-      printf 'no audit record yet. Run `gob audit` once, deliberately, then commit\n.gob/audit.tsv: SC-07 reads the record and never the network\n'
-    else
-      printf 'no audit record yet. Run .gob/bin/goblin-audit once, deliberately, then commit\n.gob/audit.tsv: SC-07 reads the record and never the network\n'
-    fi
-    return 3
-  fi
-  local d age lines=0 waivers=0 pkg sev id bad=0 wl wd
-  d=$(sed -n 's/^measured[[:space:]]*//p' "$rec" | head -n 1)
-  if [ -z "$d" ]; then printf 'the audit record carries no `measured` date\n'; return 1; fi
-  age=$(age_days "$d") || { printf 'the recorded date does not parse on this host: %s\n' "$d"; return 1; }
-  if [ "$age" -gt "$SEC_AUDIT_MAX_AGE" ]; then
-    printf 'the audit record is %s days old (max %s): run goblin-audit again\n' "$age" "$SEC_AUDIT_MAX_AGE"
-    bad=1
-  fi
-  while IFS=$'\t' read -r pkg sev id rest; do
-    [ -n "$pkg" ] || continue
-    case "$pkg" in \#*) continue ;; esac
-    case "$sev" in high|critical) : ;; *) continue ;; esac
-    lines=$((lines + 1))
-    wl=""
-    if [ -f "$wfile" ]; then
-      wl=$(awk -F'\t' -v p="$pkg" -v i="$id" '$1==p && ($3==i || $3=="*") { print $4; exit }' "$wfile")
-    fi
-    if [ -z "$wl" ]; then
-      printf 'unwaived %s advisory: %s %s\n' "$sev" "$pkg" "$id"; bad=1; continue
-    fi
-    waivers=$((waivers + 1))
-    wd=$(age_days "$wl") || { printf 'the waiver for %s carries an unparseable date: %s\n' "$pkg" "$wl"; bad=1; continue; }
-    [ "$wd" -le "$SEC_WAIVER_MAX_AGE" ] \
-      || { printf 'the waiver for %s is %s days old (max %s): re-decide it\n' "$pkg" "$wd" "$SEC_WAIVER_MAX_AGE"; bad=1; }
-  done < "$rec"
-  printf 'audit measured %s (%s days old): %s high|critical line(s), %s matched waiver(s), %s unwaived\n' \
-    "$d" "$age" "$lines" "$waivers" "$((lines - waivers))"
-  [ "$bad" -eq 0 ]
-}
-
-check_sc_08() {
-  # An install hook is arbitrary code that runs on every `npm ci`. Only npm's lockfile records
-  # it (`hasInstallScript`); pnpm/yarn do not, so the row SKIPs with that reason rather than
-  # passing vacuously.
-  local lock="$ROOT/package-lock.json"
-  if [ ! -f "$lock" ]; then
-    if [ -f "$ROOT/pnpm-lock.yaml" ] || [ -f "$ROOT/yarn.lock" ]; then
-      printf 'a pnpm/yarn lockfile carries no hasInstallScript field - nothing to enumerate\n'; return 3
-    fi
-    printf 'no package-lock.json - there is no install-hook surface to enumerate\n'; return 3
-  fi
-  local pkgs n=0 ok=0 bad=0 p
-  # Z2-2: this reader is line-anchored, so a MINIFIED (one-line) lockfile - valid JSON, and what a
-  # tool that writes without pretty-printing leaves behind - matched NOTHING and the row printed
-  # `0 install hook(s), 0 allowlisted` as a PASS, exit 0. That is a vacuous PASS: the exact defect
-  # family (D6/PR-03) this harness exists to prevent, and the one shape the pnpm/yarn branch above
-  # already reports honestly. The text is normalised into the pretty shape first - break after
-  # every `{`, `}` and `,` - which is a TEXT transform, not a JSON parse: no npm, no jq, no parser
-  # (docs/CONTRACTS.md). The anchor accepts `": {` (what npm writes) and `":{` (minified), and the
-  # per-line state machine still attributes `hasInstallScript` to the key line it followed.
-  pkgs=$(awk '
-    {
-      gsub(/\{/, "{\n"); gsub(/\}/, "}\n"); gsub(/,/, ",\n")
-      n = split($0, L, "\n")
-      for (i = 1; i <= n; i++) {
-        s = L[i]
-        if (s ~ /^[[:space:]]*"node_modules\/[^"]+":[[:space:]]*\{/) {
-          k = s; sub(/^[[:space:]]*"/, "", k); sub(/":[[:space:]]*\{.*/, "", k); sub(/^node_modules\//, "", k)
-        }
-        if (s ~ /"hasInstallScript"[[:space:]]*:[[:space:]]*true/ && k != "") print k
-      }
-    }
-  ' "$lock" | sort -u)
-  for p in $pkgs; do
-    n=$((n + 1))
-    if [ -f "$ROOT/.gob/install-hooks.allowlist" ] \
-       && grep -qxF "$p" "$ROOT/.gob/install-hooks.allowlist"; then
-      ok=$((ok + 1))
-    else
-      printf 'an install-time script is not on the allowlist: %s\n' "$p"; bad=1
-    fi
-  done
-  printf '%s install hook(s), %s allowlisted\n' "$n" "$ok"
-  [ "$bad" -eq 0 ]
 }
 
 # ---- W1 §2.5, the SK/automation split ----------------------------------------
@@ -2972,7 +2875,7 @@ SEE
   if [ "$ENGINE_MODE" = "global" ]; then
     _shadow_n=0
     for _f in "$ROOT"/.gob/bin/goblin-verify "$ROOT"/.gob/bin/goblin-lib.sh \
-              "$ROOT"/.gob/bin/goblin-audit "$ROOT"/.gob/bin/goblin-bans \
+              "$ROOT"/.gob/bin/goblin-bans \
               "$ROOT"/.gob/manifest/* "$ROOT"/.gob/bans/* \
               "$ROOT"/.gob/automations/* "$ROOT"/.gob/roles.yaml; do
       [ -e "$_f" ] || continue

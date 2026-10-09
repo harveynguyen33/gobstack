@@ -18,9 +18,6 @@ runtime_data: .gob/state.json
 # A service has real inputs and real dependencies, so the security rows bite here.
 sec_gitignore_family: yes
 sec_build_output: dist
-sec_audit_cmd: npm audit --json
-sec_audit_max_age_days: 90
-sec_waiver_max_age_days: 180
 sec_write_routes: src app
 # No perf metric is declared for this class by default (G4 D1): build bytes are measurable, but
 # latency - the number a service is judged on - is a HOST gate (`curl -w '%{time_total}'`), and a

@@ -193,7 +193,6 @@ BLOCK_KEYS=$(g_agents_keys "$PROP")
 # otherwise be silently ignored forever (fail closed, like --only does).
 KNOWN_KEYS="class electron branch models_file practice practice_sha256 owner_email archive
 max_dirty advisory_ceiling security.gitignore_family security.build_output
-security.audit_cmd security.audit_max_age_days security.waiver_max_age_days
 security.write_routes perf.metric perf.cmd perf.baseline_commit perf.baseline_value
 perf.measured perf.host_gate harness_dir scaffold_checks feature_map source_root
 verify_doctor reference_manifest quarantine_root loop_max_turns_ceiling

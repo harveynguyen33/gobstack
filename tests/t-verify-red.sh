@@ -150,8 +150,6 @@ cp -a "$WORK/standard.md" "$BK/standard.md"
 cp -a .hermes/skills/goblin-drift-audit/SKILL.md "$BK/drift-audit-SKILL.md"
 cp -a .hermes/skills/goblin-bugreporter/SKILL.md "$BK/bugreporter-SKILL.md"
 cp -a .gob/automations "$BK/automations"
-cp -a .gob/audit-waiver.tsv "$BK/audit-waiver.tsv"
-cp -a .gob/install-hooks.allowlist "$BK/install-hooks.allowlist"
 cp -a .gob/boundary-waivers "$BK/boundary-waivers"
 cp -a .gob/manifest/bans.tsv "$BK/bans.tsv"
 # G2 mutates roles.yaml (the judge lane's profile list) and the mapping file (a judge profile
@@ -196,7 +194,7 @@ restore_all() {
   cp -a "$BK/gitignore" .gitignore
   rm -f checks/green.mjs checks/red.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
         .gob/state.json .gob/last-gate-line .gob/.ds-report \
-        .envrc .gob/audit.tsv package.json package-lock.json reference-manifest.json
+        .envrc package.json reference-manifest.json
   # P15: the four RC- controls declare a corpus in directories a class-A install does not have, so
   # the last thing each leaves behind is removed here (the r_rc03_git hook only handles the index).
   rm -rf manifests refs notes
@@ -204,14 +202,6 @@ restore_all() {
   # would expand to it, but an unquoted glob in a restore path is exactly the habit that control
   # exists to break.
   rm -f 'checks/z2;true;#.mjs'
-  # The allowlist is mutated by m_sc_08_minified_ok (Z2-2's green half) and was backed up but never
-  # restored. This is FIXTURE HYGIENE, not drift prevention: .goblin/install-hooks.allowlist is an
-  # `owned` file, and IN-02 hashes only the `files` map (40 entries, the allowlist not among them),
-  # so a leftover entry is not drift-checked by IN-02 at all. Measured at 0.4.2: an allowlist edited
-  # by hand still prints `IN-02 ... 40 installed files hashed | practice pin ok` at exit 0, and this
-  # file exits 0 (`t-verify-red: PASS`) with this `cp` line deleted. The restore is what keeps the
-  # fixture byte-accurate for the green check at the end of the file.
-  cp -a "$BK/install-hooks.allowlist" .gob/install-hooks.allowlist
   cp -a "$BK/assert.mjs" checks/assert.mjs
   rm -f reviews/fixture-*.md
   # G2: the planted loop record. A leftover .gob/loop/ would leave JG-01/LP-* green by
@@ -433,15 +423,6 @@ m_sc_03()  { mkdir -p src; printf 'export const k = process.env.NEXT_PUBLIC_API_
 m_sc_04()  { mkdir -p src; printf 'document.cookie = "theme=dark";\n' > src/cookie.ts; }
 m_sc_05()  { mkdir -p app/api/contact; printf 'export async function POST(req) {\n  const b = await req.json();\n  await save(b);\n}\n' > app/api/contact/route.ts; }
 m_sc_06()  { printf '{"name":"fixture","version":"1.0.0"}\n' > package.json; }
-m_sc_07()  { printf '# .gob/audit.tsv - written by goblin-audit 0.2.0 on 2020-01-01\n# command: npm audit --json\nmeasured 2020-01-01\n' > .gob/audit.tsv; }
-m_sc_08()  { printf '{\n  "packages": {\n    "node_modules/esbuild": {\n      "version": "0.1.0",\n      "hasInstallScript": true\n    }\n  }\n}\n' > package-lock.json; }
-# Z2-2: the SAME lockfile on ONE LINE. The reader is line-anchored, so before the fix this shape
-# matched nothing and the row printed `0 install hook(s), 0 allowlisted` - a PASS, exit 0, where
-# the pnpm/yarn branch above already reports a SKIP. Two halves: the unlisted hook must FAIL here
-# (it did not - a vacuous PASS), and the allowlisted one must PASS (so the fix is not "any
-# minified lock FAILs").
-m_sc_08_minified()    { printf '{"name":"fixture","lockfileVersion":3,"packages":{"node_modules/esbuild":{"version":"0.1.0","hasInstallScript":true}}}\n' > package-lock.json; }
-m_sc_08_minified_ok() { m_sc_08_minified; printf 'esbuild\n' >> .gob/install-hooks.allowlist; }
 m_sc_09()  { m_row_fails SC-09; }
 m_pf_01()  { sed -i -e 's/^perf\.metric:.*/perf.metric: client_js_bytes/' -e 's/^perf\.baseline_commit:.*/perf.baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^perf\.baseline_value:.*/perf.baseline_value: 1/' -e 's/^perf\.measured:.*/perf.measured: 2026-01-01/' AGENTS.md; }
 # G8-6b: the budget and the measurement have to be the SAME number. Two controls - the honest
@@ -712,14 +693,6 @@ restore_all
 expect_red "a JS cookie write with no flags"        SC-04 1 m_sc_04
 expect_red "a write route with no validator"        SC-05 1 m_sc_05
 expect_red "a manifest with no lockfile"           SC-06 1 m_sc_06
-expect_red "an audit record nobody re-took"        SC-07 1 m_sc_07
-expect_red "an install hook nobody decided on"     SC-08 1 m_sc_08
-# Z2-2: the same hook in a ONE-LINE lockfile. It used to print `0 install hook(s), 0 allowlisted`
-# and exit 0 - a vacuous PASS, the defect family this harness exists to prevent; the reader now
-# normalises the text into the pretty shape, and the allowlisted half proves the fix is not "any
-# minified lock FAILs".
-expect_red   "Z2-2: the same unlisted hook in a MINIFIED (one-line) lockfile"   SC-08 1 m_sc_08_minified
-expect_green "Z2-2: the same hook ALLOWLISTED in a minified lockfile passes"    SC-08 m_sc_08_minified_ok
 expect_red "SC-09 (advisory row: wired, not biting)" SC-09 1 m_sc_09
 expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
 expect_green "G8-6b: the ceiling matches the recorded baseline"        PF-01 m_pf_ceiling_match
@@ -1270,16 +1243,15 @@ expect_red   "W1: the repo's OWN automation producer with a network verb" AU-01 
 expect_red   "W1: automations declared but the producer is gone"          AU-01 1 m_au_01_declared_gone    "" r_au_01_declared
 # The SKIP half cannot run on this fixture: its VENDORED engine payload
 # (.gob/automations/*.sh) supplies producers, so AU-01 PASSES here by design. The SKIP
-# fires only when NO producer exists in either place - the global-mode probe below (the
-# SC-07 block, which strips the engine payload) is the repo that proves it.
+# fires only when NO producer exists in either place - the global-mode probe below (which strips
+# the engine payload) is the repo that proves it.
 
-# SC-07 in global mode names the CLI verb, not the vendored path (§2.5). The probe must
-# actually resolve GLOBAL: a class-B install vendored its own engine payload, and the
-# chain's vendored step would win over the declared engine_dir:, so the mode stayed
-# vendored and the old remedy text was printed. The engine payload is removed and the
-# record it leaves behind is rewritten with the W3-shaped engine: block (§2.2) - the
-# same state a migrated repo is in mid-sequence. The same probe carries AU-01's SKIP
-# half: no producer in the engine dir, none in the repo.
+# A producer-less global-mode repo, built so the AU-01 SKIP half has a repo to prove it in.
+# The probe must actually resolve GLOBAL: a class-B install vendored its own engine payload,
+# and the chain's vendored step would win over the declared engine_dir:, so the mode stayed
+# vendored. The engine payload is removed and the record it leaves behind is rewritten with
+# the engine: block - the same state a migrated repo is in mid-sequence. This is the only
+# producer-less repo in this file: no producer in the engine dir, none in the repo.
 W1_GMODE="$WORK/w1-gmode"
 rm -rf "$W1_GMODE" /tmp/w1-engine-gmode
 mkdir -p "$W1_GMODE" /tmp/w1-engine-gmode
@@ -1295,19 +1267,10 @@ import json
 rec = json.load(open(".gob/installed.json"))
 rec["engine"] = {"mode": "global", "engine_dir": "/tmp/w1-engine-gmode", "cli_version": "0.6.0", "cli_sha256": "a", "enforcement_tsv_sha256": "b"}
 json.dump(rec, open(".gob/installed.json", "w"), indent=2)' \
-  && sed -i 's/^security\.audit_cmd:.*/security.audit_cmd: npm audit --json/' AGENTS.md \
   && rm -rf .gob/bin .gob/manifest .gob/bans .gob/automations .gob/roles.yaml )
-# The probe is the repo the SC-07 block builds below; the AU-01 SKIP half runs there
-# because that is the only producer-less repo in this file. Kept as a plain block: the
-# two checks below share the probe's one build.
 out=$( cd "$W1_GMODE" && bash "$SRC/bin/goblin-verify" --only AU-01 2>&1 )
 printf '%s' "$out" | grep -q 'SKIP  AU-01.*no automation producer found'
 check "W1: no producer anywhere -> AU-01 SKIPs with the reason (the born-RED FIX)" "$?"
-out=$( cd "$W1_GMODE" && bash "$SRC/bin/goblin-verify" --only SC-07 2>&1 )
-printf '%s' "$out" | grep -q 'gob audit'
-check "W1: a global-mode SC-07 SKIP names the CLI verb (gob audit)" "$?"
-printf '%s' "$out" | grep -q '.gob/audit.tsv'
-check "  and the record it names is still the repo-local one" "$?"
 rm -rf /tmp/w1-engine-gmode
 
 # ---- F2-6: --only must refuse a selection that runs no target row -------------

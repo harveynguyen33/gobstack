@@ -24,9 +24,6 @@ runtime_data: .gob/state.json
 # `git add` away from a live token), so SC-01/SC-02 are the rows that bite here.
 sec_gitignore_family: yes
 sec_build_output: ""
-sec_audit_cmd: ""
-sec_audit_max_age_days: 90
-sec_waiver_max_age_days: 180
 sec_write_routes: ""
 perf_metric: ""
 perf_cmd: ""
