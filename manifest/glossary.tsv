@@ -2,8 +2,7 @@ term	definition	source
 playbook	A named, ordered procedure with a measurable verification step. goblin-stack ships 15.	R6 sec.3
 skill	A Hermes SKILL.md directory. goblin-stack installs its skills into the target repo at .hermes/skills/ (project tier), never into a profile.	R6 sec.0.1 / sec.7.3
 profile	A worker identity in the Hermes fleet (architect, coder, reviewer, ...). Owns memory and skills.	R4
-class	A project category A-E that selects which parts are required, optional or off. See manifest/classes.tsv.	R7 sec.4
-part	One installable unit a class requires or forbids: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, playbooks, tokens.	R7 sec.5
+part	One installable unit: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, playbooks, tokens.	R7 sec.5
 gate	A declared command that must exit 0. Declared per project, never inferred from the stack.	PP sec.4
 ratchet	A count that must not rise, with a declared ceiling; a rise is allowed only when re-anchored with the arithmetic (old + N new = new).	PP sec.4
 HANDOFF	The session-boundary contract at the repo root: START HERE / State / Gates / Next steps / NOT verified.	PP sec.1
@@ -14,7 +13,7 @@ stakes	The S0-S4 ladder that chooses the review gate strength by the change, not
 patch-id	git patch-id --stable of base..head. A new head voids a verdict; a matching commit message does not restore it.	R1 sec.10
 advisory	A rule with no executable check. Counted in the verify summary and capped by advisory_ceiling; never a silent pass.	R6 sec.5
 opt-out	A part recorded in disabled: so its required checks report SKIP (opt-out) instead of failing.	R6 sec.6.3
-archive	A class-D flag: verify requires no HANDOFF and no gates, and the summary says so.	R7 sec.2.4
+archive	An opt-in flag: verify requires no HANDOFF and no gates, and the summary says so.	R7 sec.2.4
 sweep	P11: the same change or question across many projects, enumerated by glob, one card each.	R6 sec.3
 overnight	P10: an unattended run over a fixed goal, stopped by an escape hatch.	R6 sec.3
 review-panel	N independent verdict lanes, each its own card with its own resolved model. Only at stakes S3+.	R6 sec.4.3

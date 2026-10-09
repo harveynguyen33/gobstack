@@ -12,7 +12,7 @@
 #   M5  tools/call gob_map_status: an undeclared map says so; a declared map reports
 #       each feature, its verified: date, and resolution per entry path (resolves under
 #       a real token, DOES-NOT under a dead one — the FM-02 read-only half)
-#   M6  tools/call gob_init_status: the gob block, class, gates and engine version
+#   M6  tools/call gob_init_status: the gob block, gates and engine version
 #   M7  protocol errors: a parse error is -32700 with id null, an unknown method is
 #       -32601, an unknown tool is an isError RESULT, a notification is never answered
 #   M8  init --with-mcp-config: writes the generated .mcp.json exactly once; a second
@@ -54,7 +54,7 @@ mcp() { # <server-cmd...> -- <request json> [more...]
 # models + practice: the installer's two machine inputs
 printf 'the referenced standard\n' > "$WORK/standard.md"
 
-new_fixture() { # <tag> — a seeded, installed, committed class-A repo
+new_fixture() { # <tag> — a seeded, installed, committed repo
   local tag="$1"
   R="$WORK/$tag"
   mkdir -p "$R"
@@ -62,7 +62,7 @@ new_fixture() { # <tag> — a seeded, installed, committed class-A repo
       && git config user.email "runner@example.com" \
       && printf '# %s\n' "$tag" > README.md \
       && git add -A && git commit -q -m "chore: seed" )
-  ( cd "$R" && bash "$SRC/bin/goblin-install" --target "$R" --class A \
+  ( cd "$R" && bash "$SRC/bin/goblin-install" --target "$R" \
       --practice "$WORK/standard.md" >/dev/null 2>&1 )
   ( cd "$R" && git add -A && git commit -q -m "chore: install gobstack" )
   # the HANDOFF placeholder red is the one expected red; name a real HEAD to go green
@@ -258,8 +258,6 @@ OUT=$(cd "$R" && printf '%s\n%s\n' \
   | python3 "$SRC/tests/mcp-client.py" "node $MCP")
 printf '%s' "$OUT" | grep -q 'gob block: present'
 check "M6 the tool reports the gob block" "$?"
-printf '%s' "$OUT" | grep -q 'class: software'
-check "M6 the class is named" "$?"
 printf '%s' "$OUT" | grep -q 'gate_commit_cmd: '
 check "M6 the declared gates are named" "$?"
 printf '%s' "$OUT" | grep -q "engine version: $(cat "$SRC/VERSION")"
@@ -360,7 +358,7 @@ OUT=$(cd "$R" && bash "$SRC/bin/goblin-init" --write /dev/null 2>&1); true
 PRO="$R/.gob-init-proposal.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'class: software\nbranch: main\nowner_email: runner@example.com\ngate_commit_cmd: true\nfeature_map: features/README.md\n'
+  printf 'branch: main\nowner_email: runner@example.com\ngate_commit_cmd: true\nfeature_map: features/README.md\n'
   printf '<!-- gob:end -->\n'
   printf '\n## gob init summary\n\n- M10\n\n## feature-map\n\n'
   printf '### features/README.md\n\n```md\n# Features\n\n- [readme](./readme.md) — the repo readme\n```\n\n'

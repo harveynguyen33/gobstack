@@ -1,34 +1,30 @@
 ---
 name: goblin-bootstrap
-description: P8: adopt goblin-stack in a repo - classify, install, verify, then the first round.
+description: P8: adopt goblin-stack in a repo - install, verify, then the first round.
 ---
 
 # goblin-bootstrap (P8)
 
 Use when adopting goblin-stack in a repo, or starting one.
 
-1. **Classify the project into one of five classes.** `software`, `service`, `game`, `research` or
-   `fleet` — the class selects which parts are required, optional or off; it is not a stringency
-   level. `software` also carries the electron opt-in (`--electron`): an Electron app is `software`
-   with the electron bans and a host gate, not a sixth class. The letters `A`-`E` and the older
-   names are read-time aliases.
-2. **`goblin-install --target <dir> --class <x>`** — the default install is a NEUTRAL harness:
+1. **`goblin-install --target <dir>`** — the default install is a NEUTRAL harness:
    no agent skills. Vendor the Hermes project tier with `--skills yes` if you want them installed.
-3. **`goblin-verify`** — a default software-class install (no agent skills) verifies green:
-   `35 passed, 0 failed, 6 advisory, 21 skipped`, exit 0, once `HANDOFF.md` names a commit that
+2. **`goblin-verify`** — a default install (no agent skills) verifies green:
+   `34 passed, 0 failed, 6 advisory, 21 skipped`, exit 0, once `HANDOFF.md` names a commit that
    exists; before that edit the
-   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`34 passed, 1 failed`).
+   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`33 passed, 1 failed`).
    Twenty-one rows skip with a reason, and the reason matters: the four skill rows
    (`SK-01`..`SK-04`) skip on the `playbooks` opt-out a skills-free install records,
    then `HS-02`
    (no pinned pre-change commit yet, so the REPLAY is not provable), `SC-06` (no dependency manifest or lockfile), `PF-01` (no perf baseline measured yet), `BN-01`/`BN-02`/`BN-05` (the ban table is
-   installed but this fresh repo has no `src/` for a ban to read) and `BN-03` with the four electron
-   bans `BN-06`..`BN-09` (not in this class's `bans: [BN-01, BN-02, BN-05]`, so they skip as
+   installed but this fresh repo has no `.ts` file for a ban's `applies_when` glob, so each reports
+   *not applicable*) and `BN-03` with the four electron
+   bans `BN-06`..`BN-09` (not in the `bans:` list `[BN-01, BN-02, BN-05]`, so they skip as
    *not enabled* rather than as *unread*),
    `FM-01`/`FM-02`/`VA-01` (no feature map and no declared `verify_doctor:` yet), `RC-01`..`RC-04`
    (no reference corpus declared: `reference_manifest:` ships empty and there is no lab
    `manifests/`). Each is a *not yet*, not a pass.
-   The class's required parts
+   The parts
    that only a round can produce (a first review, a real gate) pass *vacuously*, and that list
    is the repo's first-step list, not a defect.
 4. **Fix `.gitignore` BEFORE any `git init`.** A credentials file already in the tree is
@@ -50,5 +46,5 @@ Use when adopting goblin-stack in a repo, or starting one.
 
 ## What this cannot see
 
-Whether the class you chose matches how the project actually ships. Re-classify when it does
-not; the installer records the class and `CL-01` checks the parts against it.
+Whether the parts you left on match how the project actually ships. Switch a part off with
+`--opt-out <part>` when it does not; the installer records it in `disabled:`.

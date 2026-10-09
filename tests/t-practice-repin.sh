@@ -72,7 +72,7 @@ git add -A && git commit -q -m "chore: seed"
 # W6 neutral-first: the default install is skills=no, and this control previously read the
 # installed copy of the practice skill under .hermes/skills/. The control now reads the SOURCE
 # copy (skills/*/SKILL.md is the installer's write set — the same file, pre-copy).
-bash "$SRC/bin/goblin-install" --target "$TARGET" --class A \
+bash "$SRC/bin/goblin-install" --target "$TARGET" \
   --practice "$WORK/standard.md" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
 
@@ -204,7 +204,7 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 printf '# nostandard\n' > README.md
 git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$WORK/nostandard" --class A \
+bash "$SRC/bin/goblin-install" --target "$WORK/nostandard" \
   --practice "$WORK/absent.md" >/dev/null 2>&1
 out=$(bash "$SRC/bin/goblin-install" --target "$WORK/nostandard" --re-pin 2>&1); rc=$?
 check "no practice: configured -> exit 2 (GUARD on the code)" "$([ "$rc" -eq 2 ] && echo 0 || echo 1)"
@@ -226,7 +226,7 @@ check "  and the target was not uninstalled (CONTROL)" "$?"
 # ---- a plain --upgrade must never re-pin by itself ---------------------------
 cd "$TARGET"
 PIN_STALE=$(g_agents_read "$TARGET/AGENTS.md" practice_sha256)
-bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --upgrade \
+bash "$SRC/bin/goblin-install" --target "$TARGET" --upgrade \
   --practice "$WORK/standard.md" >/dev/null 2>&1
 [ "$(g_agents_read "$TARGET/AGENTS.md" practice_sha256)" = "$PIN_STALE" ]
 check "--upgrade does not re-pin the standard by itself (GUARD)" "$?"

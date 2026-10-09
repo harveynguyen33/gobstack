@@ -75,7 +75,7 @@ mkdir -p "$P"
   printf '# probe\n' > README.md
   git add -A && git commit -q -m seed
 ) >/dev/null 2>&1
-HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target "$P" --class A >/dev/null 2>&1
+HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target "$P" >/dev/null 2>&1
 OUT5=$(HOME="$HOMEDIR" node "$SRC/bin/goblin.js" uninstall --dry-run --target "$P" 2>&1); RC5=$?
 check "SH5 goblin uninstall --dry-run exits 0" "$([ "$RC5" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$OUT5" | grep -q 'would remove'

@@ -27,7 +27,7 @@ git config user.email "runner@example.com"
 printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 
-bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A \
+bash "$SRC/bin/goblin-install" --target "$WORK/target" \
   --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install exits 0" "$?"
 check "the installer's .gob/bin holds exactly the three shipped scripts" \

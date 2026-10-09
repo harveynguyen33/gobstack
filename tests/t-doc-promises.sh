@@ -144,7 +144,7 @@ cd "$WORK/target"
 git init -q -b main
 git config user.name "Test Runner"
 git config user.email "runner@example.com"
-INSTALLED=$(HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . --class A 2>&1)
+INSTALLED=$(HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . 2>&1)
 check "the class-A install the path promises are resolved against exits 0" \
   "$([ -f .gob/installed.json ] && echo 0 || echo 1)"
 [ -d .gob/bin ] || note "  (no .gob/bin in the install: $(printf '%s' "$INSTALLED" | head -1))"

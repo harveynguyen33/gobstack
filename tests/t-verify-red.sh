@@ -22,7 +22,6 @@ set -uo pipefail
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 WORK=$(mktemp -d)
 TARGET="$WORK/target"
-TARGET_B="$WORK/targetB"
 fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
@@ -40,7 +39,7 @@ PRE_CHANGE=$(git rev-parse --short HEAD)
 # W6 neutral-first: the default install is skills=no, and this fixture's SK-*/AU-* controls
 # need their subjects — the installed skills are what the
 # mutations below violate. So the fixture opts in explicitly.
-bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --skills yes --practice "$WORK/standard.md" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$TARGET" --skills yes --practice "$WORK/standard.md" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
@@ -296,10 +295,6 @@ m_pf_01()  { sed -i -e 's/^perf\.metric:.*/perf.metric: client_js_bytes/' -e 's/
 # nothing cross-checked it.
 m_pf_ceiling_match() { sed -i -e 's/^perf\.metric:.*/perf.metric: client_js_bytes/' -e "s/^perf\.baseline_commit:.*/perf.baseline_commit: $PRE_CHANGE/" -e 's/^perf\.baseline_value:.*/perf.baseline_value: 0/' -e 's/^perf\.measured:.*/perf.measured: 2026-01-01/' AGENTS.md; }
 m_pf_ceiling_raise() { m_pf_ceiling_match; sed -i 's/^ratchet\.ceiling:.*/ratchet.ceiling: 100000/' AGENTS.md; }
-# W6: the electron opt-in's done-definition. The class-A fixture records electron: false; turning
-# it on while the host gate is blank is a repo missing half its definition -> PF-01 FAILs (the
-# positive half - electron: true WITH a host gate - is exercised in tests/t-verify-green.sh).
-m_pf_electron_nohost() { sed -i -e 's/^electron: false/electron: true/' -e 's/^perf\.host_gate:.*/perf.host_gate:/' AGENTS.md; }
 
 # ---- the ban list (G5): BN-00..BN-03, BN-05 ------------------------------------------------
 # Every mutation is the exact move a ban forbids. The bans are TEXT probes (no npm, no AST), so
@@ -327,7 +322,7 @@ m_bn_05()          { sed -i 's|^layers:\([[:space:]]*\).*|layers: [src/renderer 
 m_bn_05_nolayers() { mkdir -p src/renderer; printf 'export const r = 1;\n' > src/renderer/p.ts; }
 
 # ---- W4/G6: the Electron failure surface, as bans (BN-06..BN-09) -----------------------------
-# Each mutation turns its ban ON in the config (a class-A install does not list them - the SKIP
+# Each mutation turns its ban ON in the config (the default install does not list them - the SKIP
 # control below is the other half) and writes the exact line the row exists to catch. The pattern
 # is the wrongEnough-shape: these are the keys Electron's own security checklist names, which is
 # why they are one-line rules rather than a dependency-graph run.
@@ -409,26 +404,6 @@ m_tenant_leak()   { printf '\nsee %s/projects for the tenant list\n' "$HOME" >> 
 m_wrong_branch()  { sed -i 's/^branch: main/branch: trunk/' AGENTS.md; }
 
 m_archive_flip()  { sed -i 's/^archive: false/archive: true/' AGENTS.md; }
-
-# ---- the class-B fixture: CL-01's "the class forbids this part" branch (D10) ----
-# Class B turns tokens off, so the installer records it in disabled:. Before the fix the
-# opt-out branch returned before the '-' branch, so a tokens file in a class-B repo passed as
-# "opt-out". (reviews/ cannot be the mutation: pr-gate and review-panel share that artifact, and
-# review-panel was the one '-' part the installer never pre-disabled, so the run went RED for
-# the wrong reason.) The R branch of CL-01 is covered by t-install-off-switch.sh.
-mkdir -p "$TARGET_B" && cd "$TARGET_B"
-git init -q -b main
-git config user.name "Test Runner"
-git config user.email "runner@example.com"
-printf '# targetB\n' > README.md
-git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$TARGET_B" --class B >/dev/null 2>&1
-git add -A && git commit -q -m "chore: install gobstack (class B)"
-cd "$TARGET"
-m_b_tokens() { printf 'a_part_class_B_turns_off: true\n' > .gob/tokens.yaml; }
-restore_b()  { rm -f .gob/tokens.yaml; }
-# v2 DELETION NOTE (wave B): the class-B CI-lane control (m_b_workflow) is deleted with the CI
-# lane itself - there is no goblin-gate.yml for a class-B repo to forbid any more.
 
 # ---- the 66 target-scope rows, in manifest order ------------------------------
 expect_red "a manifest with no version"            IN-01 1 m_in_01
@@ -539,7 +514,6 @@ expect_red "SC-09 (advisory row: wired, not biting)" SC-09 1 m_sc_09
 expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
 expect_green "G8-6b: the ceiling matches the recorded baseline"        PF-01 m_pf_ceiling_match
 expect_red   "G8-6b: the ceiling raised by hand, the baseline untouched" PF-01 1 m_pf_ceiling_raise
-expect_red   "W6: electron: true declared with no perf host gate"       PF-01 1 m_pf_electron_nohost
 
 # ---- G5: the ban list is a gate, not a wish - one control per row -----------------------------
 expect_red   "the ban table loses a row the matrix still names" BN-00 1 m_bn_00_orphan
@@ -744,9 +718,6 @@ expect_red   "an entry path changed after the map was verified" FM-02 1 m_fm_02_
 # source that was never committed. "Resolves" must not imply "is tracked".
 expect_red   "Z1-6: an entry path only an untracked file holds" FM-02 1 m_fm_02_untracked
 expect_red   "a verify_doctor that exits non-zero" VA-01 1 m_va_01_fail
-expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
-# v2 DELETION NOTE (wave B): the two CI-lane CL-01 controls (class B forbids goblin-gate.yml;
-# class A requires it) are deleted with the lane - the class contract no longer names ci-gate.
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip
 
 # ---- P15: the reference-corpus rows, RC-01..RC-04 ------------------------------------------------
@@ -1017,7 +988,7 @@ rm -rf "$UX4"; mkdir -p "$UX4"
   && git init -q -b main \
   && git config user.name "Test Runner" && git config user.email "runner@example.com" \
   && printf '# ux4\n' > README.md && git add -A && git commit -qm seed \
-  && bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1 \
+  && bash "$SRC/bin/goblin-install" --target . >/dev/null 2>&1 \
   && sed -i 's/^owner_email:.*/owner_email: other@owner.example/' AGENTS.md \
   && git add -A && git commit -qm install )
 out=$( cd "$UX4" && bash .gob/bin/goblin-verify 2>&1 ); rc=$?

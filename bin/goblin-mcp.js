@@ -25,7 +25,7 @@
 //   gob_map_status   features/ + the feature_map: key, read-only: what exists, the
 //                    verified: dates, whether each entry path still resolves (FM-01
 //                    index hygiene + the FM-02 resolution half)
-//   gob_init_status  does this repo carry a gob block, which class/gates, engine version
+//   gob_init_status  does this repo carry a gob block, its gates, engine version
 //
 // Simplifications vs the full MCP spec, stated rather than hidden: no resources/,
 // no prompts/, no pagination, no progress notifications, no completion/, no logging
@@ -340,8 +340,6 @@ function toolGobInitStatus() {
     );
   }
   const lines = ["gob block: present in AGENTS.md"];
-  const cls = blockValue(block, "class");
-  lines.push("class: " + (cls || "<unset>"));
   const branch = blockValue(block, "branch");
   lines.push("branch: " + (branch || "<unset>"));
   const gates = blockGates(block);
@@ -397,7 +395,7 @@ const TOOLS = [
   {
     name: "gob_init_status",
     description:
-      "Report whether this repo is under the gobstack harness: the AGENTS.md gob block, its class and gates, " +
+      "Report whether this repo is under the gobstack harness: the AGENTS.md gob block, its gates, " +
       "and the engine version. Call this first when unsure whether the discipline gate applies here.",
     inputSchema: { type: "object", properties: {} },
   },

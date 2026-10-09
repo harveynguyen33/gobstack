@@ -17,7 +17,7 @@ or install the CLI globally (it is a CLI, not a library):
 
 **The v2 flow is `init`-first.** `gob init` prints an AGENT BRIEF — a structured prompt telling
 whichever agent is already running in the repo exactly what to scan (package.json, routes, tests,
-CI configs) and what to decide (class, branch, owner email, the first gate command) — plus the
+CI configs) and what to decide (branch, owner email, the first gate command) — plus the
 schema of the proposal file the agent writes back. `gob init --write <proposal>` validates the
 proposal and installs. The heuristic detector (`--heuristic`) is a fallback that appends
 pre-scanned hints to the brief; it never decides.
@@ -42,31 +42,25 @@ A repo that already has its own `HANDOFF.md` exits 1 on the refusal. That is the
 failure: reconcile the file rather than forcing over it — `docs/GUIDE.md`.
 
 **The config is the AGENTS.md frontmatter.** There is no separate config file in v2: every knob
-the harness reads — class, branch, gates, ratchet, bans, replay, opt-outs — is a `key: value`
+the harness reads — branch, gates, ratchet, bans, replay, opt-outs — is a `key: value`
 line inside the `<!-- gob:begin --> … <!-- gob:end -->` marker block at the top of `AGENTS.md`.
 Edit it in place; the parser reads only that block, and the installer never rewrites it after the
 first install.
-
-**`class:` picks the preset**: **software** (the default — shipped features, PRs, review gates),
-**service** (backend jobs, config, unattended runs), **game** (playable builds, perf budgets),
-**research** (specs, replays, reference corpora) and **fleet** (config-of-the-agent repos).
-The single letters `A`–`E` are accepted aliases. What each preset turns on is the matrix in
-`docs/GUIDE.md`.
 
 After installing, in this order:
 
     cd <target> && git add -A && git commit   # the install is a change like any other
     .gob/bin/goblin-verify                    # or gob verify, anywhere in the target
 
-**A default software-class install verifies green — `35 passed, 0 failed, 6 advisory,
+**A default install verifies green — `34 passed, 0 failed, 6 advisory,
 21 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
 scaffold's `0000000` placeholder is the one expected red.** Twenty-one rows skip: the four
 skill rows (`SK-01`..`SK-04`) skip on the `playbooks` opt-out a skills-free install
 records, then the not-yet rows (`HS-02` has no pinned pre-change commit yet;
 `SC-06` has no dependency manifest to read; `PF-01` has no
-measured perf baseline; `BN-01`/`BN-02`/`BN-05` have no `src/` for a ban to read, and the four
-electron bans `BN-06`–`BN-09` are not in this class's `bans:` list
-(`bans: [BN-01, BN-02, BN-05]`), so they skip as *not enabled* rather than as *unread*;
+measured perf baseline; `BN-01`/`BN-02`/`BN-05` have no `.ts` file for a ban to read, so each
+reports itself *not applicable*, and `BN-06`–`BN-09` are not in this tree's `bans:` list
+(`bans: [BN-01, BN-02, BN-05]`), so they skip as *not enabled*;
 `FM-01`/`FM-02`/`VA-01` have no feature map; `RC-01`..`RC-04` have no reference corpus). The
 parts that only a round can produce — a first review note, a gate that is not the shipped floor —
 pass *vacuously* rather than failing, and `P8` (`goblin-bootstrap`) still walks them as work to
@@ -99,7 +93,7 @@ exposes three tools:
 |---|---|
 | `gob_verify` | run the project discipline gate in the repo the agent has open — `PASS`/`FAIL` per row, each FAIL carrying its remedy line. The description is the trigger: *call this before reporting any coding task complete* |
 | `gob_map_status` | read `features/` and the `feature_map:` key: which features exist, their `verified:` dates, and whether each declared entry path still resolves (the read-only half of `FM-02`) |
-| `gob_init_status` | is this repo under the harness — the `AGENTS.md` gob block, its class and gates, the engine version |
+| `gob_init_status` | is this repo under the harness — the `AGENTS.md` gob block, its gates, the engine version |
 
 Register it one of three ways:
 
@@ -145,9 +139,8 @@ below is the reference material the guide points into, so the two do not compete
 | `docs/LIMITS.md` | where this is weaker than its sources, and what is unproven |
 | `docs/RECORD-NOTES.md` | the wave codes the changelog and the matrix parentheticals use, one line each |
 
-`manifest/enforcement.tsv` is the source of truth for rules; `manifest/classes.tsv` for what a
-class requires; `manifest/playbooks.tsv` for the flows; `manifest/glossary.tsv` for the
-vocabulary.
+`manifest/enforcement.tsv` is the source of truth for rules; `manifest/playbooks.tsv` for the
+flows; `manifest/glossary.tsv` for the vocabulary.
 
 ## Verify
 
@@ -161,7 +154,7 @@ run · `3` the manifest is broken. Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-04) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (119 over 62 target rows), each required to go RED and then
+one control per target-scope row (117 over 61 target rows), each required to go RED and then
 restored. **A verifier that only ever prints GREEN is a failure**, so that file is the one that
 matters most.
 
@@ -279,7 +272,7 @@ The split is by **kind**, and it is checkable.
   REPLAY, the gate vocabulary, commit discipline, the delegation tiers, data safety, the
   documentation duty, adopt-don't-replace.
 - **gobstack owns the mechanism**: which rule is enforced by what, how it is installed, how
-  it is verified, which class a project is, which flow applies, which role runs a flow.
+  it is verified, which flow applies, which role runs a flow.
 
 gobstack carries **no copy** of the standard's text. The `AGENTS.md` gob block holds
 `practice:` and `practice_sha256:`; `goblin-verify` re-checks the hash, so a silently edited
@@ -296,7 +289,7 @@ depend on it report advisory, never a failure — that is what makes the repo po
 | A "gobstack rules" document | The #1 anti-pattern: a rules doc with no enforcement is a measured net cost. |
 | Copying the referenced standard into this repo | It is the strongest artifact on the box and must not be weakened; a second copy is exactly the duplication that already rots. |
 | Replacing the referenced standard | Would discard the pinned-commit REPLAY rule, the stale-sentence rule, the data-safety rule and adopt-don't-replace — four things no imported source has. |
-| Per-project bespoke harnesses | The *gate vocabulary* differs by class, not the harness. Six class presets plus a real off switch. |
+| Per-project bespoke harnesses | The *gate vocabulary* differs by language, not the harness. One default config plus a real off switch. |
 | Fan-out by default, auto-merge, or an unattended hillclimb | The axis is read-versus-write, parallel lanes cost about N times the tokens, and no reviewed source ships unconditional auto-merge. |
 | A plugin or marketplace package | There is no marketplace here. The portable unit is a `SKILL.md` plus a bash installer. |
 | Shipping a workflow (the W4 position, reversed in v3) | Measured: a workflow file is not a gate (a required check can self-skip, and the forge settings are not in the repo), and CI and `goblin-verify` were free to report different truths about one SHA. v3 cut the lane and ships no workflow; a project that wants CI wires its own. |
@@ -307,8 +300,7 @@ See `docs/LIMITS.md` and the non-goals in `README.md`. The short version: it doe
 models, does not write the vault, does not replace any project's existing gate, writes nothing
 outside its target, and does not pretend the prose rules are enforced.
 
-**Amended at W4, reversed at v3.** It used to say *"there is no CI workflow"*; W4 wrote at most one
-workflow for a class that permits `ci-gate`. v3 cut the lane: it ships **no** workflow and reads
+**Amended at W4, reversed at v3.** It used to say *"there is no CI workflow"*; W4 wrote at most one workflow. v3 cut the lane: it ships **no** workflow and reads
 none. The reason the W4 experiment was reversed is recorded in `docs/LIMITS.md` #34 — a workflow
 file is not a gate (the required-check list, the bypass switch and the push identity are forge
 state), and CI and `goblin-verify` were free to report different truths about one SHA.
@@ -330,7 +322,7 @@ state), and CI and `goblin-verify` were free to report different truths about on
 | K7 | **The gate is theatre** (self-skipping checks, admin bypass) | The CI lane is cut in v3, but the hazard it named is a fact about CI in general: a required check that self-skips reports success, and a protected branch whose only admin is the person pushing protects nothing. The harness ships no workflow and reads none, so the hazard is documented here and in `docs/LIMITS.md` #13/#34, not mechanised. | Not solvable from a repo: the required-check list, the bypass switch and the push identity are forge state |
 | K8 | **Cost** | Roles plus effort tokens; the panel only at S3+; sweeps are cron-and-one-line; no playbook fans out without a named predicate. | Handled by policy |
 | K9 | **The builder may only install into its own repo plus a scratch copy** | The install proof target is a throwaway copy under the scratch directory; the recipe is in `docs/GUIDE.md`. | Constraint, satisfied |
-| K10 | **A fleet-config repo is the least-governed artifact in an estate** | The E-class preset plus an artifact-scoped gate (a commit exists). The underlying staleness bug in a backup job is named and escalated — gobstack can detect staleness but cannot fix another repository. | Escalated |
+| K10 | **A fleet-config repo is the least-governed artifact in an estate** | An artifact-scoped gate (a commit exists). The underlying staleness bug in a backup job is named and escalated — gobstack can detect staleness but cannot fix another repository. | Escalated |
 | K11 | **The pre-change tree is unknown in a repo with no git history** | Repos with no `.git` are ordered *after* `git init`. `HS-02` is **skipped with a reason** rather than faked while no pinned commit exists. | Handled by ordering |
 | K12 | **A check green on both trees** (the failure mode the REPLAY exists for) | `HS-02` runs the harness set against the pinned pre-change commit and requires **every** harness to be RED there. The shipped scaffold harness is deliberately such a check and is therefore reported as unproven until it is replaced. | Handled by design; see `docs/LIMITS.md` |
 | K13 | **A nightly automation files the same defect twice, or files one that is not there** | Cut in v3 with `automations/` and `AU-02`. A project that runs its own intake keeps a content-only dedup key (`--idempotency-key`) plus the board's own `recent_success` and `active_pr` guards; a report whose `revision` does not resolve is a refusal, not a card; `--max-runtime`, `--max-retries 1` and the failure limit auto-block a looping card. | Handled by design; the key is a dedup, not a mutex (`docs/LIMITS.md` #20) |
@@ -384,8 +376,7 @@ sentence). A term a new reader might trip on belongs here, not in a footnote.
 | term | definition | source |
 |---|---|---|
 | advisory | A rule with no executable check. Counted in the verify summary and capped by advisory_ceiling; never a silent pass. | R6 sec.5 |
-| archive | A class-D flag: verify requires no HANDOFF and no gates, and the summary says so. | R7 sec.2.4 |
-| class | A project category A-E that selects which parts are required, optional or off. See manifest/classes.tsv. | R7 sec.4 |
+| archive | An opt-in flag: verify requires no HANDOFF and no gates, and the summary says so. | R7 sec.2.4 |
 | drift | A file whose current bytes no longer match the hash recorded at install time. IN-02 reports it; the remedy column says how to recover. | UX-review-2026-10-06 |
 | engine | The bash programs plus the manifest a verify run actually resolved: per-repo (.gob/bin) or global (engine_dir:). Named in every run's footer. | UX-review-2026-10-06 |
 | forge | The hosting platform a repo pushes to (GitHub, GitLab, ...). What the forge itself enforces — the required-check list, the bypass switch, the push identity — is not observable from inside a repo. | UX-review-2026-10-06 |
@@ -396,7 +387,7 @@ sentence). A term a new reader might trip on belongs here, not in a footnote.
 | lane | A family of rules that share a mechanism and a blind spot: the ban lane, the CI lane, the reference lane. The cannot-see footer reports per lane. | UX-review-2026-10-06 |
 | opt-out | A part recorded in disabled: so its required checks report SKIP (opt-out) instead of failing. | R6 sec.6.3 |
 | overnight | P10: an unattended run over a fixed goal, stopped by an escape hatch. | R6 sec.3 |
-| part | One installable unit a class requires or forbids: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, playbooks, tokens. | R7 sec.5 |
+| part | One installable unit: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, playbooks, tokens. | R7 sec.5 |
 | patch-id | git patch-id --stable of base..head. A new head voids a verdict; a matching commit message does not restore it. | R1 sec.10 |
 | playbook | A named, ordered procedure with a measurable verification step. gobstack ships 15. | R6 sec.3 |
 | preimage | The input that produces a known hash. The hash checks here prove non-drift, not preimage resistance - they are tamper-evidence, not signatures (docs/LIMITS.md #18). | UX-review-2026-10-06 |

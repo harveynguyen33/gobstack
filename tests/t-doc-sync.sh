@@ -119,11 +119,11 @@ check "no shipped doc or skill claims a fresh install is not automatically green
 
 # The three prose docs and the shipped bootstrap skill must carry the measured line; the other
 # shipped skills do not discuss a verify run and are not required to. v2: the measured green
-# path is the DEFAULT install's (35/0/6/21 — the model/role/loop rows and the CI payload are cut
+# path is the DEFAULT install's (34/0/6/21 — the model/role/loop rows, CL-01 and the CI payload are cut
 # in v3).
 GREEN_CLAIM=""
 for f in README.md docs/GUIDE.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '35 passed, 0 failed, 6 advisory, 21 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '34 passed, 0 failed, 6 advisory, 21 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, GUIDE and the shipped bootstrap skill state the measured green path" \
@@ -181,78 +181,6 @@ awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /CI lane/) found = 1 } END { exit !
 check "the verifier's 'cannot see' footer names the CI lane (W4-A)" "$?"
 awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /required check/) found = 1 } END { exit !found }' bin/goblin-verify
 check "  and says a required check is not the same thing as a gate" "$?"
-
-# ---- W4-B / W6: the class matrix is rendered from manifest/classes.tsv ------------------------
-# The part/class table is where a reader decides what a class owes, so it is the one place a class
-# can rot in silence. W6 merged the sixth (desktop/F) class into `software` - five domain-named
-# columns now, with A-E as read-time aliases. The tsv is one row per (class, part) pair -
-# `class<TAB>part<TAB>need` - and the doc renders a missing part as an em dash, so normalise.
-# v2: the `ci-gate` rows stay in the tsv as the recorded W4 remnant (every class `-`, CI is out of
-# the product), and the DOC intentionally renders no ci-gate row — its absence IS the statement,
-# made in prose right under the table. So the loop walks the tsv parts MINUS ci-gate, and the
-# prose note is pinned separately below.
-CLASS_DRIFT=""
-CLS=$(awk -F'\t' 'NR>1 { if (!seen[$2]++) print $2 }' manifest/classes.tsv | grep -v '^ci-gate$')
-for part in $CLS; do
-  want=$(for c in software service game research fleet; do
-           need=$(awk -F'\t' -v c="$c" -v p="$part" '$1==c && $2==p { print $3 }' manifest/classes.tsv)
-           printf '%s|' "${need:--}"
-         done | sed 's/|$//')
-  got=$(grep -m1 "^| *$part *|" docs/GUIDE.md | tr -d ' `' \
-        | awk -F'|' '{ out=""; for (i=3; i<=NF; i++) { gsub(/[ \t]/,"",$i); if ($i == "") continue; out = out "|" $i } sub(/^\|/,"",out); print out }')
-  [ "$got" = "$want" ] || CLASS_DRIFT="$CLASS_DRIFT $part(doc=$got tsv=$want)"
-done
-[ -z "$CLASS_DRIFT" ] || note "class matrix drifted from manifest/classes.tsv:$CLASS_DRIFT"
-check "docs/GUIDE.md renders the class matrix from manifest/classes.tsv (W4-B)" \
-  "$([ -z "$CLASS_DRIFT" ] && echo 0 || echo 1)"
-# The ci-gate remnant is pinned BOTH ways: every class off in the tsv, and the doc says why the
-# row is not rendered (so the absence reads as a decision, not a rendering gap).
-[ "$(awk -F'\t' '$2=="ci-gate" { print $3 }' manifest/classes.tsv | sort -u | tr -d '\n')" = "-" ]
-check "manifest/classes.tsv carries ci-gate as off for EVERY class (the v2 remnant shape)" "$?"
-grep -q 'ci-gate' docs/GUIDE.md && grep -q 'v2 installs no CI' docs/GUIDE.md
-check "  and the doc states in prose why ci-gate renders no row (v2 installs no CI)" "$?"
-# W6 review guard: the matrix loop above iterates the tsv's PARTS, so it cannot see a re-added
-# CLASS - a silently restored sixth class passed the whole suite. Pin the class SET itself.
-CLS_SET=$(awk -F'\t' 'NR>1 { if (!seen[$1]++) print $1 }' manifest/classes.tsv | sort | tr '\n' ' ')
-[ "$CLS_SET" = "fleet game research service software " ] || note "classes.tsv class set is not the canonical five: '$CLS_SET'"
-check "manifest/classes.tsv carries exactly the five canonical classes (W6)" \
-  "$([ "$CLS_SET" = "fleet game research service software " ] && echo 0 || echo 1)"
-# W6: the sixth (desktop/F) class is merged into software; the classes section now teaches five
-# domain-named classes and carries the electron opt-in that replaced F. The old pin measured the F row.
-grep -q '^| \*\*software\*\* (A) |' docs/GUIDE.md
-check "docs/GUIDE.md names the software class (W6: the F class merged in)" "$?"
-grep -qi 'electron opt-in' docs/GUIDE.md
-check "  and states the electron opt-in that replaced the sixth class (W6)" "$?"
-# v3: the CI lane is OUT of the product and docs/CI.md is DELETED — no workflow is written, the
-# doc table promises no CI doc, and ADOPTION's preset matrix carries no CI-lane row. The controls
-# assert the ABSENCE, and the verifier footer still says what the old lane could not see.
-! grep -q 'docs/CI.md' README.md
-check "README's document table does NOT promise a CI doc (v3: CI is out of the product)" "$?"
-! grep -qi '^| CI lane |' docs/GUIDE.md
-check "  and the preset matrix carries no CI-lane row (the part is off for every class)" "$?"
-[ ! -e docs/CI.md ]
-check "  and docs/CI.md is deleted from the doc set (v3: the CI lane is cut)" "$?"
-
-# ---- W6: desktop/F is a legacy ALIAS, never a class a reader picks ----------------------------
-# W6 merged the sixth (desktop/F) class into software — their classes.tsv need columns were
-# identical on all ten parts. The CLI still accepts `desktop`/`F` as a read-time alias, documented
-# once on docs/GUIDE.md's --class line; no doc that teaches the class CHOICE may carry it. Same
-# shape as the W5-D clone-install absence assertions below.
-DESKTOP_TAUGHT=""
-for f in README.md skills/goblin-bootstrap/SKILL.md; do
-  grep -qi 'desktop' "$f" && DESKTOP_TAUGHT="$DESKTOP_TAUGHT $f"
-done
-if [ -z "$DESKTOP_TAUGHT" ]; then
-  note "ok   no class-choice doc teaches 'desktop' as a class (W6: desktop/F is a legacy alias)"
-else
-  note "FAIL still presents 'desktop' as a class:$DESKTOP_TAUGHT"
-  grep -ni 'desktop' $DESKTOP_TAUGHT | head -3
-  fail=1
-fi
-# And the alias is still documented, once, where the CLI surface is described - so the absence
-# above cannot be satisfied by deleting the back-compat story.
-grep -qi 'desktop' docs/GUIDE.md
-check "docs/GUIDE.md documents desktop/F as a read-time alias (W6)" "$?"
 
 # ---- F2-3: the unsigned record is admitted -----------------------------------
 grep -qi 'is not signed' docs/LIMITS.md

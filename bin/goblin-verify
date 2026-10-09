@@ -83,7 +83,7 @@ if [ -z "$ROOT" ]; then
 fi
 
 # ---- engine resolution (W1, §2.3): one chain, stated once --------------------
-# Every engine-path lookup (enforcement.tsv, classes.tsv, bans.tsv, bans/*.sh, the ban
+# Every engine-path lookup (enforcement.tsv, bans.tsv, bans/*.sh, the ban
 # engine) resolves through this chain, first hit wins:
 #   1. --source <path>            (existing flag; highest, for tests and pinned CI)
 #   2. $ROOT/.gob/...             (vendored per-repo engine — today's default)
@@ -164,14 +164,11 @@ ENGINE_CHAIN_VENDORED="\$ROOT/.gob/manifest/enforcement.tsv"
 GOBLIN_ENGINE=""                       # the resolved engine root, when NOT vendored/--source
 if [ -n "$SOURCE" ]; then
   MANIFEST="$SOURCE/manifest/enforcement.tsv"
-  CLASSES="$SOURCE/manifest/classes.tsv"
 elif [ -f "$ROOT/.gob/manifest/enforcement.tsv" ]; then
   MANIFEST="$ROOT/.gob/manifest/enforcement.tsv"
-  CLASSES="$ROOT/.gob/manifest/classes.tsv"
 elif [ -n "$ENGINE_DECLARED" ]; then
   GOBLIN_ENGINE="$ENGINE_DECLARED"
   MANIFEST="$GOBLIN_ENGINE/manifest/enforcement.tsv"
-  CLASSES="$GOBLIN_ENGINE/manifest/classes.tsv"
 elif [ -n "$ENGINE_FAIL" ]; then
   # §2.4: an explicit engine_dir: that does not resolve is exit 2, and nothing falls
   # back. The refusal names the declared value and every path the chain tried.
@@ -193,10 +190,8 @@ else
   if [ -n "$_cli_default" ] && [ -f "$_cli_default/manifest/enforcement.tsv" ]; then
     GOBLIN_ENGINE="$_cli_default"
     MANIFEST="$GOBLIN_ENGINE/manifest/enforcement.tsv"
-    CLASSES="$GOBLIN_ENGINE/manifest/classes.tsv"
   else
     MANIFEST="$SELF_DIR/../manifest/enforcement.tsv"
-    CLASSES="$SELF_DIR/../manifest/classes.tsv"
   fi
 fi
 [ -f "$MANIFEST" ] || {
@@ -283,14 +278,6 @@ if [ ! -f "$CONFIG" ]; then
   exit 2
 fi
 
-# The class is read-time resolved: the gob block records the canonical name on new installs, but
-# every repo installed before the 5-class merge records a letter (A..F) or an old name
-# (app/agent/desktop). g_class_canon maps them all to the five canonical names; the tsv carries
-# the canonical names, so nothing else in this file has to know about letters. `desktop`/F -> software.
-CLASS_RAW=$(g_agents_read "$CONFIG" class)
-CLASS=$(g_class_canon "$CLASS_RAW") \
-  || { g_err "unknown class '${CLASS_RAW:-<empty>}' in $CONFIG (expected software|service|game|research|fleet, or A-E / app / agent / desktop)"; exit 2; }
-
 # Root vs git toplevel. find_installed_root resolves the CONFIG lookup correctly, but the
 # rows that shell out to git run in $ROOT and git resolves that to the ENCLOSING repo when
 # the target is not a repository of its own: a nested target then reports the outer repo's
@@ -353,8 +340,8 @@ if [ -d "$ROOT/$HARNESS_DIR_RAW" ]; then
 else
   export GOBLIN_HARNESS_DIR=""
   export GOBLIN_HARNESS_REL="$HARNESS_DIR_RAW"
-  # 'absent' = the class scaffolds a harness dir and the declared one is missing -> FAIL.
-  # 'none'   = the class ships no harness dir -> SKIP with a reason (D7).
+  # 'absent' = scaffold_checks is yes and the declared harness dir is missing -> FAIL.
+  # 'none'   = scaffold_checks is no, so there is no harness dir to assert -> SKIP (D7).
   if [ "$SCAFFOLD_CHECKS" = "yes" ]; then
     export GOBLIN_HARNESS_STATE=absent
   else
@@ -388,12 +375,8 @@ PERF_BASELINE_COMMIT=$(g_unquote "$(g_agents_read "$CONFIG" perf.baseline_commit
 PERF_BASELINE_VALUE=$(g_agents_read "$CONFIG" perf.baseline_value)
 PERF_MEASURED=$(g_unquote "$(g_agents_read "$CONFIG" perf.measured)")
 PERF_HOST_GATE=$(g_agents_read "$CONFIG" perf.host_gate)
-# The electron opt-in (software class): true means the electron ban set stays on regardless of a
-# hand-edited bans: list, and a perf host gate must be declared (PF-01). Absent on a repo
-# installed before the merge — read as off, so a legacy class-F repo verifies with no rewrite.
-ELECTRON=$(g_agents_read "$CONFIG" electron)
 export SEC_GITIGNORE_FAMILY SEC_BUILD_OUTPUT
-export SEC_WRITE_ROUTES PERF_METRIC PERF_CMD PERF_BASELINE_VALUE PERF_HOST_GATE ELECTRON
+export SEC_WRITE_ROUTES PERF_METRIC PERF_CMD PERF_BASELINE_VALUE PERF_HOST_GATE
 
 # Whole days between an ISO date and today, or empty when the date does not parse on this host
 # (`date -d` is GNU; the row FAILS rather than assuming, because an unreadable date is not a
@@ -421,7 +404,7 @@ only_selected() {
   return 1
 }
 
-# ---- part mapping: a row id's prefix names the class-controlled part ---------
+# ---- part mapping: a row id's prefix names the part a row belongs to ---------
 row_part() {
   case "$1" in
     HP-*) echo handoff ;;
@@ -532,7 +515,7 @@ check_in_04() {
 check_in_02() {
   # The W1 semantic split (§2.2). Clause 1 - the per-repo mode: hash every recorded file,
   # the practice pin rides along - is byte-for-byte what this row has always done, and a
-  # fresh install of any class keeps it (installed.json carries no engine: block).
+  # fresh install keeps it (installed.json carries no engine: block).
   # Clause 2 - engine.mode=global with file entries remaining: hash what IS recorded;
   # an entry under the engine paths (.gob/bin, .gob/manifest, .gob/bans) that is
   # still present is hashed too
@@ -797,7 +780,7 @@ check_gt_05() {
   n=$(g_agents_read "$CONFIG" ratchet.name)
   c=$(g_agents_read "$CONFIG" ratchet.cmd)
   ceil=$(g_agents_read "$CONFIG" ratchet.ceiling)
-  [ -n "$n" ] && [ -n "$c" ] || { printf 'no ratchet declared for this class - skipped\n'; return 3; }
+  [ -n "$n" ] && [ -n "$c" ] || { printf 'no ratchet declared - skipped\n'; return 3; }
   val=$( cd "$ROOT" && bash -c "$c" 2>/dev/null | tr -d '[:space:]' )
   case "$val" in ''|*[!0-9]*) printf 'ratchet cmd produced a non-number: %s\n' "$val"; return 1 ;; esac
   if [ -f "$ROOT/.gob/ratchet-last" ]; then prev=$(cat "$ROOT/.gob/ratchet-last"); fi
@@ -815,16 +798,16 @@ check_gt_05() {
 check_hs_01() {
   local d="$GOBLIN_HARNESS_DIR" f base asserting=0 reporting=0 bad=0
   if [ -z "$d" ]; then
-    # A declared harness dir that is missing is a FAIL when the class scaffolds one; a class
-    # that ships none skips with a reason. Keying the skip off the PATH let a one-line config
+    # A declared harness dir that is missing is a FAIL when scaffold_checks is yes; when it is
+    # no the row skips with a reason. Keying the skip off the PATH alone let a one-line config
     # edit switch both HS rows off (D7).
     if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
-      printf 'harness_dir %s is declared and class %s scaffolds it, but the directory is absent\n' \
-        "$GOBLIN_HARNESS_REL" "$CLASS"
+      printf 'harness_dir %s is declared and scaffold_checks is yes, but the directory is absent\n' \
+        "$GOBLIN_HARNESS_REL"
       return 1
     fi
-    printf 'no harness dir (%s absent, class %s scaffolds none) - nothing to assert\n' \
-      "$GOBLIN_HARNESS_REL" "$CLASS"
+    printf 'no harness dir (%s absent, scaffold_checks is no) - nothing to assert\n' \
+      "$GOBLIN_HARNESS_REL"
     return 3
   fi
   for f in "$d"/*; do
@@ -873,8 +856,8 @@ check_hs_02() {
   d="$GOBLIN_HARNESS_DIR"
   if [ -z "$d" ]; then
     if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
-      printf 'harness_dir %s is declared and class %s scaffolds it, but the directory is absent\n' \
-        "$GOBLIN_HARNESS_REL" "$CLASS"
+      printf 'harness_dir %s is declared and scaffold_checks is yes, but the directory is absent\n' \
+        "$GOBLIN_HARNESS_REL"
       return 1
     fi
     printf 'no harness dir to replay\n'; return 3
@@ -1228,7 +1211,7 @@ check_bn_run() {
   # closed (the engine's own exit 2 = the table is missing/empty, which is not a pass).
   # W1 §2.5: the engine is <resolved engine>/bin/goblin-bans (chain §2.3). The hard-FAIL
   # stays for the vendored mode; in global mode the engine's own existence was already
-  # checked at resolution (§1.2 item 4), so an absent ban engine is exit-2-class, but it
+  # checked at resolution (§1.2 item 4), so an absent ban engine is a config error, but it
   # is still reported FAIL-closed here rather than silently skipped - the ban lane must
   # never read clean because a binary went missing.
   local id="$1" engine out rc detail
@@ -1267,15 +1250,8 @@ check_pf_01() {
   # to ignore it.
   local rname bad=0
   rname=$(g_agents_read "$CONFIG" ratchet.name)
-  # The electron opt-in's done-definition: an Electron repo declares its host gate (the FPS /
-  # main_thread_busy_pct number a hermetic rule cannot measure). `electron: true` with no host
-  # gate is a repo missing half its definition — FAIL, before the baseline skip below can mask it.
-  if [ "$ELECTRON" = "true" ] && [ -z "$PERF_HOST_GATE" ]; then
-    printf 'electron: true requires a declared perf.host_gate — declare the host-gate probe (the number no hermetic rule can measure) or drop electron: true\n'
-    return 1
-  fi
   [ -n "$PERF_METRIC" ] || {
-    printf 'this class declares no perf metric (perf.metric is empty). The ratchet still carries\n%s; declare metric/cmd here the day you pick one\n' "${rname:-nothing}"
+    printf 'no perf metric is declared (perf.metric is empty). The ratchet still carries\n%s; declare metric/cmd here the day you pick one\n' "${rname:-nothing}"
     return 3
   }
   [ -n "$PERF_BASELINE_COMMIT" ] || {
@@ -1405,101 +1381,11 @@ check_pt_02() {
   return 0
 }
 
-class_part_artifact() {
-  # prints 0 (present) or 1 (absent) for the part's artifact
-  case "$1" in
-    handoff)      [ -f "$ROOT/HANDOFF.md" ] ;;
-    spec)         ls "$ROOT"/*-SPEC.md >/dev/null 2>&1 ;;
-    gate)         [ "$(g_agents_gates "$CONFIG" | grep -c . || true)" -ge 1 ] ;;
-    replay)       [ -n "$(g_agents_read "$CONFIG" replay.env)" ] && [ -n "$(g_agents_read "$CONFIG" replay.cmd)" ] ;;
-    ratchet)      [ -n "$(g_agents_read "$CONFIG" ratchet.name)" ] ;;
-    pr-gate)      [ -d "$ROOT/reviews" ] ;;
-    review-panel) [ -d "$ROOT/reviews" ] ;;
-    # The W4a re-point (W4A-SPEC §5.3): the artifact test accepts the goblin-mode skill
-    # at ANY path in the W4a emitted set, or a record in the emissions ledger. The old
-    # probe hardcoded the Hermes project path and FAILed the first emitted-only repo
-    # (declaration + emit, no goblin-install). Rule text, class table and enforced_by
-    # are untouched - this is the W1 §2.5 re-point precedent.
-    playbooks)
-      # The first platform's dir name is ASSEMBLED at run time from fragments, so no rule
-      # here spells the tool's own name literally. The four remaining platforms' emitted
-      # roots are probed the same way; the last one's dir name is assembled too.
-      # The global-scope probes are gated on GOBLIN_GLOBAL=1: a global path under the real
-      # $HOME is not evidence about THIS repo, and letting it count made the T6 RED control
-      # pass vacuously on any machine whose operator emits globally (measured 2026-10-01:
-      # new_home() isolates GOBLIN_EMISSIONS but not HOME, so the fallbacks reached the
-      # operator's real ~/.hermes). GOBLIN_GLOBAL=1 is set by an operator who wants the
-      # global tier to count; tests that need isolation leave it unset.
-      local _cl_1 _cl_2 _cl_3 _g1 _g2
-      _cl_1="$(printf '%s' '.cl')"; _cl_2="$(printf '%s' 'a')"; _cl_3="$(printf '%s' 'ude')"
-      _g1="$(printf '%s' '.gem')"; _g2="$(printf '%s' 'ini')"
-      [ -f "$ROOT/.hermes/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/$_cl_1$_cl_2$_cl_3/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/.github/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/.cursor/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/.opencode/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/.agents/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/$_g1$_g2/skills/goblin-mode/SKILL.md" ] && return 0
-      if [ "${GOBLIN_GLOBAL:-0}" = "1" ]; then
-        [ -f "${HOME:-$ROOT}/.copilot/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/$_cl_1$_cl_2$_cl_3/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/.cursor/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/.opencode/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/.agents/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/.hermes/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/$_g1$_g2/skills/goblin-mode/SKILL.md" ] && return 0
-      fi
-      [ -f "${GOBLIN_EMISSIONS:-${HOME:-}/.goblin-stack/emissions.tsv}" ] \
-        && awk -F'\t' -v r="$ROOT" 'NR>1 && index($3, r) == 1 { found=1 } END { exit !found }' \
-           "${GOBLIN_EMISSIONS:-${HOME:-}/.goblin-stack/emissions.tsv}" && return 0
-      return 1 ;;
-    tokens)       [ -f "$ROOT/.gob/tokens.yaml" ] ;;
-    # ci-gate: the part is GONE from the product (v2). Every class carries need="-" in
-    # classes.tsv, and the artifact can never be written again — so the probe is a
-    # constant ABSENT and the CL-01 "-" branch (forbids, artifact absent) always passes.
-    ci-gate)      return 1 ;;
-    # The CI lane's artifact is the workflow goblin-stack WRITES, not the directory: a repo is
-    # allowed to have its own workflows, and `-` on this part means "goblin-stack must not have
-    # placed one here", not "this repo may not have CI" (G6 A.6).
-    *)            return 0 ;;
-  esac
-}
-
-check_cl_01() {
-  local part need present bad=0
-  while read -r part; do
-    [ -n "$part" ] || continue
-    need=$(g_class_need "$CLASSES" "$CLASS" "$part")
-    class_part_artifact "$part"; present=$?
-    # A class-forbidden part is forbidden whether or not the installer pre-disabled it: the
-    # opt-out branch used to mask the '-' branch for every part the class turns off, so only
-    # review-panel was ever enforced (D10).
-    if [ "$need" = "-" ]; then
-      if [ "$present" -eq 0 ]; then printf 'class %s forbids part %s, artifact present\n' "$CLASS" "$part"; bad=1; fi
-      continue
-    fi
-    if g_agents_part_disabled "$CONFIG" "$part"; then
-      printf 'part %s: opt-out\n' "$part"
-      continue
-    fi
-    case "$need" in
-      R)
-        if [ "$ARCHIVE" = "true" ]; then
-          printf 'part %s: waived (archive: true)\n' "$part"
-        elif [ "$present" -ne 0 ]; then
-          printf 'class %s requires part %s, artifact absent\n' "$CLASS" "$part"; bad=1
-        fi ;;
-      O) printf 'part %s: optional, %s\n' "$part" "$([ "$present" -eq 0 ] && echo present || echo absent)" ;;
-    esac
-  done < <(awk -F'\t' 'NR>1 {print $2}' "$CLASSES" | sort -u)
-  [ "$bad" -eq 0 ]
-}
-
 check_cl_02() {
   # The archive flag is a switch with a contract, so it must be checkable (D6 - the old body
   # printed a sentence and returned 0 in both branches, so the row could never be RED).
   # Two falsifiable clauses: the value must be a boolean, and it must agree with what the
-  # install recorded - otherwise flipping `archive:` by hand silently waives the class.
+  # install recorded - otherwise flipping `archive:` by hand silently waives the checks.
   case "$ARCHIVE" in
     true|false) ;;
     *) printf 'archive: must be true or false, got "%s"\n' "${ARCHIVE:-<empty>}"; return 1 ;;
@@ -1514,7 +1400,7 @@ check_cl_02() {
   if [ "$ARCHIVE" = "true" ]; then
     printf 'archive: true (matches the install record) - HP-*/GT-*/SP-* skipped, no HANDOFF or gates required\n'
   else
-    printf 'archive: false - the full class requirement applies\n'
+    printf 'archive: false - the full requirement applies\n'
   fi
   return 0
 }
@@ -1901,7 +1787,7 @@ check_rc_03() {
       scripts/*|notes/*|manifests/*) continue ;;
       # The harness's own directories and the .gitignore block it appends are the install, not the
       # lab's content - the same exclusion FM-02 makes for the same reason (W5-4). That set is the
-      # one the class-A install contract creates: .gob/, .hermes/, the .gitignore block, the
+      # one the install contract creates: .gob/, .hermes/, the .gitignore block, the
       # declared harness_dir (checks/ by default), reviews/, and the CI scaffold .github/. A payload
       # hidden in any of them is still caught by clause 2 (the sha256 sweep below).
       .gob/*|.hermes/*|.gitignore|.github/*|reviews/*) continue ;;
@@ -2103,8 +1989,8 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
 done < "$MANIFEST"
 
 if [ "$JSON" -eq 1 ]; then
-  printf '{"root":"%s","class":"%s","passed":%d,"failed":%d,"advisory":%d,"skipped":%d,"rows":[%s]}\n' \
-    "$(json_escape "$ROOT")" "$(json_escape "$CLASS")" "$PASS" "$FAIL" "$ADV" "$SKIP" "${JSON_ROWS%,}"
+  printf '{"root":"%s","passed":%d,"failed":%d,"advisory":%d,"skipped":%d,"rows":[%s]}\n' \
+    "$(json_escape "$ROOT")" "$PASS" "$FAIL" "$ADV" "$SKIP" "${JSON_ROWS%,}"
 else
   printf '      %d passed, %d failed, %d advisory, %d skipped\n' "$PASS" "$FAIL" "$ADV" "$SKIP"
   # Day-one framing, part (a) (review 1, scope 3): the owner mismatch names whose email the
@@ -2136,7 +2022,7 @@ else
   if [ "$VERBOSE" -eq 1 ]; then
     cat <<'SEE'
       cannot see: whether a check in the harness dir tests the right path rather than
-      merely passing; whether the forge is bound by the workflow CL-01 found; whether a human
+      merely passing; whether the forge is bound by the workflow the repo declares found; whether a human
       read the diff; and whether .gob/installed.json — the record every drift
       check trusts — was itself rewritten. It is not signed, so one edit to it (with the
       matching edit to the file it protects) defeats IN-02, SK-02 and HS-01 at once

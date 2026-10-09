@@ -28,8 +28,8 @@ PROBE="$WORK/probe"; mkdir -p "$PROBE"
 trap 'rm -rf "$WORK"' EXIT
 
 # a fresh class-A install, committed (CM-03 max_dirty 0 fails an uncommitted install)
-HOME="$HOMEDIR" node "$SRC/bin/goblin.js" install --target "$PROBE" --class A >/dev/null 2>&1 || \
-  HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target "$PROBE" --class A >/dev/null 2>&1
+HOME="$HOMEDIR" node "$SRC/bin/goblin.js" install --target "$PROBE" >/dev/null 2>&1 || \
+  HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target "$PROBE" >/dev/null 2>&1
 ( cd "$PROBE" && git init -q && git add -A && git commit -qm "install" ) >/dev/null 2>&1
 
 OUT="$WORK/stdout.txt"; ERR="$WORK/stderr.txt"

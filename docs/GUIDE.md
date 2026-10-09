@@ -58,7 +58,7 @@ Everything else in gobstack follows from that sentence. If you remember one thin
 guide, remember that one — it is also the standard the harness holds itself to, and the reason it
 ships a file of things it *cannot* check (`docs/LIMITS.md`).
 
-**Words this guide uses** — gate, ratchet, class, part, replay and the rest are defined in one
+**Words this guide uses** — gate, ratchet, part, replay and the rest are defined in one
 sentence each in `README.md` (rendered from the glossary table the install ships:
 `.gob/manifest/glossary.tsv`).
 
@@ -109,12 +109,11 @@ and installs:
 
     gob init --heuristic                 # the brief + schema; --heuristic adds scanned hints
 
-The brief asks for exactly four decisions — class, branch, owner email, and ONE gate command
+The brief asks for exactly three decisions — branch, owner email, and ONE gate command
 that proves the repo is healthy. Write them into the proposal file (the brief names the schema;
 a hand-written one works fine):
 
     <!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->
-    class: software
     branch: main
     owner_email: you@example.com
     gate_check_cmd: bash tests/run-tests.sh
@@ -123,7 +122,7 @@ a hand-written one works fine):
     ## gob init summary
 
     - scan: bare repo, no package.json — the brief was answered by hand
-    - chose: class software, branch main, gate `bash tests/run-tests.sh`
+    - chose: branch main, gate `bash tests/run-tests.sh`
 
 then install it:
 
@@ -131,7 +130,7 @@ then install it:
 
 Expected output (this is a real transcript, trimmed):
 
-    created 19 · updated 0 · unchanged 0 · skipped 0
+    created 18 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
@@ -139,7 +138,7 @@ Expected output (this is a real transcript, trimmed):
       3. edit AGENTS.md: replace the default gate with your real commands (P8 step 3)
       4. agent skills are opt-in
 
-**`created 19`** is the installer's count of the files it **tracks**. It writes **20**: the 20th
+**`created 18`** is the installer's count of the files it **tracks**. It writes **19**: the 19th
 is `.gob/installed.json`, the record it keeps for itself, which it writes but does not count. It
 has written nothing outside this directory — and nothing under `.github/`: **v2 installs no
 CI, ever.** The default install ships **no agent skills** — the harness is neutral.
@@ -177,7 +176,7 @@ You will see one line per rule. The shape:
 
 and a summary line at the bottom:
 
-    36 passed, 1 failed, 6 advisory, 19 skipped     # HP-05, below
+    36 passed, 2 failed, 6 advisory, 17 skipped     # the uncommitted install, below
 
 ### How to read that output
 
@@ -219,9 +218,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `35 passed, 2 failed, 6 advisory, 19 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
-| 2. the first commit | `git add -A && git commit` | `36 passed, 1 failed, 6 advisory, 19 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `37 passed, 0 failed, 6 advisory, 19 skipped` | none — green |
+| 1. the install ran | `gob init --write ... --yes` | `36 passed, 2 failed, 6 advisory, 17 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
+| 2. the first commit | `git add -A && git commit` | `37 passed, 1 failed, 6 advisory, 17 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `38 passed, 0 failed, 6 advisory, 17 skipped` | none — green |
 
 One of those deserves its name spelled out:
 
@@ -262,7 +261,6 @@ by the installer:
 
 Open it. The keys that matter on day one:
 
-    class: software                       # software|service|game|research|fleet (A-E are aliases)
     branch: main                          # DECLARED, never assumed
     owner_email: you@example.com          # the commit identity this repo expects
     practice: /path/to/your-standard.md   # optional: your own house rules, hash-pinned
@@ -295,34 +293,17 @@ a re-install — an edited standard is never a silent no-op.
 
 ---
 
-## 6. Step 4 — Pick the right class (this decides what you get)
+## 6. Step 4 — There is one config, not five classes
 
-A class is **not** a strictness level. It selects which parts are required, optional, or off, and it
-supplies the default gate shape. Choose by asking *what does "done" mean here?*
+There is **no class to pick**. gobstack installs one configuration; the ban table self-selects
+per row (a ban runs only when a real file matches its `applies_when` glob), so the installer
+needs no taxonomy to decide what to render. "Done" is defined by the repo's own gate, not by a
+category: ask *what does "done" mean here?* and declare it as `gate_<name>_cmd` (§5).
 
-| Class | Choose it when | "Done" means |
-|---|---|---|
-| **software** (A) | an app, library, or tool users run | a gate set reports measured numbers and a round lands |
-| **service** (B) | an API, schema, route, or deployment config | the contract is unchanged, or the change is deliberate and migrated |
-| **game** (C) | a game | a suite is green **and** a human feel verdict exists |
-| **research** (D) | notes, a vault, a research directory | a question is answered with sources and is findable |
-| **fleet** (E) | your agent's own config (`~/.hermes`) | the change is applied, verified against the artifact, versioned |
-
-An Electron app is **software** with `electron: true` — the opt-in adds the electron bans and a host
-gate, not a sixth class. The old `F` letter still resolves there as an install alias.
-
-**Two placements people get wrong:**
-
-- A repo that holds *output* while the code lives elsewhere → **research**, not **software**. Gating
-  it like an application gates the wrong artifact.
-- A plain input directory that is not a build target → **research** with `archive: true`, which tells
-  verify to expect no HANDOFF and no gates, and to say so.
-
-Switch class later by editing `class:` in the gob block and re-running install. The parts you no longer
-need are recorded as **disabled** and will report `SKIP (opt-out)` rather than failing.
+Parts you do not want are switched off by name with `--opt-out <part>`, which records the part
+in `disabled:` so its rows report `SKIP (opt-out)` rather than passing silently.
 
 ---
-
 ## 7. Step 5 — Your first real change, end to end
 
 Now do the thing the harness exists for. Pick a small real task in a real repo.
@@ -366,7 +347,7 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 13 files it
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 12 files it
 tracks — not the ones it `owns` (including `AGENTS.md`, whose gob block §5 has you editing) and not
 `.gob/installed.json`; edit one of the tracked — the exercise below uses `.gob/bans/README.md`.
 
@@ -443,20 +424,20 @@ the next session.
 
 ## 9. What to expect on day one (so you do not misread it)
 
-A software-class install lands on a specific shape. The first reds are
+A default install lands on a specific shape. The first reds are
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    35 passed, 2 failed, 6 advisory, 19 skipped     # straight after the install (CM-03 + SP-02)
-    36 passed, 1 failed, 6 advisory, 19 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
-    37 passed, 0 failed, 6 advisory, 19 skipped     # real HEAD named and committed: green
+    36 passed, 2 failed, 6 advisory, 17 skipped     # straight after the install (CM-03 + SP-02)
+    37 passed, 1 failed, 6 advisory, 17 skipped     # editing HANDOFF.md re-reds CM-03 (commit-as-you-go)
+    38 passed, 0 failed, 6 advisory, 17 skipped     # committed: green
 
 Name a real commit in `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is
 green:
 
-    37 passed, 0 failed, 6 advisory, 19 skipped     (on a real project; your numbers will differ)
+    38 passed, 0 failed, 6 advisory, 17 skipped     (on a real project; your numbers will differ)
 
-**Thirty-two rows skipping is correct**, and each skip prints its reason. In plain terms: the
+**Twenty-one rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
 scolding.
 
@@ -464,7 +445,7 @@ Two readings that are easy to get wrong:
 
 - **Advisory rows are not passes.** Six rules are labelled `advisory` — counted, not enforced, and
   all six carry no executable check at all. The count is capped by `advisory_ceiling: 10`, and a
-  software-class install sits at 6 of 10: adding unenforceable rules eventually fails verify until
+  default install sits at 6 of 10: adding unenforceable rules eventually fails verify until
   one is removed. That is intentional.
 - **Vacuously-passing rows are not proven.** A rule about "the first review note" passes when there
   is no review note yet. It is not lying — it is passing on an empty set. `docs/GUIDE.md`
@@ -608,7 +589,7 @@ the result.
 4. When you have a bug that a test could catch, walk P5 (`goblin-tdd-repro`) end to end once.
 
 **If you are sharing this with a team:** the parts that matter are `HANDOFF.md`, the gate commands
-you declare, and the REPLAY habit. The rest is optional machinery you can switch off per class.
+you declare, and the REPLAY habit. The rest is optional machinery you can switch off per part.
 Lead with *"prove it was broken first"* — it is the one practice that survives contact with a
 deadline.
 
@@ -628,14 +609,10 @@ same way the fleet's own tool reads it. Everything else is line-oriented shell.
     goblin-install --target <dir> [options]
 
     --target <dir>        required; the repo root to install into
-    --class <class>       required unless --uninstall or --re-pin. One of the five domain classes:
-                          software · service · game · research · fleet. The letters A-E and the
-                          older names app (software), agent (fleet) and desktop/F (software + the
-                          electron opt-in) are read-time aliases.
     --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE; unset = no
                           practice pin; a named path that is absent is reported, never
                           silently dropped)
-    --parts <list>        comma list to install; default = every part the class requires
+    --parts <list>        comma list to install (default = the whole default part set)
     --archive             mark the project archive: verify requires no HANDOFF and no gates
     --skills yes|no       install agent skills under .hermes/skills (default no — the harness is
                           neutral). On a repo whose record already has skills installed, an OMITTED
@@ -739,7 +716,7 @@ Output is one line per executed row, in manifest order, plus a summary line at t
     ADV   SC-09  auth is applied consistently across sibling routes
     SKIP  HS-02  no pinned pre-change commit yet - REPLAY not provable
 
-Those four lines are one row of each marking. The summary line of a green default software-class run is `35 passed, 0 failed, 6 advisory, 25 skipped`.
+Those four lines are one row of each marking. The summary line of a green default run is `34 passed, 0 failed, 6 advisory, 21 skipped`.
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -752,7 +729,7 @@ is counted and capped.
 
 **What it cannot see** (printed at the end of every run): whether a check in the harness dir
 tests the right path rather than merely passing; whether the forge is bound by the workflow
-`CL-01` found; whether a human
+a config declares found; whether a human
 read the diff; and whether `.gob/installed.json` — the record every drift check trusts — was
 itself rewritten, since it
 is not signed (`docs/LIMITS.md` #18). The CI lane is out of the product and its doc is deleted; the
@@ -761,24 +738,23 @@ workflow file is not a gate still holds (`docs/LIMITS.md` #34).
 
 #### A fresh install verifies green
 
-Measured on a fresh DEFAULT software-class install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`35 passed, 0 failed, 6 advisory, 21 skipped`, exit 0.** Twenty-one rows skip with
+Measured on a fresh DEFAULT install (skills opt-in, W6 neutral-first), committed with no
+hand edit: **`34 passed, 0 failed, 6 advisory, 21 skipped`, exit 0.** Twenty-one rows skip with
 a reason — the same not-yet rows as before, plus the four skill rows (`SK-01`..`SK-04`)
 that skip on the `playbooks` opt-out a skills-free install records: `HS-02` — no pre-change commit
 is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `SC-06`, which
 has no dependency manifest or lockfile to read yet — `PF-01`, which has
-no measured perf baseline — `BN-01`/`BN-02`/`BN-05`, which have no `src/` tree for a ban to read,
-and `BN-03` with the four electron bans
-`BN-06`..`BN-09`, which this class does not enable (`bans: [BN-01, BN-02, BN-05]`), so they skip as
+no measured perf baseline — `BN-01`/`BN-02`/`BN-05`, which have no `.ts` file for a ban's `applies_when` glob, so they report
+*not applicable*, and `BN-03` with the four electron bans
+`BN-06`..`BN-09`, which the `bans:` list does not enable (`bans: [BN-01, BN-02, BN-05]`), so they skip as
 *not enabled* rather than as *unread* — `FM-01`/`FM-02`/`VA-01`, which have no feature map and no declared
 `verify_doctor:` yet (`feature_map:` and `verify_doctor:` ship empty on purpose: a fresh install
 must not be born RED — G1, `docs/LIMITS.md` #30) — `RC-01`..`RC-04`, which read a declared
 reference corpus and a lab `manifests/` directory a fresh install has neither of
 (`reference_manifest:` and `quarantine_root:` ship empty on purpose: a repo with no corpus must
-not be born RED). The electron bans named in the skip list above do skip here too — a tree
-without a renderer skips them the same way. Every skip above is a *not yet*, not a pass.
+not be born RED). Every skip above is a *not yet*, not a pass.
 
-The class's required parts that only a round can produce do **not** fail on a fresh install; they
+The parts that only a round can produce do **not** fail on a fresh install; they
 pass **vacuously**, and that is the honest reading: `PG-01`..`PG-03` iterate over `reviews/*.md`
 and there are none, and the declared gate *is* the shipped floor until step 3 replaces it. `P8`
 (`goblin-bootstrap`) walks that first-step list because the work is not done, not because the
@@ -788,13 +764,13 @@ verifier is reporting FAILs.
 
 - **Per part:** `--opt-out <part>` records the part in `disabled:`. `goblin-verify` then reports
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
-  absent**. The same mechanism is what makes a class's `-` (off) real.
-- **The opt-out numbers are pinned (V3-3).** A software-class install with an explicit `--skills no`
-  verifies `35 passed, 0 failed, 6 advisory, 25 skipped`, exit 0, and
+  absent**. The same mechanism is what makes a part's off state real.
+- **The opt-out numbers are pinned (V3-3).** A default install with an explicit `--skills no`
+  verifies `34 passed, 0 failed, 6 advisory, 21 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
   at v0.2 as the ban and feature-map rows landed; in v3 the model/role/loop and CI rows are cut,
-  so the shape is `35/0/6/25`).
+  so the shape is `34/0/6/21`).
 - **Skills, W6 neutral-first.** A default install ships no agent skills. A repo whose record has
   `skills: yes` keeps them through every flag-less re-install and `--upgrade` (the installer
   reads the record's choice and says so out loud); an explicit `--skills no` removes exactly the
@@ -819,64 +795,11 @@ From a checkout, without installing anything:
 
 ---
 
-## 15. Classes, presets, and the adoption order
-
-### The five classes
-
-A class is **not** a stringency level. It selects which parts are required, optional or off, and
-it supplies the default gate and ratchet shape. The gate vocabulary differs by class; the
-harness does not. The names are words; the letters `A`..`E` are read-time aliases.
-
-| Class | What "done" means |
-|---|---|
-| **software** (A) | a gate set reports measured numbers, a round lands, the artifact deploys or publishes |
-| **service** (B) | a contract (schema, route, API) is unchanged, or the change is intentional and migrated |
-| **game** (C) | a suite green in the Editor **and** a human feel verdict — the verdict is a first-class deliverable |
-| **research** (D) | a question is answered with sources and the answer is findable |
-| **fleet** (E) | a config change is applied, verified against the **artifact**, and versioned |
-
-Two placements worth arguing about:
-
-- A repo whose code is small and lives elsewhere, while the repo holds *output*, belongs in
-  **research**, not **software** — gating it like an application gates the wrong artifact; its gate
-  is freshness, not compilation.
-- An input directory that is not a build target at all belongs in **research** with **`--archive`**.
-  Without the flag the installer keeps producing HANDOFFs for a directory whose own design
-  folders are empty.
-
-### The preset matrix
-
-`R` = required · `O` = optional (installed, reported) · `—` = off. The same data is in
-`.gob/manifest/classes.tsv`, and `CL-01` checks it against the repo.
-
-| Part | software | service | game | research | fleet |
-|---|---|---|---|---|---|
-| HANDOFF | R | R | R | R | R |
-| SPEC before change | R | R | R | — | R |
-| Verification gate | R | R | R | O | R |
-| Pinned-commit REPLAY | R | — | R | — | O |
-| Ratchet | R | O | O | — | O |
-| PR gate | O | — | O | — | O |
-| Review panel | O | — | R | — | O |
-| Playbooks (the skills) | R | R | R | R | R |
-| Design tokens | O | — | — | — | O |
-
-(The `ci-gate` part is not a row here: v2 installs no CI, so the part is off for every class —
-the W4 preset matrix that carried it is recorded in `docs/LIMITS.md` as out of the v2 product.)
-
-**The electron opt-in, not a class**, added at W4: an Electron app is the **software** class with
-`electron: true`, which declares the Electron failure surface as bans (`BN-06`..`BN-09`) and
-declares its FPS number as a **host gate** rather than a ratchet, because the probe that measures
-it needs Playwright or Electron plus a display — neither of which a shipped rule may depend on. Its
-ratchet carries `app_bundle_bytes` instead. The old sixth class was merged into `software` (its need
-column measured identical on all ten parts), and the old `F` letter remains an install-time alias
-that selects `software` **with** the opt-in (frame time measured flat at 16.70 ms while the main
-thread went from 1.8 % to 54.5 % busy — the number is the argument).
+## 15. The adoption order
 
 **`—` is a real, enforced option.** The installer records every off part in `disabled:`, so its
-rows report `SKIP (opt-out)`; `CL-01` fails if a forbidden part's artifact exists. A repo with
-1,599 test files or 27 research notes is not broken by a forced harness directory — it is
-switched off for that class.
+rows report `SKIP (opt-out)`. A repo with 1,599 test files or 27 research notes is not broken by
+a forced harness directory — the part is switched off by name.
 
 Four consequences that follow from measurement, not taste:
 
@@ -889,8 +812,7 @@ Four consequences that follow from measurement, not taste:
    read-only, and a repo whose runner lives in a skill — all at once. The shipped gate is a
    **floor**, and `P8` step 3 is "replace it".
 4. **The default branch is not always `main`.** It is declared in the `AGENTS.md` gob block and
-   compared against the real branch by `PT-02`; a preset that assumes `main` silently skips a
-   repo on `master`.
+   compared against the real branch by `PT-02`; assuming `main` silently skips a repo on `master`.
 
 ### The adoption order
 
@@ -904,7 +826,7 @@ Each step is independently useful and the later ones build on the earlier:
    control**: everything else is recoverable from a working tree, that one has no "before".
    Gate on: `git init` done, `.gitignore` verified against local env and build-info files, first
    commit exists, HANDOFF exists, the real typecheck recorded.
-3. **The fleet-config repo third — highest value per minute.** A non-code preset that cannot
+3. **The fleet-config repo third — highest value per minute.** A non-code repo that cannot
    fix its own home is not publishable.
 4. **The cheapest correctness win fourth.** Content types untracked inside a repo that looks
    protected: commit them, write a HANDOFF, then fix the branch name.
@@ -920,7 +842,7 @@ Each step is independently useful and the later ones build on the earlier:
 ### What a first install actually gives you
 
 `goblin-install` exits 0 and creates `.gob/` (the verifier, the manifest, the config), `HANDOFF.md`,
-`AGENTS.md`, and — for classes that need them — `ROUND-000-SPEC.md`, `reviews/`, and the harness
+`AGENTS.md`, and — when the parts are on — `ROUND-000-SPEC.md`, `reviews/`, and the harness
 scaffold in `checks/`. A default install ships **no** agent skills: skills are opt-in (W6 neutral-first).
 
 Then, in order:
@@ -928,20 +850,20 @@ Then, in order:
     git add -A && git commit          # the install is a change like any other
     .gob/bin/goblin-verify            # 33 passed, 2 failed - CM-03 + SP-02, until the install is committed
 
-A default software-class install (no agent skills) is **green** — `35 passed, 0 failed, 6 advisory,
+A default install (no agent skills) is **green** — `34 passed, 0 failed, 6 advisory,
 21 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
-the one expected red (`34 passed, 1 failed`). Both numbers are measured, not assumed
+the one expected red (`33 passed, 1 failed`). Both numbers are measured, not assumed
 (`docs/GUIDE.md`; step 2 of `docs/GUIDE.md`). Twenty-one rows skip with a reason: the
 four skill rows (`SK-01`..`SK-04`) skip on the `playbooks` opt-out a skills-free
 install records, plus the not-yet rows: `HS-02` (no
 pinned pre-change commit yet), `SC-06` (no dependency manifest, no lockfile), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-05` (no `src/` for a ban
 to read) and `BN-03` with the four
-electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` (not in this class's `bans: [BN-01, BN-02, BN-05]`, so
+electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` (not in the `bans:` list `[BN-01, BN-02, BN-05]`, so
 they skip as *not enabled* rather than as *unread*), `FM-01`/`FM-02`/`VA-01`
 (no feature map and no declared `verify_doctor:` yet) and `RC-01`..`RC-04` (no reference corpus
-declared: `reference_manifest:` ships empty and a fresh repo has no lab `manifests/`). The class's
-required parts that only a round can produce pass *vacuously* (zero `reviews/*.md` to check; the
+declared: `reference_manifest:` ships empty and a fresh repo has no lab `manifests/`). The parts
+that only a round can produce pass *vacuously* (zero `reviews/*.md` to check; the
 declared gate is still the shipped floor), so the first-step list is a list of work, not a list of
 FAILs.
 
@@ -983,8 +905,8 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .gob/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the class's full green path (`35 passed, 0 failed, 6 advisory, 25 skipped`, exit 0 for
-   the software class) with `git status --short` empty.
+   Success is the full green path (`34 passed, 0 failed, 6 advisory, 21 skipped`, exit 0)
+   with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three
 headings plus a `State` block, one dated gate line and a `Not verified` block, 15 lines, no line
@@ -1018,7 +940,7 @@ closed and now ENFORCED (`IN-03`'s third clause, Z1-5): `script`, `lint`, `gate`
 plus `test` for a source-scope row, whose check is a script under `tests/` run by
 `tests/run-tests.sh`.
 
-Measured shape of this table: **66 rows** - 62 target, 4 source; advisory 6, gate 18, lint 24, script 15, test 3.
+Measured shape of this table: **65 rows** - 61 target, 4 source; advisory 6, gate 18, lint 24, script 14, test 3.
 
 ### The rows
 
@@ -1033,7 +955,7 @@ Measured shape of this table: **66 rows** - 62 target, 4 source; advisory 6, gat
 | `HP-03` | target | lint | Every gate number is a measurement with a date, never a copy. | goblin-verify --only HP-03 | Builtin, anchored on the gate NAMES `AGENTS.md` declares (GT-01's source of truth) rather than on a hardcoded keyword list: the shipped gates are named `commit` and `todo_ceiling`, neither of which the old list matched, so on a fresh install the only line it could see was the template's own example sentence, and a real gate line could lose its `date` and the row stayed GREEN (G8-2). A line whose text says "example of the required form" is template prose, not a gate number, and is skipped, so the template cannot satisfy the row. Partial: it proves a dated line inside the `Gates` section exists and that every gate-bearing line there carries a date - not that the number was re-measured that day, and not a gate-bearing line that names no declared gate and carries no gate-shaped keyword (so a line the config does not declare and the keyword list does not recognise is unseen). Historical gate lines outside that section are exempt by design - PROJECT-PRACTICE section 1's stale-sentence rule requires them to be kept. |
 | `HP-04` | target | advisory | A stale sentence is corrected in place with a dated parenthetical, never deleted. | advisory | Detecting a silent deletion needs semantic judgement; a diff heuristic (>=5 removed non-empty lines with no 'corrected' addition) is too noisy to gate on. goblin-verify --only HP-04 prints the heuristic as a warning only. |
 | `HP-05` | target | gate | The HANDOFF names the HEAD it describes. | goblin-verify --only HP-05 | Deviation from the design spec, with the reason: the spec's literal check is `grep -q "$(git rev-parse --short HEAD)" HANDOFF.md`, which can never pass - committing the HANDOFF moves HEAD, so the file can only name a commit that is now an ancestor. The mechanised form is therefore 'the HANDOFF names a commit that exists in this repo AND is an ancestor of HEAD', which still catches the defect it exists for (a review/handoff artifact that names no commit at all). |
-| `SP-01` | target | gate | A *-SPEC.md file exists at the repo root (any round, not the current one - round-scoping arrives with the W6 staged chain). | ls ./*-SPEC.md >/dev/null 2>&1 | Skipped when class: D and disabled: [spec]. |
+| `SP-01` | target | gate | A *-SPEC.md file exists at the repo root (any round, not the current one - round-scoping arrives with the W6 staged chain). | ls ./*-SPEC.md >/dev/null 2>&1 | Skipped when `spec` is in `disabled:`. |
 | `SP-02` | target | script | The SPEC is committed, not left untracked. | test -z "$(git ls-files --others --exclude-standard -- '*-SPEC.md')" | — |
 | `SP-03` | target | lint | Every AC: item is checkable without a human. | awk '/^[[:space:]]*[-*][[:space:]]/ && /AC[0-9]*:/ && !/`\|==\|===\|exit\|<\|>/ {print; bad=1} END{exit bad}' ./*-SPEC.md | Partial: structural only - a checkable-looking bullet can still be unfalsifiable. The matcher is `AC[0-9]*:` because the shipped template writes `- AC1: ...`; the literal `/AC:/` only saw a bullet that spelled the label without a number. |
 | `GT-01` | target | gate | The gate set is declared, never inferred from the stack. | goblin-verify --only GT-01 | Builtin: every `gate_<name>_cmd:` key in the AGENTS.md gob block is a DECLARED gate and its declaration and command are one line - a gate cannot lose its cmd and survive the count (G8-3, the condition of G8's own score sentence). The count is of declarations, not of runnable pairs. It cannot see whether a declared command is the RIGHT gate for the project: it proves a command exists, not that it is meaningful. |
@@ -1041,7 +963,7 @@ Measured shape of this table: **66 rows** - 62 target, 4 source; advisory 6, gat
 | `GT-03` | target | script | The round reports one line of measured numbers. | test -f .gob/last-gate-line && [ .gob/last-gate-line -nt "$(git rev-parse --git-dir)/logs/HEAD" ] | The freshness reference is HEAD's reflog (`.git/logs/HEAD`), which every HEAD movement rewrites - a commit in an attached or a detached worktree included, and independently of whether the refs are packed. The clause it replaced read `.git/HEAD`, a file a commit never rewrites (only branch operations do), so a commit landing after the measured line left the row GREEN while the round had moved on (D2, measured: `.git/HEAD`'s mtime unchanged across a real commit, `--only GT-03` exit 0). Two limits remain, recorded rather than hidden: a repo with the reflog disabled (`core.logAllRefUpdates=false`) has no reference to compare against, and `-nt` against a missing path is true, so the clause passes vacuously and the row then proves only that a measured line EXISTS (a repo with no commit yet is the same case); and the clause reads ANY HEAD movement as staleness, so a checkout, a branch rename or a reset FAILs it until the next gate run rewrites the line. That second behaviour is what makes a full run self-freshening: `GT-02` writes the line earlier in the same pass, so the row asserts that the line in front of you came from THIS run. `tests/t-gt03-freshness.sh` is the control, in both directions. |
 | `GT-04` | target | gate | A ratchet is declared with a ceiling. | goblin-verify --only GT-04 | — |
 | `GT-05` | target | gate | The ratchet has not risen. | goblin-verify --only GT-05 | — |
-| `HS-01` | target | lint | Asserting harnesses follow the house shape. | goblin-verify --only HS-01 | A declared harness_dir that is absent FAILS when the class scaffolds one (config `scaffold_checks: yes`, classes A and C); a class that ships no harness dir (B/D/E) SKIPs with a reason. Keying the skip off the path alone let one config line switch this row and HS-02 off. A report utility in the same dir is counted and reported separately rather than failing the run. |
+| `HS-01` | target | lint | Asserting harnesses follow the house shape. | goblin-verify --only HS-01 | A declared harness_dir that is absent FAILS when `scaffold_checks: yes`; when it is `no`, the row SKIPs with a reason. Keying the skip off the path alone let one config line switch this row and HS-02 off. A report utility in the same dir is counted and reported separately rather than failing the run. |
 | `HS-02` | target | gate | A check green on both trees proves nothing - the REPLAY must show RED pre-change. | goblin-verify --only HS-02 | The declared `replay.cmd` is EXECUTED with `{name}` replaced by each harness's name, in the pre-change worktree, with `replay.env=<commit>` set (Z1-4). Two clauses that used to be unheard: a command that interpolates no `{name}` FAILs (it cannot be running the harness it names, so nothing was replayed), and a command that cannot be executed at all - exit 126 or 127 - FAILs rather than counting as a RED harness. The harness's name is substituted SHELL-QUOTED (`printf %q`), because the name is part of the command text the shell parses; unquoted, a name carrying `;` or `#` reached the shell as syntax (Z2-3, the G8-1 surface class), and the control for it carries a metacharacter-bearing file name. What it cannot see: a command that runs *something else* under the harness's name and exits non-zero, and whether the harness tests the right path rather than merely failing on this tree. |
 | `HS-03` | target | advisory | Source probes read text with comments blanked first. | advisory | Recognising 'this probe reads source text' is semantic; a grep for the blanking helper produces false FAILs on harnesses that do not probe source. |
 | `CM-01` | target | gate | Commits carry the owner identity, not an ambient one. Current scope: this gates the identity of HEAD (the last commit) at the moment of the run - earlier commits by other authors are not scanned. | test "$(git log -1 --format='%ae')" = "$(grep '^owner_email:' AGENTS.md \| cut -d' ' -f2)" | note: this repo records a different owner (you are probably new here) — commit with git -c user.email=<owner_email> --author=<owner_email>, or update owner_email: in AGENTS.md |
@@ -1058,9 +980,8 @@ Measured shape of this table: **66 rows** - 62 target, 4 source; advisory 6, gat
 | `SK-02` | target | script | The skills on disk match their recorded hashes (no drift). | goblin-verify --only SK-02 | — |
 | `SK-03` | target | script | A rule with no mechanism is labelled advisory, and the advisory count is reported. | goblin-verify --only SK-03 | — |
 | `SK-04` | target | lint | Every shipped skill says what it cannot see. | goblin-verify --only SK-04 | Partial: proves the section exists, not that what it says is complete or true - the limit every prose rule carries. Every shipped skill already carries it, so the row is GREEN on a fresh install and RED only under a real violation. W1: the check is a builtin so the engine.mode=global clause can run - in global mode the procedure tier is emitted per platform (not carried in this repo) and the row SKIPs with that reason. |
-| `PT-01` | target | lint | No tenant-specific string inside a reusable rule. | for d in skills manifest bin templates presets .gob .hermes; do [ -d "$d" ] \|\| continue; grep -rniE --exclude=AGENTS.md --exclude=installed.json '(h[a]rvey\|tech-g[o]blin\|/h[o]me/[a-z]+\|g[o]blin-ui\|op[e]n-door\|sup[r]eme\|bb[t]ech\|c[l]v)' "$d" && exit 1; done; exit 0 | — (the rules an install actually writes live in `.gob/` and `.hermes/`, not in the source layout. Two documented exceptions: `AGENTS.md`, which holds `practice:` - per-machine config, not a rule - and `.gob/installed.json`, which since W1 records the machine's absolute `engine_dir` in its `engine:` block - both per-machine facts, not rules - each excluded by name. The pattern is written with character classes so this row cannot match itself.) |
+| `PT-01` | target | lint | No tenant-specific string inside a reusable rule. | for d in skills manifest bin templates .gob .hermes; do [ -d "$d" ] \|\| continue; grep -rniE --exclude=AGENTS.md --exclude=installed.json '(h[a]rvey\|tech-g[o]blin\|/h[o]me/[a-z]+\|g[o]blin-ui\|op[e]n-door\|sup[r]eme\|bb[t]ech\|c[l]v)' "$d" && exit 1; done; exit 0 | — (the rules an install actually writes live in `.gob/` and `.hermes/`, not in the source layout. Two documented exceptions: `AGENTS.md`, which holds `practice:` - per-machine config, not a rule - and `.gob/installed.json`, which since W1 records the machine's absolute `engine_dir` in its `engine:` block - both per-machine facts, not rules - each excluded by name. The pattern is written with character classes so this row cannot match itself.) |
 | `PT-02` | target | gate | The default branch is declared, not assumed. | goblin-verify --only PT-02 | — |
-| `CL-01` | target | script | Every part the class requires is present, and every part it forbids is absent. | goblin-verify --only CL-01 | — |
 | `CL-02` | target | script | An archive: true project verifies GREEN without a HANDOFF or gates. | goblin-verify --only CL-02 | Falsifiable: FAILs when `archive:` is not `true`/`false`, and when the config's value disagrees with the one the install recorded in `.gob/installed.json` (so the waiver cannot be flipped on by hand). It cannot observe the *effect* of the waiver on the other rows without re-entering the runner. |
 | `SC-01` | target | lint | No secret file is tracked. | n=$(git ls-files \| grep -iE '(^\|/)\.env\|\.pem$\|\.key$' \| grep -vcE '\.(example\|sample\|template)$'); printf '%s tracked secret file(s)\n' "$n"; [ "$n" = 0 ] | Partial: it sees tracked PATHS, never contents - a secret pasted into a tracked file is invisible here, and the pattern is a name family, so a credential inside `config.ts` is missed by construction. |
 | `SC-02` | target | gate | The ignore rules cover the whole secret family. | goblin-verify --only SC-02 | Builtin, and behavioural: clause 1 reads `.gitignore`; clause 2 asks git's own matcher (`git check-ignore`) for `.env`, `.env.local` and `.env.production` one path at a time, so a rule that looks right but does not match still fails. It cannot see a secret already in git history, or one committed under a name the family does not cover. SKIPs with a reason when there is no `.gitignore` and no `package.json`. |
@@ -1069,7 +990,7 @@ Measured shape of this table: **66 rows** - 62 target, 4 source; advisory 6, gat
 | `SC-05` | target | gate | Every write route validates its input, or is waived. | goblin-verify --only SC-05 | Builtin: it proves a validator is CALLED (`safeParse\|zod\|valibot\|yup\|ajv\|superstruct\|validate(`), never that the schema is right - a schema that accepts everything passes. `.gob/boundary-waivers` is the escape hatch, and the waived count is printed, so a silent pile-up is visible. |
 | `SC-06` | target | gate | A lockfile exists, and the repo tracks it. | goblin-verify --only SC-06 | Builtin: presence, then `git ls-files --error-unmatch`. It cannot see that the lockfile is STALE relative to `package.json` - resolving that needs the package manager, which is a deliberate network-shaped step, not a check. SKIPs with a reason when there is no `package.json`. |
 | `SC-09` | target | advisory | Auth is applied consistently across sibling routes. | advisory | Prose on purpose: "consistently" is a semantic judgement about a private surface no repo here has yet. Counted (6 of ceiling 10) so the matrix cannot quietly grow prose. |
-| `PF-01` | target | lint | The perf baseline names the commit it measured. | goblin-verify --only PF-01 | Builtin: the metric must equal `ratchet.name` so the budget and the measurement cannot silently disagree, the value must be numeric, the date must exist, the baseline commit must exist AND be an ancestor of HEAD (`HP-05`'s mechanic, reused rather than re-derived), and `ratchet.ceiling` must equal `perf.baseline_value` - otherwise a one-line ceiling raise passes while the row prints the contradiction, which is `I raised the budget and never measured again` (G8-6b). It cannot see whether the metric is the right one for the product, and it never re-measures: re-anchoring is a deliberate operator action. SKIPs with a reason when the class declares no metric, or none has been recorded yet. |
+| `PF-01` | target | lint | The perf baseline names the commit it measured. | goblin-verify --only PF-01 | Builtin: the metric must equal `ratchet.name` so the budget and the measurement cannot silently disagree, the value must be numeric, the date must exist, the baseline commit must exist AND be an ancestor of HEAD (`HP-05`'s mechanic, reused rather than re-derived), and `ratchet.ceiling` must equal `perf.baseline_value` - otherwise a one-line ceiling raise passes while the row prints the contradiction, which is `I raised the budget and never measured again` (G8-6b). It cannot see whether the metric is the right one for the product, and it never re-measures: re-anchoring is a deliberate operator action. SKIPs with a reason when no perf metric is declared, or none has been recorded yet. |
 | `BN-00` | target | script | Every ban has an enforcement row, every ban row names a replacement, and the ban table is not empty. | goblin-verify --only BN-00 | — (this row is the reason the ban list cannot decay into prose: IN-03's shape applied to bans.tsv, and it agrees in both directions) |
 | `BN-01` | target | lint | No `any` in application TypeScript. | goblin-verify --only BN-01 | Text probe, not an AST: a `: any` inside a string or a comment is reported, and `Record<string, any>` (no leading colon) is missed. The AST form needs a parser the no-npm contract (docs/GUIDE.md) forbids (docs/LIMITS.md #27). SKIPs when the ban is not in `bans:` or its globs match no file. |
 | `BN-02` | target | lint | No `@ts-ignore` / `@ts-expect-error` suppressions. | goblin-verify --only BN-02 | Text probe: it sees the directive wherever it appears, including inside a string, and cannot tell a suppression hiding a real error from one on a line that would compile anyway. SKIPs when the ban is not in `bans:` or its globs match no file. |
@@ -1078,7 +999,7 @@ Measured shape of this table: **66 rows** - 62 target, 4 source; advisory 6, gat
 | `BN-06` | target | lint | No renderer with Node access (`nodeIntegration: true`). | goblin-verify --only BN-06 | Text probe over the ban table's globs, the same mechanism as BN-01..BN-05: it sees `nodeIntegration: true` wherever it appears, including inside a string, and cannot see a webPreferences object built at run time or spread in from another module. The STRONGER form is a runtime measurement - the renderer prints `process.contextIsolated` and `process.sandboxed` and the check requires true/true - and that needs a real Electron process, which the dependency contract (docs/GUIDE.md) does not allow a shipped rule to launch: it is the project's host gate (docs/LIMITS.md #34). SKIPs when the ban is not in `bans:` or its globs match no file. |
 | `BN-07` | target | lint | No renderer with context isolation or the process sandbox turned off. | goblin-verify --only BN-07 | One probe for two properties because Electron's own documentation makes them one: disabling `contextIsolation` "also disables process sandboxing", so a repo that has turned either off has lost both. Text probe, with the same false-positive set as BN-06. SKIPs when the ban is not in `bans:` or its globs match no file. |
 | `BN-08` | target | lint | No dangerous webPreferences. | goblin-verify --only BN-08 | Four one-line patterns from Electron's own security checklist (`webSecurity: false`, `allowRunningInsecureContent: true`, `enableBlinkFeatures`, `<webview allowpopups>`). Text probe: `enableBlinkFeatures` is banned by name rather than by value, so the string is reported even in a comment. SKIPs when the ban is not in `bans:` or its globs match no file. |
-| `BN-09` | target | lint | No synchronous IPC and no `@electron/remote`. | goblin-verify --only BN-09 | The banned-list shape the wave's note 9 asks for, applied to Electron: `sendSync(` and `@electron/remote` block the renderer's own thread, which is the freeze the class exists to prevent. Text probe - it sees the call site, not the call graph, so a wrapper around `sendSync` in a file the globs do not match is missed. SKIPs when the ban is not in `bans:` or its globs match no file. |
+| `BN-09` | target | lint | No synchronous IPC and no `@electron/remote`. | goblin-verify --only BN-09 | The banned-list shape the wave's note 9 asks for, applied to Electron: `sendSync(` and `@electron/remote` block the renderer's own thread, which is the freeze these bans exist to prevent. Text probe - it sees the call site, not the call graph, so a wrapper around `sendSync` in a file the globs do not match is missed. SKIPs when the ban is not in `bans:` or its globs match no file. |
 | `FM-01` | target | lint | Every feature file is indexed from the map README, declares its slug and at least one entry path, and carries the four-H2 entry contract. | goblin-verify --only FM-01 | SKIPs (exit 3) when feature_map: is empty - a fresh install has no map and must not be born RED (the D8 shape). When a map IS declared: the README must exist, every features/*.md must be linked from it in the (./<slug>.md) form and every relative .md link must resolve, each feature file's `feature:` must equal its filename stem, it must declare >=1 `entry_paths:`, and its H2s must be exactly Sub-features / How to get to it (user POV) / Driving it with <harness> / Gotchas, in that order. Partial: the README's own H2s are prose this row does not read, and 'the map lists every user-facing feature' is not mechanically checkable - that is docs/LIMITS.md #30, not a row. |
 | `FM-02` | target | lint | Every entry point a feature declares still resolves in source, and no entry path changed after the map was verified. | goblin-verify --only FM-02 | SKIPs (exit 3) when feature_map: is empty. A tripwire, not a proof. The token is searched under source_root with occurrences under the map's own directory excluded - without that exclusion the map's own entry-path list satisfies the search and the row could never go RED. Freshness is `git log -1 --format=%cs` on the resolved file against the feature's `verified:` date, and git sees a FILE change, not a behaviour change: the row can be RED-when-stale and never GREEN-means-fresh. A token that also occurs in a vendored copy or a build artifact is read as resolved, and a `verified:` date is itself a claim the row cannot test (docs/LIMITS.md #30). W5-4: the search skips the harness's own directories (`.gob/`, `.hermes/`, the declared `harness_dir`) and the map's own directory, so a stub map whose token occurs only in the install no longer resolves; a token that occurs only in the target's own `docs/`, `tests/` or build output still does (docs/LIMITS.md #37). Z1-6: the resolved file must be TRACKED (`git ls-files --error-unmatch`) before its date is compared - an untracked file used to make the freshness clause skip in silence, so a map could claim `verified: 2020-01-01` over source that was never committed. |
 | `VA-01` | target | gate | The generated verification skill's doctor command runs and exits 0. | goblin-verify --only VA-01 | SKIPs (exit 3) when verify_doctor: is empty (the replay.commit: "" shape). Runs the DECLARED command exactly as GT-02 runs a declared gate, and never a string read out of file content (the v0.2 blocker). Closes P6's stated-but-unenforced clause 'a generated skill that was never executed is a draft': the doctor is the smallest executable proof that the skill's own instructions still run - and it proves only that, never that the doctor tests the right path. |
@@ -1093,7 +1014,7 @@ Measured shape of this table: **66 rows** - 62 target, 4 source; advisory 6, gat
 
 ### Advisory rows, named
 
-6 of the 62 rows are labelled `advisory`. 6 of them carry no executable check at all
+6 of the 61 rows are labelled `advisory`. 6 of them carry no executable check at all
 (they are prose the matrix refuses to pretend about).
 
 - **HP-04** (no check at all) - A stale sentence is corrected in place with a dated parenthetical, never deleted.
@@ -1118,49 +1039,20 @@ CI rows had spent.
 `SK-03`'s count is the count the run itself uses: a row is advisory if its `check` cell says so
 OR its `enforced_by` cell does.
 
-### The class matrix
-
-`.gob/manifest/classes.tsv` is the same idea applied to the parts a project must have.
-`R` = required, `O` = optional (installed, reported), `-` = off, and **off is enforced**:
-the installer records every `-` part in `disabled:`, so its rows report `SKIP (opt-out)`
-instead of silently passing, and `CL-01` fails if a forbidden part's artifact exists.
-
-| part | software | service | game | research | fleet |
-|---|---|---|---|---|---|
-| handoff | R | R | R | R | R |
-| spec | R | R | R | - | R |
-| gate | R | R | R | O | R |
-| replay | R | - | R | - | O |
-| ratchet | R | O | O | - | O |
-| pr-gate | O | - | O | - | O |
-| review-panel | O | - | R | - | O |
-| playbooks | R | R | R | R | R |
-| tokens | O | - | - | - | O |
-
-The five columns carry the domain names; the letters `A`..`E` and the older names `app` (software)
-and `agent` (fleet) are read-time aliases. The old `F` class — the Electron shell — was merged into
-`software`: the merge measured the two need columns identical on all ten parts, so what it added
-lives in config, not in this table. The **electron opt-in** (`electron: true`) turns the electron
-bans `BN-06`..`BN-09` on even when a hand-edited `bans:` list omits them, and requires a declared
-**host gate** — a number measured on a machine with a display. The `ci-gate` rows in
-`.gob/manifest/classes.tsv` are a W4 remnant kept for record: **v2 installs no CI** — the part carries
-`-` for every class, the installer renders nothing under `.github/`, and no flag configures it
-(so a reader who meets `ci-gate` in the tsv reads `off everywhere`, not a missing column here).
-CI is out of the product, not a promise this repo is behind on.
-
 ### The ban list (G5)
 
 `BN-00`..`BN-09` are not ordinary rows: they read `.gob/manifest/bans.tsv`, a table whose
 every row carries a real command. A ban with no mechanism is a wish, so `.gob/manifest/bans.tsv`
-holds `id`, the ban, the globs, the `detect` command, the replacement code, the escape hatch,
-the reviewer and the source — and `BN-00` fails the whole list if any ban has no enforcement
+holds `id`, the ban, the globs, the `applies_when` glob, the `detect` command, the replacement
+code, the escape hatch, the reviewer and the source — and `BN-00` fails the whole list if any ban has no enforcement
 row, if any row names no replacement, or if the table is empty. `bin/goblin-bans` is the engine
 (`--only <id>` for one, `--list` for the table); each ban's `detect` exits 0 when the tree is
 clean, 1 when the ban is violated, 3 when it cannot be read (no file matches its globs, no
 `layers:` declared) and 2 when it could not run at all — a 2 FAILS, never passes.
 
-Which bans apply is the config's `bans:` list, not the class: an unlisted ban SKIPs with that
-reason (class A and C turn on `BN-01 BN-02 BN-05`; B and D turn on none; E turns on `BN-02`).
+Which bans apply is the config's `bans:` list, and whether a listed ban runs is decided per row by
+its `applies_when` glob: an unlisted ban SKIPs with that reason, and a listed ban whose glob matches
+no file reports itself *not applicable* (the default `bans: [BN-01, BN-02, BN-05]`).
 `bans_exempt:` records narrow, reviewed exceptions and `layers:` is what `BN-05` reads. An
 exception reaches the **probe**, not the engine's stdout: the engine exports `GOBLIN_BANS_ID` and
 `GOBLIN_BANS_EXEMPT`, the probe drops the exempted hits *before* it chooses its exit code, and an
@@ -1253,7 +1145,7 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 ### P8 - `goblin-bootstrap`
 
 - **When:** adopting gobstack in a repo, or starting one
-- **Steps:** 1 classify the project (A-F)<br>- 2 goblin-install --class <x><br>- 3 goblin-verify GREEN<br>- 4 fix .gitignore BEFORE any git init<br>- 5 first HANDOFF, first SPEC, first check script
+- **Steps:** 1 classify the project<br>- 2 goblin-install --target .<br>- 3 goblin-verify GREEN<br>- 4 fix .gitignore BEFORE any git init<br>- 5 first HANDOFF, first SPEC, first check script
 - **Verification:** goblin-verify exits 0 and the created-file list matches installed.json; a repo with no gate declares one and records its first measured numbers
 - **Profiles:** architect
 - **Role:** judgment
@@ -1277,7 +1169,7 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 ### P11 - `goblin-sweep`
 
 - **When:** the same change or question across projects
-- **Steps:** 1 enumerate targets with a shell glob, not a memory<br>- 2 classify each (A-F); an archive project is skipped, not processed<br>- 3 one card per project, parents=[sweep]<br>- 4 collect one line per project: what changed / what was refused / what is unfindable
+- **Steps:** 1 enumerate targets with a shell glob, not a memory<br>- 2 classify each; an archive project is skipped, not processed<br>- 3 one card per project, parents=[sweep]<br>- 4 collect one line per project: what changed / what was refused / what is unfindable
 - **Verification:** the per-project line carries the command it ran; the sweep report states its own coverage (n of m projects, and names the skipped ones)
 - **Profiles:** default
 - **Role:** synthesis
@@ -1455,7 +1347,7 @@ them: it reads the path from config, so moving the standard is a one-line config
     git init -b main
     gob init --heuristic                   # the brief + schema; answer it in a proposal file
     gob init --write .gob-init-proposal.md --yes
-                                           # expect: created 19 (no skills — those are opt-in)
+                                           # expect: created 18 (no skills — those are opt-in)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"

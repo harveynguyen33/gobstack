@@ -45,7 +45,7 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target . >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
 
 # ---- the reference the clause reads ---------------------------------------------------------
@@ -89,7 +89,7 @@ mkdir -p "$WORK/nocommit" && cd "$WORK/nocommit"
 git init -q -b main
 git config user.name "Test Runner"
 git config user.email "runner@example.com"
-bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target . >/dev/null 2>&1
 measure
 got=$(gt03)
 case "$got" in

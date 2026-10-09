@@ -18,7 +18,7 @@ git config user.email "runner@example.com"
 printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 
-bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --practice "$WORK/standard.md" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$WORK/target" --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install exits 0" "$?"
 git add -A && git commit -q -m "chore: install gobstack"
 
@@ -39,65 +39,18 @@ printf '%s' "$OUT" | grep -q 'not signed'
 check "the run says the record every drift check trusts is not signed (F2-3)" "$?"
 printf '%s' "$OUT" | grep -q 'SKIP  HS-02'
 check "HS-02 is skipped with a reason while no pre-change commit is pinned" "$?"
-check "a class-A repo with no reviews yet does not fail the PR gate" \
+check "a repo with no reviews yet does not fail the PR gate" \
   "$(printf '%s' "$OUT" | grep -q 'PASS  PG-03' && echo 0 || echo 1)"
 
-# ---- W6: the electron opt-in (merged from class F) installs green, and its CI lane is real ---
-# F was merged into software (§W6-TAXONOMY-SPEC): a desktop shell is `--class software --electron`.
-# It has to reach the same green path as every other install: a class whose ratchet command cannot
-# run would be born RED, which is the one thing the install path must not produce. The FPS number
-# itself is a HOST gate (it needs a display and a probe the no-npm contract forbids goblin-stack to
-# ship) - the point of this block is that the hermetic half is green and the host half is DECLARED
-# rather than silently absent.
-mkdir -p "$WORK/f" && cd "$WORK/f"
-git init -q -b main
-git config user.name "Test Runner"
-git config user.email "runner@example.com"
-printf '# desktop shell\n' > README.md
-git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$WORK/f" --class software --electron --practice "$WORK/standard.md" >/dev/null 2>&1
-check "software+electron install exits 0" "$?"
-git add -A && git commit -q -m "chore: install gobstack"
-F_HEAD=$(git rev-parse --short HEAD)
-sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$F_HEAD\`/" HANDOFF.md
-git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
+# ---- the ban table self-selects per row (the class/electron opt-in is GONE) -------------------
+# A ban is code-shaped: it runs only when a real file matches its applies_when glob, and a ban
+# with no surface REPORTS itself not applicable, never silently green. The class and the
+# electron: key are gone; BN-06..09 are not in this tree's bans: list at all.
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-01 .*not applicable: no file matches applies_when'
+check "a ban the tree has no surface for reports itself NOT APPLICABLE" "$?"
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-06 .*not enabled in bans:'
+check "a ban outside the bans: list skips with the enable reason" "$?"
 
-FOUT=$(bash .gob/bin/goblin-verify 2>&1); FRC=$?
-check "software+electron verify exits 0" "$FRC"
-printf '%s' "$FOUT" | grep -qE '[0-9]+ passed, 0 failed, [0-9]+ advisory'
-check "  and its summary line reports passed/failed/advisory" "$?"
-awk '/^perf\.host_gate:/{print; exit}' AGENTS.md | grep -q 'Electron run' \
-  && awk '/^perf\.host_gate:/{print; exit}' AGENTS.md | grep -q 'main_thread_busy_pct'
-check "  and the FPS number is DECLARED as a host gate, not silently absent" "$?"
-grep -qE '^ratchet\.name: [a-z_]+$' AGENTS.md \
-  && grep -qE '^ratchet\.name: app_bundle_bytes$' AGENTS.md \
-  && ! grep -qE '^ratchet\.name: (main_thread_busy_pct|fps|frame_time_ms)$' AGENTS.md
-check "  and the ratchet carries a hermetic metric of its own (the bundle bytes, not the FPS)" "$?"
-grep -q '^electron: true$' AGENTS.md
-check "  and electron: true is DECLARED in the config" "$?"
-# v3: the CI lane is GONE from the product (no .github/workflows payload is written, and the
-# PG-04/PG-05/PG-06 rows are cut) — the placement pin becomes an absence pin.
-[ ! -e .github/workflows ]
-check "  and the install ships no CI lane (the workflows dir stays untouched)" "$?"
-printf '%s' "$FOUT" | grep -q 'SKIP  BN-06'
-check "  and an electron ban the class lists still skips on a tree with no renderer" "$?"
-printf '%s' "$FOUT" | grep -qE 'ADV   PF-01|PASS  PF-01|SKIP  PF-01'
-check "  and the perf pin reports itself (ADV/PASS/SKIP), never silently" "$?"
-
-# ---- W6: the desktop/F alias resolves to software+electron, byte-identically -----------------
-# The merged class kept the old spellings: `--class desktop` (and F/f) must produce the SAME
-# config a `--class software --electron` install does, not a silently weaker software install.
-mkdir -p "$WORK/falias" && cd "$WORK/falias"
-git init -q -b main
-git config user.name "Test Runner"
-git config user.email "runner@example.com"
-printf '# desktop shell\n' > README.md
-git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$WORK/falias" --class desktop --practice "$WORK/standard.md" >/dev/null 2>&1
-check "the desktop alias install exits 0" "$?"
-cmp -s "$WORK/f/AGENTS.md" "$WORK/falias/AGENTS.md" \
-  && grep -q '"class": "software"' "$WORK/falias/.gob/installed.json"
-check "  and its config is identical to software+electron (class recorded as software)" "$?"
 
 # ---- UX pass: remedy lines, day-one banners, recovery lines, GT-03's sentence --------------
 # (review 1 scope 4-7) Five print contracts live in the printers and the summary block:
@@ -131,7 +84,7 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 printf '# fresh\n' > README.md
 git add -A && git commit -q -m "seed"
-bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target . >/dev/null 2>&1
 sed -i 's/^owner_email:.*/owner_email: other@owner.example/' AGENTS.md
 git add -A && git commit -q -m "install gobstack"
 FOUT2=$(bash .gob/bin/goblin-verify 2>&1); FRC2=$?

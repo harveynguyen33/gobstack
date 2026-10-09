@@ -9,8 +9,10 @@
 #   0  the tree is clean
 #   1  the ban is violated - the exit code alone decides; stdout, when any, names the lines
 #   2  the check could not run (FAIL CLOSED - a missing tool is never a silent pass)
-# A ban the config's `bans:` list does not name is SKIPPED with that reason; a ban whose
-# globs match no file is SKIPPED with that reason. A missing or empty ban table is exit 2.
+# A ban the config's `bans:` list does not name is SKIPPED with that reason. A ban whose
+# `applies_when` glob matches no real file is NOT APPLICABLE: it is reported as a SKIP with
+# that reason, never silently green (a ban that does not apply must be visible as such). A
+# missing or empty ban table is exit 2.
 #
 # A narrow, explicit exception (Dune rule 5) reaches the probe through its environment, so it can
 # change the VERDICT and not only the printed detail: GOBLIN_BANS_ID (the ban) and
@@ -83,17 +85,12 @@ if [ "$LIST" -eq 1 ]; then
 fi
 
 # ---- the config: which bans this project turns on, and its narrow exceptions --
+# Which bans run is the config's `bans:` list, and NOTHING ELSE: whether a ban applies at
+# all is decided per-row by its `applies_when` glob (below), so a ban the repo's code shape
+# has no surface for reports itself not-applicable rather than riding a removed config key.
 ENABLED=""
 if [ -f "$CONFIG" ]; then
   ENABLED=$(g_agents_list "$CONFIG" bans | tr '\n' ' ')
-  # The electron opt-in (software class): `electron: true` turns the electron ban set ON even
-  # when a hand-edited bans: list omits it — the declaration is the contract, and the engine
-  # (not the LLM) is what makes a listed ban non-skippable. A repo without the key is unaffected.
-  if [ "$(g_agents_read "$CONFIG" electron)" = "true" ]; then
-    for e in BN-06 BN-07 BN-08 BN-09; do
-      case " $ENABLED " in *" $e "*) ;; *) ENABLED="$ENABLED $e" ;; esac
-    done
-  fi
 fi
 enabled() {
   [ -z "$ENABLED" ] && return 1
@@ -122,9 +119,27 @@ only_selected() {
   return 1
 }
 
+# applies <applies_when> -> 0 when at least one REAL file in the repo matches any glob in the
+# cell (space-separated), 1 otherwise. Globstar, so `**/*.ts` matches src/a.ts and a.ts. The
+# harness's own dirs are not source and are excluded, so a ban cannot claim applicability from
+# the payload goblin-stack itself wrote.
+applies() {
+  local g
+  for g in $1; do
+    ( cd "$ROOT" 2>/dev/null || exit 1
+      shopt -s globstar nullglob dotglob
+      for f in $g; do
+        case "$f" in .git/*|.gob/*|.hermes/*|*/node_modules/*) continue ;; esac
+        [ -e "$f" ] && exit 0
+      done
+      exit 1 ) && return 0
+  done
+  return 1
+}
+
 # ---- run ---------------------------------------------------------------------
 PASS=0; FAIL=0; SKIP=0; SEL=0
-while IFS=$'\t' read -r id ban globs detect replacement escape reviewer source; do
+while IFS=$'\t' read -r id ban globs detect replacement escape reviewer source applies_when; do
   [ "$id" = "id" ] && continue
   [ -n "$id" ] || continue
   only_selected "$id" || continue
@@ -134,13 +149,10 @@ while IFS=$'\t' read -r id ban globs detect replacement escape reviewer source; 
     SKIP=$((SKIP + 1)); g_skip "$id" "$ban (not enabled in bans: - add $id to the bans: array in AGENTS.md to turn it on)"
     continue
   fi
-  # A ban whose globs match no file is a SKIP with a reason, not a pass and not a fail.
-  have_glob=0
-  for g in $globs; do
-    [ -e "$ROOT/$g" ] && have_glob=1
-  done
-  if [ "$have_glob" -eq 0 ]; then
-    SKIP=$((SKIP + 1)); g_skip "$id" "$ban (no matching files: $globs)"
+  # applies_when self-selects the ban: a ban whose glob matches no real file is reported
+  # NOT APPLICABLE (a SKIP with that reason), never silently green.
+  if ! applies "$applies_when"; then
+    SKIP=$((SKIP + 1)); g_skip "$id" "$ban (not applicable: no file matches applies_when: $applies_when)"
     continue
   fi
 

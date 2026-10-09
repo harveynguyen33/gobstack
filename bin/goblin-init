@@ -13,13 +13,13 @@
 # The CLI calls NO AI API. A bare `gob init` prints:
 #   1. the AGENT BRIEF — a structured prompt telling whichever agent is already running
 #      in this repo exactly what to scan (package.json, routes, tests, CI configs) and
-#      what to decide (class, branch, owner email, the first gate command, the feature map);
+#      what to decide (the first gate command, the feature map, the source root);
 #   2. the SCHEMA of the proposal file the agent must write — the gob block + a
 #      `## gob init summary` section + a `## feature-map` section embedding the files.
 # The agent fulfils the brief with its own tools, writes the proposal, and the human (or
 # the agent's own next step) runs `gob init --write <proposal>` to validate and install:
 #   - the frontmatter keys are validated against the engine's key set (unknown key,
-#     bad class, non-boolean archive -> exit 2, nothing written);
+#     an unknown key, non-boolean archive -> exit 2, nothing written);
 #   - the declared gate is RUN in the working tree (a non-zero exit is a day-one red, a
 #     command that cannot be run is refused);
 #   - the embedded feature map is validated by bin/goblin-map (FM-01 shape + FM-02
@@ -112,12 +112,8 @@ back one proposal file. Do this now:
    - the test layout (tests/, *.test.*, run-tests.sh or equivalent gate scripts)
    - CI configs (.github/workflows, .gitlab-ci.yml) — to READ what the project already
      gates on. gobstack installs no CI.
-   - the git identity this repo commits with (git config user.email)
 
 2. DECIDE, and be ready to justify each line:
-   - class: software | service | game | research | fleet
-   - branch: the default branch (main/master/…)
-   - owner_email: the commit identity this repo expects
    - gate_commit_cmd: ONE command that proves the repo is healthy and must stay green.
      RUN it yourself first: a command that does not exist is not a gate (--write refuses
      an exit-127 command); a command that runs and exits non-zero is a legitimate day-one
@@ -131,10 +127,8 @@ back one proposal file. Do this now:
        npx @techgoblin/gobstack init --write <proposal-path>
 
 Notes:
-   - Class letters A-E and the names app/agent/desktop are accepted aliases
-     (app->software, agent->fleet, desktop->software+electron).
    - A second gate is optional: gate_<name>_cmd, e.g. gate_todo_cmd.
-   - Keys you do not set are filled from the class default by --write.
+   - Keys you do not set are filled from the installer's default block by --write.
    - --write validates BOTH halves in one pass: the config block AND the embedded feature
      map (FM-01 shape + FM-02 resolvability: every entry path exists AND is committed).
      A repo with no committed file to map REFUSES — commit at least one file, then run again.
@@ -142,9 +136,6 @@ Notes:
 == PROPOSAL SCHEMA =============================================================
 
 <!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->
-class: <software|service|game|research|fleet>
-branch: <default branch>
-owner_email: <commit identity>
 gate_<name>_cmd: <one shell command that must stay green>
 feature_map: features/README.md
 source_root: .
@@ -287,7 +278,7 @@ BLOCK_KEYS=$(g_agents_keys "$PROP")
 
 # Unknown keys are refused: the proposal is machine-read, and a typo'd key would
 # otherwise be silently ignored forever (fail closed, like --only does).
-KNOWN_KEYS="class electron branch practice practice_sha256 owner_email archive
+KNOWN_KEYS="branch owner_email practice practice_sha256 archive
 max_dirty advisory_ceiling security.gitignore_family security.build_output
 security.write_routes perf.metric perf.cmd perf.baseline_commit perf.baseline_value
 perf.measured perf.host_gate harness_dir scaffold_checks feature_map source_root
@@ -308,28 +299,14 @@ while IFS= read -r k; do
 done <<< "$BLOCK_KEYS"
 [ -z "$BAD_KEYS" ] || { g_err "$PROP names unknown key(s):$BAD_KEYS — fix or drop them"; exit 2; }
 
-CLASS_RAW=$(g_agents_read "$PROP" class)
-CLASS=$(g_class_canon "$CLASS_RAW") \
-  || { g_err "unknown class '$CLASS_RAW' in $PROP (expected software|service|game|research|fleet, or A-E / app / agent / desktop)"; exit 2; }
-ELECTRON=0
-g_class_is_electron_alias "$CLASS_RAW" && ELECTRON=1
-[ "$(g_agents_read "$PROP" electron)" = "true" ] && ELECTRON=1
-
 GATE_NAME=$(g_agents_gates "$PROP" | head -n 1 | awk -F'\t' '{print $1}')
 GATE_CMD=$(g_agents_gates "$PROP" | head -n 1 | awk -F'\t' '{print $2}')
 [ -n "$GATE_CMD" ] || { g_err "$PROP declares no gate — the brief requires at least one gate_<name>_cmd"; exit 2; }
 
-# feature_map is REQUIRED for every class (DECISION, 2026-10-09): the map is mandatory, so
-# there is no "no map declared" state. A proposal without it, or with it empty, refuses here.
+# feature_map is REQUIRED (DECISION, 2026-10-09): the map is mandatory, so there is no
+# "no map declared" state. A proposal without it, or with it empty, refuses here.
 FEATURE_MAP=$(g_agents_read "$PROP" feature_map)
-[ -n "$FEATURE_MAP" ] || { g_err "$PROP declares no feature_map — add 'feature_map: features/README.md' to the gob block and a '## feature-map' section (the brief's SCHEMA); the map is mandatory for every class"; exit 2; }
-
-BRANCH=$(g_agents_read "$PROP" branch)
-[ -n "$BRANCH" ] || BRANCH=$( cd "$TARGET" && git rev-parse --abbrev-ref HEAD 2>/dev/null )
-[ -n "$BRANCH" ] || BRANCH=main
-EMAIL=$(g_agents_read "$PROP" owner_email)
-[ -n "$EMAIL" ] || EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
-[ -n "$EMAIL" ] || EMAIL="you@example.com"
+[ -n "$FEATURE_MAP" ] || { g_err "$PROP declares no feature_map — add 'feature_map: features/README.md' to the gob block and a '## feature-map' section (the brief's SCHEMA); the map is mandatory"; exit 2; }
 
 # The map's directory, relative to the repo root. feature_map names the README (the value
 # verify reads); the map lives in a directory of its own, never the repo root.
@@ -360,7 +337,7 @@ if ! MAP_OUT=$(bash "$SRC/bin/goblin-map" --validate "$STAGE/$MAPDIR_REL" --root
 fi
 
 if [ "$DRYRUN" -eq 1 ]; then
-  g_info "gob init --write --dry-run: validated OK (class $CLASS, branch $BRANCH, owner $EMAIL, 1+ gate, feature map '$FEATURE_MAP')"
+  g_info "gob init --write --dry-run: validated OK (1+ gate, feature map '$FEATURE_MAP')"
   g_info "  would write: AGENTS.md (body + gob block), .gob/engine/, HANDOFF.md, $MAPDIR_REL/"
   g_info "  the declared gate was NOT run (--dry-run)"
   exit 0
@@ -385,15 +362,14 @@ if [ -n "$GATE_LINE" ]; then g_info "  first output line: $GATE_LINE"; fi
 # One engine call writes the vendored payload (.gob/), AGENTS.md body + gob block and
 # HANDOFF.md. Its refusal contract applies verbatim: an existing HANDOFF.md is never
 # overwritten; an edited AGENTS.md body is kept (put_once) and only the block is rewritten.
-INSTALL_ARGS=(--target "$TARGET" --class "$CLASS" --skills no --yes)
+INSTALL_ARGS=(--target "$TARGET" --skills no --yes)
 # The first gate is the proposal's own: its name AND command. The name rides along so the
 # HANDOFF template renders the declared name — HP-03 anchors on declared gate names, and a
 # HANDOFF that names a gate the config does not declare is the day-one red (GT-04/HP-03
 # anchoring). GATE_NAME comes from the same key the reader parses (gate_<name>_cmd).
 GATE_NAME=$(g_agents_gates "$PROP" | head -n 1 | awk -F'\t' '{print $1}')
 INSTALL_ARGS+=(--gate "$GATE_CMD" "$GATE_NAME")
-[ "$ELECTRON" -eq 1 ] && INSTALL_ARGS+=(--electron)
-printf 'gob init [run] goblin-install --target %s --class %s\n' "$TARGET" "$CLASS"
+printf 'gob init [run] goblin-install --target %s\n' "$TARGET"
 bash "$SRC/bin/goblin-install" "${INSTALL_ARGS[@]}"
 RC=$?
 [ "$RC" -eq 0 ] || { g_err "install failed (exit $RC) — the refusals above name the path and the fix"; exit "$RC"; }
@@ -401,15 +377,15 @@ RC=$?
 CONFIG="$TARGET/AGENTS.md"
 [ -f "$CONFIG" ] || { g_err "install wrote no AGENTS.md at $TARGET"; exit 1; }
 
-# The proposal MERGES over the class defaults the installer rendered: the proposal's keys
+# The proposal MERGES over the defaults the installer rendered: the proposal's keys
 # win, every default key the proposal did not set stays (a proposal carrying only the
 # brief's required keys must not blank archive/ratchet/replay — the schema is a minimum,
 # not the whole block). Proposal keys the config did not have are appended.
-# EXCEPT the gate keys: the proposal's first gate REPLACES the class default gate_<name>_cmd
-# (the default names a class-taxonomy gate the project never declared), and every OTHER
+# EXCEPT the gate keys: the proposal's first gate REPLACES the installer's default gate_<name>_cmd
+# (the default names a taxonomy gate the project never declared), and every OTHER
 # default gate_* key is dropped — a gate the config declares must be one the proposal chose,
-# never a leftover default naming a gate the HANDOFF does not render. The second class gate
-# (e.g. the software class's todo_ceiling) is opt-IN: the proposal may declare it itself.
+# never a leftover default naming a gate the HANDOFF does not render. The second default gate
+# (the todo_ceiling) is opt-IN: the proposal may declare it itself.
 {
   first_gate=1
   while IFS= read -r k; do
@@ -423,8 +399,8 @@ CONFIG="$TARGET/AGENTS.md"
     esac
     # An ABSENT key prints "key<TAB><TAB>", which renders as "key:: key:" - a key that
     # reads back as its own name twice and fails IN-02/PF-01/FM-01 on a fresh install.
-    # A proposal line with an empty value carries no merge information (the class
-    # default the installer rendered already covers it): drop it here.
+    # A proposal line with an empty value carries no merge information (the installer
+    # default already covers it): drop it here.
     k_val=$(g_agents_read "$PROP" "$k")
     [ -n "$k_val" ] && printf '%s\t%s\n' "$k" "$k_val"
   done <<< "$BLOCK_KEYS"
@@ -439,7 +415,6 @@ CONFIG="$TARGET/AGENTS.md"
 # Fail closed: the declared gate must read back through the engine's own reader.
 GOT_GATE=$(g_agents_gates "$CONFIG" | head -n 1 | awk -F'\t' '{print $2}')
 [ "$GOT_GATE" = "$GATE_CMD" ] || { g_err "the first gate did not land in $CONFIG (reader sees '$GOT_GATE', wanted '$GATE_CMD')"; exit 1; }
-[ "$(g_agents_read "$CONFIG" owner_email)" = "$EMAIL" ] || { g_err "owner_email did not land in $CONFIG"; exit 1; }
 [ "$(g_agents_read "$CONFIG" feature_map)" = "$FEATURE_MAP" ] || { g_err "feature_map did not land in $CONFIG (reader sees '$(g_agents_read "$CONFIG" feature_map)', wanted '$FEATURE_MAP')"; exit 1; }
 
 # --------------------------------------------------------------- feature map ----
@@ -456,7 +431,7 @@ fi
 
 # --------------------------------------------------------------------- done ----
 printf '\n'
-printf 'gob init: installed — class %s, branch %s, owner %s\n' "$CLASS" "$BRANCH" "$EMAIL"
+printf 'gob init: installed — feature map %s\n' "$FEATURE_MAP"
 printf '  harness: %s/.gob/bin/goblin-verify\n' "$TARGET"
 printf 'next:\n'
 printf '  1. git add -A && git commit   # the install is uncommitted by design\n'

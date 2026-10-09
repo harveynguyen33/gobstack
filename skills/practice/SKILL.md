@@ -6,7 +6,7 @@ description: The composition hook: read the referenced standard at the path pinn
 # practice
 
 goblin-stack owns the **mechanism**: which rule is enforced by what, how it is installed, how
-it is verified, which class a project is, which flow applies, which role runs it.
+it is verified, which flow applies, which role runs it.
 
 The **house style** — the HANDOFF shape and the stale-sentence rule, the SPEC lifecycle, the
 harness house style and the pinned-commit REPLAY, the gate vocabulary, commit discipline, the

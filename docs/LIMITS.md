@@ -29,7 +29,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
    on the box, and goblin-stack cannot fix it from inside a project repo. It ships corrected
    text in `docs/GUIDE.md`; the fleet-side edit is
    escalated.
-7. **The staleness of a fleet-config repo is detectable and not fixable here** — the E-class gate
+7. **The staleness of a fleet-config repo is detectable and not fixable here** — an artifact-scoped gate
    notices it, and the underlying job bug belongs to another repository.
 8. **A new surface to maintain.** Per-repo vendored `.gob/` plus `.hermes/skills/` means
    upgrade debt in every adopted repo, plus one more command pair to learn. The counter is that
@@ -120,8 +120,8 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     with `SC-07`.
 25. **`SC-04` reads one statement, not one program.** A cookie write spread over three lines (or
     assembled through a helper) is not seen, and the row says so in its own cell.
-26. **The advisory slots are a count, not a strict bound.** Measured (v3): 9 advisory rows at a
-    ceiling of 10, so `SK-03` reports `advisory 9 of ceiling 10 (1 free slot)`. A row is advisory
+26. **The advisory slots are a count, not a strict bound.** Measured (v3): 6 advisory rows at a
+    ceiling of 10, so `SK-03` reports `advisory 6 of ceiling 10 (4 free slots)`. A row is advisory
     if its `check` cell says so OR its `enforced_by` cell does; the cap is a count — 10 advisory
     rows at a ceiling of 10 **pass**, and the 11th FAILs (10 at a ceiling of 9 FAILs). The v3 cuts
     (the dependency-audit and CI rows) returned the slots earlier advisory rows had spent, so the
@@ -206,7 +206,7 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     A project that runs CI wires its own workflow; the harness ships none, and none of its rows
     read one.
 35. **The Electron perf number is a host gate, and the ratchet carries a different metric.**
-    `presets/F-electron.yaml` declares `main_thread_busy_pct` as `perf_host_gate:` and uses
+    The (now removed) Electron preset declared `main_thread_busy_pct` as `perf.host_gate:` and used
     `app_bundle_bytes` for `ratchet:` — a **deliberate deviation** from G6 §B.3, which put the FPS
     number in the ratchet. The instrument that produces it (CDP `Performance.getMetrics`, or
     `app.getAppMetrics()[i].cpu.percentCPUUsage` inside a real Electron) needs Playwright or
@@ -221,9 +221,9 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     while the main thread went from 1.8 % to 54.5 % busy, the W4 sweep); an absolute FPS
     claim is not. Three further Electron failure modes are **recorded, not mechanised**: the
     dependency-graph boundary check, `ipcMain` sender validation,
-    and fuses at package time. **Corrected 2026-10-02 (W6):** this preset is now
-    `presets/electron-overlay.yaml`, rendered over `presets/software.yaml` by `--electron` (or the
-    `desktop`/`F` install alias) — the old `F` class was merged into `software`.
+    and fuses at package time. **Cut in v3:** the class presets and the `electron` overlay are
+    gone; an Electron project declares `perf.host_gate:` and lists the electron bans (`BN-06`..`BN-09`)
+    in its own `bans:` — the bans ride on their `applies_when` glob, not on a class.
 36. **A ban's exemption reaches the probe through its environment, so a custom probe can ignore it.**
     `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` are filtered *before* the exit code is
     chosen, because a filter applied to a probe's stdout afterwards cannot change a verdict — that
@@ -244,7 +244,7 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     model/role/loop cut; the numbering is kept stable.
 39. **Withdrawn (v3).** Same cut: `LP-*` no longer exist.
 40. **A fresh install into a repo with no commits is born RED, and X1 did not change that.** Measured
-    at X1: `goblin-install --class A` into a `git init` with zero commits, then `goblin-verify`, gives
+    at X1: `goblin-install` into a `git init` with zero commits, then `goblin-verify`, gives
     `36 passed, 6 failed, 10 advisory, 23 skipped`, exit 1 — `HP-05`, `SP-02`, `GT-02`, `CM-01`,
     `CM-03` and `PT-02` all read a HEAD that does not exist yet. The install never creates the seed
     commit (`bin/goblin-install` writes files and stops), and it must not: a tool that commits into
@@ -286,7 +286,7 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
       - item 13 — the cut CI lane's flow-style `jobs: {…}` refusal: it failed closed already, and
         the lane is gone, so no control is owed.
     **W5-10 is answered here too.** The tenant strings `PT-01` forbids do not reach `docs/`, because
-    `docs/` is never installed: the row's directory list is `skills manifest bin templates presets
+    `docs/` is never installed: the row's directory list is `skills manifest bin templates`
     .gob .hermes`, so a string under `docs/` is source-tree prose that no operator's repo ever
     receives. That is the whole reason, it is deliberate, and the row is not weakened by it — Y1
     agreed, and Z1 leaves it. This is the sentence Z1 added so the reason is visible in the shipped
@@ -394,7 +394,7 @@ the Node the gates ran under.
 48. **`SP-01`'s rule text once overclaimed; it now states the check's actual scope.** The text
     used to read "The current round has a SPEC" while the check is
     `ls ./*-SPEC.md >/dev/null 2>&1`, which passes on ANY spec-shaped file at the repo root. The
-    measured consequence: a fresh class-A install ships the scaffold's `ROUND-000-SPEC.md`, and
+    measured consequence: a fresh default install ships the scaffold's `ROUND-000-SPEC.md`, and
     `SP-01` PASSes on that scaffold alone — no round is open, and the row is green anyway. A stale
     spec from a finished round keeps satisfying the row exactly as well as a live one, because the
     check has no notion of "current". **Fixed in W6 (text, not check):** the row now reads
@@ -461,19 +461,13 @@ the Node the gates ran under.
     framework's own suite. Recorded as a definition; `docs/GUIDE.md`'s scope paragraph
     carries the same sentence for the reader who arrives there first.
 
-53. **The sixth class is gone: the desktop shell is `software` + `electron: true`, and `A`..`E` are
-    read-time aliases.** W6 merged `F` into `software` because their `manifest/classes.tsv` need
-    columns were measured identical on all ten parts — the old column added config (the electron
-    `bans:`, the `perf.host_gate:`, the `app_bundle_bytes` ratchet, the `dist out release`
-    build-output scope), never a part. Measured on the merge tree (2026-10-02): the tsv is 50 rows
-    over five classes; `gob init --class desktop`, `--class F` and `--class software --electron`
-    render byte-identical the `AGENTS.md` gob block (`class: software`, `electron: true`); and a pre-merge repo
-    carrying `class: F` with no `electron:` key verifies unchanged, `37 passed, 0 failed, 10
-    advisory, 31 skipped`, exit 0, with `git status --porcelain` empty — zero writes, because its
-    bans and host gate live in its own config. What this costs, recorded rather than fixed: such a
-    repo gets the merge's declaration-time host-gate check only after hand-adding `electron: true`;
-    its bans and host gate keep running either way, so nothing fails closed, and the CLI keeps
-    accepting `desktop`/`F` as aliases.
+53. **Cut in v3: the class taxonomy and the presets.** The five class names (`software`,
+    `service`, `game`, `research`, `fleet`), the `A`..`E` letters, the older `app`/`agent`/`desktop`
+    aliases, the `presets/` yaml files, `manifest/classes.tsv` and the `--class` / `--electron`
+    flags are all removed. A class only ever selected which parts were required and which bans ran;
+    the parts default on (opt out by name with `--opt-out`), and a ban self-selects by its
+    `applies_when` glob. The installer renders ONE default config block; there is no taxonomy left
+    to render it from, and no reader has to choose a category before installing.
 
 54. **The vendored engine wins over a global `engine_dir` by design, and in v2 that is the
     whole story.** The resolution chain (goblin-verify §"engine resolution") puts
@@ -489,8 +483,7 @@ the Node the gates ran under.
     against the AGENTS.md frontmatter shape.
 
 55. **CI is out of the product, and its reference doc is deleted.** The install writes nothing under
-    `.github/` — the `ci-gate` part carries `-` for every class in `manifest/classes.tsv` (kept as
-    the recorded W4 remnant) — and the `PG-04`/`PG-05`/`PG-06` rows are cut. The doc that carried
+    `.github/` — the `ci-gate` part is off — and the `PG-04`/`PG-05`/`PG-06` rows are cut. The doc that carried
     the lane's contract (`docs/CI.md`) is deleted with them; the argument it made (a required
     check that reports Success after skipping its gate is a green light for a commit whose gate
     never ran) is about CI in general and is preserved in this entry. What this admits: the
@@ -556,20 +549,20 @@ one command that produces it, `ratchet.ceiling` is the measured baseline, and `G
 `old <n> + <delta> new = <n>` when the number rises. **No second mechanism, no new key for the
 number.**
 
-| class | metric | command | hermetic? |
+| project shape | metric | command | hermetic? |
 |---|---|---|---|
-| A - web app (Next) | total client JS bytes | `find .next/static -type f -name '*.js' -exec cat {} + \| wc -c` | yes |
-| A - SPA (Vite) | bundle JS bytes | `find dist/assets -type f -name '*.js' -exec cat {} + \| wc -c` | yes |
-| A - component lib | published bytes | `find dist -type f -exec cat {} + \| wc -c` | yes |
-| B - service/config | own build bytes, plus host latency | `find dist -type f -exec cat {} + \| wc -c` · `curl -w '%{time_total}'` | size yes, latency **no** |
-| C - game | build bytes, plus host frame time | as A · Editor run | size yes, frame time **no** |
-| D, E | none declared | - | - |
+| web app (Next) | total client JS bytes | `find .next/static -type f -name '*.js' -exec cat {} + \| wc -c` | yes |
+| SPA (Vite) | bundle JS bytes | `find dist/assets -type f -name '*.js' -exec cat {} + \| wc -c` | yes |
+| component lib | published bytes | `find dist -type f -exec cat {} + \| wc -c` | yes |
+| service/config | own build bytes, plus host latency | `find dist -type f -exec cat {} + \| wc -c` · `curl -w '%{time_total}'` | size yes, latency **no** |
+| game | build bytes, plus host frame time | as web app · Editor run | size yes, frame time **no** |
+| none declared | none | - | - |
 
 `find ... -exec cat {} + | wc -c` is used rather than `du` because `du` reports block sizes and is
 not deterministic across filesystems. Raw bytes are the *reported* number and are the only one
 that is ratcheted: a gzip figure changes with the compressor, so it is a report, never a ceiling.
 
-**The class-A preset ships this metric** (`client_js_bytes`), and the TODO count that used to be
+**The default config ships this metric** (`client_js_bytes`), and the TODO count that used to be
 the ratchet moved into a **gate** (`todo_ceiling`, `-le 160`): a shipped-software round is
 supposed to move the perf number, and the TODO ceiling is a floor against decay, not the budget.
 A fresh install measures `0` for a repo with no build output, so the number is honest from the
@@ -581,7 +574,7 @@ operator re-runs the command, writes the new `ceiling`, and writes the matching
 ceiling" from silently becoming "I never measured again": a baseline whose commit does not resolve
 to an ancestor of `HEAD` is a RED.
 
-`PF-01` **skips with a reason** when the class declares no metric (`perf.metric` empty) or when no
+`PF-01` **skips with a reason** when no metric is declared (`perf.metric` empty) or when no
 baseline has been recorded yet - because a row that is RED on every fresh install teaches people
 to ignore it. The skip names the command to run.
 

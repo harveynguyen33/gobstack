@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This repository uses **gobstack** (class `{{CLASS}}`, installed {{DATE}}). It is a pointer,
+This repository uses **gobstack** (installed {{DATE}}). It is a pointer,
 not a rule dump — the rules live in one executable place, and facts beat requirements.
 
 - **Harness entry point:** `.gob/bin/goblin-verify` — exit 0 pass, 1 a check failed,
@@ -14,7 +14,7 @@ not a rule dump — the rules live in one executable place, and facts beat requi
   code exists.
 - **Session state:** `HANDOFF.md` at the repo root. Read it before touching anything.
 - **Project config:** the `<!-- gob:begin --> … <!-- gob:end -->` block in this file
-  (class, branch, gates, ratchet, runtime data, replay, opt-outs). Edit it in place; the
+  (branch, gates, ratchet, runtime data, replay, opt-outs). Edit it in place; the
   installer never rewrites the block after the first install and never touches the prose.
 - **The referenced standard**, if configured, is named by `practice:` in the gob block.
   Read it before starting work; this repo carries no copy of it.

@@ -4,10 +4,10 @@
 #   B1  the bare brief: `gob init` prints the AGENT BRIEF + proposal schema, exit 0;
 #       heuristic mode appends pre-scanned hints; nothing is written anywhere
 #   B2  the --write path on a fresh probe: a proposal file in the brief's schema
-#       validates and installs (class software, the proposal's first gate replaces the
-#       class default, proposal keys merge over the class defaults), writes AGENTS.md
+#       validates and installs (the proposal's first gate replaces the default, proposal
+#       keys merge over the installer's defaults), writes AGENTS.md
 #       with the gob block, .gob/, HANDOFF.md — and NO .hermes (the neutral-first install)
-#   B3  the validation refusals: no block, unknown key, bad class, no gate -> exit 2,
+#   B3  the validation refusals: no block, unknown key, no gate -> exit 2,
 #       nothing written; a refusal names the input it refused
 #   B4  --dry-run validates and writes nothing
 #   B5  idempotent re-`--write`: the second identical write is the installer's no-op
@@ -54,18 +54,17 @@ init_env() { # the engine's environment: sandbox HOME, no host anchors, no tty o
         timeout 120 bash "$SRC/bin/goblin-init" "$@"; } 2>&1
 }
 
-proposal() { # <file> <class> [extra lines...] — a minimal valid proposal (with a feature map)
-  local f="$1" cls="$2"; shift 2
+proposal() { # <file> [extra lines...] — a minimal valid proposal (with a feature map)
+  local f="$1"; shift 1
   {
     printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-    printf 'class: %s\n' "$cls"
     printf 'branch: main\n'
     printf 'owner_email: runner@example.com\n'
     printf 'gate_commit_cmd: bash tests/run-tests.sh\n'
     printf 'feature_map: features/README.md\n'
     [ $# -eq 0 ] || printf '%s\n' "$@"
     printf '<!-- gob:end -->\n'
-    printf '\n## gob init summary\n\n- the probe: class %s, one real gate, a one-feature map\n' "$cls"
+    printf '\n## gob init summary\n\n- the probe: one real gate, a one-feature map\n'
     map_block
   } > "$f"
 }
@@ -115,11 +114,10 @@ Preconditions: a checkout.
 MAPEOF
 }
 
-proposal_gate() { # <file> <class> <gate-cmd> — a valid proposal with a chosen gate command
-  local f="$1" cls="$2" gate="$3"
+proposal_gate() { # <file> <gate-cmd> — a valid proposal with a chosen gate command
+  local f="$1" gate="$2"
   {
     printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-    printf 'class: %s\n' "$cls"
     printf 'branch: main\nowner_email: runner@example.com\n'
     printf 'gate_commit_cmd: %s\n' "$gate"
     printf 'feature_map: features/README.md\n'
@@ -139,8 +137,6 @@ printf '%s' "$OUT" | grep -qF "PROPOSAL SCHEMA"
 check "the brief carries the proposal schema" "$?"
 printf '%s' "$OUT" | grep -qF "gate_commit_cmd"
 check "the schema names the gate key the reader parses" "$?"
-printf '%s' "$OUT" | grep -qF "software|service|game|research|fleet"
-check "the schema names the class enum" "$?"
 B1_FILES=$( cd "$REPO" && find . -path ./.git -prune -o -type f -print | sort )
 [ "$B1_FILES" = "./README.md"$'\n'"./tests/run-tests.sh" ]
 check "a bare brief writes NOTHING into the target" "$?"
@@ -155,7 +151,7 @@ check "the heuristic brief still carries the schema" "$?"
 # ---- B2: the --write path --------------------------------------------------------
 new_repo b2
 P2="$WORK/proposal-b2.md"
-proposal "$P2" software
+proposal "$P2"
 OUT2=$(init_env --target "$REPO" --write "$P2" --yes < /dev/null); RC2=$?
 check "--write with a valid proposal exits 0" "$RC2"
 printf '%s' "$OUT2" | grep -qF "gob init [run] goblin-install"
@@ -173,10 +169,8 @@ check "the proposal gate is the declared first gate (got '$GATE_DECLARED')" "$?"
 check "a neutral proposal writes NO .hermes (neutral-first)" "$?"
 grep -qF '"skills": "no"' "$REPO/.gob/installed.json"
 check "the install record carries the skills opt-out" "$?"
-# the proposal's keys merge over the class defaults: the installer rendered the class
+# the proposal's keys merge over the installer defaults: the installer rendered its
 # defaults, then --write merged the proposal's own keys over them.
-grep -qF "class: software" "$REPO/AGENTS.md"
-check "the declared class landed in the gob block" "$?"
 grep -qxF "feature_map: features/README.md" "$REPO/AGENTS.md"
 check "feature_map landed in the AGENTS.md gob block" "$?"
 [ -f "$REPO/features/README.md" ] && [ -f "$REPO/features/readme.md" ]
@@ -190,7 +184,7 @@ check "the declared gate was RUN and its exit code printed" "$?"
 new_repo b2b
 # (a) a gate command that does not exist
 P2B="$WORK/proposal-b2b-badgate.md"
-proposal_gate "$P2B" software "no-such-command-xyz-42"
+proposal_gate "$P2B" "no-such-command-xyz-42"
 OUT2B=$(init_env --target "$REPO" --write "$P2B" < /dev/null); RC2B=$?
 check "a proposal whose gate command does not exist exits 2" "$([ "$RC2B" -eq 2 ] && echo 0 || echo 1)"
 printf '%s' "$OUT2B" | grep -qF "exit 127"
@@ -202,7 +196,7 @@ check "  and it wrote NOTHING" "$?"
 
 # (b) a gate that RUNS and exits 1: accepted, installed, and the measured code is printed
 P2C="$WORK/proposal-b2c-redgate.md"
-proposal_gate "$P2C" software "bash tests/red.sh"
+proposal_gate "$P2C" "bash tests/red.sh"
 printf '#!/usr/bin/env bash\nexit 1\n' > "$REPO/tests/red.sh"
 chmod +x "$REPO/tests/red.sh"
 OUT2C=$(init_env --target "$REPO" --write "$P2C" --yes < /dev/null); RC2C=$?
@@ -214,7 +208,7 @@ check "  and the harness + map were installed" "$?"
 
 # (c) --dry-run must NOT execute the gate
 P2D="$WORK/proposal-b2d-dry.md"
-proposal_gate "$P2D" software "bash tests/sideeffect.sh"
+proposal_gate "$P2D" "bash tests/sideeffect.sh"
 printf '#!/usr/bin/env bash\ntouch "$(dirname "$0")/RAN"\n' > "$REPO/tests/sideeffect.sh"
 chmod +x "$REPO/tests/sideeffect.sh"
 OUT2D=$(init_env --target "$REPO" --write "$P2D" --dry-run --yes < /dev/null); RC2D=$?
@@ -232,25 +226,16 @@ printf '%s' "$OUT3" | grep -qF "carries no gob block"
 check "the refusal names the missing block" "$?"
 
 P3B="$WORK/proposal-b3-badkey.md"
-proposal "$P3B" software 'not_a_real_key: 42'
+proposal "$P3B" 'not_a_real_key: 42'
 OUT3B=$(init_env --target "$REPO" --write "$P3B" < /dev/null); RC3B=$?
 check "an unknown key exits 2" "$([ "$RC3B" -eq 2 ] && echo 0 || echo 1)"
 printf '%s' "$OUT3B" | grep -qF "not_a_real_key"
 check "the refusal names the key it refused" "$?"
 
-P3C="$WORK/proposal-b3-badclass.md"
-proposal "$P3C" zebra
-OUT3C=$(init_env --target "$REPO" --write "$P3C" < /dev/null); RC3C=$?
-check "a nonsense class exits 2" "$([ "$RC3C" -eq 2 ] && echo 0 || echo 1)"
-printf '%s' "$OUT3C" | grep -qF "software|service|game|research|fleet"
-check "the refusal names the class enum" "$?"
-printf '%s' "$OUT3C" | grep -qF "unknown class 'zebra'"
-check "  and names the input it refused (W6 review F1)" "$?"
-
 P3D="$WORK/proposal-b3-nogate.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'class: software\nbranch: main\nowner_email: runner@example.com\n'
+  printf 'branch: main\nowner_email: runner@example.com\n'
   printf '<!-- gob:end -->\n'
 } > "$P3D"
 OUT3D=$(init_env --target "$REPO" --write "$P3D" < /dev/null); RC3D=$?
@@ -266,7 +251,7 @@ new_repo b3b
 printf '# my own handoff, written before goblin ever saw this repo\n' > "$REPO/HANDOFF.md"
 OWN_HANDOFF=$(sha256sum "$REPO/HANDOFF.md" | awk '{print $1}')
 P3E="$WORK/proposal-b3e.md"
-proposal "$P3E" software
+proposal "$P3E"
 OUT3E=$(init_env --target "$REPO" --write "$P3E" --yes < /dev/null); RC3E=$?
 check "init --write exits 1 on the installer HANDOFF refusal" "$([ "$RC3E" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$OUT3E" | grep -qF "HANDOFF.md"
@@ -282,7 +267,7 @@ new_repo b3c
 P3F="$WORK/proposal-b3f-nomap.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'class: software\nbranch: main\nowner_email: runner@example.com\n'
+  printf 'branch: main\nowner_email: runner@example.com\n'
   printf 'gate_commit_cmd: bash tests/run-tests.sh\n'
   printf '<!-- gob:end -->\n\n## gob init summary\n\n- no map\n'
 } > "$P3F"
@@ -297,7 +282,7 @@ check "  and it wrote NOTHING" "$?"
 P3G="$WORK/proposal-b3g-nosection.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'class: software\nbranch: main\nowner_email: runner@example.com\n'
+  printf 'branch: main\nowner_email: runner@example.com\n'
   printf 'gate_commit_cmd: bash tests/run-tests.sh\nfeature_map: features/README.md\n'
   printf '<!-- gob:end -->\n'
 } > "$P3G"
@@ -312,7 +297,7 @@ check "  and it wrote NOTHING" "$?"
 P3H="$WORK/proposal-b3h-badpath.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'class: software\nbranch: main\nowner_email: runner@example.com\n'
+  printf 'branch: main\nowner_email: runner@example.com\n'
   printf 'gate_commit_cmd: bash tests/run-tests.sh\nfeature_map: features/README.md\n'
   printf '<!-- gob:end -->\n\n## gob init summary\n\n- a broken entry path\n\n## feature-map\n\n'
   printf '### features/README.md\n\n```md\n# Features\n\n- [ghost](./ghost.md) — a feature that does not resolve\n```\n\n'
@@ -331,7 +316,7 @@ EMPTY="$WORK/b3c-empty"
 mkdir -p "$EMPTY"
 ( cd "$EMPTY" && git init -q -b main && git config user.name "Test Runner" && git config user.email runner@example.com ) >/dev/null 2>&1
 P3I="$WORK/proposal-b3i.md"
-proposal "$P3I" software
+proposal "$P3I"
 OUT3I=$(init_env --target "$EMPTY" --write "$P3I" < /dev/null); RC3I=$?
 check "an empty repo (no committed file) exits 2" "$([ "$RC3I" -eq 2 ] && echo 0 || echo 1)"
 printf '%s' "$OUT3I" | grep -qF "commit at least one file, then run again"
@@ -342,12 +327,12 @@ check "  and it invented no bootstrap feature" "$?"
 # ---- B4: --dry-run validates and writes nothing ------------------------------------
 new_repo b4
 P4="$WORK/proposal-b4.md"
-proposal "$P4" research
+proposal "$P4"
 BEFORE4=$( cd "$REPO" && find . -path ./.git -prune -o -type f -print | sort )
 OUT4=$(init_env --target "$REPO" --write "$P4" --dry-run --yes < /dev/null); RC4=$?
 check "--dry-run exits 0" "$RC4"
 printf '%s' "$OUT4" | grep -qF "validated OK"
-check "the plan names the validated class and the write set" "$?"
+check "the plan names the validated proposal and the write set" "$?"
 printf '%s' "$OUT4" | grep -qF "would write"
 check "the plan says what it would write" "$?"
 AFTER4=$( cd "$REPO" && find . -path ./.git -prune -o -type f -print | sort )
@@ -356,7 +341,7 @@ check "the tree is byte-list unchanged after --dry-run" "$?"
 
 # ---- B5: idempotent re-write --------------------------------------------------------
 P5="$WORK/proposal-b5.md"
-proposal "$P5" software
+proposal "$P5"
 init_env --target "$WORK/b2" --write "$P5" --yes < /dev/null >/dev/null 2>&1
 OUT5=$(init_env --target "$WORK/b2" --write "$P5" --yes < /dev/null); RC5=$?
 check "the identical re-write exits 0" "$RC5"
@@ -372,7 +357,7 @@ check "the shim run reaches the engine's usage" "$?"
 # ---- B7: the post-install GREEN line ----------------------------------------------------
 new_repo b7
 P7="$WORK/proposal-b7.md"
-proposal "$P7" software
+proposal "$P7"
 init_env --target "$REPO" --write "$P7" --yes < /dev/null >/dev/null 2>&1
 ( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack via gob init --write" )
 VOUT=$( cd "$REPO" && env PATH="$BARE_PATH" bash .gob/bin/goblin-verify 2>&1 ); VRC=$?

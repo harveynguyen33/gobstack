@@ -33,7 +33,7 @@ operator executes, and no row in `manifest/enforcement.tsv` reads a lane yet.
    exported session, one file per lane) and `verdict.md` (the judge's per-criterion scores, each
    with an `evidence:` line naming the lane and the location). The **family** is recorded, never
    only the model slug — and **no model slug belongs under `skills/ manifest/ bin/ templates/
-   presets/ .gob/ .hermes/`**; `evals/` sits outside that scope on purpose, because a slug is
+   .gob/ .hermes/`**; `evals/` sits outside that scope on purpose, because a slug is
    run data, not content for a rule.
 6. **A change must improve the evaluated cases or add new evaluations.** That is the merge rule,
    and it is this repo's "a check must be able to go RED" applied to skill prose: changing

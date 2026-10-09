@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# t-install-off-switch.sh — the class matrix is a real switch, not a label.
-#   class D + --archive  -> no checks/, no HANDOFF, no SPEC, no reviews/, verify exits 0
-#   class A              -> the same shape fails HP-01 and CL-01
+# t-install-off-switch.sh — the part switches are real, not labels.
+#   --archive -> no checks/, no HANDOFF, no SPEC, no reviews/, verify exits 0
+#   the same shape without --archive -> the missing HANDOFF fails HP-01
 # Run by tests/run-tests.sh.
 set -uo pipefail
 
@@ -23,7 +23,7 @@ mkfix() {
 
 # ---- class D + --archive -----------------------------------------------------
 mkfix "$WORK/archived"
-bash "$SRC/bin/goblin-install" --target "$WORK/archived" --class D --archive >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$WORK/archived" --archive >/dev/null 2>&1
 check "archive install exits 0" "$?"
 check "no checks/ directory" "$([ ! -d checks ] && echo 0 || echo 1)"
 check "no HANDOFF.md" "$([ ! -f HANDOFF.md ] && echo 0 || echo 1)"
@@ -41,17 +41,15 @@ check "archive verify exits 0 without a HANDOFF" "$VERIFY_RC"
 printf '%s' "$VERIFY_OUT" | grep -q 'archive: true'
 check "the summary says why the rows were skipped" "$?"
 
-# ---- the same shape, class A: the switch is what made it pass ----------------
+# ---- the same shape, no --archive: the switch is what made it pass -----------
 mkfix "$WORK/notarchived"
-bash "$SRC/bin/goblin-install" --target "$WORK/notarchived" --class A >/dev/null 2>&1
-git add -A && git commit -q -m "chore: install (class A)"
+bash "$SRC/bin/goblin-install" --target "$WORK/notarchived" >/dev/null 2>&1
+git add -A && git commit -q -m "chore: install"
 rm -f HANDOFF.md && git add -A && git commit -q -m "test: remove the HANDOFF"
 A_OUT=$(bash .gob/bin/goblin-verify 2>&1); A_RC=$?
-note "class A without a HANDOFF: verify exit=$A_RC"
+note "no --archive, no HANDOFF: verify exit=$A_RC"
 printf '%s' "$A_OUT" | grep -q 'FAIL  HP-01'
-check "class A fails HP-01 when the HANDOFF is gone" "$?"
-printf '%s' "$A_OUT" | grep -q 'FAIL  CL-01'
-check "class A fails CL-01 when a required part is absent" "$?"
+check "the install fails HP-01 when the HANDOFF is gone" "$?"
 check "and the run is not green" "$([ "$A_RC" -eq 1 ] && echo 0 || echo 1)"
 
 # ---- the playbooks part: `--skills no` is a real switch, and it used to FAIL ---------------
@@ -59,14 +57,14 @@ check "and the run is not green" "$([ "$A_RC" -eq 1 ] && echo 0 || echo 1)"
 # "FAIL  SK-02  0 installed skill file(s) hashed" - a repo that opted OUT of the skills part was
 # failed by the row that hashes them. SK-01/SK-02/SK-04 skip instead.
 mkfix "$WORK/noskills"
-bash "$SRC/bin/goblin-install" --target "$WORK/noskills" --class A --skills no \
+bash "$SRC/bin/goblin-install" --target "$WORK/noskills" --skills no \
   >/dev/null 2>&1
 check "--skills no installs" "$?"
 git add -A && git commit -q -m "chore: install (--skills no)"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 NS_OUT=$(bash .gob/bin/goblin-verify 2>&1); NS_RC=$?
-note "class A --skills no: verify exit=$NS_RC, $(printf '%s' "$NS_OUT" | grep -E '^ *[0-9]+ passed')"
+note "--skills no: verify exit=$NS_RC, $(printf '%s' "$NS_OUT" | grep -E '^ *[0-9]+ passed')"
 check "class A with --skills no verifies green" "$NS_RC"
 printf '%s' "$NS_OUT" | grep -q 'SKIP  SK-01  .*opt-out: playbooks'
 check "  and the skill rows are opt-out, not absent" "$?"
@@ -75,10 +73,10 @@ check "  and SK-02 is opt-out rather than FAIL (the pre-fix defect)" "$?"
 # V3-3: the opt-out path had a number no file recorded (the count moved from `37/0/9/11` at v0.2
 # as rows joined - the ban rows, G1's FM-01/FM-02/VA-01, W3's judge/loop rows and the v2 CI-payload
 # removal each shifted it). In v3 the model/role/loop rows and the CI lane are cut, so the shape is
-# `35/0/6/21`. Pin the line so the next silent shift is caught here. The number is measured, not
+# `34/0/6/21`. Pin the line so the next silent shift is caught here. The number is measured, not
 # copied: see the note line the run prints above.
-printf '%s' "$NS_OUT" | grep -q '35 passed, 0 failed, 6 advisory, 21 skipped'
-check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 35/0/6/21)" "$?"
+printf '%s' "$NS_OUT" | grep -q '34 passed, 0 failed, 6 advisory, 21 skipped'
+check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 34/0/6/21)" "$?"
 
 # ---- W6 migration safety: an upgrade must not strip previously-installed skills ---------------
 # The pre-W6 default was --skills yes, so every existing install carries .hermes/skills recorded
@@ -86,14 +84,14 @@ check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs,
 # holds only if a re-install that OMITS the flag reads the record's choice: skills stay until
 # --uninstall removes exactly what the record lists.
 mkfix "$WORK/migrate"
-bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills yes \
+bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --skills yes \
   >/dev/null 2>&1
 check "migration fixture: --skills yes installs" "$?"
 S_BEFORE=$(find .hermes/skills -name SKILL.md | sort)
 REC_BEFORE=$(sha256sum .gob/installed.json | awk '{print $1}')
 git add -A && git commit -q -m "chore: install (--skills yes, the pre-W6 shape)"
 # the upgrade: the NEW default (no flag), same class — must keep every skill
-UP_OUT=$(bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --upgrade \
+UP_OUT=$(bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --upgrade \
   2>&1); UP_RC=$?
 check "upgrade with the new default exits 0" "$UP_RC"
 S_AFTER=$(find .hermes/skills -name SKILL.md 2>/dev/null | sort)
@@ -105,12 +103,12 @@ printf '%s' "$UP_OUT" | grep -q 'agent skills installed - they are kept'
 check "  and the run says so out loud (not a silent state change)" "$?"
 git add -A && git commit -q -m "chore: upgrade (default flag, skills kept)"
 # a plain SECOND install (no upgrade, no flag) keeps them too
-bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A \
+bash "$SRC/bin/goblin-install" --target "$WORK/migrate" \
   >/dev/null 2>&1
 [ "$(find .hermes/skills -name SKILL.md 2>/dev/null | sort)" = "$S_AFTER" ]
 check "a plain re-install (no flag) keeps the skills too" "$?"
 # explicit --skills no is still a real switch: the skills go, the record follows
-bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills no \
+bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --skills no \
   >/dev/null 2>&1
 check "an explicit --skills no re-install exits 0" "$?"
 [ ! -e .hermes ]
@@ -119,7 +117,7 @@ grep -q '"skills": "no"' .gob/installed.json
 check "  and the record follows the explicit choice" "$?"
 git add -A && git commit -q -m "chore: explicit skills opt-out"
 # rebuild the skills, then --uninstall removes everything recorded (the F2-7 contract)
-bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills yes \
+bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --skills yes \
   >/dev/null 2>&1
 N_BEFORE_UN=$(find .hermes/skills -name SKILL.md | wc -l | tr -d ' ')
 [ "$N_BEFORE_UN" -gt 0 ]
