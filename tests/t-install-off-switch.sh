@@ -73,10 +73,11 @@ check "  and the core skill rows RUN, not skip (GAP-2)" "$?"
 check "  because the seven-skill core tier is vendored under .gob/skills/" "$?"
 [ ! -e .hermes ]
 check "  and no Hermes project tier was installed (it is still opt-in)" "$?"
-# V3-3 + GAP-2: the count with the core tier on. The number is measured, not copied — see the
-# note line above. (It moved from 14/0/0/13 as the three skill rows stopped skipping.)
-printf '%s' "$NS_OUT" | grep -q '17 passed, 0 failed, 0 advisory, 10 skipped'
-check "  and the numbers are pinned (V3-3 + GAP-2: core tier on, 17/0/0/10)" "$?"
+# V3-3 + GAP-2/3: the count with the core tier on and bans glob-selected. The number is measured,
+# not copied — see the note line above. (It moved 14/0/0/13 -> 17/0/0/10 when the three skill rows
+# stopped skipping, then 21/0/0/6 when the electron bans started running via their globs.)
+printf '%s' "$NS_OUT" | grep -q '21 passed, 0 failed, 0 advisory, 6 skipped'
+check "  and the numbers are pinned (V3-3 + GAP-2/3: core tier + glob bans, 21/0/0/6)" "$?"
 
 # ---- the part switch is still real: an explicit --opt-out playbooks turns the rows off --------
 mkfix "$WORK/optout"
@@ -91,8 +92,8 @@ printf '%s' "$OO_OUT" | grep -q 'SKIP  SK-01  .*opt-out: playbooks'
 check "  and the skill rows are opt-out, not absent (the switch is real)" "$?"
 printf '%s' "$OO_OUT" | grep -q 'SKIP  SK-02'
 check "  and SK-02 is opt-out rather than FAIL" "$?"
-printf '%s' "$OO_OUT" | grep -q '14 passed, 0 failed, 0 advisory, 13 skipped'
-check "  and the opt-out numbers are pinned (14/0/0/13)" "$?"
+printf '%s' "$OO_OUT" | grep -q '18 passed, 0 failed, 0 advisory, 9 skipped'
+check "  and the opt-out numbers are pinned (18/0/0/9: the three skill rows skip again)" "$?"
 
 # ---- W6 migration safety: an upgrade must not strip previously-installed skills ---------------
 # The pre-W6 default was --skills yes, so every existing install carries .hermes/skills recorded

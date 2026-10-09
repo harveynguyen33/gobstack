@@ -326,7 +326,7 @@ m_bn_exit1_detect() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "exit 1"
 # the defanging is caught, one row over, by the only row that can see it.
 m_bn_defang()      { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "true"; print }' .gob/manifest/bans.tsv > .gob/manifest/bans.tsv.n && mv .gob/manifest/bans.tsv.n .gob/manifest/bans.tsv; }
 m_bn_02()          { mkdir -p src; printf '// @ts-expect-error\nexport const b = 1;\n' > src/bn02.ts; }
-m_bn_03()          { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-03, BN-05]/' AGENTS.md; mkdir -p src/components; printf 'export const P = () => { fetch("/api/x"); return null; };\n' > src/components/panel.tsx; }
+m_bn_03()          { mkdir -p src/components; printf 'export const P = () => { fetch("/api/x"); return null; };\n' > src/components/panel.tsx; }
 # v2: `layers:` is a flat key INSIDE the marker block, so the mutation sets it in place
 # (an append would land after the end marker, where the parser never reads).
 m_bn_05()          { sed -i 's|^layers:\([[:space:]]*\).*|layers: [src/renderer src/main]|' AGENTS.md; mkdir -p src/renderer src/main; printf "import { db } from '../main/db';\nexport const r = db;\n" > src/renderer/p.ts; }
@@ -335,15 +335,17 @@ m_bn_05()          { sed -i 's|^layers:\([[:space:]]*\).*|layers: [src/renderer 
 m_bn_05_nolayers() { mkdir -p src/renderer; printf 'export const r = 1;\n' > src/renderer/p.ts; }
 
 # ---- W4/G6: the Electron failure surface, as bans (BN-06..BN-09) -----------------------------
-# Each mutation turns its ban ON in the config (the default install does not list them - the SKIP
-# control below is the other half) and writes the exact line the row exists to catch. The pattern
+# GAP-3: selection is the GLOB and nothing else — each mutation writes the file the ban's
+# `applies_when` glob matches, and the row runs. There is no allow-list to turn a ban on; the
+# only config knob is the DISABLE list, and m_bn_06_disabled is that knob's control. The pattern
 # is the wrongEnough-shape: these are the keys Electron's own security checklist names, which is
 # why they are one-line rules rather than a dependency-graph run.
-m_bn_06()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-06]/' AGENTS.md; mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
-m_bn_06_unlisted() { mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
-m_bn_07()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-07]/' AGENTS.md; mkdir -p src; printf 'export const prefs = { contextIsolation: false };\n' > src/isolate.ts; }
-m_bn_08()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-08]/' AGENTS.md; mkdir -p src; printf 'export const prefs = { webSecurity: false };\n' > src/webs.ts; }
-m_bn_09()  { sed -i 's/^bans: \[.*\]/bans: [BN-01, BN-02, BN-05, BN-09]/' AGENTS.md; mkdir -p src; printf 'const v = ipcRenderer.sendSync("chan", 1);\n' > src/ipc.ts; }
+m_bn_06()  { mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
+# GAP-3: a ban whose glob MATCHES still skips when `bans_disabled:` names it — the one config knob.
+m_bn_06_disabled() { mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; sed -i 's/^bans_disabled: \[.*\]/bans_disabled: [BN-06]/' AGENTS.md; }
+m_bn_07()  { mkdir -p src; printf 'export const prefs = { contextIsolation: false };\n' > src/isolate.ts; }
+m_bn_08()  { mkdir -p src; printf 'export const prefs = { webSecurity: false };\n' > src/webs.ts; }
+m_bn_09()  { mkdir -p src; printf 'const v = ipcRenderer.sendSync("chan", 1);\n' > src/ipc.ts; }
 
 # ---- W5-1/W5-2: the two documented escapes, in BOTH directions ---------------------------------
 # `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` were documented in three places and
@@ -568,12 +570,11 @@ expect_red "an import across a declared layer boundary"       BN-05 1 m_bn_05
 # BN-05 is a SKIP (not a FAIL) when no layers are declared - the HS-01 precedent: nothing to
 # read is reported as a reason, never as a pass.
 expect_green "no layers declared -> BN-05 skips with a reason"  BN-05 m_bn_05_nolayers
-# W4/G6: the Electron surface, one control per row, plus the SKIP half. A new row has no
-# pre-change tree to be RED on, so PR-03's other branch applies: the mutation is the deliberately
-# broken copy (a renderer with the key set) and the SKIP control proves the row is not
-# always-red.
+# W4/G6 + GAP-3: the Electron surface, one control per row, plus the DISABLE-knob half. A new row
+# has no pre-change tree to be RED on, so PR-03's other branch applies: the mutation writes the
+# file the glob matches (deliberately broken), and the DISABLE control proves the knob is real.
 expect_red   "a renderer with nodeIntegration: true"            BN-06 1 m_bn_06
-expect_green "an unlisted electron ban skips with a reason"     BN-06 m_bn_06_unlisted
+expect_green "a ban turned OFF by bans_disabled: skips with the key named" BN-06 m_bn_06_disabled
 expect_red   "a renderer with contextIsolation: false"          BN-07 1 m_bn_07
 expect_red   "a renderer with webSecurity: false"               BN-08 1 m_bn_08
 expect_red   "a synchronous IPC call in a hot path"             BN-09 1 m_bn_09

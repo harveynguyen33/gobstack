@@ -278,7 +278,7 @@ g_part_disabled() {
 #   harness_dir: checks
 #   source_root: src
 #   ratchet.ceiling: 160          # one nested level = a dotted key
-#   bans: [BN-01, BN-02]          # a list is a one-line JSON-ish array
+#   bans_disabled: [BN-02]        # a list is a one-line JSON-ish array (the ban OFF-switch)
 #   gate_commit_cmd: git rev-parse --verify --quiet HEAD
 #   <!-- gob:end -->
 #

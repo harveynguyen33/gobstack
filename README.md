@@ -52,13 +52,13 @@ After installing, in this order:
     cd <target> && git add -A && git commit   # the install is a change like any other
     .gob/bin/goblin-verify                    # or gob verify, anywhere in the target
 
-**A default install verifies green — `17 passed, 0 failed, 0 advisory,
-10 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
-scaffold's `0000000` placeholder is the one expected red.** Ten rows skip: `SK-01`, `SK-02` and
+**A default install verifies green — `21 passed, 0 failed, 0 advisory,
+6 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
+scaffold's `0000000` placeholder is the one expected red.** Six rows skip: `SK-01`, `SK-02` and
 `SK-04` **run** (the core procedure tier is vendored under `.gob/skills/` on every install);
-`BN-01`/`BN-02`/`BN-05` have no `.ts` file for a ban to read, so each
-reports itself *not applicable*; `BN-03` and `BN-06`–`BN-09` are not in this tree's `bans:` list
-(`bans: [BN-01, BN-02, BN-05]`), so they skip as *not enabled*;
+`BN-01`/`BN-02`/`BN-03`/`BN-05` match only `.ts`/`.tsx`/`.js`/`.jsx` and have no such source, so
+each reports itself *not applicable*; the four electron bans `BN-06`–`BN-09` DO run (their globs
+also match the shipped `.mjs`/`.json`) and pass with nothing to flag;
 and `FM-01`/`FM-02` have no feature map yet. **Thirty-two further rows are OFF by default** —
 they are not skipped, they are held in the **library** (`gob verify --library`), the discovery
 surface for the extend mechanism: the spec/round rows (`SP-01`..`SP-03`), the ratchet rows

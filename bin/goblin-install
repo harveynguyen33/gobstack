@@ -323,7 +323,7 @@ perf_baseline_commit
 perf_baseline_value	0
 perf_measured	
 perf_host_gate	
-bans	BN-01, BN-02, BN-05
+bans_disabled	
 XEOF
 }
 default_() { default_tsv | awk -F'\t' -v OFS='\t' -v k="$1" '$1==k { $1=""; sub(/^\t/,""); print; exit }'; }
@@ -359,9 +359,10 @@ PERF_BASELINE_COMMIT=$(default_ perf_baseline_commit)
 PERF_BASELINE_VALUE=$(default_ perf_baseline_value); [ -n "$PERF_BASELINE_VALUE" ] || PERF_BASELINE_VALUE=0
 PERF_MEASURED=$(default_ perf_measured)
 PERF_HOST_GATE=$(default_ perf_host_gate)
-# The ban list (G5). An unlisted ban SKIPs with a reason; a listed ban whose applies_when glob
-# matches no file reports itself not-applicable.
-BANS=$(default_ bans)
+# The ban selection is the GLOB (a ban runs when a real file matches its applies_when cell);
+# the only config knob is an explicit DISABLE list, rendered empty by default. A ban outside
+# any of this is on automatically.
+BANS_DISABLED=$(default_ bans_disabled)
 # `layers:` is a block list the project declares; the default ships none, so it renders empty
 # and BN-05 SKIPs with that reason until the project declares a from/to pair.
 LAYERS_BLOCK=""
@@ -560,7 +561,7 @@ render_config() {
     RATCHET_CMD "$RAT_CMD" \
     RATCHET_CEILING "$RAT_CEIL" \
     RUNTIME_DATA "$runtime" \
-    BANS "$BANS" \
+    BANS_DISABLED "$BANS_DISABLED" \
     BANS_EXEMPT "" \
     LAYERS "$LAYERS_BLOCK" \
     REPLAY_ENV "$REPLAY_ENV" \

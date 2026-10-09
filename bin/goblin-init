@@ -276,7 +276,7 @@ max_dirty advisory_ceiling security.gitignore_family security.build_output
 security.write_routes perf.metric perf.cmd perf.baseline_commit perf.baseline_value
 perf.measured perf.host_gate harness_dir scaffold_checks feature_map source_root
 verify_doctor reference_manifest quarantine_root
-ratchet.name ratchet.cmd ratchet.ceiling runtime_data bans bans_exempt layers
+ratchet.name ratchet.cmd ratchet.ceiling runtime_data bans_disabled bans_exempt layers
 replay.env replay.cmd replay.commit disabled engine_dir"
 BAD_KEYS=""
 # Token-by-token, not a whole-string case: KNOWN_KEYS is a multi-line word list and a

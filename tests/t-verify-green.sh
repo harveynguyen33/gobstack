@@ -43,13 +43,19 @@ printf '%s' "$OUT" | grep -q 'gob verify --library'
 check "  and the summary names the discovery surface for the off rows" "$?"
 
 # ---- the ban table self-selects per row (the class/electron opt-in is GONE) -------------------
-# A ban is code-shaped: it runs only when a real file matches its applies_when glob, and a ban
-# with no surface REPORTS itself not applicable, never silently green. The class and the
-# electron: key are gone; BN-06..09 are not in this tree's bans: list at all.
+# A ban is code-shaped: it runs whenever a real file matches its applies_when glob, and a ban
+# with no surface REPORTS itself not applicable, never silently green. The class key and the
+# electron: key are gone, and so is the `bans:` allow-list (GAP-3): the only config knob is the
+# DISABLE list, `bans_disabled:`. This tree has no .ts/.tsx/.js source, so the bans whose globs
+# name only those (BN-01/02/03/05) report themselves not applicable; the electron bans' globs
+# also match `.mjs`/`.json`, so they run instead (below).
 printf '%s' "$OUT" | grep -qE 'SKIP  BN-01 .*not applicable: no file matches applies_when'
 check "a ban the tree has no surface for reports itself NOT APPLICABLE" "$?"
-printf '%s' "$OUT" | grep -qE 'SKIP  BN-06 .*not enabled in bans:'
-check "a ban outside the bans: list skips with the enable reason" "$?"
+# GAP-3: no allow-list — a ban also runs whenever ANY real file matches its glob. BN-06..09's
+# globs include **/*.mjs, so the shipped checks/*.mjs makes them applicable, and the probe runs
+# over its declared src/app/electron surface (nothing there) and PASSes — never a silent skip.
+printf '%s' "$OUT" | grep -qE '^PASS  BN-06'
+check "a ban whose glob matches a real file RUNS (BN-06 via shipped checks/*.mjs), never skips" "$?"
 
 
 # ---- UX pass: remedy lines, day-one banners, recovery lines, GT-03's sentence --------------

@@ -223,8 +223,9 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     claim is not. Three further Electron failure modes are **recorded, not mechanised**: the
     dependency-graph boundary check, `ipcMain` sender validation,
     and fuses at package time. **Cut in v3:** the class presets and the `electron` overlay are
-    gone; an Electron project declares `perf.host_gate:` and lists the electron bans (`BN-06`..`BN-09`)
-    in its own `bans:` — the bans ride on their `applies_when` glob, not on a class.
+    gone; the electron bans (`BN-06`..`BN-09`) ride on their `applies_when` glob like every other
+    ban — a fresh Electron repo has the files, so they run — and the only off-switch is naming a
+    ban in `bans_disabled:`.
 36. **A ban's exemption reaches the probe through its environment, so a custom probe can ignore it.**
     `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` are filtered *before* the exit code is
     chosen, because a filter applied to a probe's stdout afterwards cannot change a verdict — that

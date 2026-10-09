@@ -9,10 +9,11 @@
 #   0  the tree is clean
 #   1  the ban is violated - the exit code alone decides; stdout, when any, names the lines
 #   2  the check could not run (FAIL CLOSED - a missing tool is never a silent pass)
-# A ban the config's `bans:` list does not name is SKIPPED with that reason. A ban whose
-# `applies_when` glob matches no real file is NOT APPLICABLE: it is reported as a SKIP with
-# that reason, never silently green (a ban that does not apply must be visible as such). A
-# missing or empty ban table is exit 2.
+# A ban RUNS when its `applies_when` glob matches a real file — selection is the glob and nothing
+# else. The only config knob is an explicit DISABLE list, `bans_disabled:` (default empty): a ban
+# named there is SKIPPED with that reason, naming the key. A ban whose `applies_when` glob matches
+# no real file is NOT APPLICABLE: it is reported as a SKIP with that reason, never silently green
+# (a ban that does not apply must be visible as such). A missing or empty ban table is exit 2.
 #
 # A narrow, explicit exception (Dune rule 5) reaches the probe through its environment, so it can
 # change the VERDICT and not only the printed detail: GOBLIN_BANS_ID (the ban) and
@@ -84,17 +85,17 @@ if [ "$LIST" -eq 1 ]; then
   exit 0
 fi
 
-# ---- the config: which bans this project turns on, and its narrow exceptions --
-# Which bans run is the config's `bans:` list, and NOTHING ELSE: whether a ban applies at
-# all is decided per-row by its `applies_when` glob (below), so a ban the repo's code shape
-# has no surface for reports itself not-applicable rather than riding a removed config key.
-ENABLED=""
+# ---- the config: which bans this project turns OFF, and its narrow exceptions --
+# A ban's selection is its `applies_when` glob, and nothing else (below). The ONLY config knob
+# is an explicit DISABLE list, `bans_disabled:` (default empty): a ban named there is skipped
+# with that reason. There is no allow-list — a ban is on whenever a real file matches its glob.
+DISABLED=""
 if [ -f "$CONFIG" ]; then
-  ENABLED=$(g_agents_list "$CONFIG" bans | tr '\n' ' ')
+  DISABLED=$(g_agents_list "$CONFIG" bans_disabled | tr '\n' ' ')
 fi
-enabled() {
-  [ -z "$ENABLED" ] && return 1
-  for e in $ENABLED; do [ "$e" = "$1" ] && return 0; done
+disabled() {
+  [ -z "$DISABLED" ] && return 1
+  for e in $DISABLED; do [ "$e" = "$1" ] && return 0; done
   return 1
 }
 
@@ -145,8 +146,10 @@ while IFS=$'\t' read -r id ban globs detect replacement escape reviewer source a
   only_selected "$id" || continue
   SEL=$((SEL + 1))
 
-  if ! enabled "$id"; then
-    SKIP=$((SKIP + 1)); g_skip "$id" "$ban (not enabled in bans: - add $id to the bans: array in AGENTS.md to turn it on)"
+  # The DISABLE list is the only config knob (default empty). A ban named there is skipped with
+  # the key named; otherwise the glob alone decides whether it applies.
+  if disabled "$id"; then
+    SKIP=$((SKIP + 1)); g_skip "$id" "$ban (disabled in bans_disabled: - remove $id from the bans_disabled: list in AGENTS.md to turn it on)"
     continue
   fi
   # applies_when self-selects the ban: a ban whose glob matches no real file is reported
