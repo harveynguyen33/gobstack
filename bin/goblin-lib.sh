@@ -31,6 +31,9 @@ g_trunc() {
 # <indent> (the cannot-see footer shape). Byte-safe: awk length on bytes approximates
 # columns for ASCII prose, which is all this text is.
 g_fold() {
+  # QA fix (v2-qa issue 9): the rest-assignment used to inline substr() as sub()'s third
+  # parameter — not a changeable lvalue, a hard error on gawk 5.2+ (the helper had never
+  # been exercised until the remedy fold called it). A temp variable is portable awk.
   awk -v w="$1" -v ind="$2" '
     {
       line = $0
@@ -39,10 +42,9 @@ g_fold() {
         while (cut > 1 && substr(line, cut, 1) != " ") cut--
         if (cut <= 1) cut = w
         print substr(line, 1, cut)
-        sub(/^[ ]+/, "", substr(line, cut + 1))
-        line = substr(line, cut + 1)
-        sub(/^[ ]+/, "", line)
-        line = ind line
+        rest = substr(line, cut + 1)
+        sub(/^[ ]+/, "", rest)
+        line = ind rest
       }
       print line
     }'
@@ -71,12 +73,16 @@ g_fail() {
   case "$rem" in
     —*) return 0 ;;   # an em-dash cell: history and blindness, never a remedy
   esac
-  # Whole in verbose/--only mode (the mode that reads, not scans), width-folded otherwise —
-  # the same contract the row printers keep.
-  if [ "${GOB_VERIFY_VERBOSE:-0}" -eq 1 ]; then
-    [ -n "$rem" ] && printf 'remedy: %s\n' "$rem"
-  else
-    [ -n "$rem" ] && printf 'remedy: %s\n' "$(g_trunc "${GOB_REPORT_COLS:-100}" "$rem")"
+  # QA fix (v2-qa issue 9): a remedy is an instruction, not a detail line — truncating it
+  # with a ~ cut the command the operator had to type (measured: 'git -c user.ema~').
+  # The remedy is now WORD-FOLDED to continuation lines at the report width in every
+  # mode (whole text either way); --verbose keeps the single-line form it always had.
+  if [ -n "$rem" ]; then
+    if [ "${GOB_VERIFY_VERBOSE:-0}" -eq 1 ]; then
+      printf 'remedy: %s\n' "$rem"
+    else
+      printf 'remedy: %s\n' "$rem" | g_fold "${GOB_REPORT_COLS:-100}" "        "
+    fi
   fi
 }
 g_remedy() {

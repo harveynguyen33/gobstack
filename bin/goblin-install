@@ -232,6 +232,15 @@ if [ "$UNINSTALL" -eq 1 ]; then
       printf '.goblin\n.gob/bin\n.gob/manifest\n.gob/bans\n.hermes\n.hermes/skills\n'
     } | awk 'NF' | awk -F/ '{print NF " " $0}' | sort -rn | cut -d' ' -f2- | awk '!seen[$0]++')
   g_info "removed $n file(s) and $nd empty director(y|ies). Left in place: HANDOFF.md, AGENTS.md, ROUND-000-SPEC.md, reviews/, the .gitignore block${KEPT:+, and the decision record(s) you edited:$KEPT}."
+  # QA fix (v2-qa issue 10): honesty about what the uninstall leaves UNTOUCHED. Two
+  # by-design residues a reader could otherwise read as a clean sweep:
+  #   - the .gitignore block the install appended stays (removing it could eat a
+  #     line the project added inside the block; the preimage is untracked text),
+  #   - prose in kept files (HANDOFF.md, AGENTS.md body, SPECs) may still name
+  #     now-deleted paths (.gob/bin/goblin-verify, checks/) — those references are
+  #     dead after this command.
+  g_info "  note: the .gitignore ignore-rules block stays (by design: it may carry lines the project added; remove it by hand if you want it gone)"
+  g_info "  note: prose that names .gob/ paths (HANDOFF.md, AGENTS.md body, SPECs) now points at removed files — those references are dead"
   exit 0
 fi
 

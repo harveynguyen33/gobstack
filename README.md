@@ -261,7 +261,10 @@ reported and kept, never clobbered — then every directory that leaves empty, a
 `<!-- gob:begin --> … <!-- gob:end -->` block out of `AGENTS.md` (the body prose stays). After
 it, the repo has zero harness files; only the project's own record (`HANDOFF.md`, `AGENTS.md`'s
 prose, `reviews/`, the `.gitignore` block) survives, because that is the project's, not the
-harness's to delete. And because the engine is vendored, the repo needs no gobstack installed to
+harness's to delete. Two residues are left **by design, and named in the output**: the
+`.gitignore` ignore-rules block stays (removing it could eat a line the project added inside
+it — delete that block by hand if you want it gone), and prose that named `.gob/` paths
+(HANDOFF, the AGENTS.md body, SPECs) now points at removed files. And because the engine is vendored, the repo needs no gobstack installed to
 run this — it is self-contained until the moment you remove it.
 
 The short version, for a full removal from a machine and its repos: (b) in each initialized
