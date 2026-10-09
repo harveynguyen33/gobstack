@@ -22,12 +22,10 @@ operator executes, and no row in `manifest/enforcement.tsv` reads a lane yet.
    behaviour.
 3. **Grade the chain from the transcript** — which files it actually opened, which commands it
    ran — never the self-report.
-4. **The judge runs as `role-judge`, on a lane disjoint from the candidate's.** A model grading its
+4. **The judge runs on a lane disjoint from the candidate's.** A model grading its
    own family's output is grading itself; the lane that decides must not be the lane that wrote.
-   `JG-02` checks the declared lanes are disjoint, and reports an unresolved judge lane as `ADV`
-   rather than failing a repo for the fleet's routing. What the judge receives, what it must
-   refuse and how its verdict is recorded is `docs/LOOP.md` — the short form is: **a predicate and
-   a handle the repo can resolve, never a self-report.**
+   What the judge receives, what it must refuse and how its verdict is recorded is this skill's
+   record below — the short form is: **a verdict from the transcript, never a self-report.**
 5. **Write the record where the next reader looks.** One directory per eval, `evals/<slug>/`:
    `prompt.md` (the one organic prompt, identical across lanes), `rubric.md` (3–6 criteria, for
    the judge only), `manifest.tsv` (`lane · condition · label · profile · provider · model ·

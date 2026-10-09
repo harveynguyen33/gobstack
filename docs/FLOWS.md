@@ -55,8 +55,8 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 ## P7 - `goblin-pr-gate`
 
 - **When:** anything that should be reviewed before it lands
-- **Steps:** 1 classify stakes S0-S4<br>- 2 run the gate set at the candidate SHA and record the numbers<br>- 3 write reviews/<slug>-<head7>.md with head/base/patch-id/stakes/checks-run<br>- 4 evaluate the panel rule for S3+<br>- 5 at S3+ the foreman is `role-judge`: N lane verdicts are opinions, and one judge turns them into a decision<br>- 6 re-check the patch-id before landing
-- **Verification:** the patch-id of base..head still matches the recorded one; the review note names a SHA that exists in git rev-list; for S2+ a check ran on that SHA; at S3+ the deciding lane is disjoint from the author's (`JG-02`)
+- **Steps:** 1 classify stakes S0-S4<br>- 2 run the gate set at the candidate SHA and record the numbers<br>- 3 write reviews/<slug>-<head7>.md with head/base/patch-id/stakes/checks-run<br>- 4 evaluate the panel rule for S3+<br>- 5 at S3+ the foreman turns N lane verdicts into one decision<br>- 6 re-check the patch-id before landing
+- **Verification:** the patch-id of base..head still matches the recorded one; the review note names a SHA that exists in git rev-list; for S2+ a check ran on that SHA; at S3+ the deciding lane is disjoint from the author's
 - **Profiles:** reviewer (+ architect for S3)
 - **Role:** review-panel
 
@@ -80,9 +80,9 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 
 - **When:** an unattended run over a predicate
 - **Steps:** 1 the exit condition is a checkable predicate written before iteration 1<br>- 2 it never gets relaxed<br>- 3 an escape hatch: a genuine dead end writes up why and stops<br>- 4 the morning audit reads the Attention section first
-- **Verification:** the predicate is a command, and its first run is recorded before iteration 1 (`LP-01`); the predicate is pinned and never relaxed (`LP-02`); `goal_max_turns` is set and at or under `loop_max_turns_ceiling` (`LP-03`); no three consecutive rows share an evidence pointer without reaching `predicate:green` (`LP-04`); a run that ends without its predicate green carries `.gob/loop/stuck.md` naming it (`LP-05`); every landed change has a P7 verdict row; a verdict that says `done` cites a handle the repo resolves (`JG-01`) and comes from a lane disjoint from the author's (`JG-02`)
+- **Verification:** the predicate is a command, and its first run is recorded before iteration 1; the predicate is pinned and never relaxed; the turn budget is set and respected; no three consecutive rows share an evidence pointer without reaching `predicate:green`; a run that ends without its predicate green carries a committed write-up naming it; every landed change has a P7 verdict row; a verdict that says `done` cites a handle the repo resolves
 - **Profiles:** default + coder
-- **Role:** code + judge
+- **Role:** code
 
 ## P11 - `goblin-sweep`
 
@@ -152,7 +152,7 @@ Each cut has a reason, and a cut is recorded rather than deleted silently.
 | `visual-parity` | cut | Needs a baseline screenshot harness; no project has a pixel-parity migration target. |
 | `authoring-a-skill` | cut | `hermes-agent-skill-authoring` is live in the global library and is a Hermes-native duplicate. |
 | `autopilot-stack` | cut | Nothing to stack: measured 0 branches and 0 PR merges across the repos this was designed for. |
-| `autopilot-full`, `orchestrate` | merged into P10 + P11 + kanban | The fleet-programme half is the board's job (`parents`, `goal_mode`, `request_review`). The patch-id and different-family verifier rules they contain are kept as PG-03 and MD-02. |
+| `autopilot-full`, `orchestrate` | merged into P10 + P11 + kanban | The fleet-programme half is the board's job (`parents`, `goal_mode`, `request_review`). The patch-id rule they contain is kept as PG-03. |
 | `multi-phase-plan` | merged into P3 + P8 | The standard already owns the SPEC lifecycle; duplicating it violates the one-owner rule. The machine-checkable half is kept as SP-01/02/03. |
 | `worktree-cleanup` | cut | macOS/Xcode-specific by inspection (`xcrun simctl`, `DerivedData`). |
 | `opening-a-pr` | merged into P7 | It is the terminal step of every other playbook; as its own playbook it would be a step file with one caller. Its PR-body schema becomes P7's review-note schema. |

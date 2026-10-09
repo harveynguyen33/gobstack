@@ -131,7 +131,7 @@ then install it:
 
 Expected output (this is a real transcript, trimmed):
 
-    created 20 · updated 0 · unchanged 0 · skipped 0
+    created 19 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
@@ -139,7 +139,7 @@ Expected output (this is a real transcript, trimmed):
       3. edit AGENTS.md: replace the default gate with your real commands (P8 step 3)
       4. agent skills are opt-in
 
-**`created 20`** is the installer's count of the files it **tracks**. It writes **21**: the 21st
+**`created 19`** is the installer's count of the files it **tracks**. It writes **20**: the 20th
 is `.gob/installed.json`, the record it keeps for itself, which it writes but does not count. It
 has written nothing outside this directory — and nothing under `.github/`: **v2 installs no
 CI, ever.** The default install ships **no agent skills** — the harness is neutral.
@@ -170,14 +170,14 @@ renaming your branch** (unless you want to).
 You will see one line per rule. The shape:
 
     PASS  IN-01  the install record exists and names its version
-    PASS  IN-02  14 installed files hashed
+    PASS  IN-02  13 installed files hashed
     FAIL  HP-05  HANDOFF.md names no commit that exists in this repo
     SKIP  HS-02  no pinned pre-change commit yet - the REPLAY is not provable
     ADV   HP-04  A stale sentence is corrected in place... (advisory)
 
 and a summary line at the bottom:
 
-    35 passed, 1 failed, 10 advisory, 31 skipped     # HP-05, below
+    34 passed, 1 failed, 6 advisory, 25 skipped     # HP-05, below
 
 ### How to read that output
 
@@ -190,7 +190,7 @@ and a summary line at the bottom:
 
 **`SKIP` is not success and not failure.** It is the harness telling you the truth: "this rule has
 nothing to read yet." On a brand-new install, three dozen rows skip — because there is no `src/` for a
-ban to scan, no feature map, no loop record, no pinned pre-change commit. That is correct on day
+ban to scan, no feature map, no pinned pre-change commit. That is correct on day
 one. The list of what is still skipping *is* your onboarding checklist.
 
 ### Feature maps: generate with `gob map`, then opt in
@@ -220,9 +220,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `34 passed, 2 failed, 10 advisory, 31 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
-| 2. the first commit | `git add -A && git commit` | `35 passed, 1 failed, 10 advisory, 31 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `36 passed, 0 failed, 10 advisory, 31 skipped` | none — green |
+| 1. the install ran | `gob init --write ... --yes` | `33 passed, 2 failed, 6 advisory, 25 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
+| 2. the first commit | `git add -A && git commit` | `34 passed, 1 failed, 6 advisory, 25 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `35 passed, 0 failed, 6 advisory, 25 skipped` | none — green |
 
 One of those deserves its name spelled out:
 
@@ -267,8 +267,6 @@ Open it. The keys that matter on day one:
     branch: main                          # DECLARED, never assumed
     owner_email: you@example.com          # the commit identity this repo expects
     practice: /path/to/your-standard.md   # optional: your own house rules, hash-pinned
-    models_file: /path/to/fleet-model.yaml # the ONE machine-specific input (per machine; a
-                                           # fresh install without --models leaves it empty)
     gate_<name>_cmd: <one command>        # YOUR real commands, one line each
 
 **The single most valuable edit you will make:** replace the gate line(s) with the commands you
@@ -369,7 +367,7 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 14 files it
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 13 files it
 tracks — not the ones it `owns` (including `AGENTS.md`, whose gob block §5 has you editing) and not
 `.gob/installed.json`; edit one of the tracked — the exercise below uses `.gob/bans/README.md`.
 
@@ -450,14 +448,14 @@ A software-class install lands on a specific shape. The first reds are
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    34 passed, 2 failed, 10 advisory, 31 skipped     # straight after the install (CM-03 + SP-02)
-    35 passed, 1 failed, 10 advisory, 31 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
-    36 passed, 0 failed, 10 advisory, 31 skipped     # real HEAD named and committed: green
+    33 passed, 2 failed, 6 advisory, 25 skipped     # straight after the install (CM-03 + SP-02)
+    34 passed, 1 failed, 6 advisory, 25 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
+    35 passed, 0 failed, 6 advisory, 25 skipped     # real HEAD named and committed: green
 
 Name a real commit in `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is
 green:
 
-    36 passed, 0 failed, 10 advisory, 31 skipped     (on a real project; your numbers will differ)
+    35 passed, 0 failed, 6 advisory, 25 skipped     (on a real project; your numbers will differ)
 
 **Thirty-two rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
@@ -465,13 +463,10 @@ scolding.
 
 Two readings that are easy to get wrong:
 
-- **Advisory rows are not passes.** Nine rules are labelled `advisory` — counted, not enforced, and
-  eight of them carry no executable check at all. The count is capped by `advisory_ceiling: 10`, and
-  a software-class install sits at 9 of 10: adding unenforceable rules eventually fails verify until
-  one is removed. That is intentional. (The summary line prints `10 advisory`: the tenth ADV
-  line is `JG-02`, a row with a real command of its own that reports ADV here because your model
-  file declares no `judge:` lane — it prints the remedy rather than failing a repo for a fleet's
-  routing.)
+- **Advisory rows are not passes.** Six rules are labelled `advisory` — counted, not enforced, and
+  all six carry no executable check at all. The count is capped by `advisory_ceiling: 10`, and a
+  software-class install sits at 6 of 10: adding unenforceable rules eventually fails verify until
+  one is removed. That is intentional.
 - **Vacuously-passing rows are not proven.** A rule about "the first review note" passes when there
   is no review note yet. It is not lying — it is passing on an empty set. `docs/CONTRACTS.md`
   names which rows do this.
@@ -530,7 +525,6 @@ same commands are available outside any repo through the npm CLI: `gob init` / `
     .gob/bin/goblin-bans           # run the ban list
     gob uninstall --target <dir>             # the uninstall job
     goblin-install --target <dir> --re-pin   # the deliberate re-pin (from the checkout/install tree)
-    bin/goblin-model <role>        # checkout-only; resolve a role to a profile (docs/ROLES.md)
 
 ### Register the harness with your agent (MCP)
 
@@ -584,7 +578,7 @@ Named procedures, installed as project-local skills. Each has a measurable verif
 | `docs/RISKS.md` | the risk register and non-goals |
 | `docs/CONTRACTS.md` | exact interface, exit codes, uninstall |
 | `docs/ADOPTION.md` | classes, presets, adoption order |
-| `docs/LOOP.md`, `docs/GUARDRAILS.md` | the newer lanes |
+| `docs/GUARDRAILS.md` | the newer lanes |
 
 ---
 
@@ -636,7 +630,7 @@ deadline.
     git init -b main
     gob init --heuristic                   # the brief + schema; answer it in a proposal file
     gob init --write .gob-init-proposal.md --yes
-                                           # expect: created 20 (no skills — those are opt-in)
+                                           # expect: created 19 (no skills — those are opt-in)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"

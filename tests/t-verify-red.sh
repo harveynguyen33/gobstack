@@ -3,103 +3,20 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 122 `expect_red` call sites and 29 `expect_green` - 151 calls over
-# all 77 of the matrix's 77 target rows (the other five rows are source-scope and carry controls of
-# their own). Measured at this revision: 77 distinct ids, 0 phantom ids (every id used here is a row
-# in the matrix) and 0 target row left without a control. Eight of the 77 - `HP-04`, `HS-03`,
-# `CM-02`, `MD-03`, `DOC-01`, `DOC-02`, `SC-09` and `JG-03`, the rows whose check column is
-# literally `advisory` (docs/LIMITS.md and docs/RISKS.md name them and say why) - carry no
-# executable check at all, and nine carry the wire control below (those eight plus `MD-02`, whose
-# check column holds a real command of its own). For a row with no check of its own, its control
-# replaces the row's check column with a command that fails and proves the row is WIRED, not that a
-# rule bites. This paragraph was counted
-# from the file rather than carried: it said "63 of the matrix's 65 target rows. The two it does not
-# cover are `DOC-01` and `DOC-02`" until G2, and "70 ... the three as rules" for one commit
-# - both were one count behind, because a row whose control exists was still described as uncovered.
-# The ids were built up as 42 at v0.1 plus the
-# five added with AU-01..AU-04 and SK-04, plus the ten added with SC-01..SC-09 and PF-01, plus the
-# five added with BN-00..BN-03 and BN-05, plus the three F4/G4 extras, the two V1 extras (G8-2,
-# G8-5), the second BN-00 control, the five W1 extras (three G8-3 gate-cmd forms, the V3-2
-# exit-code ban control, and the G8-6b ceiling/baseline control), the seven added with G1's
-# FM-01/FM-02/VA-01 - four of FM-01's clauses, FM-02's two, and the failing doctor - and the
-# fourteen added with G2's JG-01..JG-03 and LP-01..LP-05 (one expectation per clause the rows
-# mechanise, plus a seeded loop record that has to PASS, which is the half of a control that
-# proves a new row is not always-red), and the seventeen added with G6/W4's CI lane and Electron
-# class (five re-declared PG-05 shapes with the GREEN half that proves the new strictness is not
-# "any file that mentions if:", six controls for the new PG-06 row - one per clause plus the two
-# halves that prove it is not always-red and not always-green, five electron bans with the SKIP
-# control, and the second class-B part control), and the ten added with X1/W5 - five for the ban
-# lane's two DOCUMENTED escapes in both directions (`bans_exempt:` with a real violation inside
-# the exempt path, the same violation outside it, the inline `BAN-OK(<id>): <reason>` marker, a
-# marker with no reason, and a marker naming another ban), one stub feature map whose token occurs
-# only in the harness, and three for the loop's close-and-reopen (silent, recorded, stub archive),
-# and the six added with Z1 - `HS-02`'s declared-command pair (the GREEN half runs a harness set
-# that is RED on the pre-change tree, the RED half declares `cmd: false`, a command that
-# interpolates no `{name}`), one for `IN-03`'s newly-enforced enum, one for `FM-02`'s tracked-file
-# clause, one for `SC-03`'s hit count, one text assertion over the summary's advisory arithmetic
-# (Z1-7 - a `check`, not an `expect_*` call, for the judge-lane reason below) and one pinning the
-# drift guard that catches a defanged ban probe, and the ten added with AA1/Z2 - two for Z2-2's
-# minified lockfile (the FAIL half that used to PASS vacuously, and the allowlisted half that
-# proves the fix is not "any minified lock FAILs"), one for Z2-3's metacharacter-bearing harness
-# name, seven for Y1 §7 items 1/2/6 (item 1 in both directions, item 6's subtree/sibling pair plus
-# the trailing-slash case, item 2's env contract in both directions - the cluster Z1 named as the
-# one with a real engine underneath), plus one assertion on the LINE the alignment control reports
-# (a `check`, not an `expect_*`, for the judge-lane reason below): ten call sites, eleven
-# assertions. Measured against a054289 with the pre-fix
-# `bin/goblin-verify` and `manifest/enforcement.tsv` restored and these tests kept: SIX controls are
-# RED there - `Z1-4`, `Z1-5`, `Z1-6`, `Z1-7` and `W5-11` (Z1's five) plus `Z2-2`, the
-# minified-lockfile FAIL half AA1 added - and they are the ONLY controls in this file that change
-# verdict between the two trees. (`W5-12` is a PIN, holding on both trees, because it asserts the
-# limitation Z1 chose to record rather than fix, and the GREEN half of the `HS-02` pair is the same
-# kind of half - it proves the row is not always-red, not that a fix bites.)
-# The judge-lane family comparison is two text assertions rather than `expect_*` calls, because
-# `MD-02` is advisory and exits 0 either way; its control reads the line it prints. Thirty-four of
-# the controls are `expect_green` (the F2-9 pairs, three F4/G8-6b asserts, two that seed a feature
-# map and require it to PASS, seven that seed a loop record or a judge lane and require
-# `JG-01`, `JG-02` and `LP-01`..`LP-05` to PASS, five that pin a new row's non-failing half -
-# a commented-out `if:`, the installed workflow, a verbatim gate run, the no-workflow SKIP and an
-# unlisted ban - four that prove the two escapes, the recorded re-scope and the replay row's
-# declared command are not
-# always-red, and the five AA1 added: Z2-2's allowlisted minified lock, Z2-3's metacharacter-bearing
-# harness name, and the non-failing half of each of Y1 §7's items 1, 2 and 6). The `--only <id>` form is used
-# so a mutation in one row cannot be masked by another row failing first.
+# One control per target-scope row: 104 `expect_red` call sites and 21 `expect_green`
+# — 125 calls over all 66 of the matrix's target rows (the five source-scope rows
+# carry controls of their own in tests/run-tests.sh). Measured at this revision: 66 distinct ids
+# against the matrix, 0 phantom ids (every id used here is a row in the matrix) and 0 target row
+# left without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
+# README's census sentence must read `125 over 66 target rows`.
 #
-# PLUS F4's four controls, in a block of their own below the HP rows. HP-02 and HP-03 are the two
-# rows whose bodies F4 rewrote, so beyond the one `expect_red` each already had, four more controls
-# pin the new semantics: two are `expect_green` (a legitimate HANDOFF that the pre-change rows
-# rejected) and two are `expect_red` (a violation the pre-change rows let through). All four are
-# RED on the pre-change rows - measured by running this file against e196b3e with its old HP-02 and
-# HP-03 bodies restored, the F4 way of proving a control is not green on both trees.
-#
-# V1 (G8-2) rewrote HP-03 a second time: the row's matcher was satisfied by the TEMPLATE's own
-# example sentence, so the real gate line could lose its `measured <date>` and the row stayed
-# GREEN. The F4 `expect_red ... m_no_gate_line` control was re-pointed with it (it now removes the
-# real gate line and leaves the example), and one control per direction was added: m_no_date_real
-# (`expect_red`) and m_no_date_example (`expect_green`). Neither is green on both trees - measured
-# in V1.md against 43f7f69 with this same file.
-#
-# WHAT THE ADVISORY-ROW CONTROLS DO AND DO NOT PROVE. Nine target rows are labelled
-# `advisory` by design (HP-04, HS-03, CM-02, MD-02, MD-03, DOC-01, DOC-02, SC-09, JG-03 —
-# the ninth landed with G4's guard rails and the tenth with G2's judge row; this sentence said
-# eight until 2026-09-25, then nine until the count was taken again at W4): their rules
-# are not mechanically checkable, so there is no violation of the *rule* to produce. Their
-# control mutates the row's check column to a command that fails, and asserts the run then
-# reports that row FAIL. That proves the row is wired into the runner and that its id is
-# honoured — it does NOT prove the rule bites, because no check for it exists. The manifest
-# itself keeps them honest: IN-03 fails the run if a row labelled advisory claims enforcement
-# it does not perform.
-#
-# WHAT THE PRE-FIX RED LOOKS LIKE. For each row whose check this pass changed, the control is
-# RED on the pre-fix tree as well as after (D4/PT-01, D5/SP-03, D6/CL-02, D7/HS-01,
-# D10/CL-01, D12/DS-01, D13/SK-03). The pre-fix transcripts are in
-# goblin-stack-research/F1.md, section 2. Z1's five biting controls were measured the same way -
-# this file run from a copy that keeps these tests and restores `bin/goblin-verify` and
-# `manifest/enforcement.tsv` from a054289: `Z1-4` (HS-02 exit 0, wanted 1), `Z1-5` (IN-03 exit 0,
-# wanted 1), `Z1-6` (FM-02 exit 0, wanted 1), `W5-11` (the run still prints the character count) and
-# `Z1-7` (the summary prints no arithmetic line) all go RED there. They were the Z1-era file's ONLY
-# five FAILs; at 0.4.2 the same procedure yields SIX - these five plus `Z2-2`, whose minified-lock
-# FAIL half is RED on the 0.4.0 verifier too (168 ok, 6 FAIL, 174 assertions in all) - and those six
-# are the only controls in the file that change verdict between the two trees.
+# The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
+# check with a command that fails and proves the row is wired into the runner, not that the rule
+# bites (there is nothing to bite). The `--only <id>` form is used so a mutation in one row cannot
+# be masked by another row failing first. For a row whose check a later pass rewrote, the control
+# is RED on the pre-fix tree as well as after (D4/PT-01, D5/SP-03, D6/CL-02, D7/HS-01, D10/CL-01,
+# D12/DS-01, D13/SK-03).
+
 set -uo pipefail
 
 SRC=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -110,7 +27,6 @@ fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n  reviewer:\n    model: model-review\n    provider: prov-review\n    effort: high\n' > "$WORK/models.yaml"
 printf '# a fixture standard\nthe house style lives here\n' > "$WORK/standard.md"
 
 mkdir -p "$TARGET" && cd "$TARGET"
@@ -124,7 +40,7 @@ PRE_CHANGE=$(git rev-parse --short HEAD)
 # W6 neutral-first: the default install is skills=no, and this fixture's SK-*/AU-* controls
 # need their subjects — the installed skills and the automation producers are what the
 # mutations below violate. So the fixture opts in explicitly.
-bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --skills yes --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --skills yes --practice "$WORK/standard.md" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
@@ -152,11 +68,6 @@ cp -a .hermes/skills/goblin-bugreporter/SKILL.md "$BK/bugreporter-SKILL.md"
 cp -a .gob/automations "$BK/automations"
 cp -a .gob/boundary-waivers "$BK/boundary-waivers"
 cp -a .gob/manifest/bans.tsv "$BK/bans.tsv"
-# G2 mutates roles.yaml (the judge lane's profile list) and the mapping file (a judge profile
-# beside the code lane). Both are restored: a leaked judge profile would turn MD-02's ADV into a
-# PASS for every control below it.
-cp -a .gob/roles.yaml "$BK/roles.yaml"
-cp -a "$WORK/models.yaml" "$BK/models.yaml"
 # v2 DELETION NOTE (wave B): the CI lane is gone product-wide - no .github/workflows is
 # installed and CL-01 no longer names ci-gate. The W4 backup of .github and the whole PG-05/
 # PG-06 workflow-mutation family it served are deleted with it (the same treatment
@@ -183,8 +94,6 @@ restore_all() {
   rm -rf .gob/bin .gob/manifest
   cp -a "$BK/bin" .gob/bin
   cp -a "$BK/manifest" .gob/manifest
-  cp -a "$BK/roles.yaml" .gob/roles.yaml
-  cp -a "$BK/models.yaml" "$WORK/models.yaml"
   cp -a "$BK/SKILL.md" .hermes/skills/goblin-mode/SKILL.md
   cp -a "$BK/ROUND-000-SPEC.md" ROUND-000-SPEC.md
   cp -a "$BK/standard.md" "$WORK/standard.md"
@@ -204,9 +113,6 @@ restore_all() {
   rm -f 'checks/z2;true;#.mjs'
   cp -a "$BK/assert.mjs" checks/assert.mjs
   rm -f reviews/fixture-*.md
-  # G2: the planted loop record. A leftover .gob/loop/ would leave JG-01/LP-* green by
-  # accident AND count as an untracked file for CM-03 in the final full run.
-  rm -rf .gob/loop
   rm -rf reports
   rm -rf dist src app features
   git add -A >/dev/null 2>&1
@@ -361,14 +267,6 @@ m_bad_author()    { git -c user.email=someone@else.test commit -q --allow-empty 
 m_cm_02()         { m_row_fails CM-02; }
 m_dirty_tree()    { printf 'untracked\n' > newfile.txt; }
 
-# The slug is assembled at run time, never written literally (G8-10 - the same fix F2-5 gave the
-# tenant string). A literal model name here was one of the two repo-wide MD-01 hits: MD-01's own
-# scope does not read tests/, so the ROW was clean, but the control was the leak its own rule
-# exists to catch, and a reviewer grepping the repo found it. The repo-wide count is 0 now.
-MD_SLUG="$(printf '%s%s' 'deep' 'seek-v9-turbo')"
-m_model_leak()    { printf '\nmodel: %s\n' "$MD_SLUG" >> .hermes/skills/goblin-mode/SKILL.md; }
-m_md_02()         { m_row_fails MD-02; }
-m_md_03()         { m_row_fails MD-03; }
 
 m_review_no_sha() { mkdir -p reviews; printf 'head: 0000000000000000000000000000000000000000\nbase: %s\npatch-id: x\nstakes: S1\n' "$PRE_CHANGE" > reviews/fixture-def5678.md; }
 m_bad_stakes()    { mkdir -p reviews; printf 'head: %s\nbase: %s\npatch-id: x\nstakes: S9\n' "$(git rev-parse HEAD)" "$PRE_CHANGE" > reviews/fixture-pg02.md; }
@@ -498,7 +396,7 @@ set_bn01_probe() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "test \"$GO
 
 m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
-m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 7/' AGENTS.md; }
+m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 5/' AGENTS.md; }
 # V1/G8-5: a ceiling that is not a number made `[ n -le ten ]` return 2, and the runner reads 2
 # as ADV - so the cap silently stopped capping and the run still exited 0. It is a FAIL now.
 m_adv_ceiling_bad() { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: ten/' AGENTS.md; }
@@ -534,7 +432,7 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 printf '# targetB\n' > README.md
 git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$TARGET_B" --class B --models "$WORK/models.yaml" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$TARGET_B" --class B >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack (class B)"
 cd "$TARGET"
 m_b_tokens() { printf 'a_part_class_B_turns_off: true\n' > .gob/tokens.yaml; }
@@ -542,7 +440,7 @@ restore_b()  { rm -f .gob/tokens.yaml; }
 # v2 DELETION NOTE (wave B): the class-B CI-lane control (m_b_workflow) is deleted with the CI
 # lane itself - there is no goblin-gate.yml for a class-B repo to forbid any more.
 
-# ---- the 82 target-scope rows, in manifest order ------------------------------
+# ---- the 66 target-scope rows, in manifest order ------------------------------
 expect_red "a manifest with no version"            IN-01 1 m_in_01
 expect_red "one edited byte of the standard"       IN-02 1 m_edit_practice
 expect_red "a manifest row with no check"          IN-03 3 m_blank_row
@@ -612,9 +510,6 @@ expect_red "an ambient commit author"              CM-01 1 m_bad_author
 expect_red "CM-02 (advisory row: wired, not biting)" CM-02 1 m_cm_02
 expect_red "an uncommitted file"                   CM-03 1 m_dirty_tree
 
-expect_red "a hardcoded model name"                MD-01 1 m_model_leak
-expect_red "MD-02 (advisory row: wired, not biting)" MD-02 1 m_md_02
-expect_red "MD-03 (advisory row: wired, not biting)" MD-03 1 m_md_03
 
 expect_red "a review naming no real SHA"           PG-01 1 m_review_no_sha
 expect_red "a review with an unknown stakes tier"  PG-02 1 m_bad_stakes
@@ -628,7 +523,7 @@ expect_red "DOC-02 (advisory row: wired, not biting)" DOC-02 1 m_doc_02
 
 expect_red "a skill with no frontmatter"           SK-01 1 m_skill_frontmatter
 expect_red "an edited installed skill"             SK-02 1 m_skill_drift
-expect_red "the advisory cap evaded by a builtin"  SK-03 1 m_adv_ceiling
+expect_red "the advisory count above the ceiling"  SK-03 1 m_adv_ceiling
 expect_red "an advisory ceiling that is not a number" SK-03 1 m_adv_ceiling_bad
 expect_red "a shipped skill with no cannot-see section" SK-04 1 m_sk_04
 
@@ -863,140 +758,6 @@ expect_red   "an entry path changed after the map was verified" FM-02 1 m_fm_02_
 # source that was never committed. "Resolves" must not imply "is tracked".
 expect_red   "Z1-6: an entry path only an untracked file holds" FM-02 1 m_fm_02_untracked
 expect_red   "a verify_doctor that exits non-zero" VA-01 1 m_va_01_fail
-# ---- G2: the judge role and the loop contract (JG-01..JG-03, LP-01..LP-05) --------------------
-# All eight rows are NEW, so there is no pre-change tree to be RED on: PR-03's other branch is "a
-# deliberately broken copy of the module under test", which is what these mutations are. A LOOP
-# RECORD is seeded first - one that passes JG-01 and all five LP rows, which is the half of the
-# control that proves the rows are not always-red - and then one clause at a time is broken.
-#
-# The empty state is asserted first, because it is the state every fresh install is in: with no
-# .gob/loop/ the six loop-dependent rows must report SKIP with their reason, never a vacuous
-# PASS (the PG-01..PG-03 shape). JG-02 is the exception by design: it reads roles.yaml and the
-# mapping file, so a lane that resolves to no provider/model is an ADV with its one-line remedy,
-# and that is asserted in t-verify-green.sh (ADV, exit 0).
-LOOP=".gob/loop"
-plant_loop() {
-  mkdir -p "$LOOP"
-  printf '# the loop exit condition: exit 0 == the loop is finished\ntest -f .gob/loop/done\n' > "$LOOP/predicate"
-  sha256sum "$LOOP/predicate" | awk '{print $1}' > "$LOOP/predicate.sha256"
-  printf 'exit=1 ts=2026-09-25T00:00:00Z\n' > "$LOOP/first-run"
-  printf '12\n' > "$LOOP/budget"
-  printf 'ts\tphase\tdecision\twhy\tevidence\tresult\n' > "$LOOP/decisions.tsv"
-  printf '2026-09-25T00:10:00Z\tcheck\tverdict:continue\tthe marker file is not there yet\tsha:%s\tpredicate:red\n' \
-    "$(git rev-parse HEAD)" >> "$LOOP/decisions.tsv"
-  printf '2026-09-25T00:20:00Z\tcheck\tverdict:done\tthe marker exists and the gate is green\tfile:README.md\tpredicate:green\n' \
-    >> "$LOOP/decisions.tsv"
-}
-# JG-02's own green: a `judge` lane beside the code lane in the mapping file. The fixture's
-# mapping file has no judge profile, which is the ADV state every install starts in.
-plant_judge_lane() {
-  printf '  judge:\n    model: model-judge\n    provider: prov-judge\n    effort: high\n' >> "$WORK/models.yaml"
-}
-m_loop_plant()   { plant_loop; }
-m_jg_02_ok()     { plant_judge_lane; }
-# The judge is the author: role-judge resolves to the code lane's own profile. A FAIL, not an ADV -
-# the declared lanes are visible to a repo, which is the whole point of the row.
-m_jg_02_shared() { plant_judge_lane; sed -i 's/^  profiles: \[judge\]$/  profiles: [coder]/' .gob/roles.yaml; }
-# A verdict resting on a command that ran: `cmd:` resolves NOTHING by design, because the command's
-# output is not in the record and a verdict resting on it is the self-report the row refuses.
-m_jg_01_cmd()    { plant_loop; sed -i "s|sha:$(git rev-parse HEAD)|cmd:npm test|" "$LOOP/decisions.tsv"; }
-# A handle of the right SHAPE that names nothing: 40 hex, no such commit in `git rev-list --all`.
-m_jg_01_ghost()  { plant_loop; sed -i "s|sha:$(git rev-parse HEAD)|sha:deadbeefdeadbeefdeadbeefdeadbeefdeadbeef|" "$LOOP/decisions.tsv"; }
-m_jg_03_wired()  { m_row_fails JG-03; }
-m_lp_01_two()    { plant_loop; printf 'test -f README.md\n' >> "$LOOP/predicate"; }
-m_lp_01_late()   { plant_loop; printf 'exit=1 ts=2026-09-25T00:30:00Z\n' > "$LOOP/first-run"; }
-m_lp_01_norun()  { plant_loop; rm -f "$LOOP/first-run"; }
-m_lp_02_repin()  { plant_loop; printf '# relaxed by hand\n' >> "$LOOP/predicate"; }
-# W5-7: the close-and-reopen path. A loop archives its bar under closed-<date>/, writes a weaker
-# one and re-pins - and before the fix LP-02 and LP-05 both PASSED with nothing in the record.
-# Three controls: the silent version must FAIL, the RECORDED version must pass (the half that
-# proves the clause is not always-red), and a stub archive must FAIL.
-m_lp_02_reopen_silent() {
-  plant_loop
-  mkdir -p "$LOOP/closed-2026-09-24"
-  cp "$LOOP/predicate" "$LOOP/closed-2026-09-24/predicate"
-  cp "$LOOP/predicate.sha256" "$LOOP/closed-2026-09-24/predicate.sha256"
-  printf '# the relaxed bar: any file will do\n' >> "$LOOP/predicate"
-  sha256sum "$LOOP/predicate" | awk '{print $1}' > "$LOOP/predicate.sha256"
-}
-m_lp_02_reopen_recorded() {
-  m_lp_02_reopen_silent
-  printf 'previous: %s\n' "$(sha256sum "$LOOP/closed-2026-09-24/predicate" | awk '{print $1}')" >> "$LOOP/predicate.sha256"
-}
-m_lp_02_reopen_noarc() {
-  plant_loop
-  mkdir -p "$LOOP/closed-2026-09-24"
-  cp "$LOOP/predicate" "$LOOP/closed-2026-09-24/predicate"
-  printf '# the relaxed bar\n' >> "$LOOP/predicate"
-  sha256sum "$LOOP/predicate" | awk '{print $1}' > "$LOOP/predicate.sha256"
-}
-m_lp_03_over()   { plant_loop; printf '21\n' > "$LOOP/budget"; }
-m_lp_03_rows()   { plant_loop; printf '1\n' > "$LOOP/budget"; }
-# The same pointer three times with no green: rows 2, 3 and 4 of the record. What the row measures
-# is a CHANGED pointer, which is a proxy for progress - the why-cell says so.
-m_lp_04_thrash() {
-  plant_loop
-  printf '2026-09-25T00:30:00Z\tcheck\tverdict:continue\tthe same pointer again\tfile:README.md\tpredicate:red\n2026-09-25T00:40:00Z\tcheck\tverdict:continue\tand again\tfile:README.md\tpredicate:red\n' \
-    >> "$LOOP/decisions.tsv"
-}
-m_lp_05_nostuck() { plant_loop; sed -i 's|\tpredicate:green$|\tpredicate:stuck|' "$LOOP/decisions.tsv"; }
-m_lp_05_short()   { m_lp_05_nostuck; printf 'the marker never appeared\nthe predicate is still red\n' > "$LOOP/stuck.md"; }
-
-# The empty state: no loop has run here, so the six loop-dependent rows SKIP with their reason.
-for pair in "JG-01:no loop record" "LP-01:no loop has run" "LP-02:no loop has run" \
-            "LP-03:no loop has run" "LP-04:no loop has run" "LP-05:no loop has run"; do
-  rid=${pair%%:*}; want=${pair#*:}
-  out=$(bash .gob/bin/goblin-verify --only "$rid" 2>&1); rc=$?
-  printf '%s' "$out" | grep -q "^SKIP  $rid.*$want"; hit=$?
-  check "$rid with no loop record SKIPs with its reason (not a vacuous pass)" \
-    "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
-done
-
-expect_green "a seeded loop record passes JG-01 (a sha: handle that resolves)" JG-01 m_loop_plant
-expect_red   "a verdict resting on a command that ran (cmd:)" JG-01 1 m_jg_01_cmd
-expect_red   "a sha of the right shape that names no commit"  JG-01 1 m_jg_01_ghost
-expect_green "a judge lane beside the code lane, disjoint"    JG-02 m_jg_02_ok
-expect_red   "the judge lane IS the author lane"              JG-02 1 m_jg_02_shared
-# ---- W5-6: the judge lane's model FAMILY ------------------------------------------------------
-# JG-02 proves the declared profile NAMES are disjoint; a `judge:` profile mapped to the author's
-# own model passed it, so the judge was distinct by name only. MD-02 now compares the judge lane's
-# resolved model with the code lane's - and it stays ADVISORY either way (`ADV`, exit 0), because
-# goblin-stack cannot choose the fleet's models. So the control reads the LINE, not the exit code:
-# the same-family case must be named as such, and the different-family case must be too.
-plant_judge()      { plant_judge_lane; }
-plant_judge_same() { plant_judge_lane; awk '{ if ($0 ~ /^  judge:$/) { print; getline; print "    model: model-code"; next } print }' "$WORK/models.yaml" > "$WORK/models.yaml.n" && mv "$WORK/models.yaml.n" "$WORK/models.yaml"; }
-plant_judge_same
-out=$(bash .gob/bin/goblin-verify --only MD-02 2>&1); rc=$?
-printf '%s' "$out" | grep -q 'the SAME family as the code lane'; hit=$?
-check "W5-6: a judge mapped to the author's own model is reported as the same family" \
-  "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
-restore_all
-plant_judge
-out=$(bash .gob/bin/goblin-verify --only MD-02 2>&1); rc=$?
-printf '%s' "$out" | grep -q 'judge lane model-judge, code lane model-code - different family'; hit=$?
-check "W5-6: a judge on another model is reported as a different family" \
-  "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
-restore_all
-expect_red   "JG-03 (advisory row: wired, not biting)"        JG-03 1 m_jg_03_wired
-expect_green "a seeded loop record passes LP-01 (one command, run first)" LP-01 m_loop_plant
-expect_red   "a predicate of two commands"                       LP-01 1 m_lp_01_two
-expect_red   "a first run recorded AFTER the first log row"      LP-01 1 m_lp_01_late
-expect_red   "no recorded first run at all"                      LP-01 1 m_lp_01_norun
-expect_green "a seeded loop record passes LP-02 (the pin still matches)" LP-02 m_loop_plant
-expect_red   "the predicate relaxed after the pin was taken"     LP-02 1 m_lp_02_repin
-# W5-7: the close-and-reopen, recorded vs silent, plus a stub archive.
-expect_red   "W5-7: a close-and-reopen that records nothing"     LP-02 1 m_lp_02_reopen_silent
-expect_green "W5-7: the same re-scope with the archived digest named" LP-02 m_lp_02_reopen_recorded
-expect_red   "W5-7: a closed loop whose archive holds no pin"    LP-02 1 m_lp_02_reopen_noarc
-expect_green "a seeded loop record passes LP-03 (budget 12, 2 rows)" LP-03 m_loop_plant
-expect_red   "a budget above loop_max_turns_ceiling"             LP-03 1 m_lp_03_over
-expect_red   "more verdict rows than the declared budget"        LP-03 1 m_lp_03_rows
-expect_green "a seeded loop record passes LP-04 (the pointer moved)" LP-04 m_loop_plant
-expect_red   "three consecutive rows on one pointer, none green" LP-04 1 m_lp_04_thrash
-expect_green "a seeded loop record passes LP-05 (the last row is green)" LP-05 m_loop_plant
-expect_red   "a loop that ended not-green and left no write-up"  LP-05 1 m_lp_05_nostuck
-expect_red   "a write-up shorter than three lines"               LP-05 1 m_lp_05_short
-
 expect_red "a class-B repo carrying a part it forbids" CL-01 1 m_b_tokens "$TARGET_B" restore_b
 # v2 DELETION NOTE (wave B): the two CI-lane CL-01 controls (class B forbids goblin-gate.yml;
 # class A requires it) are deleted with the lane - the class contract no longer names ci-gate.
@@ -1090,8 +851,7 @@ expect_red   "an acquisition record with no apk row"                         RC-
 expect_green "a well-formed acquisition record"                              RC-04 m_rc04_valid
 
 # ---- V1/G8-5: the advisory budget is reported, not left to arithmetic --------------------------
-# The ceiling is the one scarce resource a rule author spends, and two cards (G1's FM-03, G2's
-# JG-03) each wanted that last slot: nothing at HEAD decided which, and SK-03 printed the COUNT
+# The ceiling is the one scarce resource a rule author spends, and SK-03 printed the COUNT
 # with no remaining budget, so the author had to work the arithmetic out. Both statements below
 # are RED against 43f7f69, where the line was `advisory 9 of ceiling 10` and nothing else -
 # measured in V1.md. The numbers come from the fixture, not from this file, so the control still
@@ -1221,14 +981,14 @@ cp -r "$SRC/manifest" /tmp/w1-engine-gmode/manifest
   && git init -q -b main \
   && git config user.name "Test Runner" && git config user.email "runner@example.com" \
   && printf '# gmode\n' > README.md \
-  && bash "$SRC/bin/goblin-install" --target . --class B --models "$WORK/models.yaml" >/dev/null 2>&1 \
+  && bash "$SRC/bin/goblin-install" --target . --class B >/dev/null 2>&1 \
   && sed -i "/^models_file:/a engine_dir: /tmp/w1-engine-gmode" AGENTS.md \
   && python3 -c '
 import json
 rec = json.load(open(".gob/installed.json"))
 rec["engine"] = {"mode": "global", "engine_dir": "/tmp/w1-engine-gmode", "cli_version": "0.6.0", "cli_sha256": "a", "enforcement_tsv_sha256": "b"}
 json.dump(rec, open(".gob/installed.json", "w"), indent=2)' \
-  && rm -rf .gob/bin .gob/manifest .gob/bans .gob/automations .gob/roles.yaml )
+  && rm -rf .gob/bin .gob/manifest .gob/bans .gob/automations )
 out=$( cd "$W1_GMODE" && bash "$SRC/bin/goblin-verify" --only AU-01 2>&1 )
 printf '%s' "$out" | grep -q 'SKIP  AU-01.*no automation producer found'
 check "W1: no producer anywhere -> AU-01 SKIPs with the reason (the born-RED FIX)" "$?"
@@ -1316,7 +1076,7 @@ rm -rf "$UX4"; mkdir -p "$UX4"
   && git init -q -b main \
   && git config user.name "Test Runner" && git config user.email "runner@example.com" \
   && printf '# ux4\n' > README.md && git add -A && git commit -qm seed \
-  && bash "$SRC/bin/goblin-install" --target . --class A --models "$WORK/models.yaml" >/dev/null 2>&1 \
+  && bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1 \
   && sed -i 's/^owner_email:.*/owner_email: other@owner.example/' AGENTS.md \
   && git add -A && git commit -qm install )
 out=$( cd "$UX4" && bash .gob/bin/goblin-verify 2>&1 ); rc=$?
@@ -1348,12 +1108,10 @@ FINAL=$(bash .gob/bin/goblin-verify 2>&1); FINAL_RC=$?
 check "the fixture is GREEN again after every mutation was restored" "$FINAL_RC"
 
 # ---- Z1-7: the summary's advisory arithmetic, over the same full run -------------------------
-# The line `advisory N of ceiling C` counts the rows the MATRIX labels advisory (SK-03), while the
-# `ADV` lines on screen include a non-advisory row whose lane cannot be resolved here (JG-02). The
-# two numbers therefore differ by design, and the summary used to print only the first - so a
-# reader comparing it with the ADV lines saw a mismatch that only the row's why-cell explained.
-# This is a text assertion rather than an `expect_*` call for the same reason the judge-lane
-# comparison is: the row exits 0 either way and the claim is about the LINE it prints.
+# The line `advisory N of ceiling C` counts the rows the MATRIX labels advisory (SK-03); a
+# non-advisory row can also print an `ADV` line when its lane cannot be resolved here, so the two
+# numbers can differ by design. This is a text assertion rather than an `expect_*` call because
+# the row exits 0 either way and the claim is about the LINE it prints.
 ADV_LABELLED=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' .gob/manifest/enforcement.tsv)
 ADV_PRINTED=$(printf '%s\n' "$FINAL" | grep -cE '^ADV')
 printf '%s\n' "$FINAL" | grep -q "of those $ADV_PRINTED advisory: the matrix labels $ADV_LABELLED row(s) advisory"

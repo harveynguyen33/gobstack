@@ -105,13 +105,13 @@ Each step is independently useful and the later ones build on the earlier:
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .gob/bin/goblin-verify            # 34 passed, 2 failed - CM-03 + SP-02, until the install is committed
+    .gob/bin/goblin-verify            # 33 passed, 2 failed - CM-03 + SP-02, until the install is committed
 
-A default software-class install (no agent skills) is **green** — `36 passed, 0 failed, 10 advisory,
-31 skipped`, exit 0 — once
+A default software-class install (no agent skills) is **green** — `35 passed, 0 failed, 6 advisory,
+25 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
-the one expected red (`35 passed, 1 failed`). Both numbers are measured, not assumed
-(`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Thirty-four rows skip with a reason: the
+the one expected red (`34 passed, 1 failed`). Both numbers are measured, not assumed
+(`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Twenty-five rows skip with a reason: the
 five skill rows (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free
 install records, plus the not-yet rows: `HS-02` (no
 pinned pre-change commit yet), `AU-02`/`AU-03` (no report has been filed, so there is nothing to
@@ -119,12 +119,11 @@ dedup and no reporter run to audit), `SC-06` (no dependency manifest, no lockfil
 to read) and `BN-03` with the four
 electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` (not in this class's `bans: [BN-01, BN-02, BN-05]`, so
 they skip as *not enabled* rather than as *unread*), `FM-01`/`FM-02`/`VA-01`
-(no feature map and no declared `verify_doctor:` yet), `RC-01`..`RC-04` (no reference corpus
-declared: `reference_manifest:` ships empty and a fresh repo has no lab `manifests/`) and `JG-01`
-with `LP-01`..`LP-05` (no
-`.gob/loop/` record, because no loop has run here yet). The class's required parts that only a
-round can produce pass *vacuously* (zero `reviews/*.md` to check; the declared gate is still the
-shipped floor), so the first-step list is a list of work, not a list of FAILs.
+(no feature map and no declared `verify_doctor:` yet) and `RC-01`..`RC-04` (no reference corpus
+declared: `reference_manifest:` ships empty and a fresh repo has no lab `manifests/`). The class's
+required parts that only a round can produce pass *vacuously* (zero `reviews/*.md` to check; the
+declared gate is still the shipped floor), so the first-step list is a list of work, not a list of
+FAILs.
 
 ## Adopting into a repo that already has a `HANDOFF.md`
 
@@ -164,7 +163,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .gob/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the class's full green path (`36 passed, 0 failed, 10 advisory, 31 skipped`, exit 0 for
+   Success is the class's full green path (`35 passed, 0 failed, 6 advisory, 25 skipped`, exit 0 for
    the software class) with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three

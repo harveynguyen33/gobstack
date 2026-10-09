@@ -57,7 +57,7 @@ The axis that decides fan-out is **read versus write**, not difficulty.
 provider parameter, so it cannot honour a role: it would silently run every lane on one
 model, which is exactly the review failure the panel exists to prevent. Use a board card per
 lane — each carrying the resolved provider/model, the pinned SHA, the diff and one focus —
-never a subagent spawn. `docs/ROLES.md` states this as a rule.
+never a subagent spawn.
 
 ## Forbidden code
 

@@ -8,7 +8,7 @@ description: P10: an unattended run over a checkable predicate written before it
 1. **The exit condition is a checkable predicate written before iteration 1**, and it is a
    command — in the card body, or in `.goblin/loop/predicate`. Run it once before starting, so
    you know it is runnable; record that run as `exit=<n> ts=<ISO8601>` in `.goblin/loop/first-run`
-   and pin the predicate (`LP-01`, `LP-02`).
+   and pin the predicate.
 2. **It never gets relaxed.** If the predicate turns out to be wrong, stop and write up why; do
    not edit the predicate to fit the result. Relaxing it is closing this loop and opening
    another, with the old predicate archived under `.goblin/loop/closed-<date>/`.
@@ -21,17 +21,15 @@ description: P10: an unattended run over a checkable predicate written before it
 
 ## Verification
 
-- The predicate is one command, and its first run is recorded at or before the first log row
-  (`LP-01`).
-- The predicate is pinned by digest and the pin has not moved (`LP-02`).
-- `goal_max_turns` is set, at or under `loop_max_turns_ceiling`, and the record never exceeds it
-  (`LP-03`).
+- The predicate is one command, and its first run is recorded at or before the first log row.
+- The predicate is pinned by digest and the pin has not moved.
+- `goal_max_turns` is set and the record never exceeds it.
 - No three consecutive verdict rows share an evidence pointer without reaching
-  `predicate:green` (`LP-04`).
-- A run whose last row is not `predicate:green` carries `.goblin/loop/stuck.md` naming the
-  predicate (`LP-05`).
+  `predicate:green`.
+- A run whose last row is not `predicate:green` carries a committed write-up naming the
+  predicate.
 - Every landed change has a P7 verdict row, and any verdict that says `done` cites a handle the
-  repo resolves (`JG-01`).
+  repo resolves.
 - The four record artifacts — `predicate`, `predicate.sha256`, `first-run`, `decisions.tsv` —
   are committed, so tomorrow's reader can re-derive every decision.
 

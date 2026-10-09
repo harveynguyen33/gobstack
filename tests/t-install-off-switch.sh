@@ -11,7 +11,6 @@ fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
 
 mkfix() {
   mkdir -p "$1" && cd "$1"
@@ -24,7 +23,7 @@ mkfix() {
 
 # ---- class D + --archive -----------------------------------------------------
 mkfix "$WORK/archived"
-bash "$SRC/bin/goblin-install" --target "$WORK/archived" --class D --archive --models "$WORK/models.yaml" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$WORK/archived" --class D --archive >/dev/null 2>&1
 check "archive install exits 0" "$?"
 check "no checks/ directory" "$([ ! -d checks ] && echo 0 || echo 1)"
 check "no HANDOFF.md" "$([ ! -f HANDOFF.md ] && echo 0 || echo 1)"
@@ -44,7 +43,7 @@ check "the summary says why the rows were skipped" "$?"
 
 # ---- the same shape, class A: the switch is what made it pass ----------------
 mkfix "$WORK/notarchived"
-bash "$SRC/bin/goblin-install" --target "$WORK/notarchived" --class A --models "$WORK/models.yaml" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$WORK/notarchived" --class A >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install (class A)"
 rm -f HANDOFF.md && git add -A && git commit -q -m "test: remove the HANDOFF"
 A_OUT=$(bash .gob/bin/goblin-verify 2>&1); A_RC=$?
@@ -61,7 +60,7 @@ check "and the run is not green" "$([ "$A_RC" -eq 1 ] && echo 0 || echo 1)"
 # failed by the row that hashes them. The five automation rows and SK-02/SK-04 skip instead.
 mkfix "$WORK/noskills"
 bash "$SRC/bin/goblin-install" --target "$WORK/noskills" --class A --skills no \
-  --models "$WORK/models.yaml" >/dev/null 2>&1
+  >/dev/null 2>&1
 check "--skills no installs" "$?"
 check "  and writes no automation producers either" \
   "$([ ! -d .gob/automations ] && echo 0 || echo 1)"
@@ -76,17 +75,12 @@ check "  and the automation rows are opt-out, not absent" "$?"
 printf '%s' "$NS_OUT" | grep -q 'SKIP  SK-02'
 check "  and SK-02 is opt-out rather than FAIL (the pre-fix defect)" "$?"
 # V3-3: the opt-out path had a number no file recorded (the count moved from `37/0/9/11` at v0.2
-# to `38/0/9/15` with the ban rows and nothing noticed, and to `38/0/9/18` on 2026-09-25 when G1's
-# FM-01/FM-02/VA-01 joined - each of those three skips on this path for its own reason, and to
-# `38/0/11/24` on 2026-09-25 when W3's judge/loop rows joined: JG-02 reports ADV and JG-01 +
-# LP-01..LP-05 skip, all six because no loop has run — and to `37/0/11/34` when the v2 wave
-# removed the CI payload: a fresh install ships no workflow, and the PG-05/PG-06 rows are cut in
-# v3, so the old vacuously-passing shape is gone (the pre-cut text read: PG-06 SKIPs where the old
-# passes with the zero count printed on the line). Pin the
-# line so the next silent shift is caught here. The number is measured, not copied: see the note
-# line the run prints above.
-printf '%s' "$NS_OUT" | grep -q '36 passed, 0 failed, 10 advisory, 31 skipped'
-check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 36/0/10/31)" "$?"
+# as rows joined - the ban rows, G1's FM-01/FM-02/VA-01, W3's judge/loop rows and the v2 CI-payload
+# removal each shifted it). In v3 the model/role/loop rows and the CI lane are cut, so the shape is
+# `35/0/6/25`. Pin the line so the next silent shift is caught here. The number is measured, not
+# copied: see the note line the run prints above.
+printf '%s' "$NS_OUT" | grep -q '35 passed, 0 failed, 6 advisory, 25 skipped'
+check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 35/0/6/25)" "$?"
 
 # ---- W6 migration safety: an upgrade must not strip previously-installed skills ---------------
 # The pre-W6 default was --skills yes, so every existing install carries .hermes/skills recorded
@@ -95,14 +89,14 @@ check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs,
 # --uninstall removes exactly what the record lists.
 mkfix "$WORK/migrate"
 bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills yes \
-  --models "$WORK/models.yaml" >/dev/null 2>&1
+  >/dev/null 2>&1
 check "migration fixture: --skills yes installs" "$?"
 S_BEFORE=$(find .hermes/skills -name SKILL.md | sort)
 REC_BEFORE=$(sha256sum .gob/installed.json | awk '{print $1}')
 git add -A && git commit -q -m "chore: install (--skills yes, the pre-W6 shape)"
 # the upgrade: the NEW default (no flag), same class — must keep every skill
 UP_OUT=$(bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --upgrade \
-  --models "$WORK/models.yaml" 2>&1); UP_RC=$?
+  2>&1); UP_RC=$?
 check "upgrade with the new default exits 0" "$UP_RC"
 S_AFTER=$(find .hermes/skills -name SKILL.md 2>/dev/null | sort)
 [ "$S_BEFORE" = "$S_AFTER" ] && [ -n "$S_AFTER" ]
@@ -114,12 +108,12 @@ check "  and the run says so out loud (not a silent state change)" "$?"
 git add -A && git commit -q -m "chore: upgrade (default flag, skills kept)"
 # a plain SECOND install (no upgrade, no flag) keeps them too
 bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A \
-  --models "$WORK/models.yaml" >/dev/null 2>&1
+  >/dev/null 2>&1
 [ "$(find .hermes/skills -name SKILL.md 2>/dev/null | sort)" = "$S_AFTER" ]
 check "a plain re-install (no flag) keeps the skills too" "$?"
 # explicit --skills no is still a real switch: the skills go, the record follows
 bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills no \
-  --models "$WORK/models.yaml" >/dev/null 2>&1
+  >/dev/null 2>&1
 check "an explicit --skills no re-install exits 0" "$?"
 [ ! -e .hermes ]
 check "  and the explicit opt-out removes .hermes (no dead tree)" "$?"
@@ -128,7 +122,7 @@ check "  and the record follows the explicit choice" "$?"
 git add -A && git commit -q -m "chore: explicit skills opt-out"
 # rebuild the skills, then --uninstall removes everything recorded (the F2-7 contract)
 bash "$SRC/bin/goblin-install" --target "$WORK/migrate" --class A --skills yes \
-  --models "$WORK/models.yaml" >/dev/null 2>&1
+  >/dev/null 2>&1
 N_BEFORE_UN=$(find .hermes/skills -name SKILL.md | wc -l | tr -d ' ')
 [ "$N_BEFORE_UN" -gt 0 ]
 check "fixture rebuilt: $N_BEFORE_UN skills installed before the uninstall" "$?"

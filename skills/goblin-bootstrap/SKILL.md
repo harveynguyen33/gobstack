@@ -15,10 +15,10 @@ Use when adopting goblin-stack in a repo, or starting one.
 2. **`goblin-install --target <dir> --class <x>`** — the default install is a NEUTRAL harness:
    no agent skills. Vendor the Hermes project tier with `--skills yes` if you want them installed.
 3. **`goblin-verify`** — a default software-class install (no agent skills) verifies green:
-   `36 passed, 0 failed, 10 advisory, 31 skipped`, exit 0, once `HANDOFF.md` names a commit that
+   `35 passed, 0 failed, 6 advisory, 25 skipped`, exit 0, once `HANDOFF.md` names a commit that
    exists; before that edit the
-   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`36 passed, 1 failed`).
-   Thirty-one rows skip with a reason, and the reason matters: the five skill rows
+   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`34 passed, 1 failed`).
+   Twenty-five rows skip with a reason, and the reason matters: the five skill rows
    (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free install records,
    then `HS-02`
    (no pinned pre-change commit yet, so the REPLAY is not provable), `AU-02`/`AU-03` (no report
@@ -28,9 +28,7 @@ Use when adopting goblin-stack in a repo, or starting one.
    *not enabled* rather than as *unread*),
    `FM-01`/`FM-02`/`VA-01` (no feature map and no declared `verify_doctor:` yet), `RC-01`..`RC-04`
    (no reference corpus declared: `reference_manifest:` ships empty and there is no lab
-   `manifests/`), and `JG-01` with
-   `LP-01`..`LP-05` (no `.goblin/loop/` record, because no loop has run in this repo yet). Each is
-   a *not yet*, not a pass.
+   `manifests/`). Each is a *not yet*, not a pass.
    The class's required parts
    that only a round can produce (a first review, a real gate) pass *vacuously*, and that list
    is the repo's first-step list, not a defect.

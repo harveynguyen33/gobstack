@@ -18,10 +18,10 @@ rung below must be *demonstrably unable* to see it - the reason is recorded in t
 2. **`enforced_by` is a closed enum** (`script`, `lint`, `gate`, `advisory`) and `check` is one of:
    a real command, the literal `advisory`, or `goblin-verify --only <ID>` for a multi-line body.
    Every row here obeys that, and `IN-03` fails the manifest otherwise.
-3. **`advisory_ceiling` is 10 and the labelled count is 9.** The matrix labels nine rows
-   `advisory`, and the ceiling caps that count at **9 of 10** — the dependency-audit and CI cuts
-   moved it off `10 of 10`. **Corrected 2026-10-09 (v3).** Nothing else in this lane is prose
-   dressed as a check.
+3. **`advisory_ceiling` is 10 and the labelled count is 6.** The matrix labels six rows
+   `advisory`, and the ceiling caps that count at **6 of 10** — the model/role/loop, dependency-audit
+   and CI cuts moved it off `10 of 10`. **Corrected 2026-10-10 (v3).** Nothing else in this lane is
+   prose dressed as a check.
 
 ## T1 - secrets and the config surface (`SC-01`..`SC-04`)
 

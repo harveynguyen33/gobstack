@@ -8,9 +8,6 @@
 #                         / desktop (desktop/F => software + --electron); anything else is refused
 #   --electron            the electron opt-in overlay over the software class (electron: true):
 #                         the app_bundle_bytes ratchet, BN-06..09 bans, the host-gate declaration
-#   --models <path>       model mapping file   (default: $GOBLIN_MODELS; unset = rendered as an
-#                         empty models_file: the repo's machine-specific input, never a path
-#                         from the machine the installer ran on)
 #   --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE; unset = empty
 #                         practice: pin — a named path that is absent is reported, never
 #                         silently dropped)
@@ -42,15 +39,12 @@ SRC=$(cd "$SELF_DIR/.." && pwd)
 
 TARGET=""
 CLASS=""
-# QA fix (v2-qa issue 4): the old defaults were $HOME/projects/fleet-model.yaml and
-# $HOME/projects/PROJECT-PRACTICE.md - the MAINTAINER's home layout baked into every
-# rendered config on every machine, including a fresh contributor's (their rendered
-# AGENTS.md pointed at a file that does not exist on their machine). The neutral default
-# is EMPTY: no --models / no GOBLIN_MODELS renders an empty models_file: line, and the
-# practice pin stays empty (verify already treats both as the legitimate no-mapping /
-# no-standard state). A machine that HAS a fleet mapping exports GOBLIN_MODELS (or
-# passes --models) and gets the same rendering as before.
-MODELS="${GOBLIN_MODELS:-}"
+# QA fix (v2-qa issue 4): the old default was $HOME/projects/PROJECT-PRACTICE.md - the
+# MAINTAINER's home layout baked into every rendered config on every machine, including a
+# fresh contributor's (their rendered AGENTS.md pointed at a file that does not exist on
+# their machine). The neutral default is EMPTY: the practice pin stays empty (verify
+# treats that as the legitimate no-standard state). A machine that HAS a standard exports
+# GOBLIN_PRACTICE (or passes --practice) and gets the same rendering as before.
 PRACTICE="${GOBLIN_PRACTICE:-}"
 # W5-3: `--practice <path>` naming a file that is not there used to be IGNORED IN SILENCE -
 # exit 0, `practice: ~`, `practice_sha256: ~`, and not one line about it in the install log.
@@ -94,7 +88,6 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --target)    TARGET="${2:-}"; shift 2 ;;
     --class)     CLASS="${2:-}"; shift 2 ;;
-    --models)    MODELS="${2:-}"; shift 2 ;;
     --practice)  PRACTICE="${2:-}"; PRACTICE_ARG="$PRACTICE"; shift 2 ;;
     --parts)     PARTS="${2:-}"; shift 2 ;;
     --archive)   ARCHIVE="true"; shift ;;
@@ -364,9 +357,6 @@ REPLAY_ENV=$(preset replay_env)
 REPLAY_CMD=$(preset replay_cmd)
 RUNTIME_DATA=$(preset runtime_data)
 ADV_CEILING=$(preset advisory_ceiling); [ -n "$ADV_CEILING" ] || ADV_CEILING=10
-# The loop ceiling (G2, LP-03) is a CEILING, not a per-class policy: every class gets the same
-# one, defaulted to the engine's own DEFAULT_MAX_TURNS when a preset predates the key.
-LOOP_MAX_TURNS=$(preset loop_max_turns_ceiling); [ -n "$LOOP_MAX_TURNS" ] || LOOP_MAX_TURNS=20
 # The optional second gate (class A: the TODO ceiling). Empty for every other class.
 GATE2_NAME=$(preset gate2_name)
 GATE2_CMD=$(preset gate2_cmd)
@@ -574,7 +564,6 @@ render_config() {
     CLASS "$CLASS" \
     ELECTRON "$( [ "$ELECTRON" -eq 1 ] && printf 'true' || printf 'false' )" \
     BRANCH "$BRANCH" \
-    MODELS_FILE "$MODELS" \
     PRACTICE "$PRACTICE" \
     PRACTICE_SHA "$PRACTICE_SHA" \
     OWNER_EMAIL "$OWNER_EMAIL" \
@@ -597,7 +586,6 @@ render_config() {
     VERIFY_DOCTOR "" \
     REFERENCE_MANIFEST "" \
     QUARANTINE_ROOT "" \
-    LOOP_MAX_TURNS "$LOOP_MAX_TURNS" \
     GATE1_NAME "$GATE1_NAME" \
     GATE1_CMD "$GATE1_CMD" \
     GATE2_NAME "$GATE2_RENDER_NAME" \
@@ -653,7 +641,6 @@ fi
 
 put ".gob/bin/goblin-verify" "$SRC/bin/goblin-verify"
 put ".gob/bin/goblin-lib.sh" "$SRC/bin/goblin-lib.sh"
-put ".gob/roles.yaml" "$SRC/roles.yaml"
 put ".gob/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
 put ".gob/manifest/playbooks.tsv" "$SRC/manifest/playbooks.tsv"
 put ".gob/manifest/classes.tsv" "$SRC/manifest/classes.tsv"

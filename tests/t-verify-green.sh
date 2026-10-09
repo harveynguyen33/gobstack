@@ -9,7 +9,6 @@ fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n  reviewer:\n    model: model-review\n    provider: prov-review\n    effort: high\n' > "$WORK/models.yaml"
 printf 'the referenced standard\n' > "$WORK/standard.md"
 
 mkdir -p "$WORK/target" && cd "$WORK/target"
@@ -19,7 +18,7 @@ git config user.email "runner@example.com"
 printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 
-bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install exits 0" "$?"
 git add -A && git commit -q -m "chore: install gobstack"
 
@@ -40,8 +39,6 @@ printf '%s' "$OUT" | grep -q 'not signed'
 check "the run says the record every drift check trusts is not signed (F2-3)" "$?"
 printf '%s' "$OUT" | grep -q 'SKIP  HS-02'
 check "HS-02 is skipped with a reason while no pre-change commit is pinned" "$?"
-printf '%s' "$OUT" | grep -q 'ADV   MD-02'
-check "MD-02 reports the model families as ADV, never a failure" "$?"
 check "a class-A repo with no reviews yet does not fail the PR gate" \
   "$(printf '%s' "$OUT" | grep -q 'PASS  PG-03' && echo 0 || echo 1)"
 
@@ -58,7 +55,7 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 printf '# desktop shell\n' > README.md
 git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$WORK/f" --class software --electron --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$WORK/f" --class software --electron --practice "$WORK/standard.md" >/dev/null 2>&1
 check "software+electron install exits 0" "$?"
 git add -A && git commit -q -m "chore: install gobstack"
 F_HEAD=$(git rev-parse --short HEAD)
@@ -96,7 +93,7 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 printf '# desktop shell\n' > README.md
 git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$WORK/falias" --class desktop --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$WORK/falias" --class desktop --practice "$WORK/standard.md" >/dev/null 2>&1
 check "the desktop alias install exits 0" "$?"
 cmp -s "$WORK/f/AGENTS.md" "$WORK/falias/AGENTS.md" \
   && grep -q '"class": "software"' "$WORK/falias/.gob/installed.json"
@@ -106,20 +103,17 @@ check "  and its config is identical to software+electron (class recorded as sof
 # (review 1 scope 4-7) Five print contracts live in the printers and the summary block:
 #   R1  the matrix's remedy column rides under a FAIL (g_fail -> g_remedy, _GOB_MANIFEST) -
 #       absent under every PASS, whole under --only, width-truncated in the default listing.
-#       A GREEN RUN still prints one remedy: the JG-02 lane FAILs nothing but its unresolved
-#       judge lane is ADV BY DESIGN (no judge profile in the fixture's models.yaml), and an ADV
-#       remedy is part of that row's print contract since before this pass - so the pin is on
-#       the remedy-bearing ROWS, not the whole output: every row above the summary is PASS/SKIP
+#       A GREEN RUN prints no `remedy:` line at all: every row above the summary is PASS/ADV/SKIP
 #       and none of the three RED-direction remedy lines may appear.
 #   R2  the owner-mismatch note (owner_mismatch) - only under a red run, names the email
 #   R3  the fresh-clone banner (fresh_clone) - only under a red run, commit-count keyed
 #   R4  GT-03's failure line is a sentence, not the raw test(1) dump
 # Pinned here in the GREEN direction (the red direction is t-verify-red.sh's, which must
 # produce the violation itself): a green run prints none of it.
-BAD_REMEDIES=$(printf '%s' "$OUT" | grep '^remedy:' | grep -vc 'add the missing profile to the file declared as models_file')
+BAD_REMEDIES=$(printf '%s' "$OUT" | grep -c '^remedy:')
 [ -z "$OUT" ] && BAD_REMEDIES=0
 [ "$BAD_REMEDIES" -eq 0 ]
-check "R1 the only remedy: on a green run is the unresolved-lane ADV remedy (none under a PASS/FAIL row)" "$?"
+check "R1 a green run prints no remedy: line (none under a PASS/ADV/SKIP row)" "$?"
 printf '%s' "$OUT" | grep -q 'note: this repo records a different owner'
 check "R2 a green run prints no owner-mismatch note" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 printf '%s' "$OUT" | grep -q 'fresh clone detected'
@@ -137,7 +131,7 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 printf '# fresh\n' > README.md
 git add -A && git commit -q -m "seed"
-bash "$SRC/bin/goblin-install" --target . --class A --models "$WORK/models.yaml" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1
 sed -i 's/^owner_email:.*/owner_email: other@owner.example/' AGENTS.md
 git add -A && git commit -q -m "install gobstack"
 FOUT2=$(bash .gob/bin/goblin-verify 2>&1); FRC2=$?

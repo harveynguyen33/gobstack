@@ -5,8 +5,6 @@
 #         cell AND its "if it cannot be enforced, why" cell must equal manifest/enforcement.tsv.
 #         Measured stale at f23b371: checks IN-03, HP-02, SP-03, PT-01; whys IN-03, IN-04, HP-02,
 #         SP-03, HS-01, PT-01, CL-02.
-#   F2-8  docs/ROLES.md must say bin/goblin-model is checkout-only, because the installer does
-#         not install it (measured in t-uninstall.sh) and it has no enforcement.tsv row.
 #   F2-9  "A fresh install is not automatically green" is false as measured - a fresh class-A
 #         install verifies 43 passed, 0 failed, 11 advisory, 28 skipped, exit 0. The claim was
 #         written in FOUR places, not three: README.md, docs/CONTRACTS.md, docs/ADOPTION.md and
@@ -91,10 +89,6 @@ fi
 check "docs/ENFORCEMENT.md renders all $CELLS rows of the matrix, both columns" \
   "$([ -z "$DRIFT" ] && echo 0 || echo 1)"
 
-# ---- F2-8: the checkout-only statement ---------------------------------------
-grep -qi 'checkout-only' docs/ROLES.md
-check "docs/ROLES.md states that bin/goblin-model is checkout-only (F2-8)" "$?"
-
 # ---- F2-9: the false claim is gone, the measured one is there ----------------
 # The control's own control: the normalised matcher must still catch the claim wearing emphasis
 # OR carrying a capital, or the scan below reports ok on exactly the broken copy the round-1
@@ -124,11 +118,11 @@ check "no shipped doc or skill claims a fresh install is not automatically green
 
 # The three prose docs and the shipped bootstrap skill must carry the measured line; the other
 # shipped skills do not discuss a verify run and are not required to. v2: the measured green
-# path is the DEFAULT install's (36/0/10/31 — the CI payload is gone, so the cut PG-06 no longer
-# passed vacuously; before that W6 neutral-first moved 43/0/11/28 -> 38/0/11/33).
+# path is the DEFAULT install's (35/0/6/25 — the model/role/loop rows and the CI payload are cut
+# in v3).
 GREEN_CLAIM=""
 for f in README.md docs/CONTRACTS.md docs/ADOPTION.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '36 passed, 0 failed, 10 advisory, 31 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '35 passed, 0 failed, 6 advisory, 25 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, CONTRACTS, ADOPTION and the shipped bootstrap skill state the measured green path" \
@@ -278,15 +272,15 @@ awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /ban/) found = 1 } END { exit !foun
 check "the verifier's 'cannot see' footer names the ban lane's blind spots (V3-8)" "$?"
 
 # ---- AB3: the LIVE copies of the advisory arithmetic must match the run -----------------------
-# `advisory_ceiling` is 10 and `SK-03` prints `advisory 10 of ceiling 10 (0 free slots: the next
+# `advisory_ceiling` is 10 and `SK-03` prints `advisory 6 of ceiling 10 (4 free slots: the next
 # advisory row FAILs)`. docs/GUARDRAILS.md's third design constraint and docs/LIMITS.md #26 both
 # presented 9 of 10 as what the run reports - LIMITS in the present tense ("reports that arithmetic
 # on every run"), GUARDRAILS with no way to date it. Both are read here; the dated history
 # (CHANGELOG entries, docs/ENFORCEMENT.md's chronology, t-verify-red.sh's pre-change note) is not,
 # and keeps its own tense.
 ADV_POINT=$(awk '/advisory_ceiling/ { c = 6 } c > 0 { print; c-- }' docs/GUARDRAILS.md)
-printf '%s' "$ADV_POINT" | grep -q '9 of 10'
-check "docs/GUARDRAILS.md's advisory point states the measured count (9 of 10) (AB3)" "$?"
+printf '%s' "$ADV_POINT" | grep -q '6 of 10'
+check "docs/GUARDRAILS.md's advisory point states the measured count (6 of 10) (AB3)" "$?"
 printf '%s' "$ADV_POINT" | grep -qE '\*\*Corrected [0-9]{4}-[0-9]{2}-[0-9]{2}'
 check "  and dates the correction, the way docs/LIMITS.md's own W2/W3 notes do (AB3)" "$?"
 # Normalised, because the sentence wraps: a literal grep for 'reports that arithmetic on every run'

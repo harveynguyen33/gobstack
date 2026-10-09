@@ -7,7 +7,7 @@
 # summary named none of them.
 #
 # F2-8: the same fixture pins what the installer does NOT install. `.gob/bin` holds exactly the
-# two shipped scripts, which is why `docs/ROLES.md` calls `bin/goblin-model` checkout-only.
+# three shipped scripts (goblin-verify, goblin-lib.sh, goblin-bans).
 #
 # Run by tests/run-tests.sh.
 set -uo pipefail
@@ -18,7 +18,6 @@ fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
 printf 'the referenced standard\n' > "$WORK/standard.md"
 
 mkdir -p "$WORK/target" && cd "$WORK/target"
@@ -29,12 +28,10 @@ printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 
 bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A \
-  --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+  --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install exits 0" "$?"
 check "the installer's .gob/bin holds exactly the three shipped scripts" \
   "$([ "$(ls .gob/bin | sort | tr '\n' ' ')" = "goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
-check "  so bin/goblin-model is checkout-only, as docs/ROLES.md says" \
-  "$([ ! -e .gob/bin/goblin-model ] && echo 0 || echo 1)"
 # v2: the CI lane is GONE from the product (no .github/workflows payload is ever written),
 # so the v1 placement probe has nothing to place. The uninstall's own contract is now pinned
 # by the two-survivors assertions below (the edited waiver + the project docs); a workflow

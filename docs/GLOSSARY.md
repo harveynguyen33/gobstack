@@ -16,22 +16,17 @@ sentence). A term a new reader might trip on belongs here, not in a footnote.
 | gate | A declared command that must exit 0. Declared per project, never inferred from the stack. | PP sec.4 |
 | HANDOFF | The session-boundary contract at the repo root: START HERE / State / Gates / Next steps / NOT verified. | PP sec.1 |
 | harness | An asserting check file: a failures counter, an assert(name, ok, detail) printer, and a non-zero exit on failure. | PP sec.3 |
-| judge | A role that decides whether a PROCESS met its own predicate, from a command's output and a pointer it can resolve - never from a report. One lane per verdict; never the author's lane. | docs/LOOP.md |
-| lane | A family of rules that share a mechanism and a blind spot: the ban lane, the judge/loop lane, the CI lane, the reference lane. The cannot-see footer reports per lane. | UX-review-2026-10-06 |
-| loop | One unattended run over a predicate, recorded in the committed .gob/loop/ (predicate, pin, first-run, budget, one decisions.tsv row per iteration). | docs/LOOP.md |
-| never-relax | The predicate's digest is recorded at loop start and never updates itself; relaxing it is closing this loop and opening another, with the old predicate archived under .gob/loop/closed-<date>/. | docs/LOOP.md |
+| lane | A family of rules that share a mechanism and a blind spot: the ban lane, the CI lane, the reference lane. The cannot-see footer reports per lane. | UX-review-2026-10-06 |
 | opt-out | A part recorded in disabled: so its required checks report SKIP (opt-out) instead of failing. | R6 sec.6.3 |
-| overnight | P10: an unattended run over a checkable predicate written before iteration 1. | R6 sec.3 |
+| overnight | P10: an unattended run over a fixed goal, stopped by an escape hatch. | R6 sec.3 |
 | part | One installable unit a class requires or forbids: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, playbooks, tokens. | R7 sec.5 |
 | patch-id | git patch-id --stable of base..head. A new head voids a verdict; a matching commit message does not restore it. | R1 sec.10 |
 | playbook | A named, ordered procedure with a measurable verification step. goblin-stack ships 15. | R6 sec.3 |
-| predicate | One shell command that exits 0 when the loop is finished. Written before iteration 1 and run once before it, so its first state is known to be red. A duration is not a predicate. | docs/LOOP.md + pstack guide/07 |
 | preimage | The input that produces a known hash. The hash checks here prove non-drift, not preimage resistance - they are tamper-evidence, not signatures (docs/LIMITS.md #18). | UX-review-2026-10-06 |
 | profile | A worker identity in the Hermes fleet (architect, coder, reviewer, ...). Owns memory and skills. | R4 |
 | review-panel | N independent verdict lanes, each its own card with its own resolved model. Only at stakes S3+. | R6 sec.4.3 |
 | REPLAY | Re-running each assertion against the pinned pre-change commit and requiring it to be RED there. A check green on both trees proves nothing. | PP sec.3 |
 | ratchet | A count that must not rise, with a declared ceiling; a rise is allowed only when re-anchored with the arithmetic (old + N new = new). | PP sec.4 |
-| role | What the work needs: code \| judgment \| review-panel \| synthesis \| investigate \| judge. A role maps to a profile; it never names a model. | R6 sec.4.1 |
 | round | One full pass of the work cycle: plan, implement, gate, replay, hand off. The unit a wave code counts. | UX-review-2026-10-06 |
 | skill | A Hermes SKILL.md directory. goblin-stack installs its skills into the target repo at .hermes/skills/ (project tier), never into a profile. | R6 sec.0.1 / sec.7.3 |
 | SPEC | A per-round document written before implementation: measured root cause plus an AC: list checkable without a human. | PP sec.2 |

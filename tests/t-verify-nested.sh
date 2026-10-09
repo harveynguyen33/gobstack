@@ -10,7 +10,7 @@
 # The card named this as "the case that would bite ~/.hermes".
 #
 #   outer/sub   no .git of its own -> verify exits 2, names the outer repo and the fix
-#   outer/sub2  its own .git      -> verify exits 0, 36 passed / 0 failed / 10 advisory / 31 skipped
+#   outer/sub2  its own .git      -> verify exits 0, 35 passed / 0 failed / 6 advisory / 25 skipped
 #                                  (W6 neutral-first: the DEFAULT install is skills=no, so the
 #                                   measured green path moved from 43/0/11/28 to 37/0/11/34)
 #
@@ -23,7 +23,6 @@ fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
 printf 'the referenced standard\n' > "$WORK/standard.md"
 
 # ---- the enclosing repo, and a target inside it with no .git of its own -------
@@ -37,7 +36,7 @@ git add -A && git commit -q -m "chore: seed the outer repo"
 
 cd "$WORK/outer/sub"
 bash "$SRC/bin/goblin-install" --target "$WORK/outer/sub" --class A \
-  --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+  --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install into a nested target with no .git of its own succeeds" "$?"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 # The installer's own "next" advice is `git add -A && git commit`. F2's fixture staged the
@@ -75,7 +74,7 @@ git config user.email "runner@example.com"
 printf '# sub2\n' > README.md
 git add -A && git commit -q -m "chore: seed sub2"
 bash "$SRC/bin/goblin-install" --target "$WORK/outer/sub2" --class A \
-  --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+  --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install into a nested target that is its own repo succeeds" "$?"
 git add -A && git commit -q -m "chore: install gobstack"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
@@ -84,8 +83,8 @@ git add -A && git commit -q -m "docs: the handoff names the head"
 OUT2=$(bash .gob/bin/goblin-verify 2>&1); RC2=$?
 printf '%s\n' "$OUT2" | sed 's/^/      /'
 check "a nested target with its own .git verifies (exit 0)" "$([ "$RC2" -eq 0 ] && echo 0 || echo 1)"
-printf '%s' "$OUT2" | grep -qE '^ *36 passed, 0 failed, 10 advisory, 31 skipped'
-check "  and it is the class-A green path (36/0/10/31, the default skills=no install)" "$?"
+printf '%s' "$OUT2" | grep -qE '^ *35 passed, 0 failed, 6 advisory, 25 skipped'
+check "  and it is the class-A green path (35/0/6/25, the default skills=no install)" "$?"
 
 # ---- W1 §5.1: an engine_dir declaration must not leak across the boundary ----------------
 # The OUTER repo declares engine_dir; the inner repo (sub2) must resolve its own engine and
@@ -98,7 +97,7 @@ sed -i "s|^models_file:|engine_dir: $WORK/engine\nmodels_file:|" "$WORK/outer/.g
 git -C "$WORK/outer" add -A && git -C "$WORK/outer" commit -q -m "declare engine_dir in the outer repo"
 OUT3=$(bash .gob/bin/goblin-verify 2>&1); RC3=$?
 check "an inner repo verify is unaffected by the OUTER repo's engine_dir (exit 0)" "$([ "$RC3" -eq 0 ] && echo 0 || echo 1)"
-printf '%s' "$OUT3" | grep -qE '^ *36 passed, 0 failed'
+printf '%s' "$OUT3" | grep -qE '^ *35 passed, 0 failed'
 check "  and the inner run is still the class-A green path (default skills=no)" "$?"
 printf '%s' "$OUT3" | grep -q 'mode=vendored'
 check "  and the inner footer still says mode=vendored (no inherited global mode)" "$?"

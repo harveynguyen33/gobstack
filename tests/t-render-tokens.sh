@@ -31,7 +31,6 @@ fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
 printf 'the referenced standard\n' > "$WORK/standard.md"
 
 # W6: five domain-named classes, plus the electron opt-in overlay over software (the merged
@@ -46,7 +45,7 @@ for c in $CLASSES; do
   printf '# target\n' > README.md
   git add -A && git commit -q -m "chore: seed"
   bash "$SRC/bin/goblin-install" --target "$t" --class "$c" \
-    --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+    --practice "$WORK/standard.md" >/dev/null 2>&1
   check "class $c renders an install" "$?"
   # The positive control: the scan below is over a tree that HAS the rendered gate block. Without
   # this, an install that wrote nothing (or a scan that read nothing) would pass the token check
@@ -63,7 +62,7 @@ git config user.email "runner@example.com"
 printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target "$t" --class software --electron \
-  --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+  --practice "$WORK/standard.md" >/dev/null 2>&1
 check "the electron opt-in renders an install" "$?"
 [ -s "$t/AGENTS.md" ] && grep -q '^gate_.*_cmd: ' "$t/AGENTS.md" \
   && grep -q '^electron: true$' "$t/AGENTS.md"

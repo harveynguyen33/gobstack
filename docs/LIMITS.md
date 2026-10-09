@@ -27,17 +27,15 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 6. **The biggest measured defect is out of reach.** The orchestrator's routing text says a bare
    subagent spawn reaches the specialist profiles; it does not. That is the highest-cost defect
    on the box, and goblin-stack cannot fix it from inside a project repo. It ships corrected
-   text in `docs/INTEGRATION.md` and lints its own artifacts (`MD-03`); the fleet-side edit is
+   text in `docs/INTEGRATION.md`; the fleet-side edit is
    escalated.
 7. **The staleness of a fleet-config repo is detectable and not fixable here** — the E-class gate
    notices it, and the underlying job bug belongs to another repository.
 8. **A new surface to maintain.** Per-repo vendored `.goblin/` plus `.hermes/skills/` means
    upgrade debt in every adopted repo, plus one more command pair to learn. The counter is that
    the alternative — profile copies — already failed.
-9. **Nine rows are labelled `advisory`, and eight of them are prose with no check at all:**
-   `HP-04`, `HS-03`, `CM-02`, `MD-03`, `DOC-01`, `DOC-02`, `SC-09` and `JG-03` (G2, the
-   judge lane that has never returned a non-`done` verdict). One (`MD-02`) is
-   advisory-labelled but still reports its state as `ADV`. Each is counted and capped, but a
+9. **Six rows are labelled `advisory`, and all six are prose with no check at all:**
+   `HP-04`, `HS-03`, `CM-02`, `DOC-01`, `DOC-02` and `SC-09`. Each is counted and capped, but a
    counted rule is still not an enforced one, and **the cap is a policy, not a proof.**
 10. **It does not reduce the profile-skill surface.** It only stops that surface from growing
     with project procedures; the existing divergence is a separate cleanup.
@@ -80,7 +78,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     is now specified (`skills/goblin-eval/SKILL.md`) and **no row reads a lane** (#31).
     Pin: `https://www.skillsbench.ai/blogs/skillsbench-1-1`, sha256 of the retrieved page
     `d812bb7c2da702cc67556eb5f46b9e93faaca19d3545376544866e940126ef15`, fetched 2026-09-25; the
-    eleven-token ban and the judge procedure are argued in
+    eleven-token ban and the grading procedure are argued in
     `https://ai.engineer/talks/0vphxNt4wyk-don-t-ship-skills-without-evals`. **Not registered**:
     the source registry is `manifest/sources.tsv` (G9's artifact) and that file does not exist in
     this repo — measured, `git ls-files manifest/` names five files and none of them is
@@ -156,40 +154,9 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     and `P12` has still never been run. The runner and the record checks (`EV-01`..`EV-04` in G1's
     design) are deferred to a follow-up card, deliberately and in the open, rather than half-built:
     a row that reads a record nobody writes would pass vacuously and look like enforcement.
-32. **The judge is a language model grading prose, and the record proves a handle exists — never
-    that the handle supports the verdict.** `JG-01` FAILs a `done` verdict whose evidence resolves
-    to nothing: `sha:<hex>` must be a commit in `git rev-list --all`, `file:<path>` a path under the
-    root, `sha256:<hex>` the digest of a file under `.goblin/loop/`. All three say *exists*. A judge
-    may cite a real commit that has nothing to do with the claim and pass, and a `cmd:<command>`
-    token resolves **nothing on purpose** — the command ran, its output is not in the record, and a
-    verdict resting on it is the self-report the row refuses. Two smaller blind spots are stated in
-    the row's own why-cell and repeated here: the row cannot see **which lane returned a verdict**
-    (no file in a repo observes the profile that ran — `MD-03`), and **an unresolved judge lane is
-    an `ADV`, not a failure**, because a repo cannot choose the fleet's routing (`docs/ROLES.md`,
-    "the measured caveat"): measured on this box, the judge lane resolves to no profile at all.
-    Finally, the `JG-03` counter-measure is **policy, not a check** — one known-red control verdict
-    per wave, recorded in `docs/LOOP.md`: a lane that has judged twice cannot be called always-yes,
-    and the history that would show a bad lane lives across cards and repos.
-33. **`LP-04` measures a changed evidence pointer, which is a proxy for progress — not progress.**
-    Three consecutive verdict rows with an identical non-empty pointer and a result that is not
-    `predicate:green` is a FAIL naming the row numbers, and that is the strongest thing a repo can
-    read without running the loop. A loop that edits a file each turn to keep the pointer moving is
-    not caught, and **nothing in Hermes detects a lack of progress either**: measured in
-    `hermes_cli/goals.py`, `run_kanban_goal_loop` carries no progress state at all — its whole
-    state is `last_response`, `turns_used` and `nudged_to_finalize`, so a loop that returns
-    `continue` for the same reason nineteen times spends nineteen turns and then blocks
-    (`hermes_cli/goals.py:1636-1638`, `:1689-1696`). So the budget is the backstop, and the budget
-    has its own blind spots: `LP-03` proves the declared budget is a positive integer at or under
-    `loop_max_turns_ceiling` and that the record holds no more verdict rows than the budget — it
-    cannot see whether the budget is **affordable**, and cost is not a field the record holds
-    (neither turns nor tokens nor the per-turn auxiliary judge call). Three further "not yets" are
-    structural rather than measurable: `LP-01` proves a recorded first run exists and that its
-    timestamp is at or before the first log row — **not that the command ran and not that the
-    `exit=` value was measured rather than typed** (`HP-03`'s defect, one artifact over); `LP-02`
-    proves the predicate file still hashes to its pin — **not that the predicate is the right one,
-    and not who edited it**; and a predicate that was **vacuously true from the start** (a `grep -c`
-    against a renamed directory) passes `LP-01` and `LP-02` and ends the loop green on nothing.
-    `LP-05` makes a write-up mandatory and therefore visible — nothing can make it true.
+32. **Withdrawn (v3).** The judge lane and loop record this item measured were removed in the
+    model/role/loop cut; the numbering is kept stable for the cross-references below.
+33. **Withdrawn (v3).** Same cut: `LP-*` and `JG-*` no longer exist.
 
 ## What the harness refuses to do
 
@@ -197,9 +164,7 @@ It does not claim a green run means the work is right. `goblin-verify` asserts t
 files are the files on disk, that every rule with a command still passes, and that the
 untestable remainder is counted and capped — and it prints, on every single run, what it cannot
 see: the five upstream blind spots, plus the ban lane's own (the unsigned ban table #28, the
-text-probe gap #27, and a ban that is invisible until verify runs, `V3-1`), plus the judge/loop
-lane's (#32: a handle that exists is not a handle that supports the verdict; #33: a changed
-pointer is a proxy for progress, not progress), plus the CI lane's (#34: a file is not a gate —
+text-probe gap #27, and a ban that is invisible until verify runs, `V3-1`), plus the CI lane's (#34: a file is not a gate —
 the required-check list, the bypass switch and the push identity are forge state; #35: the
 Electron perf number is a host gate, and the ratchet deliberately carries a different metric).
 
@@ -278,28 +243,9 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     `tests/` or build output: a token that occurs only there still reads as resolved, and excluding
     them would be a guess about a layout goblin-stack does not know. Nor is there a frequency bound
     — a common token ("export", "main") is satisfied by the first of hundreds of files.
-38. **The judge lane's model family is reported, never enforced — and on this box it is not even
-    mapped yet.** `JG-02` proves the declared profile *names* are disjoint; W5-6 measured that a
-    profile mapped to the author's own model passed it. `MD-02` now resolves the judge lane and
-    compares its model with the code lane's, so the state is loud — but it stays `advisory`
-    (`return 2`, never a FAIL): goblin-stack cannot choose the fleet's models, and a repo-local file
-    cannot observe *which* model a lane actually ran. Measured on this box at X1: Harvey's
-    `fleet-model.yaml` names **no `judge:` profile at all**, so `MD-02` reports the judge lane
-    **unresolved** and prints the one-line remedy, while every profile it *does* name — nine of
-    them, the named per-fleet role profiles this setup routes its lanes through —
-    resolves to one model under an active promotion. So on this box the honest reading is: the judge
-    lane is not mapped, and the moment it is mapped it will be the author's own family. The
-    comparison is exact model equality, not a version-stripped "family": two spellings of the same
-    family that differ only in a suffix would read as different.
-39. **`LP-02` cannot tell a weaker predicate from a re-scope. The close-and-reopen is recorded, not
-    prevented.** A loop could archive its bar under `closed-<date>/`, write a weaker one, re-pin,
-    and pass `LP-02` and `LP-05` with nothing in the record (W5-7, measured). The row now requires
-    every archive to hold its predicate **and** the pin it was closed under, and the live
-    `predicate.sha256` to name the archived digest on a `previous:` line — so a **silent** relaxation
-    is caught and a legitimate re-scope costs one line. Whether the new predicate is weaker, and who
-    edited it, is not decidable from a digest, and a predicate that calls a script elsewhere is
-    pinned only at its call site. The residual is the same one `LP-01` carries one file over: the
-    record is evidence, not proof that the loop stopped for the right reason.
+38. **Withdrawn (v3).** The judge-lane model comparison this item measured was removed in the
+    model/role/loop cut; the numbering is kept stable.
+39. **Withdrawn (v3).** Same cut: `LP-*` no longer exist.
 40. **A fresh install into a repo with no commits is born RED, and X1 did not change that.** Measured
     at X1: `goblin-install --class A` into a `git init` with zero commits, then `goblin-verify`, gives
     `36 passed, 6 failed, 10 advisory, 23 skipped`, exit 1 — `HP-05`, `SP-02`, `GT-02`, `CM-01`,
@@ -338,15 +284,10 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
       - item 10 — `SC-03` clause 2, `sec_build_output`: a literal in `dist/assets` FAILs; only the
         clause-1 path is controlled.
       - items 11, 12, 15 — `scaffold_checks:`'s SKIP branch, `perf_host_gate` (#35) and
-        `templates/loop/*.tmpl`: declared no-ops (SKIP, a host gate, and templates `docs/LOOP.md`
-        says nothing installs). A control here would assert that nothing happens.
+        `templates/*.tmpl`: declared no-ops (SKIP, a host gate). A control here would assert that
+        nothing happens.
       - item 13 — the cut CI lane's flow-style `jobs: {…}` refusal: it failed closed already, and
         the lane is gone, so no control is owed.
-      - item 14 — `bin/goblin-model`: works (`code` → the resolved lane, unknown role → exit 2);
-        only its *absence* from an install is asserted.
-      - item 16 — `docs/LOOP.md` §6's "one known-red control verdict per wave, recorded in this
-        file": a prose obligation, not a command. It is honoured in the write-ups (or not) and no
-        check can read a wave.
     **W5-10 is answered here too.** The tenant strings `PT-01` forbids do not reach `docs/`, because
     `docs/` is never installed: the row's directory list is `skills manifest bin templates presets
     .goblin .hermes`, so a string under `docs/` is source-tree prose that no operator's repo ever

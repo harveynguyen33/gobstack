@@ -52,7 +52,6 @@ mcp() { # <server-cmd...> -- <request json> [more...]
 
 # ---- the fixtures --------------------------------------------------------------
 # models + practice: the installer's two machine inputs
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
 printf 'the referenced standard\n' > "$WORK/standard.md"
 
 new_fixture() { # <tag> — a seeded, installed, committed class-A repo
@@ -64,7 +63,7 @@ new_fixture() { # <tag> — a seeded, installed, committed class-A repo
       && printf '# %s\n' "$tag" > README.md \
       && git add -A && git commit -q -m "chore: seed" )
   ( cd "$R" && bash "$SRC/bin/goblin-install" --target "$R" --class A \
-      --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1 )
+      --practice "$WORK/standard.md" >/dev/null 2>&1 )
   ( cd "$R" && git add -A && git commit -q -m "chore: install gobstack" )
   # the HANDOFF placeholder red is the one expected red; name a real HEAD to go green
   ( cd "$R" && HEAD_NOW=$(git rev-parse --short HEAD) \
@@ -124,7 +123,7 @@ check "M3 the row lines keep the id + status shape" "$?"
 
 # ---- M4: gob_verify on a RED fixture -------------------------------------------
 new_fixture red
-printf '\ncode\n' > "$R/violation.js"
+sed -i 's/^owner_email:.*/owner_email: other@owner.example/' "$R/AGENTS.md"
 OUT=$(cd "$R" && printf '%s\n%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"gob_verify","arguments":{}}}' \
@@ -160,7 +159,7 @@ check "M4 and the error names the first step" "$?"
 new_fixture green
 GREEN_R="$R"
 new_fixture red
-printf '\ncode\n' > "$R/violation.js"
+sed -i 's/^owner_email:.*/owner_email: other@owner.example/' "$R/AGENTS.md"
 # run from the RED fixture, verify the GREEN fixture by target: the verdict must be the
 # TARGET's, not the cwd's
 OUT=$(cd "$R" && printf '%s\n%s\n' \

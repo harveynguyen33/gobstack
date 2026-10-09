@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # goblin-lib.sh — shared helpers for goblin-stack.
 #
-# Sourced by bin/goblin-install, bin/goblin-verify and bin/goblin-model.
+# Sourced by bin/goblin-install and bin/goblin-verify.
 # Dependencies: bash 4+, git, awk, sed, grep, sha256sum (or shasum).
 # No npm, no jq, no yq, no network.
 #
@@ -62,7 +62,7 @@ g_pass() {
 }
 # FAIL keeps its row line whole in every mode, and the matrix's remedy column rides under it.
 # The remedy is the TSV's own cell (IN-01/IN-02/GT-03/CM-01 carry prose there; the pre-remedy
-# rows carry `—`, which prints nothing) — the JG-02 judge-lane `remedy:` line, brought to every
+# rows carry `—`, which prints nothing) — a `remedy:` line, brought to every
 # row that names one, so the fix a failure needs is printed where the failure is read. A missing
 # column (a manifest written before the column existed) is no remedy, not an error: empty is the
 # same as `—`.

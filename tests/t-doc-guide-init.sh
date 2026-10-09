@@ -4,7 +4,7 @@
 # teaches: an EMPTY repo, a hand-written proposal (the schema the brief prints), `--write`, then
 # the day-one commits.
 #
-#   UX-i   §3's transcript is the installer's: `created 20` — it writes 21, because
+#   UX-i   §3's transcript is the installer's: `created 19` — it writes 20, because
 #          `.gob/installed.json` is written but not counted. v2 writes no `.github/` anything.
 #   UX-ii  the day-one table: the pre-commit run is `34 passed, 2 failed` (uncommitted install +
 #          the HP-05 placeholder), and the green-path run — after naming a real
@@ -57,23 +57,23 @@ EOF
 git add -A && git commit -q -m "chore: the proposal and its gate"
 OUT=$(HOME="$HOMEDIR" bash "$SRC/bin/goblin-init" --write proposal.md --yes 2>&1); RC=$?
 check "gob init --write exits 0 on the guide's proposal shape" "$RC"
-printf '%s' "$OUT" | grep -qF "created 20 · updated 0 · unchanged 0 · skipped 0"
-check "UX-i the install prints created 20 (installed.json is written but not counted)" "$?"
+printf '%s' "$OUT" | grep -qF "created 19 · updated 0 · unchanged 0 · skipped 0"
+check "UX-i the install prints created 19 (installed.json is written but not counted)" "$?"
 [ ! -e .github ]
 check "UX-i and writes NO .github anything (v2 installs no CI)" "$?"
-grep -qF "created 20" "$GUIDE"
+grep -qF "created 19" "$GUIDE"
 check "  and the guide quotes the created line" "$?"
 
 # ---- UX-ii: the day-one shapes -----------------------------------------------------------------
 # Measured here (and matching t-doc-guide.sh's plain install): the pre-commit run carries the
-# uncommitted install (CM-03) plus the untracked ROUND-000-SPEC.md (SP-02) — `35 passed,
+# uncommitted install (CM-03) plus the untracked ROUND-000-SPEC.md (SP-02) — `33 passed,
 # 2 failed` — and the first commit clears both, leaving HP-05's placeholder as the one red
-# until it names a real HEAD: `35 passed, 1 failed`. Green is `36 passed, 0 failed`.
+# until it names a real HEAD: `34 passed, 1 failed`. Green is `35 passed, 0 failed`.
 SUM() { HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//'; }
 
 PRE=$(SUM)
 check "UX-ii the pre-commit run prints 34 passed, 2 failed (uncommitted install + SP-02)" \
-  "$(printf '%s' "$PRE" | grep -qF '34 passed, 2 failed, 10 advisory, 31 skipped' && echo 0 || echo 1)"
+  "$(printf '%s' "$PRE" | grep -qF '33 passed, 2 failed, 6 advisory, 25 skipped' && echo 0 || echo 1)"
 
 git add -A && git commit -q -m "chore: install gobstack"
 DAY1=$(SUM)
@@ -81,26 +81,26 @@ DAY1=$(SUM)
 # nothing to flag and the first-commit run is already green. The placeholder red the guide
 # teaches (HP-05) belongs to the verify-on-an-empty-repo path t-doc-guide.sh walks.
 check "UX-ii the first-commit run is green (the installer filled the HANDOFF HEAD)" \
-  "$(printf '%s' "$DAY1" | grep -qF '36 passed, 0 failed, 10 advisory, 31 skipped' && echo 0 || echo 1)"
+  "$(printf '%s' "$DAY1" | grep -qF '35 passed, 0 failed, 6 advisory, 25 skipped' && echo 0 || echo 1)"
 
 # ---- UX-iii: the second-commit step (CM-03) ----------------------------------------------------
 HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 DIRTY=$(SUM)
 check "UX-iii the HANDOFF edit alone re-reds CM-03 (commit-as-you-go, day-one table step 3)" \
-  "$(printf '%s' "$DIRTY" | grep -qF '35 passed, 1 failed' && [ -n "$(git status --porcelain)" ] && echo 0 || echo 1)"
+  "$(printf '%s' "$DIRTY" | grep -qF '34 passed, 1 failed' && [ -n "$(git status --porcelain)" ] && echo 0 || echo 1)"
 printf '%s' "$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1)" | grep -q '^FAIL  CM-03  1 dirty entr(y|ies)'
 check "  and the dirty row is CM-03 with the 1-entry count" "$?"
 
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(SUM)
-check "UX-ii the green path prints 36 passed, 0 failed, 10 advisory, 31 skipped" \
-  "$(printf '%s' "$GREEN" | grep -qF '36 passed, 0 failed, 10 advisory, 31 skipped' && echo 0 || echo 1)"
+check "UX-ii the green path prints 35 passed, 0 failed, 6 advisory, 25 skipped" \
+  "$(printf '%s' "$GREEN" | grep -qF '35 passed, 0 failed, 6 advisory, 25 skipped' && echo 0 || echo 1)"
 
 # ---- the guide quotes exactly these shapes ----------------------------------------------------
-for shape in "34 passed, 2 failed, 10 advisory, 31 skipped" \
-             "35 passed, 1 failed, 10 advisory, 31 skipped" \
-             "36 passed, 0 failed, 10 advisory, 31 skipped"; do
+for shape in "33 passed, 2 failed, 6 advisory, 25 skipped" \
+             "34 passed, 1 failed, 6 advisory, 25 skipped" \
+             "35 passed, 0 failed, 6 advisory, 25 skipped"; do
   grep -qF "$shape" "$GUIDE"
   check "the guide quotes the measured line ($shape)" "$?"
 done
@@ -109,9 +109,9 @@ done
 SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped' "$GUIDE" \
          | sed -n 's/^[[:space:]]*\([0-9]* passed, [0-9]* failed, [0-9]* advisory, [0-9]* skipped\).*/\1/p' | sort -u)
 MEASURED=$(printf '%s\n' \
-  "34 passed, 2 failed, 10 advisory, 31 skipped" \
-  "35 passed, 1 failed, 10 advisory, 31 skipped" \
-  "36 passed, 0 failed, 10 advisory, 31 skipped")
+  "33 passed, 2 failed, 6 advisory, 25 skipped" \
+  "34 passed, 1 failed, 6 advisory, 25 skipped" \
+  "35 passed, 0 failed, 6 advisory, 25 skipped")
 SUBSET=0
 while IFS= read -r s; do
   [ -n "$s" ] || continue

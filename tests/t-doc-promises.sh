@@ -30,13 +30,10 @@
 #     Both directories hold commands by construction, so no hand-list of shootable names is
 #     involved: whatever the docs print, this test resolves.
 #
-#     RED case (B1, measured on the un-fixed tree): `docs/GUIDE.md:447` told the reader to run
-#     `.gob/bin/goblin-model <role>`. No install ships that path - a real class-A `.gob/bin/`
-#     holds exactly `goblin-bans`, `goblin-lib.sh`, `goblin-verify` - and the tree
-#     asserts the opposite elsewhere: `docs/ROLES.md:49` says in bold that `bin/goblin-model` is
-#     checkout-only and `tests/t-uninstall.sh:36` asserts the install does not carry it. Running
-#     the guide's own line in a fresh class-A install exits 127. A front door that hands a new
-#     reader a command that cannot work.
+#     RED case (B1, measured on the un-fixed tree): `docs/GUIDE.md` told the reader to run a
+#     `.gob/bin/` path no install ships - a real class-A `.gob/bin/` holds exactly `goblin-bans`,
+#     `goblin-lib.sh`, `goblin-verify`. Running the guide's own line in a fresh class-A install
+#     exits 127. A front door that hands a new reader a command that cannot work.
 #
 #     DELIBERATELY NOT MATCHED, and why - read this before widening the extractor:
 #       * a bare command name with no directory (`goblin-verify`, `goblin-install`). It resolves on

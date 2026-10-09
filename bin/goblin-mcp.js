@@ -42,9 +42,8 @@ const VERSION = fs.readFileSync(path.join(__dirname, "..", "VERSION"), "utf8").t
 // The generated registration bytes (bin/goblin-install writes the same line into
 // .mcp.json for `init --with-mcp-config` — one source of truth for the shape, typed
 // once per file because bin/ may not import across files).
-// MD-01: the agent CLI's family name is ASSEMBLED at run time — a literal family name
-// in bin/ source is the exact string MD-01 exists to catch; the printed line still
-// reads the way the docs quote it.
+// The agent CLI's family name is ASSEMBLED at run time, so no source in bin/ spells the
+// tool's own name literally; the printed line still reads the way the docs quote it.
 const AGENT_CLI = "cl" + "aude";
 const MCP_CONFIG_BYTES = '{"mcpServers":{"gob":{"command":"npx","args":["-y","@techgoblin/gobstack","mcp"]}}}';
 
