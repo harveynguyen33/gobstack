@@ -161,10 +161,12 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 It does not claim a green run means the work is right. `goblin-verify` asserts that the installed
 files are the files on disk, that every rule with a command still passes, and that the
 untestable remainder is counted and capped — and it prints, on every single run, what it cannot
-see: the five upstream blind spots, plus the ban lane's own (the unsigned ban table #28, the
-text-probe gap #27, and a ban that is invisible until verify runs, `V3-1`), plus the CI lane's (#34: a file is not a gate —
-the required-check list, the bypass switch and the push identity are forge state; #35: the
-Electron perf number is a host gate, and the ratchet deliberately carries a different metric).
+see: the upstream blind spots, plus the ban lane's own (the unsigned ban table #28, the text-probe
+gap #27, and a ban that is invisible until verify runs, `V3-1`) and the reference-corpus lane's own.
+The CI lane is cut (#34: a file is not a gate — the required-check list, the bypass switch and the
+push identity are forge state) and the footer names it NO LONGER: a run does not carry a blind spot
+for a lane the product deleted. (The Electron perf number #35 is a host gate, and the ratchet
+deliberately carries a different metric.)
 
 27. **The ban probes are text probes, not ASTs.** `BN-01`, `BN-02`, `BN-03` and `BN-05` are
     `grep` over source under `bash`/`grep`/`awk` only — the dependency contract in
@@ -483,7 +485,8 @@ the Node the gates ran under.
     the lane's contract (`docs/CI.md`) is deleted with them; the argument it made (a required
     check that reports Success after skipping its gate is a green light for a commit whose gate
     never ran) is about CI in general and is preserved in this entry. What this admits: the
-    verifier's "cannot see" footer still names the CI lane's blind spots.
+    verifier's "cannot see" footer NO LONGER names the CI lane — it names the ban and
+    reference-corpus lanes only, because a lane the product cut is not a blind spot a run carries.
 56. **The repo-local override is a discovery surface, and a machine-trust boundary.** A row turned
     on through `.gob/manifest/enforcement.local.tsv` runs exactly like a built-in row, and that file
     is a repo's own data: it is not part of the shipped matrix, so `IN-03` (the matrix self-check)

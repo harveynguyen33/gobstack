@@ -339,6 +339,12 @@ GATE_CMD=$(default_ gate_cmd)
 # gate line a fresh HANDOFF carries even when the name is not the default.
 case "${GATE_NAME_ARG:-}" in "") ;; *) GATE_NAME="$GATE_NAME_ARG" ;; esac
 [ -n "${GOB_GATE:-}" ] && GATE_CMD="$GOB_GATE"
+# Whether the gate was DECLARED by the caller (gob init --write passes --gate, having MEASURED
+# it) or is the installer's generic default. The next-steps advice depends on it: a declared gate
+# is already real and owes no edit, while the default gate does. GATE_LABEL is non-empty only for
+# a declared gate and rides into g_next_block.
+GATE_LABEL=""
+[ -n "${GOB_GATE:-}" ] && GATE_LABEL="$GATE_NAME: $GATE_CMD"
 RAT_NAME=$(default_ ratchet_name)
 RAT_CMD=$(default_ ratchet_cmd)
 RAT_CEIL=$(default_ ratchet_ceiling)
@@ -816,14 +822,11 @@ if [ "$DRY_RUN" -eq 0 ]; then
     g_info "recorded opt-out: $OPT_OUT"
   fi
   g_info ""
-  g_info "next:"
-  g_info "  1. cd $TARGET && git add -A && git commit   # the install is a change like any other"
-  g_info "  2. .gob/bin/goblin-verify   # or add .gob/bin to PATH"
-  g_info "  3. edit AGENTS.md: replace the default gate with your real commands (P8 step 3)"
-  if [ "$SKILLS" = "yes" ]; then
-    g_info "  4. hermes skills trust $TARGET   # one-time, so the project-tier skills load"
-  else
-    g_info "  4. agent skills are opt-in: re-run with --skills yes to vendor the Hermes project tier"
+  # ONE ordered next-steps list, shared with `gob init` (g_next_block, bin/goblin-lib.sh), and
+  # every line true of the artefact. When `gob init --write` ran this install it defers the block
+  # (GOB_NEXT_DEFER) and prints the same list itself at the end, so a user never sees two lists.
+  if [ "${GOB_NEXT_DEFER:-0}" != "1" ]; then
+    g_next_block "$TARGET" "$SKILLS" "$GATE_LABEL"
   fi
   g_info ""
 else

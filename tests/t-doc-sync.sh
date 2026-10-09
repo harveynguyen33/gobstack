@@ -174,16 +174,17 @@ done
 check "no user-facing doc claims the install copies skills by default (W6 neutral-first)" \
   "$([ -z "$STALE_INSTALL_SKILLS" ] && echo 0 || echo 1)"
 
-# ---- W4-A: the CI lane's blind spots are stated where a run will see them --------------------
-# The lane's own finding is that a workflow file is not a gate: GitHub reports a SKIPPED job as
-# Success, and an admin can push straight past a protection rule. PROJECT-PRACTICE section 3
-# requires every claim to say what it CANNOT see, and the "cannot see" footer is the place a run
-# shows it - the V3-8 precedent, one lane over. v3 cut the CI lane and DELETED docs/CI.md; the
-# verifier footer still states what the old lane could not see (the prose survives the lane).
-awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /CI lane/) found = 1 } END { exit !found }' bin/goblin-verify
-check "the verifier's 'cannot see' footer names the CI lane (W4-A)" "$?"
-awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /required check/) found = 1 } END { exit !found }' bin/goblin-verify
-check "  and says a required check is not the same thing as a gate" "$?"
+# ---- W4-A (v3): the footer names NO lane the product cut ---------------------
+# The V3-8 precedent, one lane over, INVERTED: v3 cut the CI lane and DELETED docs/CI.md, so
+# a footer that still names a lane no rule walks is a false statement on every run. The
+# forward statements stay (V3-8 names the ban lane below); this control is their inverse — the
+# footer must NOT name the deleted CI lane.
+if awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /CI lane/) found = 1 } END { exit !found }' bin/goblin-verify; then
+  note "FAIL the verifier's 'cannot see' footer still names the cut CI lane (W4-A)"
+  fail=1
+else
+  note "ok   the verifier's 'cannot see' footer names no cut CI lane (W4-A)"
+fi
 
 # ---- F2-3: the unsigned record is admitted -----------------------------------
 grep -qi 'is not signed' docs/LIMITS.md

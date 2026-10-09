@@ -633,6 +633,36 @@ commit:git rev-parse --verify --quiet HEAD" ] \
   return "$rc"
 }
 
+# g_next_block <target> <skills yes|no> [<declared-gate label>]
+# THE one ordered next-steps list a completed install prints. `gob init --write` runs the engine
+# (goblin-install), which calls this; init then calls it again for its own tail — so a user sees
+# ONE list, never the two the front-door engine and the installer each used to print. Every line
+# is true of the artefact the user now has:
+#   * the install is uncommitted (the record is written last and git is the user's to run);
+#   * verify re-runs the gate the config declares (GT-02);
+#   * when a gate LABEL is given the gate is the one the user declared and `gob init --write`
+#     MEASURED before writing it, so no edit is owed — the advice is only "edit the default gate"
+#     on a bare `goblin-install`, whose shipped gate is a generic default;
+#   * the seven-skill CORE tier ships under .gob/skills/ on EVERY install, so the agent-skill
+#     switch is about the .hermes/ project tier, not about whether any skill is present.
+g_next_block() {
+  local target="$1" skills="$2" gate="${3:-}" gline
+  if [ -n "$gate" ]; then
+    gline="the gate is the one you declared and gob init measured ($gate); edit AGENTS.md's gate_ keys when it changes"
+  else
+    gline="edit AGENTS.md: replace the default gate with your real commands"
+  fi
+  printf 'next:\n'
+  printf '  1. cd %s && git add -A && git commit   # the install is uncommitted by design\n' "$target"
+  printf '  2. .gob/bin/goblin-verify   # re-runs the gate the config declares; green on a fresh repo\n'
+  printf '  3. %s\n' "$gline"
+  if [ "$skills" = "yes" ]; then
+    printf '  4. hermes skills trust %s   # one-time, so the .hermes/ project tier loads\n' "$target"
+  else
+    printf '  4. the core goblin tier ships under .gob/skills/ by default; the .hermes/ project tier is opt-in: re-run with --skills yes\n'
+  fi
+}
+
 # Allow `bash bin/goblin-lib.sh --self-test` and `source bin/goblin-lib.sh`.
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
   case "${1:-}" in

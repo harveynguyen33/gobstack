@@ -2170,12 +2170,7 @@ else
       `Record<string, any>` is missed and a `: any` inside a string is reported
       (docs/LIMITS.md #27); and no check here can reach a ban IN CONTEXT — the row proves
       the forbidden path fails mechanically, never that the ban reached the agent that
-      wrote the line. The CI lane
-      adds its own: a workflow file is not a gate — nothing in a repository can make a forge
-      **require** it, and the required-check list, the bypass switch and the push identity are forge
-      state. A required check that reports Success after skipping its gate is a green light for a
-      commit whose gate never ran. (The lane is cut in v3; this states what it could not see.)
-      The reference-corpus lane adds its own: RC-01 matches EXACT sha256 only,
+      wrote the line. The reference-corpus lane adds its own: RC-01 matches EXACT sha256 only,
       so a resized, recoloured or re-encoded reference asset, or copied text inside a shipped
       string, passes it unseen; RC-02 proves the manifest is well-shaped, never that its entries
       are the right hashes (as strong as tamper hashing, and installed.json is unsigned); RC-03
@@ -2189,7 +2184,7 @@ SEE
     cat <<'SEE'
       cannot see: whether a check tests the right path rather than merely passing; whether a
       human read the diff; whether the unsigned install record (.gob/installed.json — it is
-      not signed) was rewritten; and the per-lane blind spots of the ban, CI and
+      not signed) was rewritten; and the per-lane blind spots of the ban and
       reference lanes. Full statement: `goblin-verify --verbose`, docs/LIMITS.md #18 #27 #28 #43.
 SEE
   fi

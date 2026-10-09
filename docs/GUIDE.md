@@ -130,10 +130,10 @@ Expected output (this is a real transcript, trimmed):
     created 24 · updated 0 · unchanged 0 · skipped 0
 
     next:
-      1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
-      2. .gob/bin/goblin-verify   # or add .gob/bin to PATH
-      3. edit AGENTS.md: replace the default gate with your real commands (P8 step 3)
-      4. agent skills are opt-in
+      1. cd /tmp/gs-try && git add -A && git commit   # the install is uncommitted by design
+      2. .gob/bin/goblin-verify   # re-runs the gate the config declares; green on a fresh repo
+      3. the gate is the one you declared and gob init measured (test: bash tests/run-tests.sh); edit AGENTS.md's gate_ keys when it changes
+      4. the core goblin tier ships under .gob/skills/ by default; the .hermes/ project tier is opt-in: re-run with --skills yes
 
 **`created 24`** is the installer's count of the files it **tracks**. It writes **25**: the 25th
 is `.gob/installed.json`, the record it keeps for itself, which it writes but does not count. It
@@ -711,9 +711,9 @@ tests the right path rather than merely passing; whether the forge is bound by t
 a config declares found; whether a human
 read the diff; and whether `.gob/installed.json` — the record every drift check trusts — was
 itself rewritten, since it
-is not signed (`docs/LIMITS.md` #18). The CI lane is out of the product and its doc is deleted; the
-verifier still names the CI lane's blind spots in its "cannot see" footer, because the *reason* a
-workflow file is not a gate still holds (`docs/LIMITS.md` #34).
+is not signed (`docs/LIMITS.md` #18). The footer names no lane the product cut: the CI lane is out
+of the product and its rows and doc are deleted, so the verifier no longer names it — a lane the
+product deleted is not a blind spot a run still carries (`docs/LIMITS.md` #13/#34).
 
 #### A fresh install verifies green
 

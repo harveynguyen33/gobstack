@@ -363,7 +363,9 @@ INSTALL_ARGS=(--target "$TARGET" --skills no --yes)
 GATE_NAME=$(g_agents_gates "$PROP" | head -n 1 | awk -F'\t' '{print $1}')
 INSTALL_ARGS+=(--gate "$GATE_CMD" "$GATE_NAME")
 printf 'gob init [run] goblin-install --target %s\n' "$TARGET"
-bash "$SRC/bin/goblin-install" "${INSTALL_ARGS[@]}"
+# The engine is told to DEFER the next-steps block: this front-door command prints the ONE list
+# itself, at the very end (g_next_block). Without this the user saw two `next:` lists.
+GOB_NEXT_DEFER=1 bash "$SRC/bin/goblin-install" "${INSTALL_ARGS[@]}"
 RC=$?
 [ "$RC" -eq 0 ] || { g_err "install failed (exit $RC) — the refusals above name the path and the fix"; exit "$RC"; }
 
@@ -426,7 +428,8 @@ do_mcp_config || exit 1
 printf '\n'
 printf 'gob init: installed — feature map %s\n' "$FEATURE_MAP"
 printf '  harness: %s/.gob/bin/goblin-verify\n' "$TARGET"
-printf 'next:\n'
-printf '  1. git add -A && git commit   # the install is uncommitted by design\n'
-printf '  2. run .gob/bin/goblin-verify — GT-02 re-runs the gate you declared; a day-one red is expected\n'
+printf '\n'
+# The ONE ordered next-steps list (the engine deferred its own copy). The gate is the one this
+# command declared and MEASURED above, so the list does not tell the user to replace it.
+g_next_block "$TARGET" no "$GATE_NAME: $GATE_CMD"
 exit 0
