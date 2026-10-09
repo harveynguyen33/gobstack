@@ -11,9 +11,8 @@
 #   V5  the GUIDE Version: stamp check still exists in t-doc-guide.sh — the AB4 matcher
 #       lives, so a refactor cannot silently drop the one stamp assertion that predates
 #       this file (its logic is asserted to EXIST here, not duplicated)
-#   V6  goblin --version prints VERSION byte-for-byte through BOTH CLIs — the bash
-#       dispatcher (W1) and the node shim (W2); a shim or constant bypassing the source
-#       fails byte-for-byte
+#   V6  goblin --version prints VERSION byte-for-byte through the npm shim (the one
+#       CLI); a shim or constant bypassing the source fails byte-for-byte
 #
 # Dependency contract: python3 for JSON (no jq), bash/awk/sed/grep only.
 
@@ -100,14 +99,11 @@ fi
 # byte-for-byte (round-2 review, LOW-1). Each CLI's stdout goes to a file untouched;
 # the expectation is VERSION's own bytes copied verbatim, no re-formatting.
 cp VERSION /tmp/v6-want
-bash bin/goblin --version 2>/dev/null > /tmp/v6-bash.out
-check "V6 bash bin/goblin --version prints VERSION byte-for-byte" \
-  "$(cmp -s /tmp/v6-bash.out /tmp/v6-want && echo 0 || echo 1)"
 
 node bin/goblin.js --version 2>/dev/null > /tmp/v6-node.out
 check "V6 node bin/goblin.js --version prints VERSION byte-for-byte" \
   "$(cmp -s /tmp/v6-node.out /tmp/v6-want && echo 0 || echo 1)"
-rm -f /tmp/v6-want /tmp/v6-bash.out /tmp/v6-node.out
+rm -f /tmp/v6-want /tmp/v6-node.out
 
 if [ "$FAIL" -eq 0 ]; then
   printf 't-version-sync: all checks passed\n'

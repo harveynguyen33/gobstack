@@ -11,8 +11,8 @@
 #       nothing written; a refusal names the input it refused
 #   B4  --dry-run validates and writes nothing
 #   B5  idempotent re-`--write`: the second identical write is the installer's no-op
-#   B6  the dispatcher: `bin/goblin init --help` exits 0; `goblin.js init --help`
-#       reaches the same usage; `gob init` (bare) prints the brief
+#   B6  the shim: `goblin.js init --help` reaches the engine usage; `gob init` (bare)
+#       prints the brief
 #   B7  the post-install GREEN line: after the day-one commit the probe verifies at the
 #       measured green line
 #   B8  the source gates (moved here from the deleted t8 pty family, still relevant):
@@ -192,11 +192,7 @@ check "the identical re-write exits 0" "$RC5"
 printf '%s' "$OUT5" | grep -qE "no-op: .* unchanged"
 check "the re-write is the installer's no-op" "$?"
 
-# ---- B6: the dispatcher routes --------------------------------------------------------
-OUT8=$( cd "$WORK" && env PATH="$BARE_PATH" bash "$SRC/bin/goblin" init --help 2>&1 ); RC8=$?
-check "gob init --help exits 0 through the dispatcher" "$RC8"
-printf '%s' "$OUT8" | grep -q -- "--write"
-check "the usage names the --write flag" "$?"
+# ---- B6: the shim routes ---------------------------------------------------------------
 OUT9=$( cd "$WORK" && env PATH="$BARE_PATH:$HOME/.local/bin" node "$SRC/bin/goblin.js" init --help 2>&1 ); RC9=$?
 check "the npm shim routes init to goblin-init" "$RC9"
 printf '%s' "$OUT9" | grep -qF "gob init"

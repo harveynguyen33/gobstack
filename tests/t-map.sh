@@ -196,17 +196,13 @@ check "MP9 a missing target exits 2" "$([ $? -eq 2 ] && echo 0 || echo 1)"
 bash "$MAP" --frobnicate >/dev/null 2>&1
 check "MP9 an unknown flag exits 2" "$([ $? -eq 2 ] && echo 0 || echo 1)"
 
-# ---- MP6b: the shims route map (the node table and the bash dispatcher) --------
-# The empty-repo fixture already has features/ from MP8's first run, so both routes
-# are exercised in the refusal shape: exit 1 with the named remedy, never a usage page.
+# ---- MP6b: the shim routes map (the npm bin is the one dispatcher) -------------
+# The empty-repo fixture already has features/ from MP8's first run, so the route
+# is exercised in the refusal shape: exit 1 with the named remedy, never a usage page.
 OUTS=$(cd "$EM" && node "$SRC/bin/goblin.js" map --heuristic 2>&1); RCS=$?
 check "MP6 node shim gob map --heuristic routes to the generator, exit 1 (refusal)" "$([ "$RCS" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$OUTS" | grep -qF -- "--force"
 check "MP6 the node route carries the generator's refusal, not the shim usage" "$?"
-OUTB=$(cd "$EM" && bash "$SRC/bin/goblin" map --heuristic 2>&1); RCB=$?
-check "MP6 bash dispatcher gob map --heuristic routes to the generator, exit 1 (refusal)" "$([ "$RCB" -eq 1 ] && echo 0 || echo 1)"
-printf '%s' "$OUTB" | grep -qF -- "--force"
-check "MP6 the bash route carries the generator's refusal, not the dispatcher usage" "$?"
 [ ! -e "$EM/.gob" ] && [ ! -e "$EM/.goblin" ]
 check "MP6 and still wrote no .gob/ (standalone)" "$?"
 

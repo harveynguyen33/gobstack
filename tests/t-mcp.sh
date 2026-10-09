@@ -347,10 +347,7 @@ check "M9 the server answers a full verify with nothing but the shell's own tool
 ENDPOINTS=$(grep -nE 'https?://[^ ]*[^ )>`]|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|net\.connect|dgram|dns\.|tls\.|fetch\(' "$MCP" | grep -v 'npx -y @techgoblin/gobstack' || true)
 [ -z "$ENDPOINTS" ]
 check "M9 no endpoint, address or socket surface in the server source" "$?"
-# and the dispatcher wiring is exercised too (both entry points, one ping each)
-OUT=$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"ping"}' | python3 "$SRC/tests/mcp-client.py" "bash $SRC/bin/goblin mcp")
-printf '%s' "$OUT" | grep -q '"id":1,"result":{}'
-check "M9 gob mcp (bash dispatcher) speaks the same protocol" "$?"
+# the mcp verb is exercised through the npm shim (the one dispatcher)
 OUT=$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"ping"}' | python3 "$SRC/tests/mcp-client.py" "node $SRC/bin/goblin.js mcp")
 printf '%s' "$OUT" | grep -q '"id":1,"result":{}'
 check "M9 the npm shim routes mcp under node (SH-M1: bash choked on the .js target)" "$?"
