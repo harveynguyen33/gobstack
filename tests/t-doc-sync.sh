@@ -120,12 +120,13 @@ check "no shipped doc or skill claims a fresh install is not automatically green
 # The three prose docs and the shipped bootstrap skill must carry the measured line; the other
 # shipped skills do not discuss a verify run and are not required to. Batch 2b-ii + GAP-2/3: the
 # measured green path is the DEFAULT install's, over the ~19-row core with the seven-skill core
-# procedure tier vendored under .gob/skills/ and bans self-selected by their glob (21/0/0/6; the
-# 32 not-for-every-repo rows moved to the library, so the advisory count is 0, SK-01/02/04 RUN,
-# and the electron bans BN-06..09 run too via the shipped .mjs/.json).
+# procedure tier vendored under .gob/skills/ and bans self-selected by glob OR the dep: predicate
+# (17/0/0/10; the 32 not-for-every-repo rows moved to the library, so the advisory count is 0,
+# SK-01/02/04 RUN, and the electron bans BN-06..09 report NOT APPLICABLE with no package.json —
+# FIX 1 removed the false green where they ran off the harness's own shipped .mjs/.json).
 GREEN_CLAIM=""
 for f in README.md docs/GUIDE.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '21 passed, 0 failed, 0 advisory, 6 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '17 passed, 0 failed, 0 advisory, 10 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, GUIDE and the shipped bootstrap skill state the measured green path" \

@@ -156,11 +156,11 @@ You will see one line per rule. The shape:
     PASS  IN-02  20 installed files hashed
     FAIL  HP-05  HANDOFF.md names no commit that exists in this repo
     SKIP  FM-01  feature_map: is empty - this state is UNREACHABLE ...
-    SKIP  BN-06  No renderer with Node access ... (not applicable: no file matches applies_when: **/*.ts **/*.tsx **/*.js **/*.jsx ...)
+    SKIP  BN-06  No renderer with Node access ... (not applicable: no package.json, so nothing declares electron)
 
 and a summary line at the bottom:
 
-    20 passed, 1 failed, 0 advisory, 6 skipped     # the HP-05 placeholder, before you name a real commit
+    16 passed, 1 failed, 0 advisory, 10 skipped     # the HP-05 placeholder, before you name a real commit
 
 ### How to read that output
 
@@ -172,7 +172,7 @@ and a summary line at the bottom:
 | `ADV` | advisory — a rule with no runnable check, **counted** | nothing, but know it is not enforced |
 
 **`SKIP` is not success and not failure.** It is the harness telling you the truth: "this rule has
-nothing to read yet." On a brand-new install, thirteen rows skip — because there is no `src/` for a
+nothing to read yet." On a brand-new install, ten rows skip — because there is no `src/` for a
 ban to scan, no feature map, no pinned pre-change commit. That is correct on day
 one. The list of what is still skipping *is* your onboarding checklist.
 
@@ -202,9 +202,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `26 passed, 0 failed, 0 advisory, 1 skipped` | none — the installer fills `HANDOFF.md`'s HEAD from the seed commit, and the uncommitted-install / untracked-SPEC reds (`CM-03`, `SP-02`) are now library rows, off by default |
-| 2. the first commit | `git add -A && git commit` | `26 passed, 0 failed, 0 advisory, 1 skipped` | none — green |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `26 passed, 0 failed, 0 advisory, 1 skipped` | none — `CM-03` is a library row, so a dirty tree no longer re-reds by default |
+| 1. the install ran | `gob init --write ... --yes` | `22 passed, 0 failed, 0 advisory, 5 skipped` | none — the installer fills `HANDOFF.md`'s HEAD from the seed commit, and the uncommitted-install / untracked-SPEC reds (`CM-03`, `SP-02`) are now library rows, off by default |
+| 2. the first commit | `git add -A && git commit` | `22 passed, 0 failed, 0 advisory, 5 skipped` | none — green |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `22 passed, 0 failed, 0 advisory, 5 skipped` | none — `CM-03` is a library row, so a dirty tree no longer re-reds by default |
 
 One of those deserves its name spelled out:
 
@@ -408,16 +408,16 @@ A default install lands on a specific shape. The first red is
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    20 passed, 1 failed, 0 advisory, 6 skipped     # straight after the install (the HP-05 placeholder)
-    21 passed, 0 failed, 0 advisory, 6 skipped     # name a real commit in HANDOFF.md, commit, and it is green
+    16 passed, 1 failed, 0 advisory, 10 skipped     # straight after the install (the HP-05 placeholder)
+    17 passed, 0 failed, 0 advisory, 10 skipped     # name a real commit in HANDOFF.md, commit, and it is green
 
 (On the older `gob init` walk the uncommitted-install and untracked-SPEC reds — `CM-03`, `SP-02`
 — were the first two FAILs; both are library rows now, off by default.) Name a real commit in
 `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is green:
 
-    21 passed, 0 failed, 0 advisory, 6 skipped     (on a real project; your numbers will differ)
+    17 passed, 0 failed, 0 advisory, 10 skipped     (on a real project; your numbers will differ)
 
-**Six rows skipping is correct**, and each skip prints its reason. In plain terms: the
+**Ten rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
 scolding.
 
@@ -691,11 +691,11 @@ Output is one line per executed row, in manifest order, plus a summary line at t
     PASS  HP-01  (test -f HANDOFF.md)
     FAIL  GT-02  gate commit: false -> exit 1
     SKIP  FM-01  feature_map: is empty - this state is UNREACHABLE ...
-    SKIP  BN-06  No renderer with Node access ... (not applicable: no file matches applies_when: **/*.ts **/*.tsx **/*.js **/*.jsx ...)
+    SKIP  BN-06  No renderer with Node access ... (not applicable: no package.json, so nothing declares electron)
 
 Those three lines are one row of each marking a default run can show (no row of the shipped
 matrix is advisory — the advisory rows live in the library). The summary line of a green default
-run is `21 passed, 0 failed, 0 advisory, 6 skipped`.
+run is `17 passed, 0 failed, 0 advisory, 10 skipped`.
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -718,13 +718,14 @@ workflow file is not a gate still holds (`docs/LIMITS.md` #34).
 #### A fresh install verifies green
 
 Measured on a fresh DEFAULT install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`21 passed, 0 failed, 0 advisory, 6 skipped`, exit 0.** The core procedure
+hand edit: **`17 passed, 0 failed, 0 advisory, 10 skipped`, exit 0.** The core procedure
 tier is vendored on every install (`.gob/skills/`), so `SK-01`, `SK-02` and `SK-04` RUN and
-pass on a fresh repo — the product no longer disables its own rows. Six rows skip with a
-reason: every ban self-selects by its `applies_when` glob, and `BN-01`/`BN-02`/`BN-03`/`BN-05`
+pass on a fresh repo — the product no longer disables its own rows. Ten rows skip with a
+reason: every ban self-selects by its `applies_when` — a GLOB (`BN-01`/`BN-02`/`BN-03`/`BN-05`
 match only `.ts`/`.tsx`/`.js`/`.jsx`, so with no such source each reports itself *not
-applicable* — while the four electron bans `BN-06`..`BN-09` DO run (their globs also match the
-shipped `checks/*.mjs` and `.json`) and pass with nothing to flag — and `FM-01`/`FM-02`, which
+applicable*) or the `dep:electron` PREDICATE (the four electron bans `BN-06`..`BN-09` run only
+when `package.json` names electron, so with none they too report *not applicable* — never running
+vacuously off the harness's own `checks/*.mjs`) — and `FM-01`/`FM-02`, which
 have no feature map yet (`feature_map:` ships empty on purpose: a fresh install must not be
 born RED — G1, `docs/LIMITS.md` #30). Thirty-two further rows are **not skipped but OFF** —
 they live in the library (`gob verify --library`), the rows that are not right for every repo.
@@ -742,7 +743,7 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a part's off state real.
 - **The opt-out numbers are pinned (V3-3).** A default install with the core tier vendored
-  verifies `21 passed, 0 failed, 0 advisory, 6 skipped`, exit 0, and
+  verifies `17 passed, 0 failed, 0 advisory, 10 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
   at v0.2 as the ban and feature-map rows landed; in v3 the model/role/loop and CI rows are cut,
@@ -824,18 +825,19 @@ scaffold in `checks/`. A default install ships **no** agent skills: skills are o
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .gob/bin/goblin-verify            # 21 passed, 0 failed - the uncommitted-install red (CM-03) is a library row now
+    .gob/bin/goblin-verify            # 17 passed, 0 failed - the uncommitted-install red (CM-03) is a library row now
 
-A default install (no agent skills) is **green** — `21 passed, 0 failed, 0 advisory,
-6 skipped`, exit 0 — once
+A default install (core tier, no agent skills) is **green** — `17 passed, 0 failed, 0 advisory,
+10 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
-the one expected red (`20 passed, 1 failed`). Both numbers are measured, not assumed
-(`docs/GUIDE.md`; step 2 of `docs/GUIDE.md`). Six rows skip with a reason: `SK-01`, `SK-02`
+the one expected red (`16 passed, 1 failed`). Both numbers are measured, not assumed
+(`docs/GUIDE.md`; step 2 of `docs/GUIDE.md`). Ten rows skip with a reason: `SK-01`, `SK-02`
 and `SK-04` RUN (the core procedure tier is vendored under `.gob/skills/` on every install),
 plus the not-yet rows: `BN-01`/`BN-02`/`BN-03`/`BN-05` have no `.ts`/`.js` source for their
 `applies_when` glob and each reports itself *not applicable*; the four electron bans
-`BN-06`/`BN-07`/`BN-08`/`BN-09` DO run (their globs match the shipped `.mjs`/`.json`) and pass
-with nothing to flag, and `FM-01`/`FM-02`
+`BN-06`/`BN-07`/`BN-08`/`BN-09` are selected by the `dep:electron` predicate, so with **no
+`package.json`** they too report *not applicable* — never passing vacuously off the harness's own
+`checks/*.mjs` — and `FM-01`/`FM-02`
 (no feature map yet). Thirty-two further rows are held in the **library** (`gob verify
 --library`) — off by default, each with the line that turns it on. The round-shaped rows
 (`PG-*`) and the corpus rows (`RC-*`) are library rows now, so the first-step list is a list of
@@ -879,7 +881,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .gob/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the full green path (`21 passed, 0 failed, 0 advisory, 6 skipped`, exit 0)
+   Success is the full green path (`17 passed, 0 failed, 0 advisory, 10 skipped`, exit 0)
    with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three
@@ -978,10 +980,10 @@ Measured shape of this table: **31 rows** - 27 target, 4 source; advisory 0, gat
 | `BN-02` | target | lint | No `@ts-ignore` / `@ts-expect-error` suppressions. | goblin-verify --only BN-02 | Text probe: it sees the directive wherever it appears, including inside a string, and cannot tell a suppression hiding a real error from one on a line that would compile anyway. SKIPs when an explicit `bans_disabled:` names it, or its globs match no file. |
 | `BN-03` | target | lint | No direct network call from a component. | goblin-verify --only BN-03 | Text probe over the declared component globs: it stops the call and cannot tell whether a data layer was written or the call merely moved into a helper. SKIPs when an explicit `bans_disabled:` names it, or its globs match no file. |
 | `BN-05` | target | lint | No import across a declared layer boundary. | goblin-verify --only BN-05 | Reads the `layers:` list; an empty list SKIPs with a reason, never a vacuous pass. It matches an import path naming the target directory's last segment - module aliases and dynamic imports are not seen. SKIPs when no file matches its globs. |
-| `BN-06` | target | lint | No renderer with Node access (`nodeIntegration: true`). | goblin-verify --only BN-06 | Text probe over the ban table's globs, the same mechanism as BN-01..BN-05: it sees `nodeIntegration: true` wherever it appears, including inside a string, and cannot see a webPreferences object built at run time or spread in from another module. The STRONGER form is a runtime measurement - the renderer prints `process.contextIsolated` and `process.sandboxed` and the check requires true/true - and that needs a real Electron process, which the dependency contract (docs/GUIDE.md) does not allow a shipped rule to launch: it is the project's host gate (docs/LIMITS.md #34). SKIPs when an explicit `bans_disabled:` names it, or its globs match no file. |
-| `BN-07` | target | lint | No renderer with context isolation or the process sandbox turned off. | goblin-verify --only BN-07 | One probe for two properties because Electron's own documentation makes them one: disabling `contextIsolation` "also disables process sandboxing", so a repo that has turned either off has lost both. Text probe, with the same false-positive set as BN-06. SKIPs when an explicit `bans_disabled:` names it, or its globs match no file. |
-| `BN-08` | target | lint | No dangerous webPreferences. | goblin-verify --only BN-08 | Four one-line patterns from Electron's own security checklist (`webSecurity: false`, `allowRunningInsecureContent: true`, `enableBlinkFeatures`, `<webview allowpopups>`). Text probe: `enableBlinkFeatures` is banned by name rather than by value, so the string is reported even in a comment. SKIPs when an explicit `bans_disabled:` names it, or its globs match no file. |
-| `BN-09` | target | lint | No synchronous IPC and no `@electron/remote`. | goblin-verify --only BN-09 | The banned-list shape the wave's note 9 asks for, applied to Electron: `sendSync(` and `@electron/remote` block the renderer's own thread, which is the freeze these bans exist to prevent. Text probe - it sees the call site, not the call graph, so a wrapper around `sendSync` in a file the globs do not match is missed. SKIPs when an explicit `bans_disabled:` names it, or its globs match no file. |
+| `BN-06` | target | lint | No renderer with Node access (`nodeIntegration: true`). | goblin-verify --only BN-06 | Text probe over the ban table's globs, the same mechanism as BN-01..BN-05: it sees `nodeIntegration: true` wherever it appears, including inside a string, and cannot see a webPreferences object built at run time or spread in from another module. The STRONGER form is a runtime measurement - the renderer prints `process.contextIsolated` and `process.sandboxed` and the check requires true/true - and that needs a real Electron process, which the dependency contract (docs/GUIDE.md) does not allow a shipped rule to launch: it is the project's host gate (docs/LIMITS.md #34). SKIPs when an explicit `bans_disabled:` names it, or `package.json` does not name electron (the `dep:electron` predicate). |
+| `BN-07` | target | lint | No renderer with context isolation or the process sandbox turned off. | goblin-verify --only BN-07 | One probe for two properties because Electron's own documentation makes them one: disabling `contextIsolation` "also disables process sandboxing", so a repo that has turned either off has lost both. Text probe, with the same false-positive set as BN-06. SKIPs when an explicit `bans_disabled:` names it, or `package.json` does not name electron (the `dep:electron` predicate). |
+| `BN-08` | target | lint | No dangerous webPreferences. | goblin-verify --only BN-08 | Four one-line patterns from Electron's own security checklist (`webSecurity: false`, `allowRunningInsecureContent: true`, `enableBlinkFeatures`, `<webview allowpopups>`). Text probe: `enableBlinkFeatures` is banned by name rather than by value, so the string is reported even in a comment. SKIPs when an explicit `bans_disabled:` names it, or `package.json` does not name electron (the `dep:electron` predicate). |
+| `BN-09` | target | lint | No synchronous IPC and no `@electron/remote`. | goblin-verify --only BN-09 | The banned-list shape the wave's note 9 asks for, applied to Electron: `sendSync(` and `@electron/remote` block the renderer's own thread, which is the freeze these bans exist to prevent. Text probe - it sees the call site, not the call graph, so a wrapper around `sendSync` in a file the globs do not match is missed. SKIPs when an explicit `bans_disabled:` names it, or `package.json` does not name electron (the `dep:electron` predicate). |
 | `FM-01` | target | lint | Every feature file is indexed from the map README, declares its slug and at least one entry path, and carries the four-H2 entry contract. | goblin-verify --only FM-01 | SKIPs (exit 3) when feature_map: is empty - a fresh install has no map and must not be born RED (the D8 shape). When a map IS declared: the README must exist, every features/*.md must be linked from it in the (./<slug>.md) form and every relative .md link must resolve, each feature file's `feature:` must equal its filename stem, it must declare >=1 `entry_paths:`, and its H2s must be exactly Sub-features / How to get to it (user POV) / Driving it with <harness> / Gotchas, in that order. Partial: the README's own H2s are prose this row does not read, and 'the map lists every user-facing feature' is not mechanically checkable - that is docs/LIMITS.md #30, not a row. |
 | `FM-02` | target | lint | Every entry point a feature declares still resolves in source, and no entry path changed after the map was verified. | goblin-verify --only FM-02 | SKIPs (exit 3) when feature_map: is empty. A tripwire, not a proof. The token is searched under source_root with occurrences under the map's own directory excluded - without that exclusion the map's own entry-path list satisfies the search and the row could never go RED. Freshness is `git log -1 --format=%cs` on the resolved file against the feature's `verified:` date, and git sees a FILE change, not a behaviour change: the row can be RED-when-stale and never GREEN-means-fresh. A token that also occurs in a vendored copy or a build artifact is read as resolved, and a `verified:` date is itself a claim the row cannot test (docs/LIMITS.md #30). W5-4: the search skips the harness's own directories (`.gob/`, `.hermes/`, the declared `harness_dir`) and the map's own directory, so a stub map whose token occurs only in the install no longer resolves; a token that occurs only in the target's own `docs/`, `tests/` or build output still does (docs/LIMITS.md #37). Z1-6: the resolved file must be TRACKED (`git ls-files --error-unmatch`) before its date is compared - an untracked file used to make the freshness clause skip in silence, so a map could claim `verified: 2020-01-01` over source that was never committed. |
 | `VA-01` | target | gate | The generated verification skill's doctor command runs and exits 0. | goblin-verify --only VA-01 | SKIPs (exit 3) when verify_doctor: is empty (the replay.commit: "" shape). Runs the DECLARED command exactly as GT-02 runs a declared gate, and never a string read out of file content (the v0.2 blocker). Closes P6's stated-but-unenforced clause 'a generated skill that was never executed is a draft': the doctor is the smallest executable proof that the skill's own instructions still run - and it proves only that, never that the doctor tests the right path. |

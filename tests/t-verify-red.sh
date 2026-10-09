@@ -335,17 +335,16 @@ m_bn_05()          { sed -i 's|^layers:\([[:space:]]*\).*|layers: [src/renderer 
 m_bn_05_nolayers() { mkdir -p src/renderer; printf 'export const r = 1;\n' > src/renderer/p.ts; }
 
 # ---- W4/G6: the Electron failure surface, as bans (BN-06..BN-09) -----------------------------
-# GAP-3: selection is the GLOB and nothing else — each mutation writes the file the ban's
-# `applies_when` glob matches, and the row runs. There is no allow-list to turn a ban on; the
-# only config knob is the DISABLE list, and m_bn_06_disabled is that knob's control. The pattern
-# is the wrongEnough-shape: these are the keys Electron's own security checklist names, which is
-# why they are one-line rules rather than a dependency-graph run.
-m_bn_06()  { mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
-# GAP-3: a ban whose glob MATCHES still skips when `bans_disabled:` names it — the one config knob.
-m_bn_06_disabled() { mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; sed -i 's/^bans_disabled: \[.*\]/bans_disabled: [BN-06]/' AGENTS.md; }
-m_bn_07()  { mkdir -p src; printf 'export const prefs = { contextIsolation: false };\n' > src/isolate.ts; }
-m_bn_08()  { mkdir -p src; printf 'export const prefs = { webSecurity: false };\n' > src/webs.ts; }
-m_bn_09()  { mkdir -p src; printf 'const v = ipcRenderer.sendSync("chan", 1);\n' > src/ipc.ts; }
+# FIX 1: selection is the PREDICATE `dep:electron` — the ban runs only when the repo's package.json
+# names electron under dependencies or devDependencies, so these four never run (and never vacuously
+# pass) on a repo with no electron. Each mutation therefore plants BOTH the dep AND the file the
+# ban's scope reads. m_bn_06_disabled is the DISABLE list's control (the only config knob).
+plant_electron() { printf '{"name":"fixture","devDependencies":{"electron":"^30"}}\n' > package.json; }
+m_bn_06()  { plant_electron; mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
+m_bn_06_disabled() { m_bn_06; sed -i 's/^bans_disabled: \[.*\]/bans_disabled: [BN-06]/' AGENTS.md; }
+m_bn_07()  { plant_electron; mkdir -p src; printf 'export const prefs = { contextIsolation: false };\n' > src/isolate.ts; }
+m_bn_08()  { plant_electron; mkdir -p src; printf 'export const prefs = { webSecurity: false };\n' > src/webs.ts; }
+m_bn_09()  { plant_electron; mkdir -p src; printf 'const v = ipcRenderer.sendSync("chan", 1);\n' > src/ipc.ts; }
 
 # ---- W5-1/W5-2: the two documented escapes, in BOTH directions ---------------------------------
 # `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` were documented in three places and

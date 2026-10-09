@@ -117,7 +117,7 @@ SUM() { HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]
 
 PRE=$(SUM)
 check "UX-ii the pre-commit run is green (CM-03/SP-02 are library rows now)" \
-  "$(printf '%s' "$PRE" | grep -qF '26 passed, 0 failed, 0 advisory, 1 skipped' && echo 0 || echo 1)"
+  "$(printf '%s' "$PRE" | grep -qF '22 passed, 0 failed, 0 advisory, 5 skipped' && echo 0 || echo 1)"
 
 git add -A && git commit -q -m "chore: install gobstack"
 DAY1=$(SUM)
@@ -125,7 +125,7 @@ DAY1=$(SUM)
 # nothing to flag and the first-commit run is already green. The placeholder red the guide
 # teaches (HP-05) belongs to the verify-on-an-empty-repo path t-doc-guide.sh walks.
 check "UX-ii the first-commit run is green (the installer filled the HANDOFF HEAD)" \
-  "$(printf '%s' "$DAY1" | grep -qF '26 passed, 0 failed, 0 advisory, 1 skipped' && echo 0 || echo 1)"
+  "$(printf '%s' "$DAY1" | grep -qF '22 passed, 0 failed, 0 advisory, 5 skipped' && echo 0 || echo 1)"
 
 # ---- UX-iii: CM-03 is a library row now (batch 2b-ii) ------------------------------------------
 # The commit-as-you-go row CM-03 moved to the library, so a dirty tree no longer re-reds the
@@ -134,18 +134,18 @@ HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 DIRTY=$(SUM)
 check "UX-iii the HANDOFF edit leaves the default run green (CM-03 is a library row now)" \
-  "$(printf '%s' "$DIRTY" | grep -qF '26 passed, 0 failed' && [ -n "$(git status --porcelain)" ] && echo 0 || echo 1)"
+  "$(printf '%s' "$DIRTY" | grep -qF '22 passed, 0 failed' && [ -n "$(git status --porcelain)" ] && echo 0 || echo 1)"
 printf '%s' "$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify --library 2>&1)" | grep -qE '^CM-03 '
 check "  and CM-03 is listed in the library with its enable hint" "$?"
 
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(SUM)
 note "MEASURED init-path shapes: PRE=[$PRE] DAY1=[$DAY1] DIRTY=[$DIRTY] GREEN=[$GREEN]"
-check "UX-ii the green path prints 26 passed, 0 failed, 0 advisory, 1 skipped" \
-  "$(printf '%s' "$GREEN" | grep -qF '26 passed, 0 failed, 0 advisory, 1 skipped' && echo 0 || echo 1)"
+check "UX-ii the green path prints 22 passed, 0 failed, 0 advisory, 5 skipped" \
+  "$(printf '%s' "$GREEN" | grep -qF '22 passed, 0 failed, 0 advisory, 5 skipped' && echo 0 || echo 1)"
 
 # ---- the guide quotes exactly these shapes ----------------------------------------------------
-for shape in "26 passed, 0 failed, 0 advisory, 1 skipped"; do
+for shape in "22 passed, 0 failed, 0 advisory, 5 skipped"; do
   grep -qF "$shape" "$GUIDE"
   check "the guide quotes the measured line ($shape)" "$?"
 done
@@ -154,9 +154,9 @@ done
 SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped' "$GUIDE" \
          | sed -n 's/^[[:space:]]*\([0-9]* passed, [0-9]* failed, [0-9]* advisory, [0-9]* skipped\).*/\1/p' | sort -u)
 MEASURED=$(printf '%s\n' \
-  "26 passed, 0 failed, 0 advisory, 1 skipped" \
-  "20 passed, 1 failed, 0 advisory, 6 skipped" \
-  "21 passed, 0 failed, 0 advisory, 6 skipped")
+  "22 passed, 0 failed, 0 advisory, 5 skipped" \
+  "16 passed, 1 failed, 0 advisory, 10 skipped" \
+  "17 passed, 0 failed, 0 advisory, 10 skipped")
 SUBSET=0
 while IFS= read -r s; do
   [ -n "$s" ] || continue

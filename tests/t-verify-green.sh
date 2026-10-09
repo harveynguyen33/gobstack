@@ -42,20 +42,32 @@ check "the summary counts the off-by-default library (HS-02/PG-03 live there, he
 printf '%s' "$OUT" | grep -q 'gob verify --library'
 check "  and the summary names the discovery surface for the off rows" "$?"
 
-# ---- the ban table self-selects per row (the class/electron opt-in is GONE) -------------------
-# A ban is code-shaped: it runs whenever a real file matches its applies_when glob, and a ban
-# with no surface REPORTS itself not applicable, never silently green. The class key and the
-# electron: key are gone, and so is the `bans:` allow-list (GAP-3): the only config knob is the
-# DISABLE list, `bans_disabled:`. This tree has no .ts/.tsx/.js source, so the bans whose globs
-# name only those (BN-01/02/03/05) report themselves not applicable; the electron bans' globs
-# also match `.mjs`/`.json`, so they run instead (below).
+# ---- the ban table self-selects per row: GLOB or `dep:` PREDICATE (FIX 1) ---------------------
+# A ban is code-shaped: it runs only when the repo actually HAS the stack it polices, and a ban
+# with no surface REPORTS itself not applicable, never silently green. Two applicability forms:
+#   * a GLOB (BN-01/02/03/05): the ban runs when at least one real file matches;
+#   * `dep:<pkg>` (BN-06..09): the ban runs only when package.json names the package under
+#     dependencies or devDependencies. This tree has NEITHER .ts source NOR a package.json, so ALL
+#     eight bans report themselves not applicable. This is the FIX-1 false green: the electron
+#     bans' globs used to include `**/*.mjs`, which matched the harness's OWN shipped
+#     checks/*.mjs, so on a repo with no electron they RAN and PASSED vacuously.
 printf '%s' "$OUT" | grep -qE 'SKIP  BN-01 .*not applicable: no file matches applies_when'
 check "a ban the tree has no surface for reports itself NOT APPLICABLE" "$?"
-# GAP-3: no allow-list — a ban also runs whenever ANY real file matches its glob. BN-06..09's
-# globs include **/*.mjs, so the shipped checks/*.mjs makes them applicable, and the probe runs
-# over its declared src/app/electron surface (nothing there) and PASSes — never a silent skip.
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-06 .*not applicable: no package' && \
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-07 .*not applicable: no package' && \
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-08 .*not applicable: no package' && \
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-09 .*not applicable: no package'
+check "FIX 1: the four electron bans report NOT APPLICABLE on a repo with no package.json" "$?"
 printf '%s' "$OUT" | grep -qE '^PASS  BN-06'
-check "a ban whose glob matches a real file RUNS (BN-06 via shipped checks/*.mjs), never skips" "$?"
+check "FIX 1: and NONE of them RUNS on the harness's own shipped checks/*.mjs (no false green)" \
+  "$([ $? -ne 0 ] && echo 0 || echo 1)"
+# The predicate's positive half: declare electron and the SAME ban RUNS (no file matches its scope,
+# so it PASSes on a clean tree, but the point is it is no longer not-applicable).
+printf '{"name":"x","devDependencies":{"electron":"^30"}}\n' > package.json
+git add -A >/dev/null 2>&1; git commit -q -m "test: declare electron"
+printf '%s' "$(bash .gob/bin/goblin-verify --only BN-06 2>&1)" | grep -qE '^PASS  BN-06'
+check "FIX 1: once package.json names electron, the same ban RUNS (predicate selects it)" "$?"
+rm -f package.json; git add -A >/dev/null 2>&1; git commit -q -m "test: drop the electron dep"
 
 
 # ---- UX pass: remedy lines, day-one banners, recovery lines, GT-03's sentence --------------
