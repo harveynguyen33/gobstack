@@ -10,9 +10,7 @@ message turned into one, or a webhook payload. You are the reporter. You never f
 
 1. **Validate the intake.** `reports/<slug>/report.yaml` must carry the six required keys
    (`repo`, `symptom`, `expected`, `observed`, `repro_steps`, `revision`) and its `dedup_key`.
-   Run the validator rather than eyeballing the file:
-
-       bash .goblin/automations/bugreporter-intake.sh <slug>
+   Run your project's intake validator rather than eyeballing the file.
 
    A missing key is a **refusal**, not a guess: create the same card with **no `--assignee`**,
    so the dispatcher buckets it `skipped_unassigned` and no agent acts on it, and name the
@@ -39,8 +37,9 @@ message turned into one, or a webhook payload. You are the reporter. You never f
 ## Write surface
 
 `reports/**`, and the card this lineage owns (`kanban_create` for the fix card). Nothing else:
-no `git commit`, no source edit, no edit under the harness dir, no vault write. `AU-03` asserts
-the working tree is clean after a run, so a reporter that edited the tree fails its own gate.
+no `git commit`, no source edit, no edit under the harness dir, no vault write. The harness
+asserts the working tree is clean after a run, so a reporter that edited the tree fails its own
+gate.
 
 ## What this cannot see
 

@@ -3,12 +3,12 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 104 `expect_red` call sites and 21 `expect_green`
-# — 125 calls over all 66 of the matrix's target rows (the five source-scope rows
-# carry controls of their own in tests/run-tests.sh). Measured at this revision: 66 distinct ids
+# One control per target-scope row: 98 `expect_red` call sites and 21 `expect_green`
+# — 119 calls over all 62 of the matrix's target rows (the four source-scope rows
+# carry controls of their own in tests/run-tests.sh). Measured at this revision: 62 distinct ids
 # against the matrix, 0 phantom ids (every id used here is a row in the matrix) and 0 target row
 # left without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `125 over 66 target rows`.
+# README's census sentence must read `119 over 62 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -38,7 +38,7 @@ git add -A && git commit -q -m "chore: seed"
 PRE_CHANGE=$(git rev-parse --short HEAD)
 
 # W6 neutral-first: the default install is skills=no, and this fixture's SK-*/AU-* controls
-# need their subjects — the installed skills and the automation producers are what the
+# need their subjects — the installed skills are what the
 # mutations below violate. So the fixture opts in explicitly.
 bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --skills yes --practice "$WORK/standard.md" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
@@ -65,7 +65,6 @@ cp -a ROUND-000-SPEC.md "$BK/ROUND-000-SPEC.md"
 cp -a "$WORK/standard.md" "$BK/standard.md"
 cp -a .hermes/skills/goblin-drift-audit/SKILL.md "$BK/drift-audit-SKILL.md"
 cp -a .hermes/skills/goblin-bugreporter/SKILL.md "$BK/bugreporter-SKILL.md"
-cp -a .gob/automations "$BK/automations"
 cp -a .gob/boundary-waivers "$BK/boundary-waivers"
 cp -a .gob/manifest/bans.tsv "$BK/bans.tsv"
 # v2 DELETION NOTE (wave B): the CI lane is gone product-wide - no .github/workflows is
@@ -99,7 +98,6 @@ restore_all() {
   cp -a "$BK/standard.md" "$WORK/standard.md"
   cp -a "$BK/drift-audit-SKILL.md" .hermes/skills/goblin-drift-audit/SKILL.md
   cp -a "$BK/bugreporter-SKILL.md" .hermes/skills/goblin-bugreporter/SKILL.md
-  cp -a "$BK/automations/." .gob/automations/
   cp -a "$BK/gitignore" .gitignore
   rm -f checks/green.mjs checks/red.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
         .gob/state.json .gob/last-gate-line .gob/.ds-report \
@@ -401,14 +399,6 @@ m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 5/' AGENTS
 # as ADV - so the cap silently stopped capping and the run still exited 0. It is a FAIL now.
 m_adv_ceiling_bad() { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: ten/' AGENTS.md; }
 
-# ---- the automation rows (G3): AU-01..AU-04, SK-04 -------------------------------------------
-# These five rows are NEW, so there is no pre-change tree for their controls: what the control
-# proves is that the rule bites on a real violation, and that the row is wired into the runner.
-# The wiring proof is IN-03/PR-03's enumeration plus one control per row here.
-m_au_01()         { printf '\ncurl https://example.invalid/thing\n' >> .gob/automations/drift-audit.sh; }
-m_au_02()         { mkdir -p reports/fixture; printf 'repo: .\nsymptom: the panel shows the wrong total\ndedup_key: bug:.:2026-09-24\n' > reports/fixture/report.yaml; }
-m_au_03()         { mkdir -p reports/fixture; printf 'stray\n' > stray.txt; }
-m_au_04()         { sed -i 's|^## Write surface$|## Surface|' .hermes/skills/goblin-drift-audit/SKILL.md; }
 m_sk_04()         { sed -i 's|^## What this cannot see$|## Not seen|' .hermes/skills/goblin-drift-audit/SKILL.md; }
 
 # The tenant string is built at run time. A literal here would be the repo's only tenant hit
@@ -530,10 +520,6 @@ expect_red "a shipped skill with no cannot-see section" SK-04 1 m_sk_04
 expect_red "a tenant string in an installed rule"  PT-01 1 m_tenant_leak
 expect_red "the declared branch is wrong"          PT-02 1 m_wrong_branch
 
-expect_red "an automation producer with a network verb" AU-01 1 m_au_01
-expect_red "a dedup key outside the content-only form"  AU-02 1 m_au_02
-expect_red "a reporter leaving the tree dirty"          AU-03 1 m_au_03
-expect_red "an automation skill with no write surface"  AU-04 1 m_au_04
 
 expect_red "a tracked dotenv-family file"           SC-01 1 m_sc_01
 expect_red "an ignore rule narrowed to .env.* only" SC-02 1 m_sc_02
@@ -948,51 +934,6 @@ else
 fi
 restore_all
 
-# AU-01's new clause (§2.5, Q2's narrow form): a repo that DECLARES its own automations
-# (a root automations/ the engine never wrote) is judged like any producer - a network
-# verb FAILs it, and when the declared producer disappears the row FAILs too. The SKIP
-# half at the bottom proves the fixture's default state (no producer anywhere) is a
-# SKIP with the reason, not the born-RED FAIL the pre-W1 glob produced (M9).
-m_au_01_declared_network() { mkdir -p automations; printf 'curl https://x\n' > automations/mine.sh; }
-# The producer-gone mutation builds the SAME tree the network control leaves: a declared
-# automations/ directory whose .sh producer is renamed away. `mv` on a file the mutation
-# never created failed with exit 1 and the control ran on the untouched fixture - the
-# false GREEN an undefined mutate function produces, in the skill's own words.
-m_au_01_declared_gone()    { mkdir -p automations; printf '# a producer\n' > automations/mine.sh; mv automations/mine.sh automations/mine.sh.gone; }
-r_au_01_declared() { rm -rf automations; }
-expect_red   "W1: the repo's OWN automation producer with a network verb" AU-01 1 m_au_01_declared_network "" r_au_01_declared
-expect_red   "W1: automations declared but the producer is gone"          AU-01 1 m_au_01_declared_gone    "" r_au_01_declared
-# The SKIP half cannot run on this fixture: its VENDORED engine payload
-# (.gob/automations/*.sh) supplies producers, so AU-01 PASSES here by design. The SKIP
-# fires only when NO producer exists in either place - the global-mode probe below (which strips
-# the engine payload) is the repo that proves it.
-
-# A producer-less global-mode repo, built so the AU-01 SKIP half has a repo to prove it in.
-# The probe must actually resolve GLOBAL: a class-B install vendored its own engine payload,
-# and the chain's vendored step would win over the declared engine_dir:, so the mode stayed
-# vendored. The engine payload is removed and the record it leaves behind is rewritten with
-# the engine: block - the same state a migrated repo is in mid-sequence. This is the only
-# producer-less repo in this file: no producer in the engine dir, none in the repo.
-W1_GMODE="$WORK/w1-gmode"
-rm -rf "$W1_GMODE" /tmp/w1-engine-gmode
-mkdir -p "$W1_GMODE" /tmp/w1-engine-gmode
-cp -r "$SRC/manifest" /tmp/w1-engine-gmode/manifest
-( cd "$W1_GMODE" \
-  && git init -q -b main \
-  && git config user.name "Test Runner" && git config user.email "runner@example.com" \
-  && printf '# gmode\n' > README.md \
-  && bash "$SRC/bin/goblin-install" --target . --class B >/dev/null 2>&1 \
-  && sed -i "/^models_file:/a engine_dir: /tmp/w1-engine-gmode" AGENTS.md \
-  && python3 -c '
-import json
-rec = json.load(open(".gob/installed.json"))
-rec["engine"] = {"mode": "global", "engine_dir": "/tmp/w1-engine-gmode", "cli_version": "0.6.0", "cli_sha256": "a", "enforcement_tsv_sha256": "b"}
-json.dump(rec, open(".gob/installed.json", "w"), indent=2)' \
-  && rm -rf .gob/bin .gob/manifest .gob/bans .gob/automations )
-out=$( cd "$W1_GMODE" && bash "$SRC/bin/goblin-verify" --only AU-01 2>&1 )
-printf '%s' "$out" | grep -q 'SKIP  AU-01.*no automation producer found'
-check "W1: no producer anywhere -> AU-01 SKIPs with the reason (the born-RED FIX)" "$?"
-rm -rf /tmp/w1-engine-gmode
 
 # ---- F2-6: --only must refuse a selection that runs no target row -------------
 # A valid SOURCE-scope id selects nothing in an installed repo, so the run printed

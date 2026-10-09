@@ -145,11 +145,10 @@ workflow file is not a gate still holds (`docs/LIMITS.md` #34).
 ### A fresh install verifies green
 
 Measured on a fresh DEFAULT software-class install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`35 passed, 0 failed, 6 advisory, 25 skipped`, exit 0.** Twenty-five rows skip with
-a reason — the same not-yet rows as before, plus the five skill rows (`SK-01`..`SK-04`,
-`AU-04`) that skip on the `playbooks` opt-out a skills-free install records: `HS-02` — no pre-change commit
-is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `AU-02` and `AU-03`, which
-have no report to audit in a repo where no reporter has run — `SC-06`, which
+hand edit: **`35 passed, 0 failed, 6 advisory, 21 skipped`, exit 0.** Twenty-one rows skip with
+a reason — the same not-yet rows as before, plus the four skill rows (`SK-01`..`SK-04`)
+that skip on the `playbooks` opt-out a skills-free install records: `HS-02` — no pre-change commit
+is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `SC-06`, which
 has no dependency manifest or lockfile to read yet — `PF-01`, which has
 no measured perf baseline — `BN-01`/`BN-02`/`BN-05`, which have no `src/` tree for a ban to read,
 and `BN-03` with the four electron bans

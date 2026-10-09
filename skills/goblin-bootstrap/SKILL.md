@@ -15,14 +15,13 @@ Use when adopting goblin-stack in a repo, or starting one.
 2. **`goblin-install --target <dir> --class <x>`** — the default install is a NEUTRAL harness:
    no agent skills. Vendor the Hermes project tier with `--skills yes` if you want them installed.
 3. **`goblin-verify`** — a default software-class install (no agent skills) verifies green:
-   `35 passed, 0 failed, 6 advisory, 25 skipped`, exit 0, once `HANDOFF.md` names a commit that
+   `35 passed, 0 failed, 6 advisory, 21 skipped`, exit 0, once `HANDOFF.md` names a commit that
    exists; before that edit the
    scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`34 passed, 1 failed`).
-   Twenty-five rows skip with a reason, and the reason matters: the five skill rows
-   (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free install records,
+   Twenty-one rows skip with a reason, and the reason matters: the four skill rows
+   (`SK-01`..`SK-04`) skip on the `playbooks` opt-out a skills-free install records,
    then `HS-02`
-   (no pinned pre-change commit yet, so the REPLAY is not provable), `AU-02`/`AU-03` (no report
-   has been filed in this repo), `SC-06` (no dependency manifest or lockfile), `PF-01` (no perf baseline measured yet), `BN-01`/`BN-02`/`BN-05` (the ban table is
+   (no pinned pre-change commit yet, so the REPLAY is not provable), `SC-06` (no dependency manifest or lockfile), `PF-01` (no perf baseline measured yet), `BN-01`/`BN-02`/`BN-05` (the ban table is
    installed but this fresh repo has no `src/` for a ban to read) and `BN-03` with the four electron
    bans `BN-06`..`BN-09` (not in this class's `bans: [BN-01, BN-02, BN-05]`, so they skip as
    *not enabled* rather than as *unread*),

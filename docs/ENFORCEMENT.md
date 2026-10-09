@@ -17,14 +17,14 @@ independent verification pass IDs.
 this repo via `tests/run-tests.sh`). The two scopes name WHOSE proof burden a row carries:
 `scope:source` is the framework's own burden when developing goblin-stack (a dev runs
 `run-tests.sh`), `scope:target` is the adopting repo's burden (the user runs `goblin-verify`).
-The source-scope rows (`PR-01`..`PR-05`) therefore never run
+The source-scope rows (`PR-01`..`PR-04`) therefore never run
 in an installed repo — they execute only in this repo's own test suite. `enforced_by` is one of
 five values, and the enum is
 closed and now ENFORCED (`IN-03`'s third clause, Z1-5): `script`, `lint`, `gate`, `advisory`,
 plus `test` for a source-scope row, whose check is a script under `tests/` run by
 `tests/run-tests.sh`.
 
-Measured shape of this table: **71 rows** - 66 target, 5 source; advisory 6, gate 19, lint 26, script 16, test 4.
+Measured shape of this table: **66 rows** - 62 target, 4 source; advisory 6, gate 18, lint 24, script 15, test 3.
 
 ## The rows
 
@@ -76,10 +76,6 @@ Measured shape of this table: **71 rows** - 66 target, 5 source; advisory 6, gat
 | `SC-06` | target | gate | A lockfile exists, and the repo tracks it. | goblin-verify --only SC-06 | Builtin: presence, then `git ls-files --error-unmatch`. It cannot see that the lockfile is STALE relative to `package.json` - resolving that needs the package manager, which is a deliberate network-shaped step, not a check. SKIPs with a reason when there is no `package.json`. |
 | `SC-09` | target | advisory | Auth is applied consistently across sibling routes. | advisory | Prose on purpose: "consistently" is a semantic judgement about a private surface no repo here has yet. Counted (6 of ceiling 10) so the matrix cannot quietly grow prose. |
 | `PF-01` | target | lint | The perf baseline names the commit it measured. | goblin-verify --only PF-01 | Builtin: the metric must equal `ratchet.name` so the budget and the measurement cannot silently disagree, the value must be numeric, the date must exist, the baseline commit must exist AND be an ancestor of HEAD (`HP-05`'s mechanic, reused rather than re-derived), and `ratchet.ceiling` must equal `perf.baseline_value` - otherwise a one-line ceiling raise passes while the row prints the contradiction, which is `I raised the budget and never measured again` (G8-6b). It cannot see whether the metric is the right one for the product, and it never re-measures: re-anchoring is a deliberate operator action. SKIPs with a reason when the class declares no metric, or none has been recorded yet. |
-| `AU-01` | target | lint | An automation's producer is deterministic and network-free. | goblin-verify --only AU-01 | Partial: proves that no line of a producer begins with a network or forge verb, not that the script is otherwise deterministic. W1: in global mode the first producer glob resolves under the engine dir (the resolution chain); the repo-local globs stay. New clause: a repo with NO producer anywhere (repo or engine) SKIPs with `no automation producer found (repo or engine)` instead of FAILing — the old FAIL was a born-RED artifact of the glob; a repo that declares its own automations but has no producer still FAILs. |
-| `AU-02` | target | script | A report's dedup key is a function of content only - no date, no run id. | goblin-verify --only AU-02 | Builtin: it recomputes the key from the report's own `repo` and `symptom` and requires the recorded `dedup_key` to equal it, then refuses a key carrying a date. Skipped with a reason when the repo holds no report - nothing to dedup. It cannot see whether two reports should have been one: a normalisation that merges two genuinely different symptoms is a duplicate card, not a lost report. |
-| `AU-03` | target | gate | A reporter run leaves the tree and the harness untouched. | goblin-verify --only AU-03 | Builtin: asserts a clean working tree, and - when HEAD is a reporter commit - that no path under the declared harness_dir appears in it. Skipped with a reason when the repo holds no reports/ - no reporter has run here. It cannot see a reporter that edited the tree and committed the edit as part of the report. |
-| `AU-04` | target | lint | An automation's skill declares its own write surface. | goblin-verify --only AU-04 | Partial: proves every installed automation skill carries a `## Write surface` section. W1: the check is a builtin so the engine.mode=global clause can run - in global mode the procedure tier is emitted per platform (not carried in this repo) and the row SKIPs with that reason. |
 | `BN-00` | target | script | Every ban has an enforcement row, every ban row names a replacement, and the ban table is not empty. | goblin-verify --only BN-00 | — (this row is the reason the ban list cannot decay into prose: IN-03's shape applied to bans.tsv, and it agrees in both directions) |
 | `BN-01` | target | lint | No `any` in application TypeScript. | goblin-verify --only BN-01 | Text probe, not an AST: a `: any` inside a string or a comment is reported, and `Record<string, any>` (no leading colon) is missed. The AST form needs a parser the no-npm contract (docs/CONTRACTS.md) forbids (docs/LIMITS.md #27). SKIPs when the ban is not in `bans:` or its globs match no file. |
 | `BN-02` | target | lint | No `@ts-ignore` / `@ts-expect-error` suppressions. | goblin-verify --only BN-02 | Text probe: it sees the directive wherever it appears, including inside a string, and cannot tell a suppression hiding a real error from one on a line that would compile anyway. SKIPs when the ban is not in `bans:` or its globs match no file. |
@@ -100,11 +96,10 @@ Measured shape of this table: **71 rows** - 66 target, 5 source; advisory 6, gat
 | `PR-02` | source | test | A second install is a no-op, and an upgrade reports created/updated/unchanged. | tests/run-tests.sh | — |
 | `PR-03` | source | test | Every target-scope check goes RED under its own violation. | tests/run-tests.sh | — (the negative control the verifier re-runs) |
 | `PR-04` | source | lint | The repo is portable: no personal path in any reusable rule. | tests/run-tests.sh (the PT-01 body over the source tree, plus tests/) | — |
-| `PR-05` | source | test | The automation producer is silent when there is nothing to report. | tests/run-tests.sh | — (the mutation is the control: the same producer, on the same fixture, with one installed file edited, must go from an empty stdout to a record and exit 1. A producer that stays quiet after the mutation is not silent, it is broken.) |
 
 ## Advisory rows, named
 
-6 of the 66 rows are labelled `advisory`. 6 of them carry no executable check at all
+6 of the 62 rows are labelled `advisory`. 6 of them carry no executable check at all
 (they are prose the matrix refuses to pretend about).
 
 - **HP-04** (no check at all) - A stale sentence is corrected in place with a dated parenthetical, never deleted.

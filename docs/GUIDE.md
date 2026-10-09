@@ -177,7 +177,7 @@ You will see one line per rule. The shape:
 
 and a summary line at the bottom:
 
-    34 passed, 1 failed, 6 advisory, 25 skipped     # HP-05, below
+    34 passed, 1 failed, 6 advisory, 21 skipped     # HP-05, below
 
 ### How to read that output
 
@@ -220,9 +220,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `33 passed, 2 failed, 6 advisory, 25 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
-| 2. the first commit | `git add -A && git commit` | `34 passed, 1 failed, 6 advisory, 25 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `35 passed, 0 failed, 6 advisory, 25 skipped` | none — green |
+| 1. the install ran | `gob init --write ... --yes` | `33 passed, 2 failed, 6 advisory, 21 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
+| 2. the first commit | `git add -A && git commit` | `34 passed, 1 failed, 6 advisory, 21 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `35 passed, 0 failed, 6 advisory, 21 skipped` | none — green |
 
 One of those deserves its name spelled out:
 
@@ -448,14 +448,14 @@ A software-class install lands on a specific shape. The first reds are
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    33 passed, 2 failed, 6 advisory, 25 skipped     # straight after the install (CM-03 + SP-02)
-    34 passed, 1 failed, 6 advisory, 25 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
-    35 passed, 0 failed, 6 advisory, 25 skipped     # real HEAD named and committed: green
+    33 passed, 2 failed, 6 advisory, 21 skipped     # straight after the install (CM-03 + SP-02)
+    34 passed, 1 failed, 6 advisory, 21 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
+    35 passed, 0 failed, 6 advisory, 21 skipped     # real HEAD named and committed: green
 
 Name a real commit in `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is
 green:
 
-    35 passed, 0 failed, 6 advisory, 25 skipped     (on a real project; your numbers will differ)
+    35 passed, 0 failed, 6 advisory, 21 skipped     (on a real project; your numbers will differ)
 
 **Thirty-two rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a

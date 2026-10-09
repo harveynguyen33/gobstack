@@ -108,14 +108,13 @@ Then, in order:
     .gob/bin/goblin-verify            # 33 passed, 2 failed - CM-03 + SP-02, until the install is committed
 
 A default software-class install (no agent skills) is **green** — `35 passed, 0 failed, 6 advisory,
-25 skipped`, exit 0 — once
+21 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
 the one expected red (`34 passed, 1 failed`). Both numbers are measured, not assumed
-(`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Twenty-five rows skip with a reason: the
-five skill rows (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free
+(`docs/CONTRACTS.md`; step 2 of `docs/GUIDE.md`). Twenty-one rows skip with a reason: the
+four skill rows (`SK-01`..`SK-04`) skip on the `playbooks` opt-out a skills-free
 install records, plus the not-yet rows: `HS-02` (no
-pinned pre-change commit yet), `AU-02`/`AU-03` (no report has been filed, so there is nothing to
-dedup and no reporter run to audit), `SC-06` (no dependency manifest, no lockfile), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-05` (no `src/` for a ban
+pinned pre-change commit yet), `SC-06` (no dependency manifest, no lockfile), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-05` (no `src/` for a ban
 to read) and `BN-03` with the four
 electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` (not in this class's `bans: [BN-01, BN-02, BN-05]`, so
 they skip as *not enabled* rather than as *unread*), `FM-01`/`FM-02`/`VA-01`

@@ -104,7 +104,7 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 
 - **When:** an event delivered a report — a bug report file, a chat message turned into one, a webhook
 - **Steps:** 1 validate intake (the six required keys; a missing key is a refusal card with no assignee)<br>- 2 freeze `repo` + `revision` as immutable<br>- 3 reproduce (R1 a failing command, then R2 the REPLAY, then R3 a real-UI drive)<br>- 4 write `reports/<slug>/repro.md` with the `pre`/`post` table<br>- 5 create the fix card only on `reproduced`<br>- 6 complete its own card with the verdict
-- **Verification:** `repro.md` carries a command, a revision that exists in `git rev-list`, and a RED `pre` row; the fix card exists iff the verdict is `reproduced`; `git status --porcelain` is empty after the run (`AU-02`, `AU-03`)
+- **Verification:** `repro.md` carries a command, a revision that exists in `git rev-list`, and a RED `pre` row; the fix card exists iff the verdict is `reproduced`; `git status --porcelain` is empty after the run
 - **Profiles:** researcher
 - **Role:** investigate
 
@@ -120,9 +120,9 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 entered by a *human or orchestrator request* and delivers a *change*. These two are entered by an
 *event* and deliver a *card*. `P10` covers "an unattended run over a predicate" — a run over a
 *condition*, not a run *started by* a condition. Stretching P1 would lose the intake gate;
-stretching P9 would lose the reproduce-first gate. The producer half is
-`automations/drift-audit.sh` (no agent at all) and `automations/bugreporter-intake.sh`; the
-three-part model is in `automations/README.md`.
+stretching P9 would lose the reproduce-first gate. The producers these cards came from were cut
+in v3 (the `automations/` cron scripts); the two playbooks remain as the card-producing
+procedures.
 
 ## P15 - `goblin-re-mobile`
 
@@ -139,7 +139,7 @@ shape, `RC-03` is the quarantine rule over the lab repo's tracked tree, and `RC-
 acquisition record. The procedure's non-negotiable fences (an owned build only, one dedicated
 sandbox, the quarantine, nothing extracted entering a repo) are stated with what enforces each.
 
-## The cuts - pstack ships 23, this ships 15 (the two automations included)
+## The cuts - pstack ships 23, this ships 15
 
 Each cut has a reason, and a cut is recorded rather than deleted silently.
 

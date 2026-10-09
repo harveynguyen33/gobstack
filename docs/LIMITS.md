@@ -103,18 +103,15 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     trust root: the source checkout is not guaranteed to exist at verify time, and any value
     stored in the tree is editable by the same hand. It is therefore **recorded here and printed
     in the "cannot see" footer on every run**, not claimed away.
-19. **No automation has ever run here.** Cost per run, the respawn guards under a nightly
-    producer, and whether `researcher` is the right reporter profile are all unmeasured; the
-    first watched run of A-02 is what produces those numbers. The producer's own ceiling is a
-    **run count**, not a dollar figure — no config key holds the spend cap, so no automation can
-    read it, and none pretends to.
-20. **The dedup key is a dedup, not a mutex.** The board's lookup runs before the write
-    transaction, so a concurrent create can insert twice and the next lookup stabilises on the
-    newest. The key stops a duplicate storm; it does not make one impossible.
-21. **`AU-02`'s normalisation is only measured on synthetic reports.** Two differently-typed
-    copies of one symptom give one key and a different symptom gives another, but whether a real
-    report set normalises well enough is unknown. Its failure mode is a duplicate card, never a
-    lost report.
+19. **Cut in v3: the automation producers.** `automations/` (the drift-audit and bugreporter cron
+    producers), their `AU-01`..`AU-04` rows and the cron walkthrough are removed. Their cost per
+    run and the respawn guards were never measured against a real board here, and the producer's
+    own ceiling was a **run count**, not a dollar figure.
+20. **Cut in v3: the automation dedup key.** The content-only dedup contract (`AU-02`) retired
+    with the producers that wrote the key; a project that runs its own intake keeps the
+    `--idempotency-key` dedup on the board side.
+21. **Cut in v3: the reporter normalisation.** `AU-02`'s synthetic-only normalisation measurement
+    retired with the row and the producers.
 22. **Cut in v3: the dependency-audit lane.** `goblin-audit`, `SC-07` and `SC-08` are removed —
     the deliberate network-shaped audit and the lockfile install-hook reader are gone.
 23. **Cut in v3: the audit-record parse (#22's lane).** The field-name reader and its
@@ -456,7 +453,7 @@ the Node the gates ran under.
 
 52. **`scope:source` and `scope:target` name WHOSE burden a row carries — the framework's or
     the adopting repo's.** `scope:source` is goblin-stack's own proof burden: those rows
-    (`PR-01`..`PR-05`) are the framework testing ITSELF while it is being developed — they run
+    (`PR-01`..`PR-04`) are the framework testing ITSELF while it is being developed — they run
     in this repo, under `tests/run-tests.sh`, and a dev of goblin-stack is the one who owes the
     run. `scope:target` is the adopting repo's proof burden: those rows run in an installed
     repo via `goblin-verify`, and the repo's owner owes the run. Same matrix, two creditors:

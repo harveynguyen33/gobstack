@@ -118,11 +118,11 @@ check "no shipped doc or skill claims a fresh install is not automatically green
 
 # The three prose docs and the shipped bootstrap skill must carry the measured line; the other
 # shipped skills do not discuss a verify run and are not required to. v2: the measured green
-# path is the DEFAULT install's (35/0/6/25 — the model/role/loop rows and the CI payload are cut
+# path is the DEFAULT install's (35/0/6/21 — the model/role/loop rows and the CI payload are cut
 # in v3).
 GREEN_CLAIM=""
 for f in README.md docs/CONTRACTS.md docs/ADOPTION.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '35 passed, 0 failed, 6 advisory, 25 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '35 passed, 0 failed, 6 advisory, 21 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, CONTRACTS, ADOPTION and the shipped bootstrap skill state the measured green path" \

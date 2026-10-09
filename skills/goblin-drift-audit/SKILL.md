@@ -5,7 +5,7 @@ description: P14: repair a recorded claim that no longer agrees with the artifac
 
 # goblin-drift-audit (P14)
 
-Use when a drift card exists. The producer (`automations/drift-audit.sh`) compared a recorded
+Use when a drift card exists. The drift run compared a recorded
 claim against an artifact, disagreed, and filed **one card per drifting repo**. You repair the
 disagreement; you do not re-derive it from memory.
 

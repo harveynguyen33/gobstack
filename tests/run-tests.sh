@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-tests.sh — every source-scope rule (PR-01..PR-05) plus the test scripts.
+# run-tests.sh — every source-scope rule (PR-01..PR-04) plus the test scripts.
 # Exits non-zero on any failure and prints one line per test.
 #
 #   bash tests/run-tests.sh
@@ -8,11 +8,6 @@
 # PR-02  a second install is a no-op                     -> t-install-idempotent.sh
 # PR-03  every target-scope check goes RED under its own violation -> t-verify-red.sh
 # PR-04  the repo is portable: no personal path in a reusable rule -> the PT-01 body below
-# PR-05  the automation producer is silent when there is nothing to report -> t-automation-silent.sh
-#
-# (This line listed PR-01..PR-04 until Z1-8 while the matrix carried five source rows and the
-# suite below did run t-automation-silent.sh - off by one in the conservative direction, in the
-# file that pins counts. The fifth row is PR-05, enforcement.tsv:84.)
 #
 # The installer's own contract (a refusal exits 1, a file it did not create is never
 # overwritten) is t-install-refusal.sh. The verifier's refusal to read an enclosing repo
@@ -50,7 +45,7 @@ if out=$(bash bin/goblin-lib.sh --self-test 2>&1); then line "goblin-lib --self-
 # hit at f23b371, 0 at b100b44, and PT-01 could not see it). tests/ is deliberately NOT added to
 # PT-01 itself: a target's own tests are its code, and a project may legitimately name its own
 # paths there.
-PT=$(for d in skills manifest bin templates presets automations tests; do
+PT=$(for d in skills manifest bin templates presets tests; do
        [ -d "$d" ] || continue
        grep -rniE '(h[a]rvey|tech-g[o]blin|/h[o]me/[a-z]+|g[o]blin-ui|op[e]n-door|sup[r]eme|bb[t]ech|c[l]v)' "$d"
      done)
@@ -70,7 +65,7 @@ fi
 
 # ---- the test scripts --------------------------------------------------------
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
-         t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
+         t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin \
          t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-doc-replay t-version-sync \
          t-init t-banner-stderr t-shim t-map t-mcp; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?

@@ -59,11 +59,11 @@ After installing, in this order:
     .gob/bin/goblin-verify                    # or gob verify, anywhere in the target
 
 **A default software-class install verifies green — `35 passed, 0 failed, 6 advisory,
-25 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
-scaffold's `0000000` placeholder is the one expected red.** Twenty-five rows skip: the five
-skill rows (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free install
-records, then the not-yet rows (`HS-02` has no pinned pre-change commit yet; `AU-02`/`AU-03`
-have no report to audit; `SC-06` has no dependency manifest to read; `PF-01` has no
+21 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
+scaffold's `0000000` placeholder is the one expected red.** Twenty-one rows skip: the four
+skill rows (`SK-01`..`SK-04`) skip on the `playbooks` opt-out a skills-free install
+records, then the not-yet rows (`HS-02` has no pinned pre-change commit yet;
+`SC-06` has no dependency manifest to read; `PF-01` has no
 measured perf baseline; `BN-01`/`BN-02`/`BN-05` have no `src/` for a ban to read, and the four
 electron bans `BN-06`–`BN-09` are not in this class's `bans:` list
 (`bans: [BN-01, BN-02, BN-05]`), so they skip as *not enabled* rather than as *unread*;
@@ -169,8 +169,8 @@ run · `3` the manifest is broken. Every run prints what it cannot see.
 
     bash tests/run-tests.sh
 
-Runs the source-scope rules (PR-01..PR-05) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (125 over 66 target rows), each required to go RED and then
+Runs the source-scope rules (PR-01..PR-04) and the test scripts, including `t-verify-red.sh` —
+one control per target-scope row (119 over 62 target rows), each required to go RED and then
 restored. **A verifier that only ever prints GREEN is a failure**, so that file is the one that
 matters most.
 

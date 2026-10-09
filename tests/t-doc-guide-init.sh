@@ -73,7 +73,7 @@ SUM() { HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]
 
 PRE=$(SUM)
 check "UX-ii the pre-commit run prints 34 passed, 2 failed (uncommitted install + SP-02)" \
-  "$(printf '%s' "$PRE" | grep -qF '33 passed, 2 failed, 6 advisory, 25 skipped' && echo 0 || echo 1)"
+  "$(printf '%s' "$PRE" | grep -qF '33 passed, 2 failed, 6 advisory, 21 skipped' && echo 0 || echo 1)"
 
 git add -A && git commit -q -m "chore: install gobstack"
 DAY1=$(SUM)
@@ -81,7 +81,7 @@ DAY1=$(SUM)
 # nothing to flag and the first-commit run is already green. The placeholder red the guide
 # teaches (HP-05) belongs to the verify-on-an-empty-repo path t-doc-guide.sh walks.
 check "UX-ii the first-commit run is green (the installer filled the HANDOFF HEAD)" \
-  "$(printf '%s' "$DAY1" | grep -qF '35 passed, 0 failed, 6 advisory, 25 skipped' && echo 0 || echo 1)"
+  "$(printf '%s' "$DAY1" | grep -qF '35 passed, 0 failed, 6 advisory, 21 skipped' && echo 0 || echo 1)"
 
 # ---- UX-iii: the second-commit step (CM-03) ----------------------------------------------------
 HEAD_NOW=$(git rev-parse --short HEAD)
@@ -94,13 +94,13 @@ check "  and the dirty row is CM-03 with the 1-entry count" "$?"
 
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(SUM)
-check "UX-ii the green path prints 35 passed, 0 failed, 6 advisory, 25 skipped" \
-  "$(printf '%s' "$GREEN" | grep -qF '35 passed, 0 failed, 6 advisory, 25 skipped' && echo 0 || echo 1)"
+check "UX-ii the green path prints 35 passed, 0 failed, 6 advisory, 21 skipped" \
+  "$(printf '%s' "$GREEN" | grep -qF '35 passed, 0 failed, 6 advisory, 21 skipped' && echo 0 || echo 1)"
 
 # ---- the guide quotes exactly these shapes ----------------------------------------------------
-for shape in "33 passed, 2 failed, 6 advisory, 25 skipped" \
-             "34 passed, 1 failed, 6 advisory, 25 skipped" \
-             "35 passed, 0 failed, 6 advisory, 25 skipped"; do
+for shape in "33 passed, 2 failed, 6 advisory, 21 skipped" \
+             "34 passed, 1 failed, 6 advisory, 21 skipped" \
+             "35 passed, 0 failed, 6 advisory, 21 skipped"; do
   grep -qF "$shape" "$GUIDE"
   check "the guide quotes the measured line ($shape)" "$?"
 done
@@ -109,9 +109,9 @@ done
 SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped' "$GUIDE" \
          | sed -n 's/^[[:space:]]*\([0-9]* passed, [0-9]* failed, [0-9]* advisory, [0-9]* skipped\).*/\1/p' | sort -u)
 MEASURED=$(printf '%s\n' \
-  "33 passed, 2 failed, 6 advisory, 25 skipped" \
-  "34 passed, 1 failed, 6 advisory, 25 skipped" \
-  "35 passed, 0 failed, 6 advisory, 25 skipped")
+  "33 passed, 2 failed, 6 advisory, 21 skipped" \
+  "34 passed, 1 failed, 6 advisory, 21 skipped" \
+  "35 passed, 0 failed, 6 advisory, 21 skipped")
 SUBSET=0
 while IFS= read -r s; do
   [ -n "$s" ] || continue
