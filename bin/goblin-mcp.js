@@ -340,8 +340,6 @@ function toolGobInitStatus() {
     );
   }
   const lines = ["gob block: present in AGENTS.md"];
-  const branch = blockValue(block, "branch");
-  lines.push("branch: " + (branch || "<unset>"));
   const gates = blockGates(block);
   if (gates.length) {
     for (const g of gates) lines.push("gate_" + g.name + "_cmd: " + g.cmd);

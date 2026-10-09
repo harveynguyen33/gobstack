@@ -17,7 +17,7 @@ or install the CLI globally (it is a CLI, not a library):
 
 **The v2 flow is `init`-first.** `gob init` prints an AGENT BRIEF — a structured prompt telling
 whichever agent is already running in the repo exactly what to scan (package.json, routes, tests,
-CI configs) and what to decide (branch, owner email, the first gate command) — plus the
+CI configs) and what to decide (the first gate command and the feature map) — plus the
 schema of the proposal file the agent writes back. `gob init --write <proposal>` validates the
 proposal and installs. The heuristic detector (`--heuristic`) is a fallback that appends
 pre-scanned hints to the brief; it never decides.
@@ -42,7 +42,7 @@ A repo that already has its own `HANDOFF.md` exits 1 on the refusal. That is the
 failure: reconcile the file rather than forcing over it — `docs/GUIDE.md`.
 
 **The config is the AGENTS.md frontmatter.** There is no separate config file in v2: every knob
-the harness reads — branch, gates, ratchet, bans, replay, opt-outs — is a `key: value`
+the harness reads — gates, ratchet, bans, replay, opt-outs — is a `key: value`
 line inside the `<!-- gob:begin --> … <!-- gob:end -->` marker block at the top of `AGENTS.md`.
 Edit it in place; the parser reads only that block, and the installer never rewrites it after the
 first install.
@@ -52,7 +52,7 @@ After installing, in this order:
     cd <target> && git add -A && git commit   # the install is a change like any other
     .gob/bin/goblin-verify                    # or gob verify, anywhere in the target
 
-**A default install verifies green — `34 passed, 0 failed, 6 advisory,
+**A default install verifies green — `32 passed, 0 failed, 6 advisory,
 21 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
 scaffold's `0000000` placeholder is the one expected red.** Twenty-one rows skip: the four
 skill rows (`SK-01`..`SK-04`) skip on the `playbooks` opt-out a skills-free install
@@ -154,7 +154,7 @@ run · `3` the manifest is broken. Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-04) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (117 over 61 target rows), each required to go RED and then
+one control per target-scope row (114 over 59 target rows), each required to go RED and then
 restored. **A verifier that only ever prints GREEN is a failure**, so that file is the one that
 matters most.
 

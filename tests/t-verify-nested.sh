@@ -10,7 +10,7 @@
 # The card named this as "the case that would bite ~/.hermes".
 #
 #   outer/sub   no .git of its own -> verify exits 2, names the outer repo and the fix
-#   outer/sub2  its own .git      -> verify exits 0, 34 passed / 0 failed / 6 advisory / 21 skipped
+#   outer/sub2  its own .git      -> verify exits 0, 32 passed / 0 failed / 6 advisory / 21 skipped
 #                                  (W6 neutral-first: the DEFAULT install is skills=no, so the
 #                                   measured green path moved from 43/0/11/28 to 37/0/11/34)
 #
@@ -83,8 +83,8 @@ git add -A && git commit -q -m "docs: the handoff names the head"
 OUT2=$(bash .gob/bin/goblin-verify 2>&1); RC2=$?
 printf '%s\n' "$OUT2" | sed 's/^/      /'
 check "a nested target with its own .git verifies (exit 0)" "$([ "$RC2" -eq 0 ] && echo 0 || echo 1)"
-printf '%s' "$OUT2" | grep -qE '^ *34 passed, 0 failed, 6 advisory, 21 skipped'
-check "  and it is the default green path (34/0/6/21, the default skills=no install)" "$?"
+printf '%s' "$OUT2" | grep -qE '^ *32 passed, 0 failed, 6 advisory, 21 skipped'
+check "  and it is the default green path (32/0/6/21, the default skills=no install)" "$?"
 
 # ---- W1 §5.1: an engine_dir declaration must not leak across the boundary ----------------
 # The OUTER repo declares engine_dir; the inner repo (sub2) must resolve its own engine and
@@ -101,7 +101,7 @@ EOF
 git -C "$WORK/outer" add -A && git -C "$WORK/outer" commit -q -m "declare engine_dir in the outer repo"
 OUT3=$(bash .gob/bin/goblin-verify 2>&1); RC3=$?
 check "an inner repo verify is unaffected by the OUTER repo's engine_dir (exit 0)" "$([ "$RC3" -eq 0 ] && echo 0 || echo 1)"
-printf '%s' "$OUT3" | grep -qE '^ *34 passed, 0 failed'
+printf '%s' "$OUT3" | grep -qE '^ *32 passed, 0 failed'
 check "  and the inner run is still the default green path (default skills=no)" "$?"
 printf '%s' "$OUT3" | grep -q 'mode=vendored'
 check "  and the inner footer still says mode=vendored (no inherited global mode)" "$?"

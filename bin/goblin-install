@@ -381,10 +381,6 @@ WANT_RATCHET=1
 WANT_CI_GATE=0
 [ "$ARCHIVE" = "true" ] && { WANT_SPEC=0; WANT_REVIEWS=0; SCAFFOLD=no; }
 
-OWNER_EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
-[ -n "$OWNER_EMAIL" ] || OWNER_EMAIL="you@example.com"
-BRANCH=$( cd "$TARGET" && git rev-parse --abbrev-ref HEAD 2>/dev/null )
-case "$BRANCH" in ""|HEAD) BRANCH=main ;; esac
 HEAD_SHORT=$( cd "$TARGET" && git rev-parse --short HEAD 2>/dev/null )
 [ -n "$HEAD_SHORT" ] || HEAD_SHORT="0000000"
 
@@ -534,10 +530,8 @@ render_config() {
   GATE2_RENDER_NAME="$GATE2_NAME"; GATE2_RENDER_CMD="$GATE2_CMD"
   runtime="$RUNTIME_DATA"
   render "$SRC/templates/agents-block.tmpl" \
-    BRANCH "$BRANCH" \
     PRACTICE "$PRACTICE" \
     PRACTICE_SHA "$PRACTICE_SHA" \
-    OWNER_EMAIL "$OWNER_EMAIL" \
     ARCHIVE "$ARCHIVE" \
     MAX_DIRTY "0" \
     ADVISORY_CEILING "$ADV_CEILING" \
@@ -698,7 +692,7 @@ if [ "$ARCHIVE" != "true" ] && part_wanted handoff; then
   else
     GATE2_LINE=""
   fi
-  render "$SRC/templates/HANDOFF.md.tmpl" DATE "$STAMP" HEAD "$HEAD_SHORT" BRANCH "$BRANCH" GATE_NAME "$GATE_NAME" GATE_CMD "$GATE_CMD" GATE2_LINE "$GATE2_LINE" > "$TMP/handoff"
+  render "$SRC/templates/HANDOFF.md.tmpl" DATE "$STAMP" HEAD "$HEAD_SHORT" GATE_NAME "$GATE_NAME" GATE_CMD "$GATE_CMD" GATE2_LINE "$GATE2_LINE" > "$TMP/handoff"
   put_once "HANDOFF.md" "$TMP/handoff"
 fi
 

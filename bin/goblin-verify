@@ -287,7 +287,7 @@ ROOT_PHYS=$(cd "$ROOT" && pwd -P)
 GIT_TOP=$(cd "$ROOT" && git rev-parse --show-toplevel 2>/dev/null)
 if [ -n "$GIT_TOP" ] && [ "$GIT_TOP" != "$ROOT_PHYS" ]; then
   g_err "target $ROOT_PHYS is inside the git repository $GIT_TOP but is not a repository of"
-  g_err "its own. CM-01 CM-03 GT-03 SP-02 PG-01 PG-03 DS-01 PT-02 and HP-05 shell out to git,"
+  g_err "its own. CM-03 GT-03 SP-02 PG-01 PG-03 DS-01 and HP-05 shell out to git,"
   g_err "and git would resolve every one of them to $GIT_TOP - the numbers would describe the"
   g_err "outer repo, not this target."
   g_err "fix: cd $ROOT_PHYS && git init   (make the target its own repo), or move it out of"
@@ -295,7 +295,6 @@ if [ -n "$GIT_TOP" ] && [ "$GIT_TOP" != "$ROOT_PHYS" ]; then
   exit 2
 fi
 
-BRANCH=$(g_agents_read "$CONFIG" branch)
 ARCHIVE=$(g_agents_read "$CONFIG" archive)
 MAX_DIRTY=$(g_agents_read "$CONFIG" max_dirty)
 ADV_CEILING=$(g_agents_read "$CONFIG" advisory_ceiling)
@@ -1370,17 +1369,6 @@ check_sk_03() {
   [ "$k" -le "$ADV_CEILING" ]
 }
 
-check_pt_02() {
-  local cur
-  cur=$(cd "$ROOT" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
-  printf 'declared %s, actual %s\n' "$BRANCH" "$cur"
-  if [ "$cur" != "$BRANCH" ]; then
-    printf 'fix: set branch: %s in %s, or check out %s\n' "$cur" "$CONFIG" "$BRANCH"
-    return 1
-  fi
-  return 0
-}
-
 check_cl_02() {
   # The archive flag is a switch with a contract, so it must be checkable (D6 - the old body
   # printed a sentence and returned 0 in both branches, so the row could never be RED).
@@ -1874,23 +1862,11 @@ rc_hdr_field() {
 }
 
 # ---- the day-one framing (review 1, scope 3) ----------------------------------
-# Two shapes are undeserved reds for a person who just cloned a repo. They are DETECTED and
-# framed — the verdict's exit semantics, the counts and every row's payload are untouched:
-#   (a) owner_email in AGENTS.md is not the current git identity -> the CM-01 red names
-#       whose email the repo actually expects (the remedy column says where to point it);
-#   (b) the repo looks freshly cloned (.gob committed, but fewer than 3 commits) -> one
-#       banner line after the verdict. Commit count only: an mtime comparison against the
-#       reflog fired after every ordinary GT-02 write, so the banner lingered on aged repos
-#       (the verify itself refreshes last-gate-line forever); a repo under 3 commits is the
-#       only unambiguous fresh-clone shape.
-owner_mismatch() {
-  [ -f "$CONFIG" ] || return 1
-  local declared cur
-  declared=$(g_agents_read "$CONFIG" owner_email | tr -d '"')
-  cur=$(cd "$ROOT" && git config user.email 2>/dev/null)
-  [ -n "$declared" ] && [ -n "$cur" ] && [ "$declared" != "$cur" ]
-}
-
+# One shape is an undeserved red for a person who just cloned a repo: the repo looks freshly
+# cloned (.gob committed, but fewer than 3 commits) -> one banner line after the verdict.
+# Commit count only: an mtime comparison against the reflog fired after every ordinary GT-02
+# write, so the banner lingered on aged repos (the verify itself refreshes last-gate-line
+# forever); a repo under 3 commits is the only unambiguous fresh-clone shape.
 fresh_clone() {
   [ -f "$INSTALLED" ] || return 1
   [ -d "$ROOT/.git" ] || return 1
@@ -1993,14 +1969,7 @@ if [ "$JSON" -eq 1 ]; then
     "$(json_escape "$ROOT")" "$PASS" "$FAIL" "$ADV" "$SKIP" "${JSON_ROWS%,}"
 else
   printf '      %d passed, %d failed, %d advisory, %d skipped\n' "$PASS" "$FAIL" "$ADV" "$SKIP"
-  # Day-one framing, part (a) (review 1, scope 3): the owner mismatch names whose email the
-  # repo expects, under the verdict, before the row detail. One line, no exit semantics.
-  if [ "$FAIL" -gt 0 ] && owner_mismatch; then
-    _owner_declared=$(g_agents_read "$CONFIG" owner_email | tr -d '"')
-    printf '      note: this repo records a different owner (you are probably new here) — commit with --author or update owner_email: %s\n' "$_owner_declared"
-    unset _owner_declared
-  fi
-  # Day-one framing, part (b): a fresh clone is not your debt. One banner line, after the
+  # Day-one framing: a fresh clone is not your debt. One banner line, after the
   # verdict; counts and exit codes untouched.
   if [ "$FAIL" -gt 0 ] && fresh_clone; then
     printf '      fresh clone detected: some of these fails are not yours — see docs/GUIDE.md §9 (day one for a new teammate)\n'

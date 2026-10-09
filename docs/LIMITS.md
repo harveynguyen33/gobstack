@@ -245,8 +245,8 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
 39. **Withdrawn (v3).** Same cut: `LP-*` no longer exist.
 40. **A fresh install into a repo with no commits is born RED, and X1 did not change that.** Measured
     at X1: `goblin-install` into a `git init` with zero commits, then `goblin-verify`, gives
-    `36 passed, 6 failed, 10 advisory, 23 skipped`, exit 1 — `HP-05`, `SP-02`, `GT-02`, `CM-01`,
-    `CM-03` and `PT-02` all read a HEAD that does not exist yet. The install never creates the seed
+    a fresh install into a repo with no commits is born RED — `HP-05`, `SP-02`, `GT-02`,
+    `CM-03` and others read a HEAD that does not exist yet. The install never creates the seed
     commit (`bin/goblin-install` writes files and stops), and it must not: a tool that commits into
     Harvey's repo on first contact is the overreach `docs/GUIDE.md` rules out. Carried from W5
     §5's `G8-9` rather than fixed here — it is a **sequencing** limit, not a hole in a row: one commit
@@ -422,34 +422,26 @@ the Node the gates ran under.
     tty-gating it would break the engine's own suite). Recorded so the pitfall is findable from
     this file; no change to the engine is implied or wanted.
 
-50. **`CM-01` reads only the most recent commit — historical commits with a wrong identity pass
-    unseen. Current stated scope: the row gates the identity of HEAD at the moment of the run,
-    and nothing older; that is the row's whole claim, by design.** The check is
-    `test "$(git log -1 --format='%ae')"` against the configured
-    `owner_email`, so it gates the identity of HEAD at the moment of the run and nothing older.
-    Measured: a probe history `owner → wrong@old.co → owner` reports `--only CM-01` clean (exit 0)
-    with the wrong-identity commit sitting one below HEAD. That is consistent with the
-    gate-at-the-moment design — every row judges the tree and history as they stand when verify
-    runs, and retrofitting an identity sweep over `git log --all` is a policy change, not a bug
-    fix — but it should be named: the row's green means "the latest commit carries the owner
-    identity", never "no commit in this repo's history carries an ambient one". A wrong-identity
-    commit that has since been followed by correct ones is invisible to every run. Recorded as a
-    boundary; no row change implied. `docs/GUIDE.md`'s CM-01 row carries the same one-line
-    scope statement.
+50. **Cut in v3: the owner-identity and declared-branch rows.** `CM-01` (commits carry the owner
+    identity) and `PT-02` (the default branch is declared, not assumed) are removed, with their
+    `owner_email:` / `branch:` config keys. The gate reads git directly, so neither is worth
+    asking a human for: a verify run that needs the current branch or the commit author can read
+    both from `git`. The old `CM-01` limit — it gated only the identity of HEAD, so historical
+    commits with a wrong identity passed — is recorded here rather than mechanised, and `GT-03`'s
+    freshness check still reads HEAD's reflog.
 
-51. **`gob init` writes its three added values into the `AGENTS.md` gob block itself, not through a
+51. **`gob init` merges its proposal keys into the `AGENTS.md` gob block itself, not through a
     template.** Install renders the `AGENTS.md` gob block from `templates/AGENTS.md.tmpl` and
-    owns it (`put_once`: never rewritten after the first install) — and install correctly
-    carries no `--branch/--email/--gate` flags, because those keys are the project's to edit.
-    The wizard therefore `sed`-patches `branch:` and `owner_email:` and rewrites the first
-    gate's `cmd:` line right after install renders the file, fail-closed: the gate must read
-    back through the engine's own `g_yaml_gates` or the run stops. The cost is a second
-    writer for exactly those three lines: a hand-customised comment placement survives, but a
-    future template change to those lines' shapes (renamed keys, a multi-gate default) must
-    be mirrored in `bin/goblin-init`. The wizard never rewrites anything outside the declared
-    keys, and a re-run after a hand edit of another line leaves that line alone. Recorded as
-    a boundary; the alternative — teaching install three wizard-only flags — would put wizard
-    vocabulary into the installer's contract for no gain.
+    owns it (`put_once`: never rewritten after the first install), and install carries no
+    `--gate`/`--feature-map` flags, because those keys are the project's to edit. The wizard
+    therefore merges the proposal's first gate (and its `feature_map:`) over the installer's
+    default keys right after install renders the file, fail-closed: the gate must read back
+    through the engine's own `g_agents_gates` or the run stops. The cost is a second writer for
+    exactly those keys: a hand-customised comment placement survives, but a future template
+    change to those lines' shapes must be mirrored in `bin/goblin-init`. The wizard never
+    rewrites anything outside the declared keys, and a re-run after a hand edit of another line
+    leaves that line alone. Recorded as a boundary; the alternative — teaching install
+    wizard-only flags — would put wizard vocabulary into the installer's contract for no gain.
 
 52. **`scope:source` and `scope:target` name WHOSE burden a row carries — the framework's or
     the adopting repo's.** `scope:source` is goblin-stack's own proof burden: those rows

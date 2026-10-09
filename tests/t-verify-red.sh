@@ -260,7 +260,6 @@ m_replay_cmd_false() { m_replay_all_red; sed -i 's/^replay\.cmd:.*/replay.cmd: f
 # harness runs, exits 1, and the row passes - which is what this control asserts.
 m_replay_meta_name() { rm -f checks/*.mjs; printf 'process.exit(1)\n' > 'checks/z2;true;#.mjs'; pin_pre_change; }
 
-m_bad_author()    { git -c user.email=someone@else.test commit -q --allow-empty -m "test: ambient author"; }
 m_cm_02()         { m_row_fails CM-02; }
 m_dirty_tree()    { printf 'untracked\n' > newfile.txt; }
 
@@ -401,7 +400,6 @@ m_sk_04()         { sed -i 's|^## What this cannot see$|## Not seen|' .hermes/sk
 # exactly that, does not scan tests/ - so the control was the leak it was meant to catch (F2-5).
 # $HOME expands to the same /home/<user>/projects the rule matches.
 m_tenant_leak()   { printf '\nsee %s/projects for the tenant list\n' "$HOME" >> .hermes/skills/goblin-mode/SKILL.md; }
-m_wrong_branch()  { sed -i 's/^branch: main/branch: trunk/' AGENTS.md; }
 
 m_archive_flip()  { sed -i 's/^archive: false/archive: true/' AGENTS.md; }
 
@@ -471,7 +469,6 @@ expect_red   "Z1-4: a replay.cmd that interpolates no {name}"                   
 expect_green "Z2-3: a harness file name carrying shell metacharacters reaches node as ONE argument" HS-02 m_replay_meta_name
 expect_red "HS-03 (advisory row: wired, not biting)" HS-03 1 m_hs_03
 
-expect_red "an ambient commit author"              CM-01 1 m_bad_author
 expect_red "CM-02 (advisory row: wired, not biting)" CM-02 1 m_cm_02
 expect_red "an uncommitted file"                   CM-03 1 m_dirty_tree
 
@@ -493,7 +490,6 @@ expect_red "an advisory ceiling that is not a number" SK-03 1 m_adv_ceiling_bad
 expect_red "a shipped skill with no cannot-see section" SK-04 1 m_sk_04
 
 expect_red "a tenant string in an installed rule"  PT-01 1 m_tenant_leak
-expect_red "the declared branch is wrong"          PT-02 1 m_wrong_branch
 
 
 expect_red "a tracked dotenv-family file"           SC-01 1 m_sc_01
@@ -965,20 +961,6 @@ printf '%s' "$out" | grep -q '^  ux stderr noise line'
 check "UX-2c the gate stderr line rides indented under the FAIL (merged capture)" "$?"
 r_ux_gate_noise
 
-# UX-3: the owner-mismatch note. The fixture's owner_email is runner@example.com; a HEAD
-# committed by another identity must FAIL CM-01 and print the note naming the owner.
-m_ux_owner() { git commit -q --allow-empty --author="Someone Else <other@person.example>" -m "not the owner"; }
-expect_red "UX-3: a foreign-author HEAD fails CM-01" CM-01 1 m_ux_owner
-m_ux_owner
-out=$(bash .gob/bin/goblin-verify 2>&1)
-printf '%s' "$out" | grep -q 'note: this repo records a different owner (you are probably new here)'
-check "UX-3a the owner-mismatch note prints under the red run" "$?"
-out2=$(bash .gob/bin/goblin-verify --only CM-01 2>&1)
-printf '%s' "$out2" | grep -q 'or update owner_email: in AGENTS.md'
-check "UX-3b the note names the owner-email update path (the cell's own tail, whole under --only)" "$?"
-git reset -q --hard HEAD~1
-restore_all
-
 # UX-4: the fresh-clone banner, red direction. The green half (R5 in t-verify-green) proved
 # commit-count keying in both directions; this fixture's own history is long, so the control
 # is a seed probe: 2 commits, planted failure, banner present.
@@ -989,7 +971,7 @@ rm -rf "$UX4"; mkdir -p "$UX4"
   && git config user.name "Test Runner" && git config user.email "runner@example.com" \
   && printf '# ux4\n' > README.md && git add -A && git commit -qm seed \
   && bash "$SRC/bin/goblin-install" --target . >/dev/null 2>&1 \
-  && sed -i 's/^owner_email:.*/owner_email: other@owner.example/' AGENTS.md \
+  && rm HANDOFF.md \
   && git add -A && git commit -qm install )
 out=$( cd "$UX4" && bash .gob/bin/goblin-verify 2>&1 ); rc=$?
 check "UX-4a the 2-commit probe is RED" "$([ "$rc" -eq 1 ] && echo 0 || echo 1)"
@@ -1031,12 +1013,12 @@ check "Z1-7: the summary prints the advisory arithmetic ($ADV_PRINTED ADV lines 
 
 # ---- UX-vi: the sign-off's red direction (locked v2 decision) ------------------------------
 # The mascot is a GREEN-run line only: every red run ends on the concrete first-FAIL remedy.
-# Pinned on a controlled red capture (a wrong owner, single row) plus the green FINAL run;
-# the green direction lives in t-verify-green.sh.
-sed -i 's/^owner_email: .*/owner_email: nobody@wrong.invalid/' AGENTS.md
-out=$(bash .gob/bin/goblin-verify --only CM-01 2>&1); UX6_RC=$?
-git checkout -q -- AGENTS.md 2>/dev/null || restore_all
-check "UX-6a the controlled capture is red (CM-01, exit 1)" "$([ "$UX6_RC" -eq 1 ] && echo 0 || echo 1)"
+# Pinned on a controlled red capture (the HANDOFF removed, so HP-01 fails) plus the green FINAL
+# run; the green direction lives in t-verify-green.sh.
+mv HANDOFF.md "$WORK/handoff.ux6.bak"
+out=$(bash .gob/bin/goblin-verify 2>&1); UX6_RC=$?
+mv "$WORK/handoff.ux6.bak" HANDOFF.md
+check "UX-6a the controlled capture is red (HANDOFF gone, exit 1)" "$([ "$UX6_RC" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$out" | grep -qF 'start with the first FAIL above — its remedy line says the fix.'
 check "UX-6b the red run ends on the first-FAIL remedy tail" "$?"
 printf '%s' "$out" | grep -qF 'the goblin sees you'

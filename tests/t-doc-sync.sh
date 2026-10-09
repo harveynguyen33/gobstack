@@ -123,7 +123,7 @@ check "no shipped doc or skill claims a fresh install is not automatically green
 # in v3).
 GREEN_CLAIM=""
 for f in README.md docs/GUIDE.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '34 passed, 0 failed, 6 advisory, 21 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '32 passed, 0 failed, 6 advisory, 21 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, GUIDE and the shipped bootstrap skill state the measured green path" \

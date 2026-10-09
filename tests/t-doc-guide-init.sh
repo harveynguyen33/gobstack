@@ -34,11 +34,11 @@ git init -q -b main
 git config user.name "Test Runner"
 git config user.email "runner@example.com"
 
-# ---- UX-i: the init transcript is `created 20` -----------------------------------------------
+# ---- UX-i: the init transcript is `created 18` -----------------------------------------------
 # The repo carries a seed commit BEFORE the install: a proposal + a gate script are themselves
-# work product, and an empty repo would fail PT-02 (no HEAD to compare the declared branch
-# against) and CM-01 on the day-one run — shapes §10 documents as configuration errors, not the
-# day-one walk. The guide's own §3 has the reader commit the proposal first, in step 2.
+# work product, and an empty repo is born RED on the day-one run — a shape §10 documents as
+# configuration, not the day-one walk. The guide's own §3 has the reader commit the proposal
+# first, in step 2.
 mkdir -p tests
 printf '#!/usr/bin/env bash\nexit 0\n' > tests/run-tests.sh
 chmod +x tests/run-tests.sh
@@ -47,15 +47,13 @@ chmod +x tests/run-tests.sh
 printf '// the gate entry: gate.ts\nexport const gate = true;\n' > gate.ts
 cat > proposal.md <<'EOF'
 <!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->
-branch: main
-owner_email: runner@example.com
 gate_check_cmd: bash tests/run-tests.sh
 feature_map: features/README.md
 <!-- gob:end -->
 
 ## gob init summary
 
-- the brief answered by hand: class software, branch main, one real gate
+- the brief answered by hand: a one-feature map and one real gate
 
 ## feature-map
 
@@ -118,7 +116,7 @@ SUM() { HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]
 
 PRE=$(SUM)
 check "UX-ii the pre-commit run prints 36 passed, 2 failed (uncommitted install + SP-02)" \
-  "$(printf '%s' "$PRE" | grep -qF '36 passed, 2 failed, 6 advisory, 17 skipped' && echo 0 || echo 1)"
+  "$(printf '%s' "$PRE" | grep -qF '34 passed, 2 failed, 6 advisory, 17 skipped' && echo 0 || echo 1)"
 
 git add -A && git commit -q -m "chore: install gobstack"
 DAY1=$(SUM)
@@ -126,26 +124,26 @@ DAY1=$(SUM)
 # nothing to flag and the first-commit run is already green. The placeholder red the guide
 # teaches (HP-05) belongs to the verify-on-an-empty-repo path t-doc-guide.sh walks.
 check "UX-ii the first-commit run is green (the installer filled the HANDOFF HEAD)" \
-  "$(printf '%s' "$DAY1" | grep -qF '38 passed, 0 failed, 6 advisory, 17 skipped' && echo 0 || echo 1)"
+  "$(printf '%s' "$DAY1" | grep -qF '36 passed, 0 failed, 6 advisory, 17 skipped' && echo 0 || echo 1)"
 
 # ---- UX-iii: the second-commit step (CM-03) ----------------------------------------------------
 HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 DIRTY=$(SUM)
 check "UX-iii the HANDOFF edit alone re-reds CM-03 (commit-as-you-go, day-one table step 3)" \
-  "$(printf '%s' "$DIRTY" | grep -qF '37 passed, 1 failed' && [ -n "$(git status --porcelain)" ] && echo 0 || echo 1)"
+  "$(printf '%s' "$DIRTY" | grep -qF '35 passed, 1 failed' && [ -n "$(git status --porcelain)" ] && echo 0 || echo 1)"
 printf '%s' "$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1)" | grep -q '^FAIL  CM-03  1 dirty entr(y|ies)'
 check "  and the dirty row is CM-03 with the 1-entry count" "$?"
 
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(SUM)
-check "UX-ii the green path prints 38 passed, 0 failed, 6 advisory, 17 skipped" \
-  "$(printf '%s' "$GREEN" | grep -qF '38 passed, 0 failed, 6 advisory, 17 skipped' && echo 0 || echo 1)"
+check "UX-ii the green path prints 36 passed, 0 failed, 6 advisory, 17 skipped" \
+  "$(printf '%s' "$GREEN" | grep -qF '36 passed, 0 failed, 6 advisory, 17 skipped' && echo 0 || echo 1)"
 
 # ---- the guide quotes exactly these shapes ----------------------------------------------------
-for shape in "36 passed, 2 failed, 6 advisory, 17 skipped" \
-             "37 passed, 1 failed, 6 advisory, 17 skipped" \
-             "38 passed, 0 failed, 6 advisory, 17 skipped"; do
+for shape in "34 passed, 2 failed, 6 advisory, 17 skipped" \
+             "35 passed, 1 failed, 6 advisory, 17 skipped" \
+             "36 passed, 0 failed, 6 advisory, 17 skipped"; do
   grep -qF "$shape" "$GUIDE"
   check "the guide quotes the measured line ($shape)" "$?"
 done
@@ -154,9 +152,9 @@ done
 SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped' "$GUIDE" \
          | sed -n 's/^[[:space:]]*\([0-9]* passed, [0-9]* failed, [0-9]* advisory, [0-9]* skipped\).*/\1/p' | sort -u)
 MEASURED=$(printf '%s\n' \
-  "36 passed, 2 failed, 6 advisory, 17 skipped" \
-  "37 passed, 1 failed, 6 advisory, 17 skipped" \
-  "38 passed, 0 failed, 6 advisory, 17 skipped")
+  "34 passed, 2 failed, 6 advisory, 17 skipped" \
+  "35 passed, 1 failed, 6 advisory, 17 skipped" \
+  "36 passed, 0 failed, 6 advisory, 17 skipped")
 SUBSET=0
 while IFS= read -r s; do
   [ -n "$s" ] || continue

@@ -278,7 +278,7 @@ BLOCK_KEYS=$(g_agents_keys "$PROP")
 
 # Unknown keys are refused: the proposal is machine-read, and a typo'd key would
 # otherwise be silently ignored forever (fail closed, like --only does).
-KNOWN_KEYS="branch owner_email practice practice_sha256 archive
+KNOWN_KEYS="practice practice_sha256 archive
 max_dirty advisory_ceiling security.gitignore_family security.build_output
 security.write_routes perf.metric perf.cmd perf.baseline_commit perf.baseline_value
 perf.measured perf.host_gate harness_dir scaffold_checks feature_map source_root

@@ -58,8 +58,6 @@ proposal() { # <file> [extra lines...] — a minimal valid proposal (with a feat
   local f="$1"; shift 1
   {
     printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-    printf 'branch: main\n'
-    printf 'owner_email: runner@example.com\n'
     printf 'gate_commit_cmd: bash tests/run-tests.sh\n'
     printf 'feature_map: features/README.md\n'
     [ $# -eq 0 ] || printf '%s\n' "$@"
@@ -118,7 +116,6 @@ proposal_gate() { # <file> <gate-cmd> — a valid proposal with a chosen gate co
   local f="$1" gate="$2"
   {
     printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-    printf 'branch: main\nowner_email: runner@example.com\n'
     printf 'gate_commit_cmd: %s\n' "$gate"
     printf 'feature_map: features/README.md\n'
     printf '<!-- gob:end -->\n'
@@ -158,10 +155,6 @@ printf '%s' "$OUT2" | grep -qF "gob init [run] goblin-install"
 check "the run names the install engine call" "$?"
 [ -f "$REPO/AGENTS.md" ] && [ -f "$REPO/HANDOFF.md" ] && [ -x "$REPO/.gob/bin/goblin-verify" ]
 check "the harness landed (AGENTS.md, HANDOFF.md, .gob/bin/goblin-verify)" "$?"
-grep -qF "owner_email: runner@example.com" "$REPO/AGENTS.md"
-check "the declared email landed in the AGENTS.md gob block" "$?"
-grep -qxF "branch: main" "$REPO/AGENTS.md"
-check "the declared branch landed in the AGENTS.md gob block" "$?"
 GATE_DECLARED=$(awk '/^<!-- gob:begin/{ing=1;next} /^<!-- gob:end/{ing=0} ing && /^gate_commit_cmd:/{sub(/^gate_commit_cmd: */,"");print;exit}' "$REPO/AGENTS.md")
 [ "$GATE_DECLARED" = "bash tests/run-tests.sh" ]
 check "the proposal gate is the declared first gate (got '$GATE_DECLARED')" "$?"
@@ -235,7 +228,7 @@ check "the refusal names the key it refused" "$?"
 P3D="$WORK/proposal-b3-nogate.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'branch: main\nowner_email: runner@example.com\n'
+  printf 'archive: false\n'
   printf '<!-- gob:end -->\n'
 } > "$P3D"
 OUT3D=$(init_env --target "$REPO" --write "$P3D" < /dev/null); RC3D=$?
@@ -267,7 +260,6 @@ new_repo b3c
 P3F="$WORK/proposal-b3f-nomap.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'branch: main\nowner_email: runner@example.com\n'
   printf 'gate_commit_cmd: bash tests/run-tests.sh\n'
   printf '<!-- gob:end -->\n\n## gob init summary\n\n- no map\n'
 } > "$P3F"
@@ -282,7 +274,6 @@ check "  and it wrote NOTHING" "$?"
 P3G="$WORK/proposal-b3g-nosection.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'branch: main\nowner_email: runner@example.com\n'
   printf 'gate_commit_cmd: bash tests/run-tests.sh\nfeature_map: features/README.md\n'
   printf '<!-- gob:end -->\n'
 } > "$P3G"
@@ -297,7 +288,6 @@ check "  and it wrote NOTHING" "$?"
 P3H="$WORK/proposal-b3h-badpath.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'branch: main\nowner_email: runner@example.com\n'
   printf 'gate_commit_cmd: bash tests/run-tests.sh\nfeature_map: features/README.md\n'
   printf '<!-- gob:end -->\n\n## gob init summary\n\n- a broken entry path\n\n## feature-map\n\n'
   printf '### features/README.md\n\n```md\n# Features\n\n- [ghost](./ghost.md) — a feature that does not resolve\n```\n\n'

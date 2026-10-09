@@ -71,8 +71,7 @@ sentence each in `README.md` (rendered from the glossary table the install ships
 | | |
 |---|---|
 | `bash`, `git`, `awk`, `sed`, `grep`, `python3` | already on any Linux/macOS box |
-| a project that is a **git repository** | `git status` must work; the harness reads commit identity |
-| a branch named the same as the one you declare | see step 3 — a `master`/`main` mismatch is the most common first failure |
+| a project that is a **git repository** | `git status` must work; the harness reads commit history |
 
 You need node ≥ 18 (for the npm shim only), beyond the row above.
 
@@ -109,20 +108,18 @@ and installs:
 
     gob init --heuristic                 # the brief + schema; --heuristic adds scanned hints
 
-The brief asks for exactly three decisions — branch, owner email, and ONE gate command
+The brief asks for one decision — the gate command — plus the mandatory feature map
 that proves the repo is healthy. Write them into the proposal file (the brief names the schema;
 a hand-written one works fine):
 
     <!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->
-    branch: main
-    owner_email: you@example.com
     gate_check_cmd: bash tests/run-tests.sh
     <!-- gob:end -->
 
     ## gob init summary
 
     - scan: bare repo, no package.json — the brief was answered by hand
-    - chose: branch main, gate `bash tests/run-tests.sh`
+    - chose: gate `bash tests/run-tests.sh`, a one-feature map
 
 then install it:
 
@@ -147,19 +144,6 @@ CI, ever.** The default install ships **no agent skills** — the harness is neu
 harness reads lives in the `<!-- gob:begin --> … <!-- gob:end -->` marker block at the top of
 `AGENTS.md`. Edit it in place; the parser reads only that block.
 
-### Why `git init -b main` matters
-
-The harness **declares** your default branch rather than assuming it (rule `PT-02`). If your repo's
-branch is `master` and the config says `main`, verify fails on the very first run:
-
-    FAIL  PT-02  declared main, actual master
-
-That is not a bug — it is the harness refusing to guess, which is the same reason it fails instead
-of silently skipping a repo whose branch it got wrong. **Fix it in the AGENTS.md block, not by
-renaming your branch** (unless you want to).
-
----
-
 ## 4. Step 2 — Commit, then verify (the moment it earns its keep)
 
     cd /tmp/gs-try
@@ -176,7 +160,7 @@ You will see one line per rule. The shape:
 
 and a summary line at the bottom:
 
-    36 passed, 2 failed, 6 advisory, 17 skipped     # the uncommitted install, below
+    34 passed, 2 failed, 6 advisory, 17 skipped     # the uncommitted install, below
 
 ### How to read that output
 
@@ -218,9 +202,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `36 passed, 2 failed, 6 advisory, 17 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
-| 2. the first commit | `git add -A && git commit` | `37 passed, 1 failed, 6 advisory, 17 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `38 passed, 0 failed, 6 advisory, 17 skipped` | none — green |
+| 1. the install ran | `gob init --write ... --yes` | `34 passed, 2 failed, 6 advisory, 17 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
+| 2. the first commit | `git add -A && git commit` | `35 passed, 1 failed, 6 advisory, 17 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `36 passed, 0 failed, 6 advisory, 17 skipped` | none — green |
 
 One of those deserves its name spelled out:
 
@@ -238,11 +222,9 @@ If you ran step 1 without `-b main`, or with the wrong git identity, you will se
 
 | FAIL | Cause | Fix |
 |---|---|---|
-| `PT-02 declared main, actual master` | branch name mismatch | set `branch:` in the AGENTS.md gob block |
-| `CM-01` (commit identity) | the repo's commit email ≠ the declared `owner_email:` | set `owner_email:` in the gob block |
 | `HP-05` | `HANDOFF.md` still names the scaffold placeholder `` `0000000` `` | replace it with your real short HEAD |
 
-**All three are configuration, not defects.** The harness is reporting your repo's actual state
+**It is configuration, not a defect.** The harness is reporting your repo's actual state
 against a declared expectation. That is exactly what you want it to do.
 
 `HP-05` deserves one sentence more, because it surprises people: the scaffold ships
@@ -261,8 +243,6 @@ by the installer:
 
 Open it. The keys that matter on day one:
 
-    branch: main                          # DECLARED, never assumed
-    owner_email: you@example.com          # the commit identity this repo expects
     practice: /path/to/your-standard.md   # optional: your own house rules, hash-pinned
     gate_<name>_cmd: <one command>        # YOUR real commands, one line each
 
@@ -428,14 +408,14 @@ A default install lands on a specific shape. The first reds are
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    36 passed, 2 failed, 6 advisory, 17 skipped     # straight after the install (CM-03 + SP-02)
-    37 passed, 1 failed, 6 advisory, 17 skipped     # editing HANDOFF.md re-reds CM-03 (commit-as-you-go)
-    38 passed, 0 failed, 6 advisory, 17 skipped     # committed: green
+    34 passed, 2 failed, 6 advisory, 17 skipped     # straight after the install (CM-03 + SP-02)
+    35 passed, 1 failed, 6 advisory, 17 skipped     # editing HANDOFF.md re-reds CM-03 (commit-as-you-go)
+    36 passed, 0 failed, 6 advisory, 17 skipped     # committed: green
 
 Name a real commit in `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is
 green:
 
-    38 passed, 0 failed, 6 advisory, 17 skipped     (on a real project; your numbers will differ)
+    36 passed, 0 failed, 6 advisory, 17 skipped     (on a real project; your numbers will differ)
 
 **Twenty-one rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
@@ -458,7 +438,6 @@ Two readings that are easy to get wrong:
 | Symptom | What it means | What to do |
 |---|---|---|
 | `refused to overwrite: HANDOFF.md`, exit 1 | your repo already had a HANDOFF | **do not `--force`** — reconcile it (below) |
-| `PT-02 declared main, actual master` | branch mismatch | set `branch:` in the gob block |
 | `IN-02 ... practice EDITED` | someone changed the pinned standard | re-pin deliberately: `--re-pin` |
 | `gob: unrecognized command: <verb>` (exit 2) | you ran a verb outside the v2 surface (`audit`, `install`) | use the six wired verbs: `init`, `map`, `verify`, `bans`, `mcp`, `uninstall` |
 | `IN-03` fails, "manifest is broken" | a row has a broken check column | fix the row; this is a source defect, not yours |
@@ -716,7 +695,7 @@ Output is one line per executed row, in manifest order, plus a summary line at t
     ADV   SC-09  auth is applied consistently across sibling routes
     SKIP  HS-02  no pinned pre-change commit yet - REPLAY not provable
 
-Those four lines are one row of each marking. The summary line of a green default run is `34 passed, 0 failed, 6 advisory, 21 skipped`.
+Those four lines are one row of each marking. The summary line of a green default run is `32 passed, 0 failed, 6 advisory, 21 skipped`.
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -739,7 +718,7 @@ workflow file is not a gate still holds (`docs/LIMITS.md` #34).
 #### A fresh install verifies green
 
 Measured on a fresh DEFAULT install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`34 passed, 0 failed, 6 advisory, 21 skipped`, exit 0.** Twenty-one rows skip with
+hand edit: **`32 passed, 0 failed, 6 advisory, 21 skipped`, exit 0.** Twenty-one rows skip with
 a reason — the same not-yet rows as before, plus the four skill rows (`SK-01`..`SK-04`)
 that skip on the `playbooks` opt-out a skills-free install records: `HS-02` — no pre-change commit
 is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `SC-06`, which
@@ -766,7 +745,7 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a part's off state real.
 - **The opt-out numbers are pinned (V3-3).** A default install with an explicit `--skills no`
-  verifies `34 passed, 0 failed, 6 advisory, 21 skipped`, exit 0, and
+  verifies `32 passed, 0 failed, 6 advisory, 21 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
   at v0.2 as the ban and feature-map rows landed; in v3 the model/role/loop and CI rows are cut,
@@ -811,8 +790,6 @@ Four consequences that follow from measurement, not taste:
    inferred command is wrong for a repo with no runner, a repo that cannot run its own typecheck
    read-only, and a repo whose runner lives in a skill — all at once. The shipped gate is a
    **floor**, and `P8` step 3 is "replace it".
-4. **The default branch is not always `main`.** It is declared in the `AGENTS.md` gob block and
-   compared against the real branch by `PT-02`; assuming `main` silently skips a repo on `master`.
 
 ### The adoption order
 
@@ -829,7 +806,7 @@ Each step is independently useful and the later ones build on the earlier:
 3. **The fleet-config repo third — highest value per minute.** A non-code repo that cannot
    fix its own home is not publishable.
 4. **The cheapest correctness win fourth.** Content types untracked inside a repo that looks
-   protected: commit them, write a HANDOFF, then fix the branch name.
+   protected: commit them and write a HANDOFF.
 5. **The small ones fifth** — they exercise the `—` switches. One needs a single commit; another
    needs its `.gitignore` fixed **before** `git init` because a credentials file sits in-tree.
 6. **The two small repairs sixth** that make a fleet self-consistent: a stale HEAD, a stale
@@ -905,7 +882,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .gob/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the full green path (`34 passed, 0 failed, 6 advisory, 21 skipped`, exit 0)
+   Success is the full green path (`32 passed, 0 failed, 6 advisory, 21 skipped`, exit 0)
    with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three
@@ -940,7 +917,7 @@ closed and now ENFORCED (`IN-03`'s third clause, Z1-5): `script`, `lint`, `gate`
 plus `test` for a source-scope row, whose check is a script under `tests/` run by
 `tests/run-tests.sh`.
 
-Measured shape of this table: **65 rows** - 61 target, 4 source; advisory 6, gate 18, lint 24, script 14, test 3.
+Measured shape of this table: **63 rows** - 59 target, 4 source; advisory 6, gate 16, lint 24, script 14, test 3.
 
 ### The rows
 
@@ -966,7 +943,6 @@ Measured shape of this table: **65 rows** - 61 target, 4 source; advisory 6, gat
 | `HS-01` | target | lint | Asserting harnesses follow the house shape. | goblin-verify --only HS-01 | A declared harness_dir that is absent FAILS when `scaffold_checks: yes`; when it is `no`, the row SKIPs with a reason. Keying the skip off the path alone let one config line switch this row and HS-02 off. A report utility in the same dir is counted and reported separately rather than failing the run. |
 | `HS-02` | target | gate | A check green on both trees proves nothing - the REPLAY must show RED pre-change. | goblin-verify --only HS-02 | The declared `replay.cmd` is EXECUTED with `{name}` replaced by each harness's name, in the pre-change worktree, with `replay.env=<commit>` set (Z1-4). Two clauses that used to be unheard: a command that interpolates no `{name}` FAILs (it cannot be running the harness it names, so nothing was replayed), and a command that cannot be executed at all - exit 126 or 127 - FAILs rather than counting as a RED harness. The harness's name is substituted SHELL-QUOTED (`printf %q`), because the name is part of the command text the shell parses; unquoted, a name carrying `;` or `#` reached the shell as syntax (Z2-3, the G8-1 surface class), and the control for it carries a metacharacter-bearing file name. What it cannot see: a command that runs *something else* under the harness's name and exits non-zero, and whether the harness tests the right path rather than merely failing on this tree. |
 | `HS-03` | target | advisory | Source probes read text with comments blanked first. | advisory | Recognising 'this probe reads source text' is semantic; a grep for the blanking helper produces false FAILs on harnesses that do not probe source. |
-| `CM-01` | target | gate | Commits carry the owner identity, not an ambient one. Current scope: this gates the identity of HEAD (the last commit) at the moment of the run - earlier commits by other authors are not scanned. | test "$(git log -1 --format='%ae')" = "$(grep '^owner_email:' AGENTS.md \| cut -d' ' -f2)" | note: this repo records a different owner (you are probably new here) — commit with git -c user.email=<owner_email> --author=<owner_email>, or update owner_email: in AGENTS.md |
 | `CM-02` | target | advisory | The commit message was written to a file, not passed with -m. | advisory | A backtick lost to command substitution leaves no trace a later check can read. Reported as a heuristic (unbalanced backticks in a body) only. |
 | `CM-03` | target | script | Commit-as-you-go: the working tree is not carrying a dead run's work. | goblin-verify --only CM-03 | — |
 | `PG-01` | target | gate | The reviewed artifact is named by SHA, and that SHA exists. | goblin-verify --only PG-01 | — |
@@ -981,7 +957,6 @@ Measured shape of this table: **65 rows** - 61 target, 4 source; advisory 6, gat
 | `SK-03` | target | script | A rule with no mechanism is labelled advisory, and the advisory count is reported. | goblin-verify --only SK-03 | — |
 | `SK-04` | target | lint | Every shipped skill says what it cannot see. | goblin-verify --only SK-04 | Partial: proves the section exists, not that what it says is complete or true - the limit every prose rule carries. Every shipped skill already carries it, so the row is GREEN on a fresh install and RED only under a real violation. W1: the check is a builtin so the engine.mode=global clause can run - in global mode the procedure tier is emitted per platform (not carried in this repo) and the row SKIPs with that reason. |
 | `PT-01` | target | lint | No tenant-specific string inside a reusable rule. | for d in skills manifest bin templates .gob .hermes; do [ -d "$d" ] \|\| continue; grep -rniE --exclude=AGENTS.md --exclude=installed.json '(h[a]rvey\|tech-g[o]blin\|/h[o]me/[a-z]+\|g[o]blin-ui\|op[e]n-door\|sup[r]eme\|bb[t]ech\|c[l]v)' "$d" && exit 1; done; exit 0 | — (the rules an install actually writes live in `.gob/` and `.hermes/`, not in the source layout. Two documented exceptions: `AGENTS.md`, which holds `practice:` - per-machine config, not a rule - and `.gob/installed.json`, which since W1 records the machine's absolute `engine_dir` in its `engine:` block - both per-machine facts, not rules - each excluded by name. The pattern is written with character classes so this row cannot match itself.) |
-| `PT-02` | target | gate | The default branch is declared, not assumed. | goblin-verify --only PT-02 | — |
 | `CL-02` | target | script | An archive: true project verifies GREEN without a HANDOFF or gates. | goblin-verify --only CL-02 | Falsifiable: FAILs when `archive:` is not `true`/`false`, and when the config's value disagrees with the one the install recorded in `.gob/installed.json` (so the waiver cannot be flipped on by hand). It cannot observe the *effect* of the waiver on the other rows without re-entering the runner. |
 | `SC-01` | target | lint | No secret file is tracked. | n=$(git ls-files \| grep -iE '(^\|/)\.env\|\.pem$\|\.key$' \| grep -vcE '\.(example\|sample\|template)$'); printf '%s tracked secret file(s)\n' "$n"; [ "$n" = 0 ] | Partial: it sees tracked PATHS, never contents - a secret pasted into a tracked file is invisible here, and the pattern is a name family, so a credential inside `config.ts` is missed by construction. |
 | `SC-02` | target | gate | The ignore rules cover the whole secret family. | goblin-verify --only SC-02 | Builtin, and behavioural: clause 1 reads `.gitignore`; clause 2 asks git's own matcher (`git check-ignore`) for `.env`, `.env.local` and `.env.production` one path at a time, so a rule that looks right but does not match still fails. It cannot see a secret already in git history, or one committed under a name the family does not cover. SKIPs with a reason when there is no `.gitignore` and no `package.json`. |
@@ -1014,7 +989,7 @@ Measured shape of this table: **65 rows** - 61 target, 4 source; advisory 6, gat
 
 ### Advisory rows, named
 
-6 of the 61 rows are labelled `advisory`. 6 of them carry no executable check at all
+6 of the 59 rows are labelled `advisory`. 6 of them carry no executable check at all
 (they are prose the matrix refuses to pretend about).
 
 - **HP-04** (no check at all) - A stale sentence is corrected in place with a dated parenthetical, never deleted.
@@ -1354,7 +1329,7 @@ them: it reads the path from config, so moving the standard is a one-line config
     .gob/bin/goblin-verify                 # expect: mostly PASS, some SKIP
 
     # 3. make it yours
-    $EDITOR AGENTS.md               # branch, owner_email, and YOUR real gate commands (the gob block)
+    $EDITOR AGENTS.md               # YOUR real gate commands (the gob block)
 
     # 4. prove a check can fail (the habit that matters) - the same block §7 runs
     # REPLAY-BEGIN (this exact block is run by tests/t-doc-guide.sh - keep the two copies identical)

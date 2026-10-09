@@ -58,7 +58,6 @@ check "a ban outside the bans: list skips with the enable reason" "$?"
 #       absent under every PASS, whole under --only, width-truncated in the default listing.
 #       A GREEN RUN prints no `remedy:` line at all: every row above the summary is PASS/ADV/SKIP
 #       and none of the three RED-direction remedy lines may appear.
-#   R2  the owner-mismatch note (owner_mismatch) - only under a red run, names the email
 #   R3  the fresh-clone banner (fresh_clone) - only under a red run, commit-count keyed
 #   R4  GT-03's failure line is a sentence, not the raw test(1) dump
 # Pinned here in the GREEN direction (the red direction is t-verify-red.sh's, which must
@@ -67,8 +66,6 @@ BAD_REMEDIES=$(printf '%s' "$OUT" | grep -c '^remedy:')
 [ -z "$OUT" ] && BAD_REMEDIES=0
 [ "$BAD_REMEDIES" -eq 0 ]
 check "R1 a green run prints no remedy: line (none under a PASS/ADV/SKIP row)" "$?"
-printf '%s' "$OUT" | grep -q 'note: this repo records a different owner'
-check "R2 a green run prints no owner-mismatch note" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 printf '%s' "$OUT" | grep -q 'fresh clone detected'
 check "R3 a green run prints no fresh-clone banner" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 printf '%s' "$OUT" | grep -q 'the gate line is older than the last commit'
@@ -85,14 +82,12 @@ git config user.email "runner@example.com"
 printf '# fresh\n' > README.md
 git add -A && git commit -q -m "seed"
 bash "$SRC/bin/goblin-install" --target . >/dev/null 2>&1
-sed -i 's/^owner_email:.*/owner_email: other@owner.example/' AGENTS.md
+rm HANDOFF.md
 git add -A && git commit -q -m "install gobstack"
 FOUT2=$(bash .gob/bin/goblin-verify 2>&1); FRC2=$?
-check "R5a the 2-commit probe fails for the planted reason (CM-01, exit 1)" "$([ "$FRC2" -eq 1 ] && echo 0 || echo 1)"
+check "R5a the 2-commit probe fails for the planted reason (HP-01, exit 1)" "$([ "$FRC2" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$FOUT2" | grep -q 'fresh clone detected: some of these fails are not yours'
 check "R5b the fresh-clone banner fires under 3 commits" "$?"
-printf '%s' "$FOUT2" | grep -q 'note: this repo records a different owner'
-check "R5c the owner-mismatch note fires beside it (same red run)" "$?"
 git commit -q --allow-empty -m "third commit"
 git commit -q --allow-empty -m "fourth commit"
 FOUT3=$(bash .gob/bin/goblin-verify 2>&1)

@@ -123,7 +123,7 @@ check "M3 the row lines keep the id + status shape" "$?"
 
 # ---- M4: gob_verify on a RED fixture -------------------------------------------
 new_fixture red
-sed -i 's/^owner_email:.*/owner_email: other@owner.example/' "$R/AGENTS.md"
+mkdir -p "$R/src" && printf 'export const a: any = 1;\n' > "$R/src/red.ts"   # a BN-01 violation: a deterministic red with a remedy
 OUT=$(cd "$R" && printf '%s\n%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"gob_verify","arguments":{}}}' \
@@ -159,7 +159,7 @@ check "M4 and the error names the first step" "$?"
 new_fixture green
 GREEN_R="$R"
 new_fixture red
-sed -i 's/^owner_email:.*/owner_email: other@owner.example/' "$R/AGENTS.md"
+mkdir -p "$R/src" && printf 'export const a: any = 1;\n' > "$R/src/red.ts"   # a BN-01 violation: a deterministic red with a remedy
 # run from the RED fixture, verify the GREEN fixture by target: the verdict must be the
 # TARGET's, not the cwd's
 OUT=$(cd "$R" && printf '%s\n%s\n' \
@@ -358,7 +358,7 @@ OUT=$(cd "$R" && bash "$SRC/bin/goblin-init" --write /dev/null 2>&1); true
 PRO="$R/.gob-init-proposal.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'branch: main\nowner_email: runner@example.com\ngate_commit_cmd: true\nfeature_map: features/README.md\n'
+  printf 'gate_commit_cmd: true\nfeature_map: features/README.md\n'
   printf '<!-- gob:end -->\n'
   printf '\n## gob init summary\n\n- M10\n\n## feature-map\n\n'
   printf '### features/README.md\n\n```md\n# Features\n\n- [readme](./readme.md) — the repo readme\n```\n\n'
