@@ -6,8 +6,7 @@ description: P15: understand one shipped Android build as facts for study - tria
 # goblin-re-mobile (P15)
 
 Use when one shipped Android build must be understood as facts for study, with a
-reproducible, hash-manifested corpus. The full procedure is `docs/RE-PLAYBOOK.md`; the
-steps:
+reproducible, hash-manifested corpus. The steps:
 
 1. **S0 preflight.** The dedicated sandbox exists and is the one the fences describe - a
    disposable LXC/VM, never the host.
