@@ -14,7 +14,7 @@
 //   gob uninstall [--target <dir>]        -> bin/goblin-install --uninstall
 //   no args | -h/--help | any other first arg -> this file's short usage, exit 2.
 //
-// UNWIRED (code kept, deletion is session 3): audit, upgrade, doctor, emit, sync,
+// UNWIRED (code kept, deletion is session 3): audit, upgrade, doctor,
 // install. The usage() list is the product's contract: a verb absent from it is refused,
 // naming what replaced it — never silently executed.
 //

@@ -6,8 +6,7 @@
 #   B2  the --write path on a fresh probe: a proposal file in the brief's schema
 #       validates and installs (class software, the proposal's first gate replaces the
 #       class default, proposal keys merge over the class defaults), writes AGENTS.md
-#       with the gob block, .gob/, HANDOFF.md — and NO .hermes unless the proposal
-#       names sync_platforms
+#       with the gob block, .gob/, HANDOFF.md — and NO .hermes (the neutral-first install)
 #   B3  the validation refusals: no block, unknown key, bad class, no gate -> exit 2,
 #       nothing written; a refusal names the input it refused
 #   B4  --dry-run validates and writes nothing
@@ -109,24 +108,13 @@ GATE_DECLARED=$(awk '/^<!-- gob:begin/{ing=1;next} /^<!-- gob:end/{ing=0} ing &&
 [ "$GATE_DECLARED" = "bash tests/run-tests.sh" ]
 check "the proposal gate is the declared first gate (got '$GATE_DECLARED')" "$?"
 [ ! -e "$REPO/.hermes" ]
-check "no sync_platforms in the proposal writes NO .hermes (neutral-first)" "$?"
+check "a neutral proposal writes NO .hermes (neutral-first)" "$?"
 grep -qF '"skills": "no"' "$REPO/.gob/installed.json"
 check "the install record carries the skills opt-out" "$?"
 # the proposal's keys merge over the class defaults: the installer rendered the class
 # defaults, then --write merged the proposal's own keys over them.
 grep -qF "class: software" "$REPO/AGENTS.md"
 check "the declared class landed in the gob block" "$?"
-
-# ---- B2b: the sync path — sync_platforms emits platform files --------------------
-new_repo b2b
-P2B="$WORK/proposal-b2b.md"
-proposal "$P2B" software 'sync_platforms: [hermes]'
-OUT2B=$(init_env --target "$REPO" --write "$P2B" --yes < /dev/null); RC2B=$?
-check "--write with sync_platforms [hermes] exits 0" "$RC2B"
-[ -e "$REPO/.hermes" ]
-check "sync_platforms emits the platform files under the target" "$?"
-printf '%s' "$OUT2B" | grep -qF "sync --platform hermes"
-check "the run names the sync engine call" "$?"
 
 # ---- B3: the validation refusals --------------------------------------------------
 new_repo b3

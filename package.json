@@ -15,7 +15,6 @@
   "license": "MIT",
   "files": [
     "bin/",
-    "adapters/",
     "manifest/",
     "presets/",
     "templates/",

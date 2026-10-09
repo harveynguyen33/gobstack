@@ -76,8 +76,9 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 
 ## The `gob` CLI
 
-The v2 surface is seven verbs. Everything else — audit, doctor, emit/sync, upgrade, install —
-is unwired in this alpha: the shim refuses the verb by name and prints the usage.
+The v2 surface is six verbs — `init`, `map`, `verify`, `bans`, `mcp`, `uninstall`. Everything
+else — audit, doctor, upgrade, install — is unwired in this alpha: the shim refuses the verb
+by name and prints the usage.
 
 | command | what it does |
 |---|---|
@@ -122,11 +123,9 @@ get.
 
 ## Agent skills
 
-**Agent skills are opt-in, and the per-platform emit surface returns in a later alpha.** An
-`init --write` installs the neutral harness only — `.gob/`, `AGENTS.md`, `HANDOFF.md`, the
-checks and the `.gitignore` block; no skills directory, and no files belonging to any coding
-agent. The proposal schema's `sync_platforms:` line is where the platform choice is recorded
-when that surface lands.
+**Agent skills are opt-in.** An `init --write` installs the neutral harness only — `.gob/`,
+`AGENTS.md`, `HANDOFF.md`, the checks and the `.gitignore` block; no skills directory, and no
+files belonging to any coding agent.
 
 ## What it is not
 

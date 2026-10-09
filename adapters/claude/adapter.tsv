@@ -1,8 +1,0 @@
-# adapters/claude/adapter.tsv - W4A-SPEC SS2/SS8 P1. Shapes from Claude Code's own docs
-# (code.claude.com/docs/en/skills + /memory, read 2026-09-29): skills are <name>/SKILL.md under
-# .claude/skills/ (project) and ~/.claude/skills/ (personal), name+description frontmatter
-# required to index; project memory is repo-root CLAUDE.md (the docs' project-instructions
-# location; .claude/CLAUDE.md is listed as an alternate). settings.json and hooks are
-# deliberately untouched (W4A-SPEC SS10.3).
-id	display	detect_any	skills_path_project	skills_path_global	context_path	docs_url	docs_read	cap_skills	cap_context_injection	cap_command_blocking	cap_marketplace	cap_post_compaction
-claude	Claude Code	~/.claude:claude	.claude/skills/<name>/SKILL.md	~/.claude/skills/<name>/SKILL.md	CLAUDE.md	https://code.claude.com/docs/en/skills	2026-09-29	yes	full	yes	no	yes

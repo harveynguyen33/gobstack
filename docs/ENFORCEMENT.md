@@ -6,9 +6,9 @@ real command that `goblin-verify` runs, or the literal `advisory`, or the marker
 builtins in `bin/goblin-verify`, so the row stays self-describing and the matrix stays the
 single source of truth).
 
-Some `if_not_why` cells carry internal workstream tags — `W1`..`W5` — recording which redesign
-of this toolkit last touched that rule's check (W1 the global-engine split, W2 the version
-sync and npm shim, W3 the upgrade migration, W4 the platform adapters, W5 the publish prep).
+Some `if_not_why` cells carry internal workstream tags — `W1`, `W5`, `W6` — recording which
+redesign of this toolkit last touched that rule's check (W1 the global-engine split, W5 the
+publish prep, W6 neutral-first).
 They are historical provenance only: the rule text and its check are authoritative, not the
 tag. `D1`..`D6` are the design decisions in `docs/DESIGN.md`; `Z1`-style identifiers are
 independent verification pass IDs.

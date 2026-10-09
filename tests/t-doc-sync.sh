@@ -143,18 +143,15 @@ for f in README.md docs/GUIDE.md; do
   norm_text "$f" | grep -q 'agent skills are opt-in'
   check "$f states agent skills are opt-in (W6 neutral-first)" "$?"
 done
-# v2: the per-platform sync surface is UNWIRED. The docs name it as a later alpha, never as a
-# working verb — the shim refuses emit/sync today (t-shim SH1), and a doc teaching it would
-# send a reader into exit 2.
+# v3: the per-platform sync surface is CUT — the docs must not teach `gob sync/emit` as a
+# working verb (the shim refuses emit/sync today, t-shim SH1).
 SYNC_TAUGHT=""
 for f in README.md docs/GUIDE.md; do
   norm_text "$f" | grep -qE 'gob (sync|emit) --platform' && SYNC_TAUGHT="$SYNC_TAUGHT $f"
 done
-[ -z "$SYNC_TAUGHT" ] || note "still teaches the unwired sync verb:$SYNC_TAUGHT"
-check "no doc teaches gob sync/emit as a working verb (v2: the surface is unwired)" \
+[ -z "$SYNC_TAUGHT" ] || note "still teaches the cut sync verb:$SYNC_TAUGHT"
+check "no doc teaches gob sync/emit as a working verb (v3: the surface is cut)" \
   "$([ -z "$SYNC_TAUGHT" ] && echo 0 || echo 1)"
-norm_text README.md | grep -q 'the per-platform emit surface returns in a later alpha'
-check "README states the emit surface is a later alpha (v2 unwired)" "$?"
 # v2 installs no CI: no doc may teach a ci opt-in that does not exist, and the absence must be
 # STATED (the strongest form of the old default-no pin).
 norm_text README.md | grep -q 'not a ci product: nothing is installed under .github/'

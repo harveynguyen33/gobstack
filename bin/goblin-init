@@ -21,8 +21,7 @@
 #   - the frontmatter keys are validated against the engine's key set (unknown key,
 #     bad class, non-boolean archive -> exit 2, nothing written);
 #   - AGENTS.md (body + gob block) and .gob/engine (the vendored verifier + manifest)
-#     are written; HANDOFF.md is written once; the sync-translator step runs to emit
-#     platform files for the proposal's `sync:` line. CI is never part of any output.
+#     are written; HANDOFF.md is written once. CI is never part of any output.
 #
 # The heuristic detector (package.json scripts + route tokens, from bin/goblin-map) is
 # the --heuristic FALLBACK: appended to the brief as pre-scanned hints, never the answer.
@@ -43,13 +42,12 @@ g_info() { printf '%s\n' "$*"; }
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 # ------------------------------------------------------------------ flags -----
-TARGET="" WRITE="" HEURISTIC=0 DRYRUN=0 RESYNC=0 WITH_MCP=0
+TARGET="" WRITE="" HEURISTIC=0 DRYRUN=0 WITH_MCP=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --target)    TARGET="${2:-}"; shift 2 ;;
     --write)     WRITE="${2:-}"; shift 2 ;;
     --heuristic) HEURISTIC=1; shift ;;
-    --resync)    RESYNC=1; shift ;;   # init-internal: re-run the sync step (hidden)
     --with-mcp-config) WITH_MCP=1; shift ;;
     --dry-run)   DRYRUN=1; shift ;;
     --yes)       shift ;;             # accepted for pipe parity; --write is already explicit
@@ -138,7 +136,6 @@ class: <software|service|game|research|fleet>
 branch: <default branch>
 owner_email: <commit identity>
 gate_<name>_cmd: <one shell command that must stay green>
-sync_platforms: <optional array — the agent platform ids the sync reads>
 <!-- gob:end -->
 
 ## gob init summary
@@ -199,12 +196,12 @@ max_dirty advisory_ceiling security.gitignore_family security.build_output
 security.audit_cmd security.audit_max_age_days security.waiver_max_age_days
 security.write_routes perf.metric perf.cmd perf.baseline_commit perf.baseline_value
 perf.measured perf.host_gate harness_dir scaffold_checks feature_map source_root
-verify_doctor reference_manifest quarantine_root loop_max_turns_ceiling sync_platforms
+verify_doctor reference_manifest quarantine_root loop_max_turns_ceiling
 ratchet.name ratchet.cmd ratchet.ceiling runtime_data bans bans_exempt layers
 replay.env replay.cmd replay.commit disabled engine_dir"
 BAD_KEYS=""
 # Token-by-token, not a whole-string case: KNOWN_KEYS is a multi-line word list and a
-# `case` pattern cannot span the newlines (measured: sync_platforms read as unknown).
+# `case` pattern cannot span the newlines.
 while IFS= read -r k; do
   [ -n "$k" ] || continue
   case "$k" in gate_*_cmd) continue ;; esac
@@ -232,11 +229,9 @@ BRANCH=$(g_agents_read "$PROP" branch)
 EMAIL=$(g_agents_read "$PROP" owner_email)
 [ -n "$EMAIL" ] || EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
 [ -n "$EMAIL" ] || EMAIL="you@example.com"
-SYNC_SEL=$(g_agents_list "$PROP" sync_platforms | tr '\n' ' ')
 
 if [ "$DRYRUN" -eq 1 ]; then
   g_info "gob init --write --dry-run: validated OK (class $CLASS, branch $BRANCH, owner $EMAIL, 1+ gate)"
-  g_info "  sync: ${SYNC_SEL:-none}"
   g_info "  would write: AGENTS.md (body + gob block), .gob/engine/, HANDOFF.md"
   exit 0
 fi
@@ -301,15 +296,6 @@ GOT_GATE=$(g_agents_gates "$CONFIG" | head -n 1 | awk -F'\t' '{print $2}')
 [ "$GOT_GATE" = "$GATE_CMD" ] || { g_err "the first gate did not land in $CONFIG (reader sees '$GOT_GATE', wanted '$GATE_CMD')"; exit 1; }
 [ "$(g_agents_read "$CONFIG" owner_email)" = "$EMAIL" ] || { g_err "owner_email did not land in $CONFIG"; exit 1; }
 
-# ------------------------------------------------------------- sync (hidden) ---
-# The sync-translator step (existing emit engine) runs for the platforms the proposal
-# named. A proposal that names none emits nothing — the neutral-first contract.
-for p in $SYNC_SEL; do
-  printf 'gob init [run] sync --platform %s --scope project\n' "$p"
-  bash "$SRC/bin/goblin-emit" --platform "$p" --scope project --target "$TARGET" || {
-    RC=$?; g_err "sync $p failed (exit $RC)"; exit "$RC"; }
-done
-
 # ------------------------------------------------------------- mcp config ------
 if [ "$WITH_MCP" -eq 1 ]; then
   do_mcp_config || exit 1
@@ -324,5 +310,4 @@ printf '  1. git add -A && git commit   # the install is uncommitted by design\n
 printf '  2. run .gob/bin/goblin-verify — the skipped rows are the day-one checklist\n'
 printf '  3. features/: gob map (agent brief) then gob map --write features/\n'
 printf '  4. register the verify tool for your agent: %s mcp add gob -- npx -y @techgoblin/gobstack mcp (or run gob init --with-mcp-config)\n' "$AGENT_CLI"
-[ -n "$SYNC_SEL" ] || printf '  5. agent skills are opt-in per platform\n'
 exit 0

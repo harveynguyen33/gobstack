@@ -1,9 +1,0 @@
-# adapters/hermes/adapter.tsv - W4A-SPEC SS2/SS8 P3/P4. Project path MEASURED = the installer's
-# own write (bin/goblin-install skills loop); global tier ~/.hermes/skills/ measured live.
-# external_dirs is a real skills-section key on this Hermes build (docs/user-guide/features/
-# skills, read 2026-09-29) - the doctor may REPORT it; emit never writes config.yaml (SS10.5).
-# No context block: bootstrap is the project's AGENTS.md naming the mode skill (the INTEGRATION
-# position). No post-compaction hook exists on this runtime (on_session_start's return is an
-# observer's, discarded; pre_llm_call is the injection point - hooks doc, same date).
-id	display	detect_any	skills_path_project	skills_path_global	context_path	docs_url	docs_read	cap_skills	cap_context_injection	cap_command_blocking	cap_marketplace	cap_post_compaction
-hermes	Hermes Agent	~/.hermes:hermes	.hermes/skills/<name>/SKILL.md	~/.hermes/skills/<name>/SKILL.md	-	https://hermes-agent.nousresearch.com/docs/user-guide/features/skills	2026-09-29	yes	partial	yes	no	no

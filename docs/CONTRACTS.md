@@ -25,7 +25,7 @@ same way the fleet's own tool reads it. Everything else is line-oriented shell.
                           flag keeps them; an explicit --skills no removes them.
     --dry-run             print the plan; write nothing
     --no-verify           skip the health check (goblin-verify) at the end; the wizard
-                          still installs and syncs, and prints the skip notice
+                          still installs, and prints the skip notice
     --upgrade             re-install at the current version; report created/updated/unchanged/skipped
     --opt-out <part>      record the part in disabled: so its required checks are skipped
     --uninstall           remove exactly the files in installed.json
