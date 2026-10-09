@@ -23,8 +23,6 @@
     "automations/",
     "bans/",
     "docs/",
-    "extras-catalogue/catalogue.tsv",
-    "extras-catalogue/payload/",
     "roles.yaml",
     "VERSION",
     "CHANGELOG.md"

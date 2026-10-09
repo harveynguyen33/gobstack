@@ -21,9 +21,8 @@ same way the fleet's own tool reads it. Everything else is line-oriented shell.
     --parts <list>        comma list to install; default = every part the class requires
     --archive             mark the project archive: verify requires no HANDOFF and no gates
     --skills yes|no       install agent skills under .hermes/skills (default no — the harness is
-                          neutral; opt in per catalogue row with: gob extras install <id...>). On a repo whose
-                          record already has skills installed, an OMITTED flag keeps them; an explicit
-                          --skills no removes them.
+                          neutral). On a repo whose record already has skills installed, an OMITTED
+                          flag keeps them; an explicit --skills no removes them.
     --dry-run             print the plan; write nothing
     --no-verify           skip the health check (goblin-verify) at the end; the wizard
                           still installs and syncs, and prints the skip notice

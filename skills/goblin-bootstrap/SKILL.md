@@ -13,8 +13,7 @@ Use when adopting goblin-stack in a repo, or starting one.
    with the electron bans and a host gate, not a sixth class. The letters `A`-`E` and the older
    names are read-time aliases.
 2. **`goblin-install --target <dir> --class <x>`** — the default install is a NEUTRAL harness:
-   no agent skills. Opt in per catalogue row afterwards with `gob extras install <id>` (or vendor the
-   Hermes project tier with `--skills yes`).
+   no agent skills. Vendor the Hermes project tier with `--skills yes` if you want them installed.
 3. **`goblin-verify`** — a default software-class install (no agent skills) verifies green:
    `37 passed, 0 failed, 11 advisory, 34 skipped`, exit 0, once `HANDOFF.md` names a commit that
    exists; before that edit the
