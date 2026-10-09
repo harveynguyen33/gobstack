@@ -31,7 +31,7 @@
 
 set -uo pipefail
 
-GOBLIN_INSTALL_VERSION="0.6.0-alpha.2"
+GOBLIN_INSTALL_VERSION="0.6.0-alpha.3"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC=$(cd "$SELF_DIR/.." && pwd)
 # shellcheck source=goblin-lib.sh
