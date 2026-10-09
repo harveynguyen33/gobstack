@@ -81,7 +81,6 @@ and prints the usage.
 | command | what it does |
 |---|---|
 | `gob init` | the first step: print the AGENT BRIEF + proposal schema; `--heuristic` appends scanned hints as a fallback; `--write <proposal> [--yes]` validates the proposal and installs; `--target <dir>` aims elsewhere; `--dry-run` validates without writing |
-| `gob map` | the feature-map prompt + schema (`--heuristic [target]` runs the starter scanner); `--write <dir> [--force]` validates an agent-written map and installs it; never clobbers — an existing map refuses until `--force` |
 | `gob verify` | run the rule matrix against the current repo — `PASS`/`FAIL`/`SKIP` per row, exit 0 pass · 1 a check failed · 2 could not run · 3 the manifest is broken |
 | `gob bans` | run the ban list (per-pattern red lines over the source tree) |
 | `gob mcp` | serve the harness to your coding agent over MCP stdio — three tools (`gob_verify`, `gob_map_status`, `gob_init_status`), local only, no SDK, no network |

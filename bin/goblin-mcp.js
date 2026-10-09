@@ -284,7 +284,7 @@ function toolGobMapStatus() {
   if (!fm) {
     return text(
       "feature_map: is empty — no map is declared, so there is nothing to index. " +
-      "Generate a starter with: gob map --heuristic"
+      "The map is mandatory: author it with `gob init` (the brief carries the feature-map schema)"
     );
   }
   const readme = path.resolve(root, fm);

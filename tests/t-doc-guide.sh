@@ -261,9 +261,9 @@ SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0
 # measurement — the plain installer this file walks never prints it. The guide teaches the wizard
 # path in §8's table, so the set this SUBSET accepts is both paths' union.
 WIZ_SHAPES=$(printf '%s\n' \
-  "33 passed, 2 failed, 6 advisory, 21 skipped" \
-  "34 passed, 1 failed, 6 advisory, 21 skipped" \
-  "35 passed, 0 failed, 6 advisory, 21 skipped")
+  "35 passed, 2 failed, 6 advisory, 19 skipped" \
+  "36 passed, 1 failed, 6 advisory, 19 skipped" \
+  "37 passed, 0 failed, 6 advisory, 19 skipped")
 MEASURED=$(printf '%s\n%s\n%s\n' "$DAYONE" "$GREEN" "$WIZ_SHAPES" | sort -u)
 SUBSET=0
 while IFS= read -r s; do

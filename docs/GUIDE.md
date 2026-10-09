@@ -177,7 +177,7 @@ You will see one line per rule. The shape:
 
 and a summary line at the bottom:
 
-    34 passed, 1 failed, 6 advisory, 21 skipped     # HP-05, below
+    36 passed, 1 failed, 6 advisory, 19 skipped     # HP-05, below
 
 ### How to read that output
 
@@ -193,24 +193,23 @@ nothing to read yet." On a brand-new install, three dozen rows skip — because 
 ban to scan, no feature map, no pinned pre-change commit. That is correct on day
 one. The list of what is still skipping *is* your onboarding checklist.
 
-### Feature maps: generate with `gob map`, then opt in
+### Feature maps: authored in the `gob init` proposal, mandatory
 
-The feature-map rows (`FM-01`, `FM-02`) are opt-in by declaration: while `feature_map:` in the
-AGENTS.md gob block is empty, both rows SKIP. When you are ready to keep a map honest, the flow
-is:
+The feature-map rows (`FM-01`, `FM-02`) are always live: `feature_map:` is a REQUIRED key, so
+there is no "no map declared" state and no standalone generator. The map is authored in the SAME
+pass as the install — the `gob init` brief's `## feature-map` section asks the agent to embed the
+files in the proposal: a `### features/README.md` index and one `### features/<slug>.md` per
+feature, each in a fenced block. `gob init --write` validates the whole map before it writes
+anything, then materialises `features/`.
 
-1. **Generate a starter.** `gob map --heuristic` works in any git repo — no install needed. It
-   scans the repo (Next.js app/pages router, Nuxt, route files, or top-level `src/`/`lib/`
-   module dirs as TODO placeholders) and writes `features/README.md` plus one file per detected
-   feature. It never clobbers: an existing `features/` refuses until `--force`, which regenerates
-   only the index and adds new slugs — your hand-edited feature files are never rewritten.
-2. **Hand-pass every file.** The generated files say so themselves: a `verified: never-driven
-   (generated <date>)` line is not a drive claim. Edit each one into a real feature description
-   with concrete entry paths and driving steps.
-3. **Then, optionally, declare it.** Set `feature_map: features/README.md` in the AGENTS.md gob
-   block and `FM-01`/`FM-02` start reading it on every verify — that declaration is the
-   verify opt-in, never forced. A repo that wants the generator but not the rows can run
-   `gob map` and never declare anything.
+Per feature file: frontmatter with `feature:` equal to the filename stem, >=1 `entry_paths:`
+item (each a single whitespace-free token), and exactly the four H2s in order — `Sub-features`,
+`How to get to it (user POV)`, `Driving it with <harness>`, `Gotchas`. The README index must link
+every feature as `(./<slug>.md)` and every relative link must resolve. `--write` resolves every
+entry path at write time: it must EXIST and be TRACKED (`git ls-files`), so a map cannot claim a
+`verified:` date over uncommitted source — `verified: never-driven (<date>)` is the honest
+day-one line, not a drive claim. A repo with no committed file to map refuses with a named
+remedy — commit at least one file, then run again.
 
 **Read the failure messages.** They are written to be actionable, not decorative. `HP-05` above is
 telling you the HANDOFF does not yet name a commit — fix it by naming your HEAD in the `State`
@@ -220,9 +219,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `33 passed, 2 failed, 6 advisory, 21 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
-| 2. the first commit | `git add -A && git commit` | `34 passed, 1 failed, 6 advisory, 21 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `35 passed, 0 failed, 6 advisory, 21 skipped` | none — green |
+| 1. the install ran | `gob init --write ... --yes` | `35 passed, 2 failed, 6 advisory, 19 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
+| 2. the first commit | `git add -A && git commit` | `36 passed, 1 failed, 6 advisory, 19 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `37 passed, 0 failed, 6 advisory, 19 skipped` | none — green |
 
 One of those deserves its name spelled out:
 
@@ -448,14 +447,14 @@ A software-class install lands on a specific shape. The first reds are
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    33 passed, 2 failed, 6 advisory, 21 skipped     # straight after the install (CM-03 + SP-02)
-    34 passed, 1 failed, 6 advisory, 21 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
-    35 passed, 0 failed, 6 advisory, 21 skipped     # real HEAD named and committed: green
+    35 passed, 2 failed, 6 advisory, 19 skipped     # straight after the install (CM-03 + SP-02)
+    36 passed, 1 failed, 6 advisory, 19 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
+    37 passed, 0 failed, 6 advisory, 19 skipped     # real HEAD named and committed: green
 
 Name a real commit in `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is
 green:
 
-    35 passed, 0 failed, 6 advisory, 21 skipped     (on a real project; your numbers will differ)
+    37 passed, 0 failed, 6 advisory, 19 skipped     (on a real project; your numbers will differ)
 
 **Thirty-two rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
@@ -497,7 +496,7 @@ itself with the vendored manifest, because that is the manifest its install reco
 (`docs/LIMITS.md` #54). A declared but unusable `engine_dir:` is verify **exit 2 with no
 fallback** — a repo is never judged by an engine it did not declare. The engine's own identity
 prints in every run's footer (`engine: mode=vendored cli_sha256=… enforcement_tsv_sha256=…`). The
-same commands are available outside any repo through the npm CLI: `gob init` / `gob map` /
+same commands are available outside any repo through the npm CLI: `gob init` /
 `gob verify` / `gob bans` / `gob --version`.
 
 **Two exit-code contracts worth knowing:**
@@ -518,7 +517,6 @@ same commands are available outside any repo through the npm CLI: `gob init` / `
 
     gob init [--heuristic] [--write <proposal>] [--target <dir>] [--dry-run] [--yes]
              [--with-mcp-config]
-    gob map [--heuristic [target]] [--write <dir>] [--force]
     gob mcp                                  # the MCP stdio server (three tools, local only)
 
     .gob/bin/goblin-verify [--only <id[,id...]>] [--json] [--list]

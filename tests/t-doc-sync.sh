@@ -413,22 +413,16 @@ for f in README.md docs/GUIDE.md; do
   fi
 done
 
-# ---- gob map: the standalone generator is documented where a reader decides -----
-# The docs must teach BOTH halves of the product decision (2026-10): the generator is
-# standalone (works with no .gob/ install and no AGENTS.md gob block), AND the FM-01/FM-02
-# rows stay opt-in through the feature_map: declaration — generating a map never forces
-# the rows on. Each asserted sentence is the pin for its own edit; the generator
-# behaviour itself is t-map.sh and the shim's SH9.
-norm_text README.md | grep -q 'gob map . the feature-map prompt . schema'
-check "README's command table carries the gob map row" "$?"
-norm_text README.md | grep -q 'never clobbers . an existing map refuses until --force'
-check "README's gob map row states the never-clobber contract" "$?"
-norm_text docs/GUIDE.md | grep -q 'feature maps: generate with gob map , then opt in'
-check "docs/GUIDE.md has the feature-map section" "$?"
-norm_text docs/GUIDE.md | grep -q 'no install needed'
-check "the GUIDE section states the standalone contract (no install)" "$?"
-norm_text docs/GUIDE.md | grep -q 'that declaration is the verify opt-in, never forced'
-check "the GUIDE section states FM-01/FM-02 stay opt-in (the declaration decides)" "$?"
+# ---- the feature map: authored in the init proposal, no standalone verb ---------------------
+# v3 folds the map into `gob init`: the docs must teach the mandatory map authored INSIDE the
+# proposal, and must NOT hand a reader a `gob map` command (the verb is gone). Each asserted
+# sentence is the pin for its own edit; the validation itself is bin/goblin-map + t-init.sh.
+if norm_text README.md | grep -q 'gob map . the feature-map prompt . schema'; then RM=1; else RM=0; fi
+check "README's command table carries no gob map row" "$RM"
+norm_text docs/GUIDE.md | grep -q 'feature maps: authored in the gob init proposal, mandatory'
+check "docs/GUIDE.md has the v3 feature-map section" "$?"
+norm_text docs/GUIDE.md | grep -q 'no .no map declared. state'
+check "the GUIDE section states the map is mandatory (no empty state)" "$?"
 norm_text docs/GUIDE.md | grep -q 'verified: never-driven'
 check "the GUIDE section teaches the never-driven verified form is not a drive claim" "$?"
 

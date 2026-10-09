@@ -7,7 +7,6 @@
 //
 // v2 SURFACE (AI-driven development):
 //   gob init    [...]                     -> bin/goblin-init (the prompt+schema engine)
-//   gob map    [...]                      -> bin/goblin-map (prompt+schema; --heuristic fallback)
 //   gob verify [...]                      -> bin/goblin-verify
 //   gob bans   [...]                      -> bin/goblin-bans
 //   gob mcp                               -> bin/goblin-mcp.js (the MCP stdio server)
@@ -36,7 +35,7 @@ if (arg0 === "--version" || arg0 === "-V" || arg0 === "-v") {
   process.exit(0);
 }
 
-const SCRIPT = { init: "goblin-init", map: "goblin-map", verify: "goblin-verify", bans: "goblin-bans", mcp: "goblin-mcp.js" };
+const SCRIPT = { init: "goblin-init", verify: "goblin-verify", bans: "goblin-bans", mcp: "goblin-mcp.js" };
 const [cmd, ...rest] = process.argv.slice(2);
 
 // No args, a help flag, or an unrecognized first arg: short usage, exit 2. A bare
@@ -50,8 +49,7 @@ function usage() {
 "  gob init      start here — prints the agent brief + proposal schema; --write installs it",
 "  gob verify    run the rule matrix against the current repo",
 "  gob bans      run the ban list (per-pattern red lines over the source tree)",
-"  gob map       print the feature-map prompt + schema; --heuristic scans instead",
-"  gob mcp       serve the harness to your agent over MCP stdio (verify/map/init tools)",
+"  gob mcp       serve the harness to your agent over MCP stdio (verify/init tools)",
 "  gob uninstall --target .          remove exactly what an install wrote (preimages)",
 "",
 "start here: npx @techgoblin/gobstack init",

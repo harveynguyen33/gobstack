@@ -67,7 +67,7 @@ fi
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
          t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin \
          t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-version-sync \
-         t-init t-banner-stderr t-shim t-map t-mcp; do
+         t-init t-banner-stderr t-shim t-mcp; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi
@@ -82,6 +82,9 @@ done
 #   t-audit.sh, t-emit.sh, t-doctor.sh — audit/emit/doctor are UNWIRED in v2 (the shim
 #     refuses the verbs); the suites tested commands no reader can reach. They return with
 #     the commands in session 3, re-measured, or not at all.
+#   t-map.sh — folded into t-init.sh: the feature map is no longer a standalone verb
+#     (`gob map` is gone); `gob init --write` validates the map embedded in the proposal
+#     in the same pass as the config block.
 
 echo
 if [ "$FAIL" -eq 0 ]; then echo "run-tests: PASS"; else echo "run-tests: FAIL"; fi

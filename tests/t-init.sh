@@ -54,7 +54,7 @@ init_env() { # the engine's environment: sandbox HOME, no host anchors, no tty o
         timeout 120 bash "$SRC/bin/goblin-init" "$@"; } 2>&1
 }
 
-proposal() { # <file> <class> [extra lines...] — a minimal valid proposal
+proposal() { # <file> <class> [extra lines...] — a minimal valid proposal (with a feature map)
   local f="$1" cls="$2"; shift 2
   {
     printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
@@ -62,9 +62,57 @@ proposal() { # <file> <class> [extra lines...] — a minimal valid proposal
     printf 'branch: main\n'
     printf 'owner_email: runner@example.com\n'
     printf 'gate_commit_cmd: bash tests/run-tests.sh\n'
+    printf 'feature_map: features/README.md\n'
     [ $# -eq 0 ] || printf '%s\n' "$@"
     printf '<!-- gob:end -->\n'
+    printf '\n## gob init summary\n\n- the probe: class %s, one real gate, a one-feature map\n' "$cls"
+    map_block
   } > "$f"
+}
+
+map_block() { # the `## feature-map` half every proposal now carries
+  cat <<'MAPEOF'
+## feature-map
+
+### features/README.md
+
+```md
+# Features
+
+- [readme](./readme.md) — the probe README
+```
+
+### features/readme.md
+
+```md
+---
+feature: readme
+entry_paths:
+  - README.md
+verified: never-driven (2024-01-01)
+---
+# readme
+
+The probe repository's README.
+
+## Sub-features
+
+- the readme file
+
+## How to get to it (user POV)
+
+- open the repository root
+
+## Driving it with bash
+
+Preconditions: a checkout.
+**Read.** Run `cat README.md`. The file prints.
+
+## Gotchas
+
+- nothing has been driven yet; the verified line says so.
+```
+MAPEOF
 }
 
 # ---- B1: the bare brief --------------------------------------------------------
@@ -115,6 +163,10 @@ check "the install record carries the skills opt-out" "$?"
 # defaults, then --write merged the proposal's own keys over them.
 grep -qF "class: software" "$REPO/AGENTS.md"
 check "the declared class landed in the gob block" "$?"
+grep -qxF "feature_map: features/README.md" "$REPO/AGENTS.md"
+check "feature_map landed in the AGENTS.md gob block" "$?"
+[ -f "$REPO/features/README.md" ] && [ -f "$REPO/features/readme.md" ]
+check "the embedded feature map was materialised at features/ (index + readme.md)" "$?"
 
 # ---- B3: the validation refusals --------------------------------------------------
 new_repo b3
@@ -167,6 +219,71 @@ printf '%s' "$OUT3E" | grep -qF "HANDOFF.md"
 check "the refusal names the path" "$?"
 [ "$(sha256sum "$REPO/HANDOFF.md" | awk '{print $1}')" = "$OWN_HANDOFF" ]
 check "the project's own HANDOFF.md is byte-identical" "$?"
+
+# ---- B3c: one proposal, one pass — the feature map is REQUIRED and validated --------
+# (folded from the deleted t-map.sh: the map is no longer made by a standalone verb; it is
+# validated inside `gob init --write`, in the same pass as the config block.)
+new_repo b3c
+# (a) no feature_map key at all
+P3F="$WORK/proposal-b3f-nomap.md"
+{
+  printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
+  printf 'class: software\nbranch: main\nowner_email: runner@example.com\n'
+  printf 'gate_commit_cmd: bash tests/run-tests.sh\n'
+  printf '<!-- gob:end -->\n\n## gob init summary\n\n- no map\n'
+} > "$P3F"
+OUT3F=$(init_env --target "$REPO" --write "$P3F" < /dev/null); RC3F=$?
+check "a proposal with no feature_map exits 2" "$([ "$RC3F" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3F" | grep -qF "declares no feature_map"
+check "the refusal names feature_map as the missing key" "$?"
+[ ! -e "$REPO/AGENTS.md" ] && [ ! -e "$REPO/.gob" ] && [ ! -e "$REPO/features" ]
+check "  and it wrote NOTHING" "$?"
+
+# (b) feature_map declared, but the `## feature-map` section is absent
+P3G="$WORK/proposal-b3g-nosection.md"
+{
+  printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
+  printf 'class: software\nbranch: main\nowner_email: runner@example.com\n'
+  printf 'gate_commit_cmd: bash tests/run-tests.sh\nfeature_map: features/README.md\n'
+  printf '<!-- gob:end -->\n'
+} > "$P3G"
+OUT3G=$(init_env --target "$REPO" --write "$P3G" < /dev/null); RC3G=$?
+check "a proposal with feature_map but no feature-map section exits 2" "$([ "$RC3G" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3G" | grep -qF "feature-map blocks"
+check "the refusal names the missing section" "$?"
+[ ! -e "$REPO/AGENTS.md" ] && [ ! -e "$REPO/features" ]
+check "  and it wrote NOTHING" "$?"
+
+# (c) a map whose entry path does not resolve (FM-02 at write time)
+P3H="$WORK/proposal-b3h-badpath.md"
+{
+  printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
+  printf 'class: software\nbranch: main\nowner_email: runner@example.com\n'
+  printf 'gate_commit_cmd: bash tests/run-tests.sh\nfeature_map: features/README.md\n'
+  printf '<!-- gob:end -->\n\n## gob init summary\n\n- a broken entry path\n\n## feature-map\n\n'
+  printf '### features/README.md\n\n```md\n# Features\n\n- [ghost](./ghost.md) — a feature that does not resolve\n```\n\n'
+  printf '### features/ghost.md\n\n```md\n---\nfeature: ghost\nentry_paths:\n  - does-not-exist.ts\nverified: never-driven (2024-01-01)\n---\n'
+  printf '# ghost\n\nA feature whose entry path is not committed.\n\n## Sub-features\n\n- x\n\n## How to get to it (user POV)\n\n- x\n\n## Driving it with bash\n\nRun `true`.\n\n## Gotchas\n\n- x\n```\n'
+} > "$P3H"
+OUT3H=$(init_env --target "$REPO" --write "$P3H" < /dev/null); RC3H=$?
+check "a map with an unresolvable entry path exits 2" "$([ "$RC3H" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3H" | grep -qF "does-not-exist.ts"
+check "the refusal names the entry path that does not resolve" "$?"
+[ ! -e "$REPO/AGENTS.md" ] && [ ! -e "$REPO/features" ]
+check "  and it wrote NOTHING" "$?"
+
+# (d) an empty repo (no committed file to map) refuses with the named remedy
+EMPTY="$WORK/b3c-empty"
+mkdir -p "$EMPTY"
+( cd "$EMPTY" && git init -q -b main && git config user.name "Test Runner" && git config user.email runner@example.com ) >/dev/null 2>&1
+P3I="$WORK/proposal-b3i.md"
+proposal "$P3I" software
+OUT3I=$(init_env --target "$EMPTY" --write "$P3I" < /dev/null); RC3I=$?
+check "an empty repo (no committed file) exits 2" "$([ "$RC3I" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3I" | grep -qF "commit at least one file, then run again"
+check "the refusal names the remedy" "$?"
+[ "$( cd "$EMPTY" && find . -path ./.git -prune -o -type f -print )" = "" ]
+check "  and it invented no bootstrap feature" "$?"
 
 # ---- B4: --dry-run validates and writes nothing ------------------------------------
 new_repo b4

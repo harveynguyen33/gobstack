@@ -360,8 +360,12 @@ OUT=$(cd "$R" && bash "$SRC/bin/goblin-init" --write /dev/null 2>&1); true
 PRO="$R/.gob-init-proposal.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'class: software\nbranch: main\nowner_email: runner@example.com\ngate_commit_cmd: true\n'
+  printf 'class: software\nbranch: main\nowner_email: runner@example.com\ngate_commit_cmd: true\nfeature_map: features/README.md\n'
   printf '<!-- gob:end -->\n'
+  printf '\n## gob init summary\n\n- M10\n\n## feature-map\n\n'
+  printf '### features/README.md\n\n```md\n# Features\n\n- [readme](./readme.md) — the repo readme\n```\n\n'
+  printf '### features/readme.md\n\n```md\n---\nfeature: readme\nentry_paths:\n  - README.md\nverified: never-driven (2024-01-01)\n---\n'
+  printf '# readme\n\nx\n\n## Sub-features\n\n- x\n\n## How to get to it (user POV)\n\n- x\n\n## Driving it with bash\n\nRun `cat README.md`.\n\n## Gotchas\n\n- x\n```\n'
 } > "$PRO"
 OUT=$(cd "$R" && bash "$SRC/bin/goblin-init" --write "$PRO" --yes 2>&1)
 printf '%s' "$OUT" | grep -q 'claude mcp add gob'

@@ -7,24 +7,26 @@
 #   gob init --target <dir>                   aim at a directory that is not $PWD
 #   gob init --with-mcp-config                write .mcp.json (repo-distributed MCP
 #                                             registration; ask-once, never overwrites)
-#   gob init --dry-run                        --write without writing anything
+#   gob init --dry-run                        --write without writing anything (and without
+#                                             running the declared gate)
 #
 # The CLI calls NO AI API. A bare `gob init` prints:
 #   1. the AGENT BRIEF — a structured prompt telling whichever agent is already running
-#      in this repo (the coding agent the developer already uses) exactly what to scan
-#      (package.json, routes, tests, CI configs) and what to decide (class, branch,
-#      owner email, the first gate command);
-#   2. the SCHEMA of the proposal file the agent must write — AGENTS.md frontmatter
-#      pre-filled + a `## gob init summary` section.
+#      in this repo exactly what to scan (package.json, routes, tests, CI configs) and
+#      what to decide (class, branch, owner email, the first gate command, the feature map);
+#   2. the SCHEMA of the proposal file the agent must write — the gob block + a
+#      `## gob init summary` section + a `## feature-map` section embedding the files.
 # The agent fulfils the brief with its own tools, writes the proposal, and the human (or
 # the agent's own next step) runs `gob init --write <proposal>` to validate and install:
 #   - the frontmatter keys are validated against the engine's key set (unknown key,
 #     bad class, non-boolean archive -> exit 2, nothing written);
-#   - AGENTS.md (body + gob block) and .gob/engine (the vendored verifier + manifest)
-#     are written; HANDOFF.md is written once. CI is never part of any output.
+#   - the embedded feature map is validated by bin/goblin-map (FM-01 shape + FM-02
+#     resolvability) in the SAME pass, before anything is written;
+#   - AGENTS.md (body + gob block), .gob/engine (the vendored verifier + manifest) and
+#     features/ are written; HANDOFF.md is written once. CI is never part of any output.
 #
-# The heuristic detector (package.json scripts + route tokens, from bin/goblin-map) is
-# the --heuristic FALLBACK: appended to the brief as pre-scanned hints, never the answer.
+# The heuristic detector (package.json scripts + route tokens) is the --heuristic FALLBACK:
+# appended to the brief as pre-scanned hints, never the answer.
 #
 # Exit codes: 0 printed or installed | 1 a refusal (named path + fix) | 2 bad input.
 # No npm, no jq, no yq, no network, no AI API. bash/awk/sed/grep only.
@@ -114,8 +116,9 @@ back one proposal file. Do this now:
    - class: software | service | game | research | fleet
    - branch: the default branch (main/master/…)
    - owner_email: the commit identity this repo expects
-   - gate_commit_cmd: ONE command that proves the repo is healthy and must stay green
-     (a real test/lint command from package.json — never a placeholder)
+   - gate_commit_cmd: ONE command that proves the repo is healthy and must stay green.
+   - feature_map: the map's README path (the convention is features/README.md). REQUIRED —
+     there is no "no map declared" state.
 
 3. WRITE the proposal file exactly in the SCHEMA below, at a path you choose (for
    example .gob-init-proposal.md), then run:
@@ -127,6 +130,9 @@ Notes:
      (app->software, agent->fleet, desktop->software+electron).
    - A second gate is optional: gate_<name>_cmd, e.g. gate_todo_cmd.
    - Keys you do not set are filled from the class default by --write.
+   - --write validates BOTH halves in one pass: the config block AND the embedded feature
+     map (FM-01 shape + FM-02 resolvability: every entry path exists AND is committed).
+     A repo with no committed file to map REFUSES — commit at least one file, then run again.
 
 == PROPOSAL SCHEMA =============================================================
 
@@ -135,12 +141,59 @@ class: <software|service|game|research|fleet>
 branch: <default branch>
 owner_email: <commit identity>
 gate_<name>_cmd: <one shell command that must stay green>
+feature_map: features/README.md
+source_root: .
 <!-- gob:end -->
 
 ## gob init summary
 
 - <one bullet per decision: what you scanned, what you chose, why>
 - <framework / package manager / test command found>
+
+## feature-map
+
+### features/README.md
+
+```md
+# Features
+
+- [<slug>](./<slug>.md) — <one line>
+```
+
+### features/<slug>.md
+
+```md
+---
+feature: <slug — lowercase [a-z0-9-], equals the filename stem>
+entry_paths:
+  - <repo-relative path that exists AND is committed (git ls-files)>
+verified: never-driven (<today>)
+---
+# <slug>
+
+<one user-visible paragraph, no implementation detail>
+
+## Sub-features
+
+- <the sub-behaviours, one per line>
+
+## How to get to it (user POV)
+
+- <how a user reaches this feature, and what they should see>
+
+## Driving it with <harness>
+
+Preconditions: <what must be true first>.
+**<action>.** Run `<exact command>`. <the observable result.>
+
+## Gotchas
+
+- <what commonly breaks, or what the entry-path token does and does not prove>
+```
+
+(embed one `### <dir>/<slug>.md` block per feature; every feature must be linked from the
+README index in the `(./<slug>.md)` form. `feature:` must equal the filename stem, and the
+four H2s above are required, in order.)
 ============================================================================== ==
 BRIEF
 }
@@ -169,6 +222,45 @@ print_heuristic() {
     printf 'no package.json, no src/ — the scan above is empty; say so in the summary\n'
   fi
   printf '\n'
+}
+
+# ------------------------------------------------------------------ the map -----
+# Extract the proposal's `## feature-map` section. Each `### <path>` heading is followed
+# by a fenced code block whose body is the file at <path> (repo-relative). Writes into
+# <stage-dir>/<path> and prints the number of `### ` blocks found. This is the ONLY reader
+# of the map half of the proposal; the SHAPE is then validated by bin/goblin-map (the same
+# code path `gob map --write` used), never re-implemented here.
+extract_feature_map() {  # <proposal> <stage-dir> -> block count on stdout
+  local prop="$1" stage="$2" p
+  # awk cannot mkdir: create every declared path's parent directory first.
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    mkdir -p "$stage/$(dirname "$p")" || return 1
+  done < <(awk '
+    /^```/ { fence = !fence; next }
+    !inmap { if (!fence && $0 ~ /^##[[:space:]]+[Ff]eature-map[[:space:]]*$/) inmap=1; next }
+    !fence {
+      if ($0 ~ /^##[[:space:]]/) { inmap=0; next }
+      if ($0 ~ /^###[[:space:]]+/) { p=$0; sub(/^###[[:space:]]+/,"",p); sub(/[[:space:]]+$/,"",p); print p }
+    }
+  ' "$prop")
+  # then write the fenced-block bodies. Fence-aware: a feature file's own `## ` H2s and any
+  # `### ` inside its fenced body are CONTENT, never the section's structure.
+  awk -v stage="$stage" '
+    function flush() { if (out != "") { close(out); out="" } }
+    /^```/ { fence = !fence; next }
+    !inmap { if (!fence && $0 ~ /^##[[:space:]]+[Ff]eature-map[[:space:]]*$/) inmap=1; next }
+    !fence {
+      if ($0 ~ /^##[[:space:]]/) { inmap=0; flush(); next }
+      if ($0 ~ /^###[[:space:]]+/) {
+        flush(); p=$0; sub(/^###[[:space:]]+/,"",p); sub(/[[:space:]]+$/,"",p)
+        out = stage "/" p; n++; next
+      }
+      next
+    }
+    { if (out != "") print >> out }
+    END { print n+0 }
+  ' "$prop"
 }
 
 if [ -z "$WRITE" ]; then
@@ -221,6 +313,12 @@ g_class_is_electron_alias "$CLASS_RAW" && ELECTRON=1
 GATE_NAME=$(g_agents_gates "$PROP" | head -n 1 | awk -F'\t' '{print $1}')
 GATE_CMD=$(g_agents_gates "$PROP" | head -n 1 | awk -F'\t' '{print $2}')
 [ -n "$GATE_CMD" ] || { g_err "$PROP declares no gate — the brief requires at least one gate_<name>_cmd"; exit 2; }
+
+# feature_map is REQUIRED for every class (DECISION, 2026-10-09): the map is mandatory, so
+# there is no "no map declared" state. A proposal without it, or with it empty, refuses here.
+FEATURE_MAP=$(g_agents_read "$PROP" feature_map)
+[ -n "$FEATURE_MAP" ] || { g_err "$PROP declares no feature_map — add 'feature_map: features/README.md' to the gob block and a '## feature-map' section (the brief's SCHEMA); the map is mandatory for every class"; exit 2; }
+
 BRANCH=$(g_agents_read "$PROP" branch)
 [ -n "$BRANCH" ] || BRANCH=$( cd "$TARGET" && git rev-parse --abbrev-ref HEAD 2>/dev/null )
 [ -n "$BRANCH" ] || BRANCH=main
@@ -228,9 +326,37 @@ EMAIL=$(g_agents_read "$PROP" owner_email)
 [ -n "$EMAIL" ] || EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
 [ -n "$EMAIL" ] || EMAIL="you@example.com"
 
+# The map's directory, relative to the repo root. feature_map names the README (the value
+# verify reads); the map lives in a directory of its own, never the repo root.
+MAPDIR_REL=$(dirname "$FEATURE_MAP")
+[ "$MAPDIR_REL" != "." ] || { g_err "feature_map must name a directory of its own (e.g. features/README.md), not the repo root"; exit 2; }
+
+# Empty repo: no committed file to map. The map's entry paths are committed files, so a repo
+# with nothing committed cannot carry a resolvable map. Refuse with the named remedy — no
+# bootstrap feature is invented (a feature with no resolvable entry path is an assertion,
+# not a count).
+if [ -z "$( cd "$TARGET" && git ls-files 2>/dev/null | head -n 1 )" ]; then
+  g_err "the target has no committed file to map — commit at least one file, then run again"; exit 2
+fi
+
+# Validate BOTH halves in ONE pass, before anything is written. The map the proposal embeds
+# is extracted to a staging dir and handed to bin/goblin-map (the SAME validator `gob map
+# --write` used): the FM-01 shape plus FM-02 resolvability (exists AND tracked) against the
+# target. Nothing is written unless it validates.
+STAGE=$(mktemp -d "${TMPDIR:-/tmp}/goblin-init.map.XXXXXX") || { g_err "mktemp failed"; exit 2; }
+trap 'rm -rf "$STAGE"' EXIT
+BLOCKS=$(extract_feature_map "$PROP" "$STAGE") || { g_err "could not read the proposal's feature-map section"; exit 2; }
+[ "${BLOCKS:-0}" -ge 1 ] || { g_err "$PROP carries no feature-map blocks — the SCHEMA needs a '### $MAPDIR_REL/README.md' block and one '### $MAPDIR_REL/<slug>.md' per feature"; exit 2; }
+[ -d "$STAGE/$MAPDIR_REL" ] || { g_err "the proposal's feature-map blocks are not under '$MAPDIR_REL' (the directory of the declared feature_map: $FEATURE_MAP)"; exit 2; }
+if ! MAP_OUT=$(bash "$SRC/bin/goblin-map" --validate "$STAGE/$MAPDIR_REL" --root "$TARGET" 2>&1); then
+  printf '%s\n' "$MAP_OUT" >&2
+  g_err "the proposal's feature map failed validation (FM-01/FM-02) — fix the file(s) named above; nothing was written"
+  exit 2
+fi
+
 if [ "$DRYRUN" -eq 1 ]; then
-  g_info "gob init --write --dry-run: validated OK (class $CLASS, branch $BRANCH, owner $EMAIL, 1+ gate)"
-  g_info "  would write: AGENTS.md (body + gob block), .gob/engine/, HANDOFF.md"
+  g_info "gob init --write --dry-run: validated OK (class $CLASS, branch $BRANCH, owner $EMAIL, 1+ gate, feature map '$FEATURE_MAP')"
+  g_info "  would write: AGENTS.md (body + gob block), .gob/engine/, HANDOFF.md, $MAPDIR_REL/"
   exit 0
 fi
 
@@ -293,6 +419,14 @@ CONFIG="$TARGET/AGENTS.md"
 GOT_GATE=$(g_agents_gates "$CONFIG" | head -n 1 | awk -F'\t' '{print $2}')
 [ "$GOT_GATE" = "$GATE_CMD" ] || { g_err "the first gate did not land in $CONFIG (reader sees '$GOT_GATE', wanted '$GATE_CMD')"; exit 1; }
 [ "$(g_agents_read "$CONFIG" owner_email)" = "$EMAIL" ] || { g_err "owner_email did not land in $CONFIG"; exit 1; }
+[ "$(g_agents_read "$CONFIG" feature_map)" = "$FEATURE_MAP" ] || { g_err "feature_map did not land in $CONFIG (reader sees '$(g_agents_read "$CONFIG" feature_map)', wanted '$FEATURE_MAP')"; exit 1; }
+
+# --------------------------------------------------------------- feature map ----
+# Materialise the map the proposal embedded (validated above, before anything was written).
+mkdir -p "$TARGET/$MAPDIR_REL" || { g_err "could not create $TARGET/$MAPDIR_REL"; exit 1; }
+cp -R "$STAGE/$MAPDIR_REL/." "$TARGET/$MAPDIR_REL/" 2>/dev/null \
+  || { g_err "could not write the feature map into $TARGET/$MAPDIR_REL"; exit 1; }
+[ -f "$TARGET/$FEATURE_MAP" ] || { g_err "the feature map did not land at $TARGET/$FEATURE_MAP"; exit 1; }
 
 # ------------------------------------------------------------- mcp config ------
 if [ "$WITH_MCP" -eq 1 ]; then
@@ -305,7 +439,6 @@ printf 'gob init: installed — class %s, branch %s, owner %s\n' "$CLASS" "$BRAN
 printf '  harness: %s/.gob/bin/goblin-verify\n' "$TARGET"
 printf 'next:\n'
 printf '  1. git add -A && git commit   # the install is uncommitted by design\n'
-printf '  2. run .gob/bin/goblin-verify — the skipped rows are the day-one checklist\n'
-printf '  3. features/: gob map (agent brief) then gob map --write features/\n'
-printf '  4. register the verify tool for your agent: %s mcp add gob -- npx -y @techgoblin/gobstack mcp (or run gob init --with-mcp-config)\n' "$AGENT_CLI"
+printf '  2. run .gob/bin/goblin-verify — GT-02 re-runs the gate you declared; a day-one red is expected\n'
+printf '  3. register the verify tool for your agent: %s mcp add gob -- npx -y @techgoblin/gobstack mcp (or run gob init --with-mcp-config)\n' "$AGENT_CLI"
 exit 0
