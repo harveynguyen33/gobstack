@@ -14,9 +14,8 @@
 //   gob uninstall [--target <dir>]        -> bin/goblin-install --uninstall
 //   no args | -h/--help | any other first arg -> this file's short usage, exit 2.
 //
-// UNWIRED (code kept, deletion is session 3): audit, doctor,
-// install. The usage() list is the product's contract: a verb absent from it is refused,
-// naming what replaced it — never silently executed.
+// UNWIRED (code kept, deletion is session 3): audit, install. The usage() list is the product's
+// contract: a verb absent from it is refused, naming what replaced it — never silently executed.
 //
 // Non-negotiables: args are passed as an ARRAY, never a shell string (no injection
 // surface); `bash` is named explicitly (a packager stripping the executable bit must not

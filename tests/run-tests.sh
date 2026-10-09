@@ -34,7 +34,7 @@ line() { printf '%-34s %s\n' "$1" "$2"; }
 # ---- syntax ------------------------------------------------------------------
 SYNTAX_OK=0
 for f in bin/goblin-install bin/goblin-verify bin/goblin-model bin/goblin-lib.sh \
-         bin/goblin-doctor bin/goblin-init \
+         bin/goblin-init \
          tests/run-tests.sh tests/t-*.sh templates/checks/gate.sh.tmpl; do
   bash -n "$f" 2>/dev/null || { SYNTAX_OK=1; printf 'syntax error: %s\n' "$f"; }
 done

@@ -76,7 +76,7 @@ The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
 ## The `gob` CLI
 
 The v2 surface is six verbs — `init`, `map`, `verify`, `bans`, `mcp`, `uninstall`. Everything
-else — audit, doctor, install — is unwired in this alpha: the shim refuses the verb by name
+else — audit, install — is unwired in this alpha: the shim refuses the verb by name
 and prints the usage.
 
 | command | what it does |

@@ -357,7 +357,7 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
 42. **The doc walk cannot read a path broken at the directory/name boundary.**
     `tests/t-doc-promises.sh` reads a command directory only as `.goblin/bin/` or `bin/` **with its
     trailing slash**; when a line ends on the bare directory (`.goblin/bin`, `bin`) and the slash
-    leads the next line (`/goblin-doctor`) or is dropped (`goblin-doctor`), the directory and its
+    leads the next line (`/goblin-verify`) or is dropped (`goblin-verify`), the directory and its
     continuation are both invisible — the first fragment stops before the name the grammar needs, the
     second is not preceded by `bin/`, so neither is a token and neither is asserted. Measured
     2026-09-26 (AB7): a plant of that form is reported **`PASS`, rc 0**, mentioning

@@ -565,7 +565,7 @@ check_in_02() {
         # W4a (§5.3/§5.2): the procedure tier is EMITTED per platform, not carried in the
         # repo - a recorded .hermes/skills/ file absent from disk is the tier living at its
         # emitted paths, not drift. A copy that IS present must still hash true (a stale or
-        # hand-edited shadow is exactly what --unshadow/doctor exist to surface).
+        # hand-edited shadow is exactly what the drift check exists to surface).
         .hermes/skills/*)
           [ -e "$ROOT/$p" ] || continue ;;
       esac
