@@ -115,6 +115,20 @@ Preconditions: a checkout.
 MAPEOF
 }
 
+proposal_gate() { # <file> <class> <gate-cmd> — a valid proposal with a chosen gate command
+  local f="$1" cls="$2" gate="$3"
+  {
+    printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
+    printf 'class: %s\n' "$cls"
+    printf 'branch: main\nowner_email: runner@example.com\n'
+    printf 'gate_commit_cmd: %s\n' "$gate"
+    printf 'feature_map: features/README.md\n'
+    printf '<!-- gob:end -->\n'
+    printf '\n## gob init summary\n\n- the probe with a chosen gate\n'
+    map_block
+  } > "$f"
+}
+
 # ---- B1: the bare brief --------------------------------------------------------
 new_repo b1
 OUT=$(init_env --target "$REPO" < /dev/null); RC=$?
@@ -167,6 +181,46 @@ grep -qxF "feature_map: features/README.md" "$REPO/AGENTS.md"
 check "feature_map landed in the AGENTS.md gob block" "$?"
 [ -f "$REPO/features/README.md" ] && [ -f "$REPO/features/readme.md" ]
 check "the embedded feature map was materialised at features/ (index + readme.md)" "$?"
+printf '%s' "$OUT2" | grep -qF "measured exit code: 0"
+check "the declared gate was RUN and its exit code printed" "$?"
+
+# ---- B2b: the gate is RUN, not guessed (P7) ----------------------------------------
+# A command that CANNOT be run at all is not a gate: refuse, write nothing. A command that
+# RUNS and exits non-zero is a legitimate day-one red: accept it and install.
+new_repo b2b
+# (a) a gate command that does not exist
+P2B="$WORK/proposal-b2b-badgate.md"
+proposal_gate "$P2B" software "no-such-command-xyz-42"
+OUT2B=$(init_env --target "$REPO" --write "$P2B" < /dev/null); RC2B=$?
+check "a proposal whose gate command does not exist exits 2" "$([ "$RC2B" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT2B" | grep -qF "exit 127"
+check "the refusal names the exit-127 not-found" "$?"
+printf '%s' "$OUT2B" | grep -qF "no-such-command-xyz-42"
+check "  and names the command it could not run" "$?"
+[ ! -e "$REPO/AGENTS.md" ] && [ ! -e "$REPO/features" ]
+check "  and it wrote NOTHING" "$?"
+
+# (b) a gate that RUNS and exits 1: accepted, installed, and the measured code is printed
+P2C="$WORK/proposal-b2c-redgate.md"
+proposal_gate "$P2C" software "bash tests/red.sh"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$REPO/tests/red.sh"
+chmod +x "$REPO/tests/red.sh"
+OUT2C=$(init_env --target "$REPO" --write "$P2C" --yes < /dev/null); RC2C=$?
+check "a gate that exits 1 is ACCEPTED (exit 0, installed)" "$([ "$RC2C" -eq 0 ] && echo 0 || echo 1)"
+printf '%s' "$OUT2C" | grep -qF "measured exit code: 1"
+check "  and the measured exit code is printed (1)" "$?"
+[ -x "$REPO/.gob/bin/goblin-verify" ] && [ -f "$REPO/features/README.md" ]
+check "  and the harness + map were installed" "$?"
+
+# (c) --dry-run must NOT execute the gate
+P2D="$WORK/proposal-b2d-dry.md"
+proposal_gate "$P2D" software "bash tests/sideeffect.sh"
+printf '#!/usr/bin/env bash\ntouch "$(dirname "$0")/RAN"\n' > "$REPO/tests/sideeffect.sh"
+chmod +x "$REPO/tests/sideeffect.sh"
+OUT2D=$(init_env --target "$REPO" --write "$P2D" --dry-run --yes < /dev/null); RC2D=$?
+check "--dry-run on a gate that would run exits 0" "$([ "$RC2D" -eq 0 ] && echo 0 || echo 1)"
+[ ! -e "$REPO/tests/RAN" ]
+check "  and the gate was NOT executed (no side-effect file)" "$?"
 
 # ---- B3: the validation refusals --------------------------------------------------
 new_repo b3

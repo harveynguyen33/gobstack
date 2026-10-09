@@ -20,6 +20,8 @@
 # the agent's own next step) runs `gob init --write <proposal>` to validate and install:
 #   - the frontmatter keys are validated against the engine's key set (unknown key,
 #     bad class, non-boolean archive -> exit 2, nothing written);
+#   - the declared gate is RUN in the working tree (a non-zero exit is a day-one red, a
+#     command that cannot be run is refused);
 #   - the embedded feature map is validated by bin/goblin-map (FM-01 shape + FM-02
 #     resolvability) in the SAME pass, before anything is written;
 #   - AGENTS.md (body + gob block), .gob/engine (the vendored verifier + manifest) and
@@ -117,6 +119,9 @@ back one proposal file. Do this now:
    - branch: the default branch (main/master/…)
    - owner_email: the commit identity this repo expects
    - gate_commit_cmd: ONE command that proves the repo is healthy and must stay green.
+     RUN it yourself first: a command that does not exist is not a gate (--write refuses
+     an exit-127 command); a command that runs and exits non-zero is a legitimate day-one
+     red (--write accepts it and the harness reports it as one).
    - feature_map: the map's README path (the convention is features/README.md). REQUIRED —
      there is no "no map declared" state.
 
@@ -357,8 +362,24 @@ fi
 if [ "$DRYRUN" -eq 1 ]; then
   g_info "gob init --write --dry-run: validated OK (class $CLASS, branch $BRANCH, owner $EMAIL, 1+ gate, feature map '$FEATURE_MAP')"
   g_info "  would write: AGENTS.md (body + gob block), .gob/engine/, HANDOFF.md, $MAPDIR_REL/"
+  g_info "  the declared gate was NOT run (--dry-run)"
   exit 0
 fi
+
+# ------------------------------------------------------------------- the gate ---
+# The gate is RUN, not guessed (DECISION, 2026-10-09). Execute the declared first gate in the
+# working tree before installing, and report the measured exit code and the command's first
+# output line. A non-zero exit is ACCEPTED — a legitimate day-one red that GT-02 re-runs from
+# the installed config. A command that CANNOT be run at all (exit 127) is not a gate: refuse.
+GATE_RAW=$( cd "$TARGET" && bash -c "$GATE_CMD" 2>&1 ); GATE_RC=$?
+if [ "$GATE_RC" -eq 127 ]; then
+  g_err "gate_${GATE_NAME}_cmd is not a runnable command (exit 127): $GATE_CMD — name a command that exists, or author one at checks/gate.sh"
+  exit 2
+fi
+GATE_LINE=$(printf '%s\n' "$GATE_RAW" | sed '/^[[:space:]]*$/d' | head -n 1)
+g_info "gob init [gate] $GATE_CMD"
+g_info "  measured exit code: $GATE_RC"
+if [ -n "$GATE_LINE" ]; then g_info "  first output line: $GATE_LINE"; fi
 
 # ------------------------------------------------------------------- install ---
 # One engine call writes the vendored payload (.gob/), AGENTS.md body + gob block and
