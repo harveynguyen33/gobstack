@@ -13,12 +13,15 @@ same way the fleet's own tool reads it. Everything else is line-oriented shell.
                           software · service · game · research · fleet. The letters A-E and the
                           older names app (software), agent (fleet) and desktop/F (software + the
                           electron opt-in) are read-time aliases.
-    --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)
-    --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md)
+    --models <path>       model mapping file   (default: $GOBLIN_MODELS; unset = an empty
+                          models_file: the repo's machine-specific input, set per machine)
+    --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE; unset = no
+                          practice pin; a named path that is absent is reported, never
+                          silently dropped)
     --parts <list>        comma list to install; default = every part the class requires
     --archive             mark the project archive: verify requires no HANDOFF and no gates
     --skills yes|no       install agent skills under .hermes/skills (default no — the harness is
-                          neutral; opt in per platform with: gob emit --platform <p>). On a repo whose
+                          neutral; opt in per catalogue row with: gob extras install <id...>). On a repo whose
                           record already has skills installed, an OMITTED flag keeps them; an explicit
                           --skills no removes them.
     --dry-run             print the plan; write nothing

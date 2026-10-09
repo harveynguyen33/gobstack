@@ -87,7 +87,7 @@ is unwired in this alpha: the shim refuses the verb by name and prints the usage
 | `gob bans` | run the ban list (per-pattern red lines over the source tree) |
 | `gob extras` | the curated extras catalogue: `list [category]` / `show <id>` / `install <id...> [­-target <dir>] [--platform <id>] [--with-mcp-config]` — init only SUGGESTS; installs come from the catalogue (the allowlist rule), never the web |
 | `gob mcp` | serve the harness to your coding agent over MCP stdio — three tools (`gob_verify`, `gob_map_status`, `gob_init_status`), local only, no SDK, no network |
-| `gob uninstall` | remove everything an install wrote, byte-exactly (`gob install --target <dir> --uninstall` is the same job) |
+| `gob uninstall` | remove everything an install wrote, byte-exactly (the same job as `goblin-install --target <dir> --uninstall` from the checkout/install tree) |
 
 `goblin` remains as a legacy alias for every command above — existing scripts keep working, but
 new commands and docs use `gob`.
@@ -254,7 +254,7 @@ capability.
 
     gob uninstall --target .
 
-(equivalently `gob install --target . --uninstall` — through the legacy alias, spell it `goblin`
+(the same job as `goblin-install --target . --uninstall` — through the legacy alias, spell it `goblin`
 instead of `gob`). The uninstall is **byte-exact**: it removes exactly the files
 `installed.json` records — hash-compared preimages, so a file you edited after install is
 reported and kept, never clobbered — then every directory that leaves empty, and it strips the
@@ -269,7 +269,7 @@ repo, then (a).
 
 ## Re-pin the referenced standard
 
-    gob install --target <dir> --re-pin
+    goblin-install --target <dir> --re-pin   # from the gobstack checkout / install tree
 
 `practice_sha256:` in the AGENTS.md gob block pins the referenced standard and `IN-02`
 re-checks it, so editing that standard — a legitimate, intended edit — reds `IN-02` in every

@@ -276,9 +276,9 @@ if [ ! -f "$CONFIG" ]; then
   if [ "$ROOT" != "$PWD" ]; then
     g_err "not installed: $CONFIG is absent — and $PWD is not the installed repo ($ROOT)."
     g_err "fix: cd to your project repo, then re-run gob verify."
-    g_err "    (installing here would initialize $PWD: goblin-install --target $PWD --class <software|service|game|research|fleet>)"
+    g_err "    (installing here would initialize $PWD: npx @techgoblin/gobstack init)"
   else
-    g_err "not installed: $CONFIG is absent. Run: goblin-install --target $ROOT --class <software|service|game|research|fleet>"
+    g_err "not installed: $CONFIG is absent. Run: npx @techgoblin/gobstack init   # or: gob init, inside $ROOT"
   fi
   exit 2
 fi
@@ -484,7 +484,7 @@ check_in_01() {
   # IN-01 recovery line (review 1, scope 4): the record is corrupt or missing; name the two
   # restores. The matrix's remedy: line rides under the payload via g_fail.
   printf 'installed.json is absent or records no version\n'
-  printf 'recover: gob install --upgrade, or git checkout -- .gob/installed.json\n'
+  printf 'recover: git checkout -- .gob/installed.json, or re-run npx @techgoblin/gobstack init --write to re-install\n'
   return 1
 }
 
@@ -609,7 +609,7 @@ check_in_02() {
         # catch a SILENT edit, so re-pinning is a deliberate act: one explicit command, which
         # prints the old and new hash (docs/CONTRACTS.md, "An edited standard is not a dead end").
         printf '  if the edit is yours and intended, re-pin it deliberately:\n'
-        printf '    goblin-install --target %s --re-pin\n' "$ROOT"
+        printf '    goblin-install --target %s --re-pin   # from the gobstack checkout/install tree\n' "$ROOT"
         bad=1; pin=" | practice EDITED"
       else
         pin=" | practice pin ok"
@@ -626,7 +626,7 @@ check_in_02() {
   # naming the drifted file the payload above reported. Sits between the row's own lines and
   # the summary; g_fail appends the matrix's remedy: line under the whole payload.
   if [ "$bad" -ne 0 ] && [ -n "$DRIFTED" ]; then
-    printf 'recover: git checkout -- %s, or gob install --upgrade\n' "$DRIFTED"
+    printf 'recover: git checkout -- %s, or re-run npx @techgoblin/gobstack init --write to re-install\n' "$DRIFTED"
   fi
   [ "$bad" -eq 0 ]
 }

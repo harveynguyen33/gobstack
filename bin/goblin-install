@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
 # goblin-install — drop the harness into a target repo, idempotently.
 #
-# Usage: gob install --target <dir> [options]   (script: bin/goblin-install)
+# Usage: bash bin/goblin-install --target <dir> [options]   # checkout-only; `gob init --write` is the user surface
 #   --target <dir>        required; the repo root to install into
 #   --class <name>        required unless --uninstall or --re-pin; one of
 #                         software|service|game|research|fleet, or the aliases A-E / app / agent
 #                         / desktop (desktop/F => software + --electron); anything else is refused
 #   --electron            the electron opt-in overlay over the software class (electron: true):
 #                         the app_bundle_bytes ratchet, BN-06..09 bans, the host-gate declaration
-#   --models <path>       model mapping file   (default: $GOBLIN_MODELS -> ~/projects/fleet-model.yaml)
-#   --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE -> ~/projects/PROJECT-PRACTICE.md); a named path that is absent is reported, never silently dropped
+#   --models <path>       model mapping file   (default: $GOBLIN_MODELS; unset = rendered as an
+#                         empty models_file: the repo's machine-specific input, never a path
+#                         from the machine the installer ran on)
+#   --practice <path>     the referenced standard (default: $GOBLIN_PRACTICE; unset = empty
+#                         practice: pin — a named path that is absent is reported, never
+#                         silently dropped)
 #   --parts <list>        comma list to install; default = every part the class requires
 #   --archive             mark the project archive: verify requires no HANDOFF and no gates
 #   --skills yes|no       install agent skills under .hermes/skills (default no; opt in per
-#                         platform with: gob emit --platform <p>)
+#                         catalogue row with: gob extras install <id>)
 #   --dry-run             print the plan; write nothing
 #   --upgrade             re-install at the current version; report created/updated/unchanged/skipped
 #   --opt-out <part>      record the part in disabled: so its required checks are skipped
@@ -39,8 +43,16 @@ SRC=$(cd "$SELF_DIR/.." && pwd)
 
 TARGET=""
 CLASS=""
-MODELS="${GOBLIN_MODELS:-$HOME/projects/fleet-model.yaml}"
-PRACTICE="${GOBLIN_PRACTICE:-$HOME/projects/PROJECT-PRACTICE.md}"
+# QA fix (v2-qa issue 4): the old defaults were $HOME/projects/fleet-model.yaml and
+# $HOME/projects/PROJECT-PRACTICE.md - the MAINTAINER's home layout baked into every
+# rendered config on every machine, including a fresh contributor's (their rendered
+# AGENTS.md pointed at a file that does not exist on their machine). The neutral default
+# is EMPTY: no --models / no GOBLIN_MODELS renders an empty models_file: line, and the
+# practice pin stays empty (verify already treats both as the legitimate no-mapping /
+# no-standard state). A machine that HAS a fleet mapping exports GOBLIN_MODELS (or
+# passes --models) and gets the same rendering as before.
+MODELS="${GOBLIN_MODELS:-}"
+PRACTICE="${GOBLIN_PRACTICE:-}"
 # W5-3: `--practice <path>` naming a file that is not there used to be IGNORED IN SILENCE -
 # exit 0, `practice: ~`, `practice_sha256: ~`, and not one line about it in the install log.
 # The empty pin is a legitimate state (a repo may reference no standard, and the default path is
@@ -852,7 +864,7 @@ if [ "$DRY_RUN" -eq 0 ]; then
   if [ "$SKILLS" = "yes" ]; then
     g_info "  4. hermes skills trust $TARGET   # one-time, so the project-tier skills load"
   else
-    g_info "  4. agent skills are opt-in: gob emit --platform <p>   # run gob doctor for the platform list"
+    g_info "  4. agent skills are opt-in: gob extras install <id...>   # gob extras list shows the catalogue"
   fi
   g_info ""
   g_info "automations (optional; neither writes outside this repo, and A-02 has no agent in it):"
