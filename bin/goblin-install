@@ -243,7 +243,7 @@ fi
 # intended has to be explicit, printed and deliberate. This mode rewrites exactly one line and
 # reports the old and new hash. It is unreachable from --upgrade and from goblin-verify, by
 # design: an automatic re-pin would be the silent edit the pin exists to catch.
-# See docs/CONTRACTS.md, "An edited standard is not a dead end".
+# See docs/GUIDE.md, "An edited standard is not a dead end".
 # The write's own failure output is captured (not discarded) so the fail-closed branch below can
 # name it: a g_agents_write that could not land used to vanish into >/dev/null and the pipe still
 # exited 0 (the sed inside writes via mktemp+mv, and only the mv reports).
@@ -451,7 +451,7 @@ REFUSED_PATHS=""
 PREV_OWNED=""
 # Files a PREVIOUS run installed (the hash-checked 'files' map). A path that exists on disk
 # but is NOT in this map was not created by goblin-stack, so it is refused rather than
-# clobbered - the contract in docs/CONTRACTS.md. --force is the only way past it.
+# clobbered - the contract in docs/GUIDE.md. --force is the only way past it.
 PREV_FILES=""
 if [ -f "$INSTALLED" ]; then
   PREV_OWNED=$(g_json_object "$INSTALLED" owned | cut -f1)
@@ -837,8 +837,8 @@ else
 fi
 
 if [ -n "$REFUSED_PATHS" ]; then
-  g_info "refused to overwrite:$REFUSED_PATHS (kept - reconcile it: docs/ADOPTION.md; --force would destroy it)"
-  # Documented contract (docs/CONTRACTS.md, this file's header): exit 1 is "a refusal, with
+  g_info "refused to overwrite:$REFUSED_PATHS (kept - reconcile it: docs/GUIDE.md; --force would destroy it)"
+  # Documented contract (docs/GUIDE.md, this file's header): exit 1 is "a refusal, with
   # the path and the fix". A wrapper has to be able to detect it (D2).
   exit 1
 fi

@@ -21,7 +21,7 @@ standard this repo references. goblin-stack carries **no copy of it**.
    is visible rather than assumed. If the standard has been edited **deliberately**, re-record
    the pin deliberately: `goblin-install --target <repo> --re-pin` rewrites that one line and
    prints the old and new hash. Nothing re-pins on its own — not `goblin-verify`, not
-   `--upgrade` (`docs/CONTRACTS.md`).
+   `--upgrade` (`docs/GUIDE.md`).
 3. If the path is absent or unset, **say so** and continue with the goblin-stack rules alone.
    Absent is not an error: goblin-stack is portable, and another machine has no such file.
 

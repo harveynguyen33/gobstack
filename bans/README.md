@@ -64,7 +64,7 @@ stays RED. That is deliberate — the failure is **closed**, never open — and 
 
 ## No npm, no AST
 
-The engine uses `bash`/`grep`/`awk` only — the dependency contract in `docs/CONTRACTS.md`. So
+The engine uses `bash`/`grep`/`awk` only — the dependency contract in `docs/GUIDE.md`. So
 these are **text probes**, not AST checks: a `: any` inside a string or a comment is reported,
 and `Record<string, any>` (no leading `:`) is missed. The AST-grade form of the same bans needs
 a parser the contract does not allow; that gap is `docs/LIMITS.md` #27, stated rather than

@@ -16,7 +16,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 3. **No agent graph and no verdict-ledger daemon.** The board replaces both at a lower
    resolution: `parents` expresses ordering, not data flow, and sibling cards cannot see each
    other.
-4. **Fifteen playbooks against twenty-three.** The cuts in `docs/FLOWS.md` are deliberate and each
+4. **Fifteen playbooks against twenty-three.** The cuts in `docs/GUIDE.md` are deliberate and each
    is argued, but real coverage is lost: performance hillclimbing, pixel parity, trace
    forensics, stack landing, worktree hygiene.
 5. **No swarm or arena fan-out.** The read-versus-write axis says that is correct for this work
@@ -27,7 +27,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 6. **The biggest measured defect is out of reach.** The orchestrator's routing text says a bare
    subagent spawn reaches the specialist profiles; it does not. That is the highest-cost defect
    on the box, and goblin-stack cannot fix it from inside a project repo. It ships corrected
-   text in `docs/INTEGRATION.md`; the fleet-side edit is
+   text in `docs/GUIDE.md`; the fleet-side edit is
    escalated.
 7. **The staleness of a fleet-config repo is detectable and not fixable here** — the E-class gate
    notices it, and the underlying job bug belongs to another repository.
@@ -54,7 +54,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     gone: no `.github/workflows` payload is shipped, no row reads a workflow, and the doc that
     argued the forge settings is deleted. What the lane could never see — the required-check list,
     the bypass switch, the push identity, whether the job ever ran — is recorded here and in
-    `docs/RISKS.md` K7/K18, not solved.
+    `README.md` K7/K18, not solved.
 14. **`CM-02` cannot be enforced.** A backtick lost to command substitution leaves no trace a
     later check can read.
 
@@ -73,7 +73,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     curated Skills stayed above it. **goblin-stack installs agent-authored skills**, so the lower
     row of that result is a warning about its own output, not someone else's: a generated skill
     accepted after a skim is a different proposition from a written one. It is why `P6` hands the
-    generated skill to `P12` before any `verified:` date advances (`docs/RISKS.md` K15).
+    generated skill to `P12` before any `verified:` date advances (`README.md` K15).
     **`P12` is still the mechanism to find out, and it has still never been run**: the record format
     is now specified (`skills/goblin-eval/SKILL.md`) and **no row reads a lane** (#31).
     Pin: `https://www.skillsbench.ai/blogs/skillsbench-1-1`, sha256 of the retrieved page
@@ -167,7 +167,7 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
 
 27. **The ban probes are text probes, not ASTs.** `BN-01`, `BN-02`, `BN-03` and `BN-05` are
     `grep` over source under `bash`/`grep`/`awk` only — the dependency contract in
-    `docs/CONTRACTS.md` allows no parser and no `npm`. So a `: any` inside a string or a comment
+    `docs/GUIDE.md` allows no parser and no `npm`. So a `: any` inside a string or a comment
     is reported, `Record<string, any>` (no leading colon) is missed, and BN-05 does not resolve
     module aliases or dynamic imports. The AST-grade form of the same bans (BN-01..BN-04 in
     `G5.md` §C.2) needs ESLint and `dependency-cruiser`; that is why **G5's `BN-04` (the nine
@@ -211,7 +211,7 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     number in the ratchet. The instrument that produces it (CDP `Performance.getMetrics`, or
     `app.getAppMetrics()[i].cpu.percentCPUUsage` inside a real Electron) needs Playwright or
     Electron plus a GUI, and a shipped rule may use nothing but bash/git/awk/sed/grep/python3
-    (`docs/CONTRACTS.md`) — so `ratchet.cmd` pointing at the probe would make a fresh install
+    (`docs/GUIDE.md`) — so `ratchet.cmd` pointing at the probe would make a fresh install
     **born RED**, which is the one thing the install path must not produce. The probe belongs to
     the project; a project whose CI needs npm runs it in **its own** workflow. What the number
     means has a limit of its own, and it is measured: this box is an LXC with no display and no
@@ -248,7 +248,7 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     `36 passed, 6 failed, 10 advisory, 23 skipped`, exit 1 — `HP-05`, `SP-02`, `GT-02`, `CM-01`,
     `CM-03` and `PT-02` all read a HEAD that does not exist yet. The install never creates the seed
     commit (`bin/goblin-install` writes files and stops), and it must not: a tool that commits into
-    Harvey's repo on first contact is the overreach `docs/CONTRACTS.md` rules out. Carried from W5
+    Harvey's repo on first contact is the overreach `docs/GUIDE.md` rules out. Carried from W5
     §5's `G8-9` rather than fixed here — it is a **sequencing** limit, not a hole in a row: one commit
     clears all six, and `tests/t-verify-green.sh` seeds one before it installs.
 41. **Eleven of Y1 §7's eighteen documented mechanisms still carry no control of their own, and one
@@ -399,7 +399,7 @@ the Node the gates ran under.
     spec from a finished round keeps satisfying the row exactly as well as a live one, because the
     check has no notion of "current". **Fixed in W6 (text, not check):** the row now reads
     "A *-SPEC.md file exists at the repo root (any round, not the current one - round-scoping
-    arrives with the W6 staged chain)" — manifest and `docs/ENFORCEMENT.md` re-rendered in the
+    arrives with the W6 staged chain)" — manifest and `docs/GUIDE.md` re-rendered in the
     same commit, the check cell untouched. What it costs: the SPEC-exists signal in a run summary is
     weaker than a round-scoped claim would suggest — read it as "a `*-SPEC.md` file is present", not "this round's spec is
     here". Measured: `goblin-verify` on a fresh probe install reports `PASS SP-01 (ls
@@ -434,7 +434,7 @@ the Node the gates ran under.
     fix — but it should be named: the row's green means "the latest commit carries the owner
     identity", never "no commit in this repo's history carries an ambient one". A wrong-identity
     commit that has since been followed by correct ones is invisible to every run. Recorded as a
-    boundary; no row change implied. `docs/ENFORCEMENT.md`'s CM-01 row carries the same one-line
+    boundary; no row change implied. `docs/GUIDE.md`'s CM-01 row carries the same one-line
     scope statement.
 
 51. **`gob init` writes its three added values into `goblin.yaml` itself, not through a
@@ -458,7 +458,7 @@ the Node the gates ran under.
     run. `scope:target` is the adopting repo's proof burden: those rows run in an installed
     repo via `goblin-verify`, and the repo's owner owes the run. Same matrix, two creditors:
     a source row can never fail a user's repo, and a target row can never substitute for the
-    framework's own suite. Recorded as a definition; `docs/ENFORCEMENT.md`'s scope paragraph
+    framework's own suite. Recorded as a definition; `docs/GUIDE.md`'s scope paragraph
     carries the same sentence for the reader who arrives there first.
 
 53. **The sixth class is gone: the desktop shell is `software` + `electron: true`, and `A`..`E` are
@@ -495,3 +495,103 @@ the Node the gates ran under.
     check that reports Success after skipping its gate is a green light for a commit whose gate
     never ran) is about CI in general and is preserved in this entry. What this admits: the
     verifier's "cannot see" footer still names the CI lane's blind spots.
+
+---
+
+## The guard rails — the security and perf rows
+
+`manifest/enforcement.tsv` is the machine-readable form; this is the prose for the ten rows it
+gained in v0.2 (`SC-01`..`SC-09`, `PF-01`). Every one of them is **declared** in
+`.gob/goblin.yaml` under `security:` and `perf:` - a stack-specific rule guessed from the
+files on disk is how a matrix starts lying, so nothing here infers a stack.
+
+### The rung ladder, and the rule for choosing a rung
+
+    (a) lint rule / static check  >  (b) script gate  >  (c) CI job  >  (d) runtime check  >  (e) prose
+
+The rung is chosen by **what can observe the failure**, not by what is cheapest to write, and the
+rung below must be *demonstrably unable* to see it - the reason is recorded in the row's
+`if_not_why` cell. Three constraints shaped the design, and all three are pre-existing:
+
+1. **No network at verify time.** `README.md` K4: a network call at verify time breaks the
+   offline dependency contract. A row that needs the network is not a verify-time row.
+2. **`enforced_by` is a closed enum** (`script`, `lint`, `gate`, `advisory`) and `check` is one of:
+   a real command, the literal `advisory`, or `goblin-verify --only <ID>` for a multi-line body.
+   Every row here obeys that, and `IN-03` fails the manifest otherwise.
+3. **`advisory_ceiling` is 10 and the labelled count is 6.** The matrix labels six rows
+   `advisory`, and the ceiling caps that count at **6 of 10** — the model/role/loop, dependency-audit
+   and CI cuts moved it off `10 of 10`. **Corrected 2026-10-10 (v3).** Nothing else in this lane is
+   prose dressed as a check.
+
+### T1 - secrets and the config surface (`SC-01`..`SC-04`)
+
+All four are rung (a)/(b): one shell line or a small builtin, and all four are RED-able.
+
+| row | what it proves | how it proves it |
+|---|---|---|
+| `SC-01` | no secret file is tracked | `git ls-files` over the `.env`/`.pem`/`.key` family (`.example`/`.sample`/`.template` excluded) |
+| `SC-02` | the ignore rules cover the **whole** family | clause 1 reads `.gitignore`; clause 2 asks git's own matcher, `git check-ignore -q`, once per path - a rule that looks right but does not match still fails |
+| `SC-03` | no client-visible name is secret-shaped, and no build output carries a secret literal | the `NEXT_PUBLIC_*_(SECRET\|TOKEN\|KEY\|PASSWORD\|PRIVATE)` name pattern over source, then known secret prefixes (`sk-`, `ghp_`, `AKIA`, `eyJ`) over `security.build_output` |
+| `SC-04` | every cookie write carries its flags | `document.cookie =` needs `secure` + `samesite` in the same statement; `cookies().set(` / `res.cookie(` need `httpOnly` + `sameSite` |
+
+`SC-02` ships a real control rather than being assumed, because the honest baseline is GREEN: a
+fresh install writes the family into `.gitignore` (`sec_gitignore_family: yes`), and the control
+proves the row would notice the day a hand edit narrows it.
+
+**A JS-written cookie is readable by any script.** `SC-04` *reports* that; it does not fail on it.
+That is a design fact about the product, not a bug, and a matrix that failed on it would be wrong
+about the thing it was measuring.
+
+### T2 - input boundaries and dependencies (`SC-05`..`SC-06`)
+
+| row | what it proves | the limit it states |
+|---|---|---|
+| `SC-05` | every write route calls a validator, or is waived | it proves a validator is *called* (`safeParse\|zod\|valibot\|yup\|ajv\|superstruct\|validate(`), never that the schema is right - a schema that accepts everything passes |
+| `SC-06` | a lockfile exists and is tracked | it cannot see that the lockfile is *stale* relative to `package.json`: resolving that needs the package manager, which is a deliberate network-shaped step |
+
+### T3 - the performance budget (`PF-01`, plus the ratchet)
+
+The budget **is** `GT-04`/`GT-05`, unchanged: `ratchet.name` is the metric, `ratchet.cmd` is the
+one command that produces it, `ratchet.ceiling` is the measured baseline, and `GT-05` prints
+`old <n> + <delta> new = <n>` when the number rises. **No second mechanism, no new key for the
+number.**
+
+| class | metric | command | hermetic? |
+|---|---|---|---|
+| A - web app (Next) | total client JS bytes | `find .next/static -type f -name '*.js' -exec cat {} + \| wc -c` | yes |
+| A - SPA (Vite) | bundle JS bytes | `find dist/assets -type f -name '*.js' -exec cat {} + \| wc -c` | yes |
+| A - component lib | published bytes | `find dist -type f -exec cat {} + \| wc -c` | yes |
+| B - service/config | own build bytes, plus host latency | `find dist -type f -exec cat {} + \| wc -c` · `curl -w '%{time_total}'` | size yes, latency **no** |
+| C - game | build bytes, plus host frame time | as A · Editor run | size yes, frame time **no** |
+| D, E | none declared | - | - |
+
+`find ... -exec cat {} + | wc -c` is used rather than `du` because `du` reports block sizes and is
+not deterministic across filesystems. Raw bytes are the *reported* number and are the only one
+that is ratcheted: a gzip figure changes with the compressor, so it is a report, never a ceiling.
+
+**The class-A preset ships this metric** (`client_js_bytes`), and the TODO count that used to be
+the ratchet moved into a **gate** (`todo_ceiling`, `-le 160`): a shipped-software round is
+supposed to move the perf number, and the TODO ceiling is a floor against decay, not the budget.
+A fresh install measures `0` for a repo with no build output, so the number is honest from the
+first commit and gets re-anchored deliberately.
+
+**Re-anchoring is deliberate, never automatic.** When a round legitimately raises the number, the
+operator re-runs the command, writes the new `ceiling`, and writes the matching
+`perf.baseline_value`/`baseline_commit`/`measured`. `PF-01` is the row that stops "I raised the
+ceiling" from silently becoming "I never measured again": a baseline whose commit does not resolve
+to an ancestor of `HEAD` is a RED.
+
+`PF-01` **skips with a reason** when the class declares no metric (`perf.metric` empty) or when no
+baseline has been recorded yet - because a row that is RED on every fresh install teaches people
+to ignore it. The skip names the command to run.
+
+### What this lane cannot see
+
+- **A local byte count is not a real user's device.** It says nothing about parse/execute time on
+  a mid-range phone, a cold cache or a slow network - and nothing about what the bytes do. A
+  700 KB bundle that does nothing is better than a 200 KB one that blocks the main thread.
+- **Frame time, idle CPU, memory growth and latency are host gates**, named as such in
+  `perf.host_gate` and in `gates:` - never hermetic ratchets.
+- **A perf budget cannot see a layout thrash or a re-render per keystroke.** Only a frame-time
+  measurement can, and that is a host gate.
+- **No automation has ever run against a real board here.** Cost per run is unmeasured.

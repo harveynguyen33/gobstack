@@ -160,7 +160,7 @@ m_in_01()         { sed -i '/"version"/d' .gob/installed.json; }
 m_edit_practice() { printf '# an edited byte\n' >> "$WORK/standard.md"; }
 m_blank_row()     { sed -i -E 's/^(HP-05\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t)[^\t]*/\1/' .gob/manifest/enforcement.tsv; }
 m_in_04()         { sed -i 's|^  "refused": {|  "refused": {\n    "checks/gone.mjs": "deadbeef",|' .gob/installed.json; }
-# Z1-5: a typo in the `enforced_by` cell. docs/ENFORCEMENT.md calls the enum closed; before the
+# Z1-5: a typo in the `enforced_by` cell. docs/GUIDE.md calls the enum closed; before the
 # fix NOTHING read the column, so this changed no verdict anywhere in the run.
 m_bad_enum()      { awk -F'\t' -v OFS='\t' '{ if ($1=="BN-01") $4="bogus"; print }' .gob/manifest/enforcement.tsv > .gob/manifest/enforcement.tsv.n && mv .gob/manifest/enforcement.tsv.n .gob/manifest/enforcement.tsv; }
 
@@ -435,7 +435,7 @@ expect_red "a manifest with no version"            IN-01 1 m_in_01
 expect_red "one edited byte of the standard"       IN-02 1 m_edit_practice
 expect_red "a manifest row with no check"          IN-03 3 m_blank_row
 # Z1-5: the third clause. A typo in `enforced_by` used to change NO verdict in the whole run -
-# the enum was documented as closed in docs/ENFORCEMENT.md and read by nothing.
+# the enum was documented as closed in docs/GUIDE.md and read by nothing.
 expect_red "Z1-5: an enforced_by outside the closed enum" IN-03 1 m_bad_enum
 expect_red "a pre-existing file the install recorded has vanished" IN-04 1 m_in_04
 

@@ -2,7 +2,7 @@
 # t-install-refusal.sh — the installer's documented refusal contract.
 #
 #   D1  a file goblin-stack did not create is never overwritten (it used to be clobbered
-#       silently, against docs/CONTRACTS.md and the installer's own header)
+#       silently, against docs/GUIDE.md and the installer's own header)
 #   D2  a refusal exits 1 with the path (it used to print the refusal and exit 0, so a wrapper
 #       could not detect it)
 #   D11 --force is the documented override, and it takes over a file that existed before the

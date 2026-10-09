@@ -12,7 +12,7 @@
 # actual parent — with this file copied in): 47 assertions, 23 pass and 24 fail, exit 1. Those 24
 # are the controls:
 #   * 4 name-the-remedy assertions: the `practice EDITED` detail, the installed verifier, the
-#     installed `practice` skill and docs/CONTRACTS.md all say nothing about `--re-pin` there;
+#     installed `practice` skill and docs/GUIDE.md all say nothing about `--re-pin` there;
 #   * 14 from the "the documented path clears it" block: `--re-pin` is an unknown option there
 #     (exit 2), so nothing is rewritten, nothing prints either hash, and IN-02 stays RED;
 #   * the 2 refusal *messages* ("nothing to re-pin", "no practice: recorded");
@@ -103,8 +103,8 @@ grep -q -- '--re-pin' .gob/bin/goblin-verify
 check "  and the installed verifier names it (CONTROL)" "$?"
 grep -q -- '--re-pin' "$SRC/skills/practice/SKILL.md"
 check "  and the practice skill names it (CONTROL; the source copy — a default install ships no skills)" "$?"
-grep -q -- '--re-pin' "$SRC/docs/CONTRACTS.md"
-check "  and docs/CONTRACTS.md documents it (CONTROL)" "$?"
+grep -q -- '--re-pin' "$SRC/docs/GUIDE.md"
+check "  and docs/GUIDE.md documents it (CONTROL)" "$?"
 
 # ---- the documented path clears it ------------------------------------------
 out=$(bash "$SRC/bin/goblin-install" --target "$TARGET" --re-pin 2>&1); rc=$?

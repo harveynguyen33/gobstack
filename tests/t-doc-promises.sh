@@ -89,7 +89,7 @@
 #     the reader's repo: a `manifest/<file>` token in `docs/GUIDE.md` names a file of THIS
 #     checkout, which is not where the reader's copy lives (the guide's own section 1 writes
 #     `.goblin/manifest/enforcement.tsv`). The rule is scoped to the guide because the other
-#     documents address this checkout as well as the reader's repo - measured: `docs/ENFORCEMENT.md`
+#     documents address this checkout as well as the reader's repo - measured: `docs/GUIDE.md`
 #     and `docs/LIMITS.md` each name `manifest/bans.tsv` in a sentence about the source table - so
 #     the same assertion there would be false. RED case (B3): `docs/GUIDE.md:517` wrote
 #     `manifest/bans.tsv` in a section 13 instruction addressed to the reader.
@@ -106,7 +106,7 @@
 #       * the matrix's shape. `manifest/enforcement.tsv` is the source: total rows, scope split,
 #         and the per-`enforced_by` counts. The live claim is the sentence that says
 #         `Measured shape of this table:` plus the advisory section that names the count. Everything
-#         else in `docs/ENFORCEMENT.md` that contains the word `advisory` and a number is DATED
+#         else in `docs/GUIDE.md` that contains the word `advisory` and a number is DATED
 #         HISTORY (`advisory 9 of ceiling 10`, measured at a named revision, kept on purpose by the
 #         stale-sentence rule) and is NOT matched - the same live-vs-history split
 #         `tests/t-doc-sync.sh`'s AB3 section makes for the same file.
@@ -116,7 +116,7 @@
 #         with the ids themselves checked: a phantom id, or a target row with no control, is a
 #         FAIL. The sentence was true and read by nothing - the last live instance of the species.
 #
-#     RED case (B2, measured on the un-fixed tree): `docs/FLOWS.md:127` read
+#     RED case (B2, measured on the un-fixed tree): `docs/GUIDE.md:127` read
 #     `this ships 12 (plus the two automations below)` while the same file's line 1, its own
 #     catalogue P1..P14, `manifest/playbooks.tsv` (14 rows), `README.md:29`,
 #     `docs/GUIDE.md` and `docs/LIMITS.md:18` ("Fourteen playbooks against twenty-three") all say
@@ -345,7 +345,7 @@ check "every 'this ships N' / 'gobstack ships N' equals the playbook count ($PLA
 [ -z "$BAD_SHIP" ] || note "  disagrees:$BAD_SHIP  (pstack is the predecessor project; its count is not this artifact's and is not read here)"
 
 # ---- (b3) the matrix's shape ------------------------------------------------------------------
-ENF="$SRC/docs/ENFORCEMENT.md"
+ENF="$SRC/docs/GUIDE.md"
 m_total=$(awk -F'\t' 'NR>1 && NF>1 {n++} END{print n+0}' "$ENF_SRC")
 m_target=$(awk -F'\t' 'NR>1 && $2=="target" {n++} END{print n+0}' "$ENF_SRC")
 m_source=$(awk -F'\t' 'NR>1 && $2=="source" {n++} END{print n+0}' "$ENF_SRC")
@@ -358,7 +358,7 @@ SHAPE=$(grep -m1 'Measured shape of this table' "$ENF")
 c_total=$(printf '%s' "$SHAPE" | grep -oE '[0-9]+ rows' | head -1 | awk '{print $1}')
 c_target=$(printf '%s' "$SHAPE" | grep -oE '[0-9]+ target' | head -1 | awk '{print $1}')
 c_source=$(printf '%s' "$SHAPE" | grep -oE '[0-9]+ source' | head -1 | awk '{print $1}')
-check "docs/ENFORCEMENT.md states the matrix's total row count (doc ${c_total:-none} vs table $m_total)" \
+check "docs/GUIDE.md states the matrix's total row count (doc ${c_total:-none} vs table $m_total)" \
   "$([ -n "$c_total" ] && [ "$c_total" = "$m_total" ] && echo 0 || echo 1)"
 check "  and its scope split (target ${c_target:-none}/$m_target, source ${c_source:-none}/$m_source)" \
   "$([ -n "$c_target" ] && [ -n "$c_source" ] && [ "$c_target" = "$m_target" ] && [ "$c_source" = "$m_source" ] && echo 0 || echo 1)"
@@ -374,7 +374,7 @@ ADVBLOCK=$(awk '/rows are labelled/{c=2} c>0{print;c--}' "$ENF")
 a_first=$(printf '%s' "$ADVBLOCK" | grep -oE '[0-9]+ of the [0-9]+ rows' | head -1 | awk '{print $1}')
 a_second=$(printf '%s' "$ADVBLOCK" | grep -oE '[0-9]+ of the [0-9]+ rows' | head -1 | awk '{print $4}')
 a_lit=$(printf '%s' "$ADVBLOCK" | grep -oE '[0-9]+ of them carry no executable check' | head -1 | awk '{print $1}')
-check "docs/ENFORCEMENT.md's advisory section states the advisory row count (doc ${a_first:-none} vs table $m_adv)" \
+check "docs/GUIDE.md's advisory section states the advisory row count (doc ${a_first:-none} vs table $m_adv)" \
   "$([ -n "$a_first" ] && [ "$a_first" = "$m_adv" ] && echo 0 || echo 1)"
 check "  and states it against a row count that is the table's (doc ${a_second:-none} vs target $m_target / total $m_total)" \
   "$([ -n "$a_second" ] && { [ "$a_second" = "$m_target" ] || [ "$a_second" = "$m_total" ]; } && echo 0 || echo 1)"
