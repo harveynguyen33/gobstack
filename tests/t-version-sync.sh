@@ -69,17 +69,16 @@ else
   check "V3 every GOBLIN_*_VERSION constant in bin/ equals VERSION" 1
 fi
 
-# ---- V4: the count is pinned at 6 (the load-bearing assertion) ------------------------------
-# A value comparison cannot stop a SIXTH copy being added — even one that agrees today.
+# ---- V4: the count is pinned at 5 (the load-bearing assertion) ------------------------------
+# A value comparison cannot stop another copy being added — even one that agrees today.
 # Pinning the COUNT converts the next unread copy into a red run (the IN-03 move, applied
-# to the version). The five, measured in PLAN-V1 §4.4's table, plus W3's sixth:
+# to the version). The five, measured in PLAN-V1 §4.4's table:
 #   bin/goblin-install  GOBLIN_INSTALL_VERSION
 #   bin/goblin-verify   GOBLIN_VERIFY_VERSION
 #   bin/goblin-bans     GOBLIN_BANS_VERSION
 #   bin/goblin-lib.sh   GOBLIN_LIB_VERSION
 #   bin/goblin-audit    GOBLIN_AUDIT_VERSION
-#   bin/goblin-upgrade  GOBLIN_UPGRADE_VERSION   (W3 — caught by this very pin at 5, moved to 6)
-EXPECTED_COUNT=6
+EXPECTED_COUNT=5
 COUNT=$(grep -hE '^GOBLIN_[A-Z_]+_VERSION=' bin/* 2>/dev/null | wc -l | tr -d ' ')
 check "V4 the GOBLIN_*_VERSION constant count is pinned ($COUNT declared vs $EXPECTED_COUNT pinned)" \
   "$([ "$COUNT" -eq "$EXPECTED_COUNT" ] && echo 0 || echo 1)"

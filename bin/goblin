@@ -13,8 +13,7 @@
 # EMIT a prompt + schema that the agent already running in this repo fulfils with its own
 # tools; heuristic detection demotes to the --heuristic fallback.
 #
-# UNWIRED this session (code kept under bin/, deletion is session 3): doctor, audit,
-# upgrade.
+# UNWIRED this session (code kept under bin/, deletion is session 3): doctor, audit.
 #
 # Identity: the package is gobstack (npm @techgoblin/gobstack), the command is `gob`
 # (`goblin` remains as a legacy alias).
@@ -116,13 +115,13 @@ case "$CMD" in
     usage
     exit 0
     ;;
-  doctor|audit|upgrade|install)
+  doctor|audit|install)
     # Unwired from usage in v2 (code kept; deletion is session 3). The refusal names
     # what replaced each verb rather than silently executing the old path.
     g_err "gob $CMD is unwired in v2."
     case "$CMD" in
       install|init-legacy) g_err "fix: gob init --write <proposal> installs a repo now." ;;
-      doctor|audit|upgrade) g_err "fix: gob verify (audit stays a deliberate manual step; see docs/)." ;;
+      doctor|audit) g_err "fix: gob verify (audit stays a deliberate manual step; see docs/)." ;;
     esac
     exit 2
     ;;

@@ -8,7 +8,6 @@ the docs name it by what it changed and point here.
 | code | revision | in one line |
 |---|---|---|
 | W1 | engine mode | the rule table can live in a shared engine (`engine_dir:`), not only per-repo; declared-but-unusable is exit 2 with no fallback |
-| W3 | `gob upgrade` | the 8-step migration of a repo to the global engine, two commits, refusal on every unsafe tree |
 | W4 | class + ci-gate | the five domain classes replaced the A–E letters (read-time aliases kept), and `ci-gate` became a declared part with its own workflow |
 | W5 | report width | the verify report learned columns: payloads fold at the report width, multi-line payloads print whole, `--verbose` prints everything |
 | W6 | neutral-first | a default install ships no agent skills, the desktop class merged into software, and the wizard got its health-check screen |

@@ -485,7 +485,7 @@ Two readings that are easy to get wrong:
 | `refused to overwrite: HANDOFF.md`, exit 1 | your repo already had a HANDOFF | **do not `--force`** — reconcile it (below) |
 | `PT-02 declared main, actual master` | branch mismatch | set `branch:` in the gob block |
 | `IN-02 ... practice EDITED` | someone changed the pinned standard | re-pin deliberately: `--re-pin` |
-| `gob: unrecognized command: <verb>` (exit 2) | you ran a verb outside the v2 surface (`audit`, `doctor`, `upgrade`, `install`) | use the six wired verbs: `init`, `map`, `verify`, `bans`, `mcp`, `uninstall` |
+| `gob: unrecognized command: <verb>` (exit 2) | you ran a verb outside the v2 surface (`audit`, `doctor`, `install`) | use the six wired verbs: `init`, `map`, `verify`, `bans`, `mcp`, `uninstall` |
 | `IN-03` fails, "manifest is broken" | a row has a broken check column | fix the row; this is a source defect, not yours |
 | a `FAIL` you believe is wrong | the check may be weak, or your belief may be | run `--only <id>` and read the command it prints |
 | a changelog or matrix note says `W6` or `Z1-4` | that is a revision wave code | `docs/RECORD-NOTES.md` is the legend, one line per code |
@@ -511,7 +511,7 @@ same commands are available outside any repo through the npm CLI: `gob init` / `
 |---|---|
 | `goblin-install` | `0` ok · `1` a refusal (with the path and the fix) · `2` bad input |
 | `goblin-verify` | `0` all checks passed · `1` a check failed · `2` could not run · `3` the manifest itself is broken |
-| `gob` (npm CLI) | propagates the subcommand's codes verbatim; a verb outside the surface (`audit`/`doctor`/`upgrade`/`install`) is refused with exit 2 and the usage |
+| `gob` (npm CLI) | propagates the subcommand's codes verbatim; a verb outside the surface (`audit`/`doctor`/`install`) is refused with exit 2 and the usage |
 
 `3` is the one to notice: it means gobstack's own rule table is malformed, not your project.
 

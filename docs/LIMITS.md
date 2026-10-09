@@ -481,48 +481,17 @@ the Node the gates ran under.
     version a rule — which is a real option, not done here. Until then the guarantee is
     development-time only: green in this checkout, unverifiable in the wild.
 
-45. **The migration is crash-safe by sequence, not by journal — a kill mid-upgrade leaves a shape
-    only three of which are detected.** `goblin upgrade` runs eight steps across two commits, and
-    the spec's refusal conditions name the shapes a crashed run can leave: record says global but
-    the 18 files are still here (R8 catches it), the record lost its engine: block entirely (R9
-    catches it), commits half-landed (the preflight's own state resolution). What is NOT caught:
-    a crash between the engine landing (step 3) and commit A (step 4) leaves `~/.goblin/engine`
-    written but the repo untouched — harmless, invisible, and never re-verified (the next upgrade
-    run compares hashes and refuses R6 if the payload has since changed, so the stale engine can
-    sit there being wrong until someone looks). And the shadowing footer (W3 §3) reads only the
-    vendored-payload shape; a repo whose engine_dir points at an engine that no longer exists
-    FAILs the resolution chain loudly (exit 2), but a repo pointing at an engine whose bytes have
-    silently changed since migration day runs green on the drifted table — the footer's hashes
-    name what ran, nothing compares them to migration day's. **Ticketed, not gated:** a
-    migration-day hash pin in the record compared per-run is the real fix and is a row-shaped
-    change (a new IN clause), not a W3 patch. Measured: R6 refuses the wrong-engine reuse, R8/R9
-    catch the two crash shapes they name, and the between-steps engine write is unwatched.
+45. **Cut in v3: the `gob upgrade` migration.** The 0.4.4 per-repo → global-engine migration is
+    removed; `init --write` re-pins a repo in place. The crash-safety limitation it carried (its
+    safety was sequence-ordered, not journalled) retires with the command.
 
-46. **The emitted platform config is unsigned and hand-editable — DRIFT is detected per run,
-    never prevented.** `goblin emit` writes skills byte-copies and one delimited block in the
-    platform's context file, recorded in `~/.goblin-stack/emissions.tsv` with pre-image hashes
-    (so `--uninstall` restores byte-exactly), but nothing signs what it writes: an edit to an
-    emitted `SKILL.md` or to the bytes inside the `goblin-stack:begin/end` block makes the
-    platform's `verify.sh` oracle report DRIFT on the next `goblin doctor` run — and that is
-    all it does. There is no lock, no signature, and no write protection on any emitted file;
-    a platform (or the user) can change them between two doctor runs and nothing notices
-    until someone runs one. The same holds for `--unshadow`: it removes only project copies
-    whose hash equals the source payload and refuses-and-names any that differ, so a real
-    local edit survives, but nothing reconciles it either. Measured: a one-byte tamper in an
-    emitted `SKILL.md` and a stale marker VERSION in the context block each report DRIFT (exit
-    1) on the next run, and uninstall refuses to delete a recorded file whose bytes no longer
-    match its post-image (R6).
+46. **Cut in v3: the platform-emit surface.** The adapter tree and the emit engine are gone; no
+    per-platform skills or context blocks are emitted; the harness stays repo-neutral. The
+    unsigned, hand-editable emitted-config limitation retires with the engine.
 
-47. **The four W4b adapter conventions are documented shapes, not run-probed installs — and
-    two of the seven platforms cannot block commands outright.** cursor and codex are not
-    installed on the build machine, so their rows pin the official docs (read 2026-09-29),
-    not a live CLI; a platform changing its layout invalidates the adapter silently until a
-    doctor DRIFT names it. codex and gemini report cap_command_blocking `partial` — codex
-    disables skills via `~/.codex/config.toml` `[[skills.config]]`, gemini only narrows via
-    approval modes — so an emitted skill is *available* there even when the operator would
-    forbid it; the doctor prints the codex hooks caveat (sessionStart only). And gemini's
-    id cell was measured to be exactly its platform name (the `gem_ini` typo shipped in one
-    W4b build and the doctor's DRIFT caught it — the schema check works).
+47. **Cut in v3: the adapter conventions.** The seven near-duplicate adapter verify/detect
+    scripts are gone with the platform-emit surface; the neutral harness plus the core skills
+    carry the per-platform story now.
 
 48. **`SP-01`'s rule text once overclaimed; it now states the check's actual scope.** The text
     used to read "The current round has a SPEC" while the check is
@@ -617,7 +586,7 @@ the Node the gates ran under.
     pin closes silent re-pinning — the rules a repo is judged by must be the rules its own
     install record hashes, and any change to them is a diff the repo owner reviews. The
     corresponding suite (`t-engine-dir.sh`) is deleted with the v2 surface cut rather than
-    migrated: v2 has no `upgrade` command to move a global engine under a repo, and the
+    migrated: v3 ships no command to move a global engine under a repo, and the
     global-engine lane itself is session-2/3 scope — when it returns it returns re-measured
     against the AGENTS.md frontmatter shape.
 
