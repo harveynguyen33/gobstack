@@ -146,6 +146,14 @@ The verdict decides what each row can do: `RECOMMEND` rows are pre-ticked when `
 suggests, `MAYBE` rows are listed but never pre-ticked, and a `SKIP` row refuses install —
 it stays visible so the curation history is readable, but the curator declined it.
 
+**The license gate is hard.** A verdict alone never installs anything: every row carries a
+`license_status` (verified | pending | proprietary-confirmed-ok) and the date it was checked.
+Only `verified` installs. A row whose license is not yet resolved carries verdict
+`LICENSE-PENDING` — it is never pre-ticked at init, and `gob extras install` refuses it with
+`license pending verification` until a curator verifies the license and flips the row's data
+in `catalogue.tsv`. The gate reads the data, not the code: flipping a row installable is a
+catalogue edit (a new `license_status` + `license_check_date`), never an engine change.
+
 **The catalogue is the allowlist.** An id that is not a row in `catalogue.tsv` is refused by
 name; nothing is ever installed from a URL, a repo name, or a web search. Installs are
 offline by contract: skill and workflow rows copy from the vendored payload the curator

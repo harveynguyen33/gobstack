@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # t-extras.sh — the curated catalogue system (W-extras).
 #
-#   X1  catalogue.tsv parses: 17 columns on every data row, unique ids, the closed
-#       verdict enum (RECOMMEND|MAYBE|SKIP), the closed kind enum (skill|mcp|workflow),
-#       a review stamp on every row, and the impeccable row exactly as decided (F6).
+#   X1  catalogue.tsv parses: 19 columns on every data row, unique ids, the closed
+#       verdict enum (RECOMMEND|MAYBE|SKIP|LICENSE-PENDING), the closed kind enum
+#       (skill|mcp|workflow), a review stamp on every row, the license gate columns
+#       (license_status verified|pending|proprietary-confirmed-ok + a check date on
+#       every row; verdict and status agree: a non-verified installable row is
+#       LICENSE-PENDING, a LICENSE-PENDING row is never verified), and the impeccable
+#       row exactly as decided (F6).
 #   X2  `gob extras list`: exit 0, the group headers, the row count matches the file;
 #       `list <category>` filters; an unknown category is bad input (exit 2), not an
 #       empty table.
@@ -12,6 +16,11 @@
 #   X4  THE ALLOWLIST RULE: `install <unknown-id>` refuses (exit 2) and writes NOTHING;
 #       a SKIP-verdict row refuses (exit 1); a MAYBE row installs on an explicit
 #       command (the verdict decides defaults at init, not installability).
+#   X4L THE LICENSE GATE: a LICENSE-PENDING row refuses install (exit 1, `license
+#       pending verification`, nothing written) even though the gate is verdict-blind;
+#       a verified row installs; and a pending fixture row FLIPPED to verified in the
+#       tsv (engine unchanged) becomes installable — the gate is data-driven, and a
+#       later bogus status is bad input (exit 2).
 #   X5  install flows: skill -> .gob/extras/<name>/ (standalone), skill -> the
 #       platform's project skills root (read from adapters/<id>/adapter.tsv, the
 #       sync_platforms pattern) with --platform, mcp -> the printed mcp.json snippet
@@ -46,29 +55,38 @@ gxb() { HOME="$HOMEDIR" bash "$EXTRAS" "$@"; }
 # ---- X1: the catalogue parses --------------------------------------------------
 [ -f "$CAT" ]; check "X1 catalogue.tsv exists at extras-catalogue/" "$?"
 HDR=$(head -n 1 "$CAT")
-[ "$(printf '%s' "$HDR" | awk -F'\t' '{print NF}')" -eq 17 ]
-check "X1 the header carries the 17 recommended columns" "$?"
+[ "$(printf '%s' "$HDR" | awk -F'\t' '{print NF}')" -eq 19 ]
+check "X1 the header carries the 19 columns (17 + the license gate pair)" "$?"
 for col in id category kind name source_repo path_within_repo has_skill_md license stars \
-           last_push matches conflicts requires install_hint verdict reviewed_by reviewed_date; do
+           last_push matches conflicts requires install_hint verdict reviewed_by reviewed_date \
+           license_status license_check_date; do
   printf '%s' "$HDR" | grep -qF "$col" || break
 done
-[ "$(printf '%s' "$HDR" | awk -F'\t' '{print NF}')" -eq 17 ] && \
+[ "$(printf '%s' "$HDR" | awk -F'\t' '{print NF}')" -eq 19 ] && \
   printf '%s' "$HDR" | tr '\t' '\n' | sort > /tmp/x1.hdrs
 printf '%s\n' id category kind name source_repo path_within_repo has_skill_md license \
   stars last_push matches conflicts requires install_hint verdict reviewed_by reviewed_date \
+  license_status license_check_date \
   | sort > /tmp/x1.want
 cmp -s /tmp/x1.hdrs /tmp/x1.want
 check "X1 every column name is exact (order-insensitive)" "$?"
-BADNF=$(awk -F'\t' 'NR>1 && NF!=17 {print $1}' "$CAT")
-[ -z "$BADNF" ]; check "X1 every data row carries 17 fields" "$?"
+BADNF=$(awk -F'\t' 'NR>1 && NF!=19 {print $1}' "$CAT")
+[ -z "$BADNF" ]; check "X1 every data row carries 19 fields" "$?"
 DUP=$(awk -F'\t' 'NR>1 {c[$1]++} END {for (k in c) if (c[k]>1) print k}' "$CAT")
 [ -z "$DUP" ]; check "X1 ids are unique" "$?"
-BADV=$(awk -F'\t' 'NR>1 && $15 !~ /^(RECOMMEND|MAYBE|SKIP)$/ {print $1}' "$CAT")
-[ -z "$BADV" ]; check "X1 verdict is the closed enum (RECOMMEND|MAYBE|SKIP)" "$?"
+BADV=$(awk -F'\t' 'NR>1 && $15 !~ /^(RECOMMEND|MAYBE|SKIP|LICENSE-PENDING)$/ {print $1}' "$CAT")
+[ -z "$BADV" ]; check "X1 verdict is the closed enum (RECOMMEND|MAYBE|SKIP|LICENSE-PENDING)" "$?"
 BADK=$(awk -F'\t' 'NR>1 && $3 !~ /^(skill|mcp|workflow)$/ {print $1}' "$CAT")
 [ -z "$BADK" ]; check "X1 kind is the closed enum (skill|mcp|workflow)" "$?"
 NOSTAMP=$(awk -F'\t' 'NR>1 && ($16=="" || $17 !~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) {print $1}' "$CAT")
 [ -z "$NOSTAMP" ]; check "X1 every row carries reviewed_by + reviewed_date" "$?"
+BADLIC=$(awk -F'\t' 'NR>1 && $18 !~ /^(verified|pending|proprietary-confirmed-ok)$/ {print $1}' "$CAT")
+[ -z "$BADLIC" ]; check "X1 license_status is the closed enum (verified|pending|proprietary-confirmed-ok)" "$?"
+NOLICDATE=$(awk -F'\t' 'NR>1 && ($18=="" || $19 !~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) {print $1}' "$CAT")
+[ -z "$NOLICDATE" ]; check "X1 every row carries license_status + a license_check_date" "$?"
+MIXED=$(awk -F'\t' 'NR>1 { if ($15 ~ /^(RECOMMEND|MAYBE)$/ && $18!="verified") print $1;
+                      else if ($15=="LICENSE-PENDING" && $18=="verified") print $1 }' "$CAT")
+[ -z "$MIXED" ]; check "X1 verdict and license_status agree (installable = verified; LICENSE-PENDING never verified)" "$?"
 awk -F'\t' '$1=="impeccable" && $5=="pbakaus/impeccable" && $8=="Apache-2.0" && \
             $9=="78552" && $10=="2026-10-07" && $11 ~ /frontend/ && $15=="RECOMMEND"' "$CAT" \
   | grep -q impeccable
@@ -93,7 +111,8 @@ gx list nosuchcat >/dev/null 2>&1; check "X2 an unknown category is bad input (e
 # ---- X3: show ------------------------------------------------------------------
 OUT=$(gx show impeccable 2>&1); RC=$?
 check "X3 show exits 0" "$RC"
-for label in "id:" "category:" "kind:" "source_repo:" "license:" "stars:" "verdict:"; do
+for label in "id:" "category:" "kind:" "source_repo:" "license:" "stars:" "verdict:" \
+             "license_status:" "license_check_date:"; do
   printf '%s' "$OUT" | grep -qF "$label" || { RC=1; break; }
 done
 check "X3 show prints every field label" "$RC"
@@ -125,6 +144,47 @@ else
   [ "$RC" -eq 2 ] && printf '%s' "$RC" | grep -qF 2
   # refusal reason is the missing payload (exit 2), never the verdict
   check "X4 a MAYBE row is installable in principle (payload-missing, not verdict refusal)" "$([ "$RC" -eq 2 ] && echo 0 || echo 1)"
+fi
+
+# ---- X4L: the license gate (W-license, hard) ------------------------------------
+# THE GATE IS VERDICT-BLIND: whatever a row's verdict says, install reads
+# license_status. The refusals are exit 1 (a refusal with the named fix), an unknown
+# status is exit 2 (bad input), and flipping the DATA (never the engine) flips the
+# outcome — the proof the gate is data-driven.
+PENDID=$(awk -F'\t' 'NR>1 && $15=="LICENSE-PENDING" {print $1; exit}' "$CAT")
+[ -n "$PENDID" ]; check "X4L the catalogue carries a LICENSE-PENDING row (the gate has a subject)" "$?"
+PENDPAYLOAD="$SRC/extras-catalogue/payload/$PENDID"
+if [ ! -d "$PENDPAYLOAD" ]; then
+  # A fixture payload so the refusal is the license gate, never the payload gate.
+  mkdir -p "$PENDPAYLOAD/$PENDID-probe"
+  printf 'probe\n' > "$PENDPAYLOAD/$PENDID-probe/SKILL.md"
+  FIXTURE=1
+fi
+BEFORE=$(find . -not -path './.git/*' | sort)
+OUT=$(gxb install "$PENDID" --target . 2>&1); RC=$?
+printf '%s' "$OUT" | grep -qF 'license pending verification'
+check "X4L a LICENSE-PENDING row refuses install naming the fix (exit 1)" "$([ "$RC" -eq 1 ] && echo 0 || echo 1)"
+AFTER=$(find . -not -path './.git/*' | sort)
+[ "$BEFORE" = "$AFTER" ]; check "X4L the refused install wrote NOTHING" "$?"
+gxb install "$PENDID" --target . --dry-run >/dev/null 2>&1
+check "X4L even --dry-run refuses a pending row (the gate is not a copy-time check)" "$([ $? -eq 1 ] && echo 0 || echo 1)"
+# a verified row installs (the shipped payload row, already exercised by X5 — probe one)
+VTASTE=$(awk -F'\t' 'NR>1 && $1=="taste-skill" {print $18}' "$CAT")
+[ "$VTASTE" = "verified" ]; check "X4L taste-skill carries license_status=verified in the shipped catalogue" "$([ "$VTASTE" = verified ] && echo 0 || echo 1)"
+# THE DATA-DRIVEN PROOF: flip the pending row to verified in a COPY of the catalogue
+# (the engine is untouched); the same install command flips from exit 1 to exit 0.
+FIXCAT="$WORK/catalogue-licensed.tsv"
+awk -F'\t' -v OFS='\t' -v id="$PENDID" 'NR==1 || $1!=id {print; next} { $15="RECOMMEND"; $18="verified"; print }' "$CAT" > "$FIXCAT"
+OUT=$(GOB_EXTRAS_CATALOGUE="$FIXCAT" gxb install "$PENDID" --target . 2>&1); RC=$?
+check "X4L the SAME row with license_status flipped to verified in the tsv installs (gate is data-driven, exit 0)" "$([ "$RC" -eq 0 ] && echo 0 || echo 1)"
+[ -d ".gob/extras/$PENDID-probe" ]; check "X4L the flipped install landed the payload" "$?"
+# and the gate is not a string match on 'pending' alone: a bogus status is bad input
+awk -F'\t' -v OFS='\t' -v id="$PENDID" 'NR==1 || $1!=id {print; next} { $18="eh-sort-of"; print }' "$CAT" > "$FIXCAT"
+GOB_EXTRAS_CATALOGUE="$FIXCAT" gxb install "$PENDID" --target . >/dev/null 2>&1
+check "X4L a bogus license_status is bad input (exit 2), never a silent pass" "$([ $? -eq 2 ] && echo 0 || echo 1)"
+rm -rf ".gob/extras/$PENDID-probe"
+if [ -n "${FIXTURE:-}" ]; then
+  rm -rf "$PENDPAYLOAD"; git -C "$SRC" checkout -q -- "extras-catalogue/payload" 2>/dev/null || true
 fi
 
 # ---- X5: the install flows -----------------------------------------------------

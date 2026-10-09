@@ -586,6 +586,10 @@ The one rule to hold onto: **init suggests, the catalogue allows, you install.**
 
 Verdicts: a `RECOMMEND` row is pre-ticked when `gob init` suggests; a `MAYBE` row is listed
 but never pre-ticked; a `SKIP` row refuses install (visible history, declined candidate).
+The license gate rides on top, hard: a row installs only when its `license_status` is
+`verified` — a `LICENSE-PENDING` row (license unresolved) is never pre-ticked and
+`gob extras install` refuses it with `license pending verification` until the curator flips
+the row's data in `catalogue.tsv`.
 Nothing installs at init — `gob init --write` honours only the rows your proposal ticks, and
 it installs them by calling `gob extras install`, so the allowlist is one code path. An id
 that is not in the catalogue is refused; installs copy from the vendored payload in the
