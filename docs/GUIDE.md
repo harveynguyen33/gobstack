@@ -3,7 +3,7 @@
 A step-by-step guide for your first week. **Read this before the README.** The README tells you
 what the pieces are; this tells you what to *do*, in order, and what you should see when it works.
 
-Version: `0.6.0-alpha.2` · Last measured: 2026-10-09 · Every command and every output below was run on a
+Version: `0.6.0-alpha.3` · Last measured: 2026-10-09 · Every command and every output below was run on a
 real repository while writing this guide.
 
 ---

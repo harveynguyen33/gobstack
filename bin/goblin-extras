@@ -54,7 +54,7 @@ usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 CATALOGUE="${GOB_EXTRAS_CATALOGUE:-$SRC/extras-catalogue/catalogue.tsv}"
 PAYLOAD="${GOB_EXTRAS_PAYLOAD:-$SRC/extras-catalogue/payload}"
 
-die() { g_err "extras: $*"; exit "${2:-2}"; }
+die() { local msg="$1"; shift; g_err "extras: $msg"; exit "${1:-2}"; }
 
 # catalogue_row <id> — the whole data row (tab-separated), empty when absent.
 catalogue_row() {
@@ -250,7 +250,12 @@ install_skill() {
     [ -d "$d" ] || continue
     name=$(basename "$d")
     n=$((n + 1))
-    g_info "extras: skill $name -> ${dst_root#"$TARGET"/}$name/"
+    # QA fix (v2-qa): the display path joined $dst_root (which ends in /) with $name
+    # WITHOUT a separator-aware join — `.gob/extras` + `/` was printed as
+    # `.gob/extrastaste/`. The join below inserts the separator the string lacks.
+    case "$dst_root" in */) printf 'extras: skill %s -> %s%s/\n' "$name" "$dst_root" "$name" ;;
+      *)    printf 'extras: skill %s -> %s/%s/\n' "$name" "$dst_root" "$name" ;;
+    esac
     copy_tree "$d" "$dst_root/$name"
   done
   [ "$n" -gt 0 ] || die "payload for '$id' holds no skill dirs ($src_root/*/ with SKILL.md each) — see extras-catalogue/payload/README.md" 2

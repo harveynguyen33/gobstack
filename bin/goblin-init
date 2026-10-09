@@ -133,6 +133,10 @@ back one proposal file. Do this now:
      found in step 1 — react, vue, playwright, godot, unity, node, postgres, …);
    - RECOMMEND rows are pre-ticked (write `- id` with `[x]`); MAYBE rows are
      listed but NOT pre-ticked (`[ ]`) — they are visible choices, never defaults;
+   - a row with NO vendored payload (no `extras-catalogue/payload/<id>/` directory)
+     must NOT be pre-ticked even when RECOMMEND — print it as `[ ]` instead;
+     `--write` installs through `gob extras install`, which refuses a
+     payload-missing id and fails the whole --write;
    - a row whose `conflicts:` names an id you also picked: pick at most one of them;
    - SKIP rows are never suggested and refuse install; leave them out entirely.
 
@@ -226,13 +230,21 @@ print_heuristic() {
   # files). The SAME matches column the agent brief reads — the fallback suggests from
   # the catalogue, never from its own private list. Verdicts are respected: only
   # RECOMMEND rows pre-tick; MAYBE rows print unticked; SKIP rows never appear.
+  # QA fix (v2-qa): a row pre-ticks ONLY when its vendored payload exists —
+  # extras-catalogue/payload/<id>/ — because --write installs through
+  # `gob extras install`, which refuses a payload-missing row and fails the whole
+  # --write after everything else was already written. A RECOMMEND row with no
+  # payload prints as a visible, unticked `[ ]` choice instead. (41 researched rows,
+  # 1 vendored payload: the old pre-tick turned a day-one init into a guaranteed
+  # exit 2 halfway through writing.)
   if [ -f "$CATALOGUE_TSV" ]; then
     local scan
     scan=$(cat "$TARGET/package.json" "$TARGET"/*.lock "$TARGET"/pnpm-lock.yaml \
               "$TARGET"/vue.config.* "$TARGET"/nuxt.config.* "$TARGET"/godot/project.godot \
               "$TARGET"/unity/ProjectSettings/ProjectVersion.txt 2>/dev/null | tr 'A-Z' 'a-z')
     if [ -n "$scan" ]; then
-      local ticked="" maybe=""
+      local ticked="" maybe="" payload_root
+      payload_root="${GOB_EXTRAS_PAYLOAD:-$SRC/extras-catalogue/payload}"
       while IFS=$'\t' read -r cid ccat ckind cname crepo cpath chmd clic cstars cpush \
                           cmatches cconf creq chint cverdict cby cdate; do
         [ -n "$cid" ] || continue
@@ -242,6 +254,12 @@ print_heuristic() {
           case "$scan" in *"$tok"*) hit=1; break ;; esac
         done
         [ "$hit" -eq 1 ] || continue
+        if [ ! -d "$payload_root/$cid" ]; then
+          # no vendored payload: the row stays visible but never pre-ticks —
+          # a tick --write cannot honour is a refusal waiting to happen
+          maybe="$maybe    - [ ] $cid  # matches this repo, NO VENDORED PAYLOAD yet (gob extras install would refuse — vendor it under extras-catalogue/payload/$cid/ first)"$'\n'
+          continue
+        fi
         case "$cverdict" in
           RECOMMEND) ticked="$ticked    - [x] $cid  # matches this repo ($cmatches)"$'\n' ;;
           MAYBE)     maybe="$maybe    - [ ] $cid  # matches, verdict MAYBE (not pre-ticked)"$'\n' ;;
@@ -325,6 +343,37 @@ SYNC_SEL=$(g_agents_list "$PROP" sync_platforms | tr '\n' ' ')
 # gate in goblin-extras (unknown id -> refusal; SKIP verdict -> refusal): a proposal
 # cannot install anything the catalogue does not carry.
 EXTRAS_SEL=$(sed -n '/catalogue_suggestions:/,/^[^ -]/{s/^[[:space:]]*-[[:space:]]*\[x\][[:space:]]*\([A-Za-z0-9_-]*\).*/\1/p;}' "$PROP" | sort -u | tr '\n' ' ')
+
+# ---------------------------------------------------------------- pre-flight ---
+# QA fix (v2-qa issue 1b): the TICKED extras are validated BEFORE anything is written.
+# The old order installed the harness first and ran `gob extras install` last, so a
+# missing vendored payload refused AFTER 23 files were already in the tree (the day-one
+# exit 2 with the repo half-initialized). Here every ticked id is resolved through the
+# same allowlist path goblin-extras uses (row exists, verdict installable, license gate,
+# vendored payload present) while the target is still untouched; a refusal names the id
+# and the fix and exits before the first write.
+if [ -n "$EXTRAS_SEL" ] && [ "$DRYRUN" -eq 0 ]; then
+  PAYLOAD_ROOT="${GOB_EXTRAS_PAYLOAD:-$SRC/extras-catalogue/payload}"
+  for xid in $EXTRAS_SEL; do
+    row=$(awk -F'\t' -v id="$xid" 'NR>1 && $1==id { print; exit }' "$CATALOGUE_TSV" 2>/dev/null)
+    [ -n "$row" ] || { g_err "pre-flight: catalogue has no row '$xid' — fix the proposal's catalogue_suggestions (gob extras list names the allowlist)"; exit 2; }
+    verdict=$(printf '%s' "$row" | awk -F'\t' '{print $15}')
+    lic=$(printf '%s' "$row" | awk -F'\t' '{print $18}')
+    case "$verdict" in
+      RECOMMEND|MAYBE) ;;
+      *) g_err "pre-flight: '$xid' carries verdict '$verdict' — untick it in the proposal's catalogue_suggestions"; exit 2 ;;
+    esac
+    # the same license gate goblin-extras enforces, read before any write
+    case "$lic" in
+      verified) ;;
+      *) g_err "pre-flight: '$xid' refuses install: license pending verification — untick it in the proposal's catalogue_suggestions"; exit 2 ;;
+    esac
+    [ -d "$PAYLOAD_ROOT/$xid" ] || {
+      g_err "pre-flight: no vendored payload for '$xid' at $PAYLOAD_ROOT/$xid — untick it in the proposal's catalogue_suggestions, or vendor the payload there first";
+      exit 2;
+    }
+  done
+fi
 
 if [ "$DRYRUN" -eq 1 ]; then
   g_info "gob init --write --dry-run: validated OK (class $CLASS, branch $BRANCH, owner $EMAIL, 1+ gate)"
