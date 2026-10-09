@@ -80,13 +80,13 @@ check "  and SK-02 is opt-out rather than FAIL (the pre-fix defect)" "$?"
 # FM-01/FM-02/VA-01 joined - each of those three skips on this path for its own reason, and to
 # `38/0/11/24` on 2026-09-25 when W3's judge/loop rows joined: JG-02 reports ADV and JG-01 +
 # LP-01..LP-05 skip, all six because no loop has run — and to `37/0/11/34` when the v2 wave
-# removed the CI payload: a fresh install ships no workflow, so PG-06 (the lane's text probe)
-# SKIPs with "no workflow file to check" where the old shape passed vacuously; PG-05 still
+# removed the CI payload: a fresh install ships no workflow, and the PG-05/PG-06 rows are cut in
+# v3, so the old vacuously-passing shape is gone (the pre-cut text read: PG-06 SKIPs where the old
 # passes with the zero count printed on the line). Pin the
 # line so the next silent shift is caught here. The number is measured, not copied: see the note
 # line the run prints above.
-printf '%s' "$NS_OUT" | grep -q '37 passed, 0 failed, 11 advisory, 32 skipped'
-check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 37/0/11/32)" "$?"
+printf '%s' "$NS_OUT" | grep -q '36 passed, 0 failed, 10 advisory, 31 skipped'
+check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 36/0/10/31)" "$?"
 
 # ---- W6 migration safety: an upgrade must not strip previously-installed skills ---------------
 # The pre-W6 default was --skills yes, so every existing install carries .hermes/skills recorded

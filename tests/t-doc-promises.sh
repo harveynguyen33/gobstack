@@ -401,12 +401,9 @@ c_phantom=$(comm -23 <(printf '%s\n' "$c_ids") \
 c_nocontrol=$(comm -13 <(printf '%s\n' "$c_ids") \
               <(awk -F'\t' 'NR>1 && $2=="target" {print $1}' "$ENF_SRC" | grep -oE '[A-Z]{2,3}-[0-9]{2}' | sort -u) \
               | tr -d '[:space:]')
-# v2 (wave B): the CI lane is out of the product — PG-05/PG-06 have no subject to mutate (nothing
-# installs .github/workflows), so their controls are DELETED, not migrated (the same treatment
-# t-verify-green gave the CI family). They are target-scope rows that SKIP on a v2 install, so the
-# census excludes them BY NAME here — the exclusion list is the record that this was measured, not
-# an accident of the grep.
-C_EXCLUDE="PG-05 PG-06"
+# v3: the CI lane is out of the product and its rows (PG-04/PG-05/PG-06) are cut, so there is
+# nothing to exclude — the census reads the matrix as it now stands.
+C_EXCLUDE=""
 
 c_line=$(grep -m1 -nE '[0-9]+ over [0-9]+ target rows' "$SRC/README.md")
 c_where=${c_line%%:*}

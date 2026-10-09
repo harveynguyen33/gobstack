@@ -124,7 +124,7 @@ Output is one line per executed row, in manifest order, plus a summary line at t
 
 Those four lines are one row of each marking. The summary line of a green default software-class run is:
 
-          37 passed, 0 failed, 11 advisory, 32 skipped
+          36 passed, 0 failed, 10 advisory, 31 skipped
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -140,14 +140,14 @@ tests the right path rather than merely passing; whether the forge is bound by t
 `CL-01` found; whether a human
 read the diff; whether the model mapping names a family that actually differs; and whether
 `.gob/installed.json` — the record every drift check trusts — was itself rewritten, since it
-is not signed (`docs/LIMITS.md` #18). The CI lane's blind spots are named there too, though in v2
-the lane itself is out of the product (`docs/LIMITS.md` records `docs/CI.md` as its LIMITS
-candidate) — the prose survives because the *reason* a workflow file is not a gate still does.
+is not signed (`docs/LIMITS.md` #18). The CI lane is out of the product and its doc is deleted; the
+verifier still names the CI lane's blind spots in its "cannot see" footer, because the *reason* a
+workflow file is not a gate still holds (`docs/LIMITS.md` #34).
 
 ### A fresh install verifies green
 
 Measured on a fresh DEFAULT software-class install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`37 passed, 0 failed, 11 advisory, 32 skipped`, exit 0.** Thirty-two rows skip with
+hand edit: **`36 passed, 0 failed, 10 advisory, 31 skipped`, exit 0.** Thirty-one rows skip with
 a reason — the same not-yet rows as before, plus the five skill rows (`SK-01`..`SK-04`,
 `AU-04`) that skip on the `playbooks` opt-out a skills-free install records: `HS-02` — no pre-change commit
 is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `AU-02` and `AU-03`, which
@@ -163,11 +163,9 @@ reference corpus and a lab `manifests/` directory a fresh install has neither of
 (`reference_manifest:` and `quarantine_root:` ship empty on purpose: a repo with no corpus must
 not be born RED) — and `JG-01` with `LP-01`..`LP-05`, which have
 no `.gob/loop/` record because no loop has run in this repo: the six judge/loop rows are
-**absent-state** rows, and a fresh install must not be born RED either. **Two** rows do
-**not** skip, both of them the CI lane's: `PG-05` and `PG-06` read the workflow this class installs.
-Two, not four — the four electron bans named in the skip list above do skip here, and a tree without
-a renderer would skip them the same way. Every skip above
-is a *not yet*, not a pass.
+**absent-state** rows, and a fresh install must not be born RED either. The electron bans named in
+the skip list above do skip here too — a tree without a renderer skips them the same way. Every
+skip above is a *not yet*, not a pass.
 
 Two of the eleven advisories arrive with the same lane. `JG-02` reports that the judge lane
 resolves to **no profile** on this fleet — measured `bash bin/goblin-model judge` →
@@ -187,7 +185,7 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a class's `-` (off) real.
 - **The opt-out numbers are pinned (V3-3).** A software-class install with an explicit `--skills no`
-  verifies `37 passed, 0 failed, 11 advisory, 32 skipped`, exit 0, and
+  verifies `36 passed, 0 failed, 10 advisory, 31 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
   at v0.2 when the ban rows landed, **15 → 18 on 2026-09-25 (G1)** — the feature-map rows,

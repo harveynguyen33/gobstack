@@ -24,7 +24,7 @@ closed and now ENFORCED (`IN-03`'s third clause, Z1-5): `script`, `lint`, `gate`
 plus `test` for a source-scope row, whose check is a script under `tests/` run by
 `tests/run-tests.sh`.
 
-Measured shape of this table: **85 rows** - 80 target, 5 source; advisory 10, gate 23, lint 28, script 20, test 4.
+Measured shape of this table: **82 rows** - 77 target, 5 source; advisory 9, gate 22, lint 27, script 20, test 4.
 
 ## The rows
 
@@ -59,9 +59,6 @@ Measured shape of this table: **85 rows** - 80 target, 5 source; advisory 10, ga
 | `PG-01` | target | gate | The reviewed artifact is named by SHA, and that SHA exists. | goblin-verify --only PG-01 | — |
 | `PG-02` | target | script | The gate is chosen by the change, not the repo, and the tier's evidence exists. | goblin-verify --only PG-02 | — |
 | `PG-03` | target | gate | A new head voids the verdict. | goblin-verify --only PG-03 | — |
-| `PG-04` | target | advisory | Never bypass what the forge enforces. | advisory | Needs the forge: GitHub's restrictions do not apply to admins, and a sole-admin repo has nobody the gate binds. Not observable from the repo. |
-| `PG-05` | target | lint | No required check that self-skips. | goblin-verify --only PG-05 | Text, not a YAML parser. Three clauses per job: the job declares at least one `run:`/`uses:` step (else the check runs nothing); the JOB carries no `if:` (else the whole required check self-skips); and no STEP carries an `if:` (else that step - possibly the gate step - self-skips). The old body flagged only 'every step guarded', which PASSED the real shape: in the estate's one existing workflow a deliberately UNGUARDED credential step decides whether the guarded compile step runs, so `guarded < steps` and the row reported PASS on the workflow it exists to catch (G8 section 3, re-measured V3-4). Deliberately strict, and the strictness is the point: GitHub reports a SKIPPED job as Success even when it is a required check (docs S1/S2), so a conditional step is a step that can green-light a commit whose gate never ran. False positives it cannot avoid: a `#` inside a quoted string is read as a comment, a flow-style (`jobs: {...}`) mapping is refused rather than parsed, and a conditional step that is genuinely safe is indistinguishable from the trap - the remedy is to move the condition into the declared command, or into a second job that is not the required check. It cannot see branch-protection state, the required-check list, or whether the workflow ever ran (`PG-04`), and a repo with no workflow passes with the count printed on the line. |
-| `PG-06` | target | gate | The gate CI runs is the gate the project declares. | goblin-verify --only PG-06 | The declared set comes from `g_yaml_gates`, the reader `GT-01` uses, so a gate cannot vanish from the comparison in silence (G8-3). A workflow passes when the whole declared set is RUN: the verifier with no `--only` (a full run executes every declared gate through `GT-02`), or each declared gate command verbatim. It reads TEXT with comments blanked first, and only `run:` payloads and block-scalar bodies count - a command sitting in a `name:`, `env:` or `with:` value is dropped, which is what stops a comment or a label from satisfying the row. What it cannot see: that the forge marks that job a REQUIRED check, that the job is the one the forge waits on, or that the workflow can fail at all (`PG-05`). A repo with no workflow reports SKIP with that reason instead of a vacuous pass. The lane's own enforcement is the TARGET repo's, not goblin-stack's (`docs/LIMITS.md` #34): goblin-stack can prove the file invokes the gate and cannot make the forge run it, so this row is a text reading of the target's CI and never a claim that CI gated the SHA. |
 | `DS-01` | target | script | Runtime data is not test fixture: a gate run must not write it. | goblin-verify --only DS-01 | — |
 | `DS-02` | target | gate | Snapshot before, verify after. | goblin-verify --only DS-02 | — |
 | `DOC-01` | target | advisory | A significant change updates the docs that teach it. | advisory | 'Significant' is a judgement; a diff-size heuristic fails on the cases that matter. |
@@ -118,7 +115,7 @@ Measured shape of this table: **85 rows** - 80 target, 5 source; advisory 10, ga
 
 ## Advisory rows, named
 
-10 of the 80 rows are labelled `advisory`. 9 of them carry no executable check at all
+9 of the 77 rows are labelled `advisory`. 8 of them carry no executable check at all
 (they are prose the matrix refuses to pretend about); 1 is advisory-labelled but still
 reports its state.
 
@@ -127,30 +124,21 @@ reports its state.
 - **CM-02** (no check at all) - The commit message was written to a file, not passed with -m.
 - **MD-02** (reports state as ADV) - The review lane is a different model family from the code lane.
 - **MD-03** (no check at all) - Role-pinned fan-out goes through kanban, not a model-less subagent spawn.
-- **PG-04** (no check at all) - Never bypass what the forge enforces.
 - **DOC-01** (no check at all) - A significant change updates the docs that teach it.
 - **DOC-02** (no check at all) - System-level changes are recorded wherever the project's standard says they live.
 - **SC-09** (no check at all) - Auth is applied consistently across sibling routes. Added when the missing entry was measured: the count said 9 and this list held 8.
 - **JG-03** (no check at all) - A judge lane that has never returned a non-`done` verdict is escalated. The history that would show a bad lane lives across cards and repos, so the counter-measure is policy - one known-red control verdict per wave, recorded in `docs/LOOP.md` - not a command.
 
 `advisory_ceiling` (default 10) caps that count: **SK-03 fails the run when the advisory
-count exceeds it.** The number of unenforceable rules is itself a gate. Measured at `43f7f69`:
-`advisory 9 of ceiling 10`; measured after W3's judge/loop rows:
-`advisory 10 of ceiling 10`.
+count exceeds it.** The number of unenforceable rules is itself a gate. Measured (v3):
+`advisory 9 of ceiling 10`.
 
 **The budget, stated so the next rule author does not have to work it out (V1/G8-5).** The
-count is 10 of a ceiling of 10, so **no advisory slot is free**: the next advisory row FAILs
-`SK-03` unless the ceiling is raised in the same change, with the reason written down. `SK-03`
-prints the arithmetic on every run (`advisory 10 of ceiling 10 (0 free slots: the next advisory
-row FAILs)`), and a ceiling that is not a number is a FAIL rather than a silent ADVISORY.
-
-Two planned rows each wanted the last slot - **`FM-03`** (G1, the feature map) and **`JG-03`**
-(G2, the judge agent). **Decided 2026-09-25 (W2):** G1's `FM-03` does **not** take it. The
-feature map ships `FM-01` and `FM-02` as real commands, and the completeness claim `FM-03` would
-have carried is recorded in `docs/LIMITS.md` #30 instead of as a counted row, so the slot stayed
-free for G2's `JG-03`. The decision is recorded in `docs/LIMITS.md` #26; W2 measured `advisory 9
-of ceiling 10 (1 free slot)`. **Spent 2026-09-25 (W3):** G2's `JG-03` took it, measured `advisory
-10 of ceiling 10 (0 free slots)`.
+count is 9 of a ceiling of 10, so **one advisory slot is free**: a tenth advisory row is
+available, but the one after it FAILs `SK-03` unless the ceiling is raised in the same change,
+with the reason written down. `SK-03` prints the arithmetic on every run
+(`advisory 9 of ceiling 10 (1 free slot)`), and a ceiling that is not a number is a FAIL rather
+than a silent ADVISORY. The v3 cuts returned the slots the dependency-audit and CI rows had spent.
 
 `SK-03`'s count is the count the run itself uses: a row is advisory if its `check` cell says so
 OR its `enforced_by` cell does.
@@ -183,8 +171,7 @@ bans `BN-06`..`BN-09` on even when a hand-edited `bans:` list omits them, and re
 `manifest/classes.tsv` are a W4 remnant kept for record: **v2 installs no CI** — the part carries
 `-` for every class, the installer renders nothing under `.github/`, and no flag configures it
 (so a reader who meets `ci-gate` in the tsv reads `off everywhere`, not a missing column here).
-The CI story that used to live at `docs/CI.md` moved to `docs/LIMITS.md` (CI is out of the v2
-product, not a promise this repo is behind on).
+CI is out of the product, not a promise this repo is behind on.
 
 ## The ban list (G5)
 

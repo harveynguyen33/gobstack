@@ -177,7 +177,7 @@ You will see one line per rule. The shape:
 
 and a summary line at the bottom:
 
-    36 passed, 1 failed, 11 advisory, 32 skipped     # HP-05, below
+    35 passed, 1 failed, 10 advisory, 31 skipped     # HP-05, below
 
 ### How to read that output
 
@@ -220,9 +220,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `35 passed, 2 failed, 11 advisory, 32 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
-| 2. the first commit | `git add -A && git commit` | `36 passed, 1 failed, 11 advisory, 32 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `37 passed, 0 failed, 11 advisory, 32 skipped` | none — green |
+| 1. the install ran | `gob init --write ... --yes` | `34 passed, 2 failed, 10 advisory, 31 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
+| 2. the first commit | `git add -A && git commit` | `35 passed, 1 failed, 10 advisory, 31 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `36 passed, 0 failed, 10 advisory, 31 skipped` | none — green |
 
 One of those deserves its name spelled out:
 
@@ -450,14 +450,14 @@ A software-class install lands on a specific shape. The first reds are
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    35 passed, 2 failed, 11 advisory, 32 skipped     # straight after the install (CM-03 + SP-02)
-    36 passed, 1 failed, 11 advisory, 32 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
-    37 passed, 0 failed, 11 advisory, 32 skipped     # real HEAD named and committed: green
+    34 passed, 2 failed, 10 advisory, 31 skipped     # straight after the install (CM-03 + SP-02)
+    35 passed, 1 failed, 10 advisory, 31 skipped     # first commit: HP-05 left (and GT-02 too if the gate cannot run)
+    36 passed, 0 failed, 10 advisory, 31 skipped     # real HEAD named and committed: green
 
 Name a real commit in `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is
 green:
 
-    37 passed, 0 failed, 11 advisory, 32 skipped     (on a real project; your numbers will differ)
+    36 passed, 0 failed, 10 advisory, 31 skipped     (on a real project; your numbers will differ)
 
 **Thirty-two rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
@@ -465,10 +465,10 @@ scolding.
 
 Two readings that are easy to get wrong:
 
-- **Advisory rows are not passes.** Ten rules are labelled `advisory` — counted, not enforced, and
-  nine of them carry no executable check at all. The count is capped by `advisory_ceiling: 10`, and
-  a software-class install already sits at 10 of 10: adding another unenforceable rule fails verify until
-  one is removed. That is intentional. (The summary line can print `11 advisory`: the eleventh ADV
+- **Advisory rows are not passes.** Nine rules are labelled `advisory` — counted, not enforced, and
+  eight of them carry no executable check at all. The count is capped by `advisory_ceiling: 10`, and
+  a software-class install sits at 9 of 10: adding unenforceable rules eventually fails verify until
+  one is removed. That is intentional. (The summary line prints `10 advisory`: the tenth ADV
   line is `JG-02`, a row with a real command of its own that reports ADV here because your model
   file declares no `judge:` lane — it prints the remedy rather than failing a repo for a fleet's
   routing.)

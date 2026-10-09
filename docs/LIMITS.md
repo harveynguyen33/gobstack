@@ -34,8 +34,8 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 8. **A new surface to maintain.** Per-repo vendored `.goblin/` plus `.hermes/skills/` means
    upgrade debt in every adopted repo, plus one more command pair to learn. The counter is that
    the alternative — profile copies — already failed.
-9. **Ten rows are labelled `advisory`, and nine of them are prose with no check at all:**
-   `HP-04`, `HS-03`, `CM-02`, `MD-03`, `PG-04`, `DOC-01`, `DOC-02`, `SC-09` and `JG-03` (G2, the
+9. **Nine rows are labelled `advisory`, and eight of them are prose with no check at all:**
+   `HP-04`, `HS-03`, `CM-02`, `MD-03`, `DOC-01`, `DOC-02`, `SC-09` and `JG-03` (G2, the
    judge lane that has never returned a non-`done` verdict). One (`MD-02`) is
    advisory-labelled but still reports its state as `ADV`. Each is counted and capped, but a
    counted rule is still not an enforced one, and **the cap is a policy, not a proof.**
@@ -52,24 +52,11 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     line can no longer lose its `measured <date>` in silence (G8-2 measured the old row passing
     exactly that); but nothing re-measures the number, and a gate-bearing line that names no
     declared gate and carries no gate-shaped keyword is still unseen.
-13. **`PG-04` is documentation, and `PG-05` is a text reading — re-declared at W4 rather than
-    called a gate.** `PG-04` stays `advisory` because the forge is unobservable from inside a
-    repo: a protected branch whose only admin is the person pushing protects nothing, so a
-    required check armed under the sole admin's own identity binds nobody — the second half of
-    that sentence is measured (Harvey is the sole admin of every repo he owns), and changing it
-    is a forge/account change, not a repository change. `PG-05` **used to be a heuristic**: it
-    counted "every step is guarded", so a single **job-level** `if:`, a job with no step, and the
-    measured real shape (one *unguarded* step deciding whether the guarded gate step runs) all
-    passed it while GitHub reported Success. It now refuses a conditional job, a conditional
-    step, a job that declares no step and a workflow with no `jobs:` — see `docs/CI.md` §1 for
-    why a skipped job is a green light. It is still a **text reading**: no YAML parser
-    (`docs/CONTRACTS.md` allows none), so a flow-style `jobs: {…}` mapping is refused rather than
-    parsed, a `#` inside a quoted string is read as a comment, and a conditional step that is
-    genuinely safe is indistinguishable from the trap. It cannot see branch protection, the
-    required-check list, or whether the job ever ran — `PG-04` is the row that says so. `PG-06`
-    is the other half and has its own limit: it proves the declared gate is **invoked** in a file
-    under `.github/workflows/`, never that the forge marks that job required, never that it is
-    the job the forge waits on, and never that the workflow can fail.
+13. **Cut in v3: the CI lane (`PG-04`, `PG-05`, `PG-06`, `docs/CI.md`).** The workflow reader is
+    gone: no `.github/workflows` payload is shipped, no row reads a workflow, and the doc that
+    argued the forge settings is deleted. What the lane could never see — the required-check list,
+    the bypass switch, the push identity, whether the job ever ran — is recorded here and in
+    `docs/RISKS.md` K7/K18, not solved.
 14. **`CM-02` cannot be enforced.** A backtick lost to command substitution leaves no trace a
     later check can read.
 
@@ -138,27 +125,15 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     with `SC-07`.
 25. **`SC-04` reads one statement, not one program.** A cookie write spread over three lines (or
     assembled through a helper) is not seen, and the row says so in its own cell.
-26. **The last advisory slot is an open decision, not a rule.** Measured (V1): the advisory rows
-    are `HP-04`, `HS-03`, `CM-02`, `MD-02`, `MD-03`, `PG-04`, `DOC-01`, `DOC-02`, `SC-09` — 9 at a
-    ceiling of 10 — so **exactly one slot was free**, and `SK-03` reported that arithmetic at the
-    time (`advisory 9 of ceiling 10 (1 free slot)`; **corrected 2026-09-25 (AB3):** the run prints
-    `advisory 10 of ceiling 10 (0 free slots: the next advisory row FAILs)`, W3's `JG-03` having
-    taken the slot — the two notes below carry the chronology). Two planned cards each wanted the
-    slot: G1's `FM-03` (the feature map) and G2's `JG-03` (the judge agent). **Nothing in this repo
-    chooses between them**, and V1 deliberately spent nothing. The cap is a count, not a strict
-    bound: measured, 10 advisory rows at a ceiling of 10 **pass**, and the 11th FAILs (10 at a
-    ceiling of 9 FAILs). So the tenth row is allowed; the eleventh is not. Whoever lands second
-    brings a real command.
-    **Decided 2026-09-25 (W2):** G1's `FM-03` does **not** take the slot. The feature map ships
-    `FM-01` and `FM-02` as real commands, and the one thing they cannot check — whether the map
-    lists every feature — is recorded as #30 instead of as a counted row; the slot is left free for
-    G2's `JG-03`, whose judge is the mechanism `P12` actually needs. Measured after W2, `SK-03`
-    still reads `advisory 9 of ceiling 10 (1 free slot)`.
-    **Spent 2026-09-25 (W3):** G2 landed and `JG-03` took it. The slot is now **full** — measured
-    `advisory 10 of ceiling 10 (0 free slots: the next advisory row FAILs)` — so the next author who
-    wants an advisory row must raise `advisory_ceiling` in the same change and write down why,
-    rather than discovering the cap from a red run. This is not a rule change; it is the arithmetic
-    the ceiling was always meant to force into the open.
+26. **The advisory slots are a count, not a strict bound.** Measured (v3): 9 advisory rows at a
+    ceiling of 10, so `SK-03` reports `advisory 9 of ceiling 10 (1 free slot)`. A row is advisory
+    if its `check` cell says so OR its `enforced_by` cell does; the cap is a count — 10 advisory
+    rows at a ceiling of 10 **pass**, and the 11th FAILs (10 at a ceiling of 9 FAILs). The v3 cuts
+    (the dependency-audit and CI rows) returned the slots earlier advisory rows had spent, so the
+    next author who wants an advisory row has room — and, once it is full again, must raise
+    `advisory_ceiling` in the same change and write down why rather than discovering the cap from a
+    red run. This is not a rule change; it is the arithmetic the ceiling was always meant to force
+    into the open.
 30. **The feature map is an inventory, and nothing checks that it is complete.** `FM-01` checks the
     index against the feature files that exist and the four-H2 entry contract; `FM-02` is a tripwire
     over `entry_paths:`. **Neither can see a feature nobody wrote down** — that needs semantic
@@ -262,20 +237,12 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     new number together, and record it as an operator action), which is the deliberate re-anchor
     the row's own why-cell names. It is a bound on the budget's shape, not a claim that the
     budget is the right one — and it still never re-measures.
-34. **The CI lane reads files, and a file is not a gate.** The shipped workflow
-    (`templates/ci/goblin-gate.yml.tmpl` → `.github/workflows/goblin-gate.yml`) has no `if:` at any
-    level, but nothing in a repository can make GitHub **require** it: the required-check list,
-    the bypass switch and the push identity are forge state (four settings, `docs/CI.md` §1).
-    `PG-06` proves the whole declared gate set is invoked in a file under `.github/workflows/` and
-    cannot prove that file is the one the forge waits on; `PG-05`'s reader has no parser, so a
-    flow-style `jobs: {…}` mapping is refused, and a `#` inside a quoted string truncates the line
-    it is on. Two further measured gaps: the template's job is `ubuntu-latest` with no cache, so a
-    repo whose gate needs a display, a licence, a GPU or a signed-in session cannot use it at all
-    (that is a **host** gate — the class-C rule, restated for class F; **corrected 2026-10-02 (W6):**
-    F is merged into `software`, so this is the electron opt-in), and a private repo's
-    Actions minutes are billed to the account (2,000/month free). Measured ground truth at W4:
-    **one** first-party workflow exists in the whole estate and it self-skips; five of the six
-    repos with a remote have none.
+34. **Cut in v3: the CI lane reads files, and a file is not a gate.** The shipped
+    `goblin-gate.yml` template and the `PG-05`/`PG-06` readers are gone. The limit the lane named
+    stands as a fact about CI in general: nothing in a repository can make GitHub **require** a
+    workflow, and the required-check list, the bypass switch and the push identity are forge state.
+    A project that runs CI wires its own workflow; the harness ships none, and none of its rows
+    read one.
 35. **The Electron perf number is a host gate, and the ratchet carries a different metric.**
     `presets/F-electron.yaml` declares `main_thread_busy_pct` as `perf_host_gate:` and uses
     `app_bundle_bytes` for `ratchet:` — a **deliberate deviation** from G6 §B.3, which put the FPS
@@ -289,9 +256,9 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     system Chromium, so the G6 sweep came from a *bundled headless* Chromium with no compositor
     and no vsync. Relative comparisons on one machine are meaningful (which is why
     `main_thread_busy_pct` works at all, and why frame time does not — p50 stayed flat at 16.70 ms
-    while the main thread went from 1.8 % to 54.5 % busy, `docs/CI.md` §3.3); an absolute FPS
-    claim is not. Three further Electron failure modes are **recorded, not mechanised**, and
-    `docs/CI.md` §4 says why: the dependency-graph boundary check, `ipcMain` sender validation,
+    while the main thread went from 1.8 % to 54.5 % busy, the W4 sweep); an absolute FPS
+    claim is not. Three further Electron failure modes are **recorded, not mechanised**: the
+    dependency-graph boundary check, `ipcMain` sender validation,
     and fuses at package time. **Corrected 2026-10-02 (W6):** this preset is now
     `presets/electron-overlay.yaml`, rendered over `presets/software.yaml` by `--electron` (or the
     `desktop`/`F` install alias) — the old `F` class was merged into `software`.
@@ -335,7 +302,7 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     record is evidence, not proof that the loop stopped for the right reason.
 40. **A fresh install into a repo with no commits is born RED, and X1 did not change that.** Measured
     at X1: `goblin-install --class A` into a `git init` with zero commits, then `goblin-verify`, gives
-    `37 passed, 6 failed, 11 advisory, 24 skipped`, exit 1 — `HP-05`, `SP-02`, `GT-02`, `CM-01`,
+    `36 passed, 6 failed, 10 advisory, 23 skipped`, exit 1 — `HP-05`, `SP-02`, `GT-02`, `CM-01`,
     `CM-03` and `PT-02` all read a HEAD that does not exist yet. The install never creates the seed
     commit (`bin/goblin-install` writes files and stops), and it must not: a tool that commits into
     Harvey's repo on first contact is the overreach `docs/CONTRACTS.md` rules out. Carried from W5
@@ -373,8 +340,8 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
       - items 11, 12, 15 — `scaffold_checks:`'s SKIP branch, `perf_host_gate` (#35) and
         `templates/loop/*.tmpl`: declared no-ops (SKIP, a host gate, and templates `docs/LOOP.md`
         says nothing installs). A control here would assert that nothing happens.
-      - item 13 — `docs/CI.md`'s flow-style `jobs: {…}` refusal: fails closed already, so a control
-        would pin the strict direction of a check that cannot pass vacantly.
+      - item 13 — the cut CI lane's flow-style `jobs: {…}` refusal: it failed closed already, and
+        the lane is gone, so no control is owed.
       - item 14 — `bin/goblin-model`: works (`code` → the resolved lane, unknown role → exit 2);
         only its *absence* from an install is asserted.
       - item 16 — `docs/LOOP.md` §6's "one known-red control verdict per wave, recorded in this
@@ -393,7 +360,7 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     leads the next line (`/goblin-doctor`) or is dropped (`goblin-doctor`), the directory and its
     continuation are both invisible — the first fragment stops before the name the grammar needs, the
     second is not preceded by `bin/`, so neither is a token and neither is asserted. Measured
-    2026-09-26 (AB7): a plant of that form in `docs/CI.md` is reported **`PASS`, rc 0**, mentioning
+    2026-09-26 (AB7): a plant of that form is reported **`PASS`, rc 0**, mentioning
     the plant **zero** times, and a line that ends on the bare directory with nothing after it is
     silent too, because the `dangling()` guard needs the trailing slash as well. **0 live instances**
     — measured: `grep -rnE '\.goblin/bin$|bin/$' $(git ls-files)` → **no output, exit 1**. **What it
@@ -563,8 +530,8 @@ the Node the gates ran under.
     build-output scope), never a part. Measured on the merge tree (2026-10-02): the tsv is 50 rows
     over five classes; `gob init --class desktop`, `--class F` and `--class software --electron`
     render byte-identical `goblin.yaml` (`class: software`, `electron: true`); and a pre-merge repo
-    carrying `class: F` with no `electron:` key verifies unchanged, `38 passed, 0 failed, 11
-    advisory, 33 skipped`, exit 0, with `git status --porcelain` empty — zero writes, because its
+    carrying `class: F` with no `electron:` key verifies unchanged, `37 passed, 0 failed, 10
+    advisory, 31 skipped`, exit 0, with `git status --porcelain` empty — zero writes, because its
     bans and host gate live in its own config. What this costs, recorded rather than fixed: such a
     repo gets the merge's declaration-time host-gate check only after hand-adding `electron: true`;
     its bans and host gate keep running either way, so nothing fails closed, and the CLI keeps
@@ -583,14 +550,10 @@ the Node the gates ran under.
     global-engine lane itself is session-2/3 scope — when it returns it returns re-measured
     against the AGENTS.md frontmatter shape.
 
-55. **CI is out of the v2 product, and `docs/CI.md` is its LIMITS candidate, not a kept promise.**
-    v2 installs nothing under `.github/` — the `ci-gate` part carries `-` for every class in
-    `manifest/classes.tsv` (kept as the recorded W4 remnant), `PG-05`/`PG-06` SKIP with no
-    workflow to read, and no flag configures the lane. The file that carried the lane's contract
-    (`docs/CI.md`: the four forge settings that make a workflow a gate, the Electron perf
-    deviation) still exists in the checkout as REFERENCE — the argument it makes ("a required
+55. **CI is out of the product, and its reference doc is deleted.** The install writes nothing under
+    `.github/` — the `ci-gate` part carries `-` for every class in `manifest/classes.tsv` (kept as
+    the recorded W4 remnant) — and the `PG-04`/`PG-05`/`PG-06` rows are cut. The doc that carried
+    the lane's contract (`docs/CI.md`) is deleted with them; the argument it made (a required
     check that reports Success after skipping its gate is a green light for a commit whose gate
-    never ran") is about CI in general and survives the cut — but no document the README's table
-    promises sends a reader there, and the lane returns with the CI surface in a later alpha or
-    not at all. What this admits: the verifier's "cannot see" footer still names the CI lane's
-    blind spots, for the day the lane comes back re-measured.
+    never ran) is about CI in general and is preserved in this entry. What this admits: the
+    verifier's "cannot see" footer still names the CI lane's blind spots.

@@ -3,13 +3,13 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 133 `expect_red` call sites and 34 `expect_green` - 167 calls over
-# all 82 of the matrix's 82 target rows (the other five rows are source-scope and carry controls of
-# their own). Measured at this revision: 82 distinct ids, 0 phantom ids (every id used here is a row
-# in the matrix) and 0 target row left without a control. Nine of the 82 - `HP-04`, `HS-03`,
-# `CM-02`, `MD-03`, `PG-04`, `DOC-01`, `DOC-02`, `SC-09` and `JG-03`, the rows whose check column is
+# One control per target-scope row: 122 `expect_red` call sites and 29 `expect_green` - 151 calls over
+# all 77 of the matrix's 77 target rows (the other five rows are source-scope and carry controls of
+# their own). Measured at this revision: 77 distinct ids, 0 phantom ids (every id used here is a row
+# in the matrix) and 0 target row left without a control. Eight of the 77 - `HP-04`, `HS-03`,
+# `CM-02`, `MD-03`, `DOC-01`, `DOC-02`, `SC-09` and `JG-03`, the rows whose check column is
 # literally `advisory` (docs/LIMITS.md and docs/RISKS.md name them and say why) - carry no
-# executable check at all, and ten carry the wire control below (those nine plus `MD-02`, whose
+# executable check at all, and nine carry the wire control below (those eight plus `MD-02`, whose
 # check column holds a real command of its own). For a row with no check of its own, its control
 # replaces the row's check column with a command that fails and proves the row is WIRED, not that a
 # rule bites. This paragraph was counted
@@ -78,8 +78,8 @@
 # (`expect_red`) and m_no_date_example (`expect_green`). Neither is green on both trees - measured
 # in V1.md against 43f7f69 with this same file.
 #
-# WHAT THE ADVISORY-ROW CONTROLS DO AND DO NOT PROVE. Ten target rows are labelled
-# `advisory` by design (HP-04, HS-03, CM-02, MD-02, MD-03, PG-04, DOC-01, DOC-02, SC-09, JG-03 —
+# WHAT THE ADVISORY-ROW CONTROLS DO AND DO NOT PROVE. Nine target rows are labelled
+# `advisory` by design (HP-04, HS-03, CM-02, MD-02, MD-03, DOC-01, DOC-02, SC-09, JG-03 —
 # the ninth landed with G4's guard rails and the tenth with G2's judge row; this sentence said
 # eight until 2026-09-25, then nine until the count was taken again at W4): their rules
 # are not mechanically checkable, so there is no violation of the *rule* to produce. Their
@@ -373,37 +373,6 @@ m_md_03()         { m_row_fails MD-03; }
 m_review_no_sha() { mkdir -p reviews; printf 'head: 0000000000000000000000000000000000000000\nbase: %s\npatch-id: x\nstakes: S1\n' "$PRE_CHANGE" > reviews/fixture-def5678.md; }
 m_bad_stakes()    { mkdir -p reviews; printf 'head: %s\nbase: %s\npatch-id: x\nstakes: S9\n' "$(git rev-parse HEAD)" "$PRE_CHANGE" > reviews/fixture-pg02.md; }
 m_bad_review()    { mkdir -p reviews; printf 'head: %s\nbase: %s\npatch-id: deadbeef\nstakes: S2\nchecks-run:\n' "$(git rev-parse HEAD)" "$PRE_CHANGE" > reviews/fixture-abc1234.md; }
-m_pg_04()         { m_row_fails PG-04; }
-m_self_skip_wf()  { mkdir -p .github/workflows; printf 'jobs:\n  a:\n    steps:\n      - if: ${{ secrets.NOPE }}\n        run: echo hi\n' > .github/workflows/ci.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: self-skipping workflow" >/dev/null 2>&1; }
-# ---- W4/G6: the PG-05 hole G8 measured, and the PG-06 row that closes the other half ---------
-# The four shapes below are all PASSES on the pre-change predicate (measured - see W4.md), because
-# it counted "every step is guarded": a JOB-level condition reads as zero guarded steps, a job with
-# no step has nothing to guard, and an UNGUARDED step that decides whether the guarded gate step
-# runs makes the count 1-of-2. Each one reaches the end of the job without running the gate while
-# the required check reports Success (R5's trap, one level up).
-m_job_if_wf()     { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    if: ${{ github.event_name == '"'"'push'"'"' }}\n    steps:\n      - run: bash .gob/bin/goblin-verify\n' > .github/workflows/jobif.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: a job-level if:" >/dev/null 2>&1; }
-m_nosteps_wf()    { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    runs-on: ubuntu-latest\n' > .github/workflows/nosteps.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: a job with no steps" >/dev/null 2>&1; }
-m_nojobs_wf()     { mkdir -p .github/workflows; printf 'name: nothing\non: push\n' > .github/workflows/nojobs.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: a workflow with no jobs" >/dev/null 2>&1; }
-m_decider_wf()    { mkdir -p .github/workflows; printf 'jobs:\n  gate:\n    steps:\n      - id: check\n        run: echo ready=true >> "$GITHUB_OUTPUT"\n      - if: steps.check.outputs.ready == '"'"'true'"'"'\n        run: bash .gob/bin/goblin-verify\n' > .github/workflows/decider.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: an unguarded decider step" >/dev/null 2>&1; }
-# The probe is a TEXT reading and the row says so: a `#` before the step keeps the words and
-# removes the step. This is the expect_green half - it proves the new strictness is not "any file
-# that mentions if:".
-m_wf_comment_if() { sed -i '1i # the old shape, kept for reference: if: steps.check.outputs.ready == true' .github/workflows/goblin-gate.yml; }
-# PG-06, clause 1: a workflow that runs something else entirely.
-m_wf_npm_test()   { rm -f .github/workflows/goblin-gate.yml; printf 'jobs:\n  gate:\n    steps:\n      - run: npm test\n' > .github/workflows/ci.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: CI runs npm test" >/dev/null 2>&1; }
-# PG-06, clause 1: the verifier IS called, but narrowed - a subset of the declared gates is a
-# different truth about the same SHA, which is the failure mode the row exists for.
-m_wf_only()       { sed -i 's|run: bash .gob/bin/goblin-verify$|run: bash .gob/bin/goblin-verify --only IN-02|' .github/workflows/goblin-gate.yml; }
-# PG-06: the call is COMMENTED OUT. The words are still in the file, so a probe that reads text
-# without blanking comments first would call this a run (HS-03's rule, applied to the CI lane).
-m_wf_commented()  { sed -i 's|^\( *\)run: bash .gob/bin/goblin-verify|\1# run: bash .gob/bin/goblin-verify|' .github/workflows/goblin-gate.yml; }
-# PG-06, clause 2: the workflow runs each DECLARED gate command verbatim instead of the verifier.
-m_wf_verbatim()   { rm -f .github/workflows/goblin-gate.yml; { printf 'jobs:\n  gate:\n    steps:\n'; sed -n 's/^    cmd: /      - run: /p' AGENTS.md; } > .github/workflows/ci.yml; git add -A >/dev/null 2>&1; git commit -q -m "test: CI runs the declared gates verbatim" >/dev/null 2>&1; }
-# PG-06 is a SKIP (not a pass) when there is no workflow to compare: the HS-01 precedent.
-m_wf_none()       { rm -rf .github; git add -A >/dev/null 2>&1; git commit -q -m "test: no workflow" >/dev/null 2>&1; }
-# The do-nothing mutation, for the two expect_green controls whose point is the state the install
-# already produced (the shipped workflow passes, and PG-06 skips when there is nothing to read).
-m_wf_nothing()    { :; }
 
 m_tracked_runtime() { sed -i 's|^runtime_data: .*|runtime_data: [README.md]|' AGENTS.md; }
 m_drop_ds_report()  { rm -f .gob/.ds-report; }
@@ -650,14 +619,6 @@ expect_red "MD-03 (advisory row: wired, not biting)" MD-03 1 m_md_03
 expect_red "a review naming no real SHA"           PG-01 1 m_review_no_sha
 expect_red "a review with an unknown stakes tier"  PG-02 1 m_bad_stakes
 expect_red "a review with a wrong patch-id"        PG-03 1 m_bad_review
-expect_red "PG-04 (advisory row: wired, not biting)" PG-04 1 m_pg_04
-# W4/G6: re-declared PG-05. The old body counted "every step is guarded", so the four shapes
-# below all PASSED it. Measured on the pre-change tree: see W4.md section 3.
-# v2 DELETION NOTE (wave B): the PG-05 and PG-06 controls are DELETED, not migrated. The CI
-# lane is a v2 product deletion: nothing installs .github/workflows, PG-05/PG-06 have no
-# subject to mutate, and the row family itself is gone from the matrix the same way
-# t-verify-green deleted its CI controls. PG-04 (advisory, above) stays: it proves the ROW
-# RUNNER is wired, which is independent of what any row reads.
 
 expect_red "a runtime_data path that is git-tracked" DS-01 1 m_tracked_runtime
 expect_red "no DS-01 snapshot to verify"           DS-02 1 m_drop_ds_report

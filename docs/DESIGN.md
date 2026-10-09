@@ -76,7 +76,7 @@ depend on it report advisory, never a failure — that is what makes the repo po
 | Per-project bespoke harnesses | The *gate vocabulary* differs by class, not the harness. Six class presets plus a real off switch. |
 | Fan-out by default, auto-merge, or an unattended hillclimb | The axis is read-versus-write, parallel lanes cost about N times the tokens, and no reviewed source ships unconditional auto-merge. |
 | A plugin or marketplace package | There is no marketplace here. The portable unit is a `SKILL.md` plus a bash installer. |
-| Shipping no workflow at all (the pre-W4 position) | Measured: `PG-05` cannot bite without a workflow to read, and CI and `goblin-verify` were free to report different truths about one SHA. Reversed at W4 as an **architecture change**, which is why the part is in `manifest/classes.tsv` and the installer step is explicit rather than a loose template file. |
+| Shipping a workflow (the W4 position, reversed in v3) | Measured: a workflow file is not a gate (a required check can self-skip, and the forge settings are not in the repo), and CI and `goblin-verify` were free to report different truths about one SHA. v3 cut the lane and ships no workflow; a project that wants CI wires its own. |
 
 ## What it deliberately does not do
 
@@ -84,9 +84,8 @@ See `docs/LIMITS.md` and the non-goals in `docs/RISKS.md`. The short version: it
 models, does not write the vault, does not replace any project's existing gate, writes nothing
 outside its target, and does not pretend the prose rules are enforced.
 
-**One amendment, at W4.** It used to say *"there is no CI workflow"*. It now writes **at most one**
-workflow, into its own target, only for a class that requires or permits the `ci-gate` part
-(`.github/workflows/goblin-gate.yml`), never overwriting a file it did not write. What it cannot do
-is make that file a **gate**: the required-check list, the bypass switch and the push identity are
-forge state, so `docs/CI.md` §1 writes them down and `PG-04` stays advisory. The workflow runs the
-repo's own declared gate set through `goblin-verify`, so it adds no second source of truth.
+**Amended at W4, reversed at v3.** It used to say *"there is no CI workflow"*; W4 wrote at most one
+workflow for a class that permits `ci-gate`. v3 cut the lane: it ships **no** workflow and reads
+none. The reason the W4 experiment was reversed is recorded in `docs/LIMITS.md` #34 — a workflow
+file is not a gate (the required-check list, the bypass switch and the push identity are forge
+state), and CI and `goblin-verify` were free to report different truths about one SHA.

@@ -58,9 +58,9 @@ After installing, in this order:
     cd <target> && git add -A && git commit   # the install is a change like any other
     .gob/bin/goblin-verify                    # or gob verify, anywhere in the target
 
-**A default software-class install verifies green — `37 passed, 0 failed, 11 advisory,
-32 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
-scaffold's `0000000` placeholder is the one expected red.** Thirty-two rows skip: the five
+**A default software-class install verifies green — `36 passed, 0 failed, 10 advisory,
+31 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
+scaffold's `0000000` placeholder is the one expected red.** Thirty-one rows skip: the five
 skill rows (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free install
 records, then the not-yet rows (`HS-02` has no pinned pre-change commit yet; `AU-02`/`AU-03`
 have no report to audit; `SC-06` has no dependency manifest to read; `PF-01` has no
@@ -68,8 +68,7 @@ measured perf baseline; `BN-01`/`BN-02`/`BN-05` have no `src/` for a ban to read
 electron bans `BN-06`–`BN-09` are not in this class's `bans:` list
 (`bans: [BN-01, BN-02, BN-05]`), so they skip as *not enabled* rather than as *unread*;
 `FM-01`/`FM-02`/`VA-01` have no feature map; `RC-01`..`RC-04` have no reference corpus; `JG-01`
-with `LP-01`..`LP-05` have no loop record, because no loop has run in this repo yet; and
-`PG-06` — v2 installs no CI, so there is no workflow for its probe to read). The parts
+with `LP-01`..`LP-05` have no loop record, because no loop has run in this repo yet). The parts
 that only a round can produce — a first review note, a gate that is not the shipped floor — pass
 *vacuously* rather than failing, and `P8` (`goblin-bootstrap`) still walks them as work to do.
 The measurement and the vacuous-pass reading are in `docs/CONTRACTS.md`.
@@ -174,7 +173,7 @@ run · `3` the manifest is broken. Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-05) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (152 over 78 target rows), each required to go RED and then
+one control per target-scope row (151 over 77 target rows), each required to go RED and then
 restored. **A verifier that only ever prints GREEN is a failure**, so that file is the one that
 matters most.
 

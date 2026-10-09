@@ -11,7 +11,7 @@ sentence). A term a new reader might trip on belongs here, not in a footnote.
 | class | A project category A-E that selects which parts are required, optional or off. See manifest/classes.tsv. | R7 sec.4 |
 | drift | A file whose current bytes no longer match the hash recorded at install time. IN-02 reports it; the remedy column says how to recover. | UX-review-2026-10-06 |
 | engine | The bash programs plus the manifest a verify run actually resolved: per-repo (.gob/bin) or global (engine_dir:). Named in every run's footer. | UX-review-2026-10-06 |
-| forge | The hosting platform a repo pushes to (GitHub, GitLab, ...). PG-05 and PG-06 read the workflow text but can never see what the forge itself enforces. | UX-review-2026-10-06 |
+| forge | The hosting platform a repo pushes to (GitHub, GitLab, ...). What the forge itself enforces — the required-check list, the bypass switch, the push identity — is not observable from inside a repo. | UX-review-2026-10-06 |
 | foreman | The orchestrating agent that delegates work to the fleet; the role that reads HANDOFF.md first and writes it last. | UX-review-2026-10-06 |
 | gate | A declared command that must exit 0. Declared per project, never inferred from the stack. | PP sec.4 |
 | HANDOFF | The session-boundary contract at the repo root: START HERE / State / Gates / Next steps / NOT verified. | PP sec.1 |

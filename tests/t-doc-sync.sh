@@ -124,11 +124,11 @@ check "no shipped doc or skill claims a fresh install is not automatically green
 
 # The three prose docs and the shipped bootstrap skill must carry the measured line; the other
 # shipped skills do not discuss a verify run and are not required to. v2: the measured green
-# path is the DEFAULT install's (37/0/11/34 — the CI payload is gone, so PG-06 SKIPs where it
+# path is the DEFAULT install's (36/0/10/31 — the CI payload is gone, so the cut PG-06 no longer
 # passed vacuously; before that W6 neutral-first moved 43/0/11/28 -> 38/0/11/33).
 GREEN_CLAIM=""
 for f in README.md docs/CONTRACTS.md docs/ADOPTION.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '37 passed, 0 failed, 11 advisory, 32 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '36 passed, 0 failed, 10 advisory, 31 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, CONTRACTS, ADOPTION and the shipped bootstrap skill state the measured green path" \
@@ -178,18 +178,12 @@ check "no user-facing doc claims the install copies skills by default (W6 neutra
 # The lane's own finding is that a workflow file is not a gate: GitHub reports a SKIPPED job as
 # Success, and an admin can push straight past a protection rule. PROJECT-PRACTICE section 3
 # requires every claim to say what it CANNOT see, and the "cannot see" footer is the place a run
-# shows it - the V3-8 precedent, one lane over. The four settings a workflow needs to BE a gate
-# live in docs/CI.md, because a template cannot arm a check.
+# shows it - the V3-8 precedent, one lane over. v3 cut the CI lane and DELETED docs/CI.md; the
+# verifier footer still states what the old lane could not see (the prose survives the lane).
 awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /CI lane/) found = 1 } END { exit !found }' bin/goblin-verify
 check "the verifier's 'cannot see' footer names the CI lane (W4-A)" "$?"
 awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /required check/) found = 1 } END { exit !found }' bin/goblin-verify
 check "  and says a required check is not the same thing as a gate" "$?"
-for marker in 'required check' 'Do not allow bypassing' 'sole admin' 'skipped'; do
-  grep -qi -- "$marker" docs/CI.md
-  check "docs/CI.md states '$marker' - the settings that make a workflow a gate" "$?"
-done
-grep -q 'main_thread_busy_pct' docs/CI.md && grep -q 'app_bundle_bytes' docs/CI.md
-check "docs/CI.md carries the Electron perf deviation, both metrics named" "$?"
 
 # ---- W4-B / W6: the class matrix is rendered from manifest/classes.tsv ------------------------
 # The part/class table is where a reader decides what a class owes, so it is the one place a class
@@ -232,17 +226,15 @@ grep -q '^| \*\*software\*\* (A) |' docs/ADOPTION.md
 check "docs/ADOPTION.md names the software class (W6: the F class merged in)" "$?"
 grep -qi 'electron opt-in' docs/ADOPTION.md
 check "  and states the electron opt-in that replaced the sixth class (W6)" "$?"
-# W4-B, v2: the CI lane is OUT of the product — no workflow is written, docs/CI.md is a LIMITS
-# candidate, not a promise in the doc table, and ADOPTION's preset matrix carries no CI-lane row.
-# The controls assert the ABSENCE (the W4-B pin as it now reads) plus the LIMITS note that keeps
-# the decision from looking like an accident, and the verifier footer still says what the old
-# lane could not see (the prose survives even though the lane does not).
+# v3: the CI lane is OUT of the product and docs/CI.md is DELETED — no workflow is written, the
+# doc table promises no CI doc, and ADOPTION's preset matrix carries no CI-lane row. The controls
+# assert the ABSENCE, and the verifier footer still says what the old lane could not see.
 ! grep -q 'docs/CI.md' README.md
-check "README's document table does NOT promise a CI doc (v2: CI is out of the product)" "$?"
+check "README's document table does NOT promise a CI doc (v3: CI is out of the product)" "$?"
 ! grep -qi '^| CI lane |' docs/ADOPTION.md
 check "  and the preset matrix carries no CI-lane row (the part is off for every class)" "$?"
-grep -q 'docs/CI.md' docs/LIMITS.md
-check "  and docs/LIMITS.md records CI.md as a v2 LIMITS candidate" "$?"
+[ ! -e docs/CI.md ]
+check "  and docs/CI.md is deleted from the doc set (v3: the CI lane is cut)" "$?"
 
 # ---- W6: desktop/F is a legacy ALIAS, never a class a reader picks ----------------------------
 # W6 merged the sixth (desktop/F) class into software — their classes.tsv need columns were
@@ -250,7 +242,7 @@ check "  and docs/LIMITS.md records CI.md as a v2 LIMITS candidate" "$?"
 # once on docs/CONTRACTS.md's --class line; no doc that teaches the class CHOICE may carry it. Same
 # shape as the W5-D clone-install absence assertions below.
 DESKTOP_TAUGHT=""
-for f in README.md docs/GUIDE.md docs/ADOPTION.md docs/ENFORCEMENT.md docs/CI.md skills/goblin-bootstrap/SKILL.md; do
+for f in README.md docs/GUIDE.md docs/ADOPTION.md docs/ENFORCEMENT.md skills/goblin-bootstrap/SKILL.md; do
   grep -qi 'desktop' "$f" && DESKTOP_TAUGHT="$DESKTOP_TAUGHT $f"
 done
 if [ -z "$DESKTOP_TAUGHT" ]; then
@@ -293,8 +285,8 @@ check "the verifier's 'cannot see' footer names the ban lane's blind spots (V3-8
 # (CHANGELOG entries, docs/ENFORCEMENT.md's chronology, t-verify-red.sh's pre-change note) is not,
 # and keeps its own tense.
 ADV_POINT=$(awk '/advisory_ceiling/ { c = 6 } c > 0 { print; c-- }' docs/GUARDRAILS.md)
-printf '%s' "$ADV_POINT" | grep -q '10 of 10'
-check "docs/GUARDRAILS.md's advisory point states the measured count (10 of 10) (AB3)" "$?"
+printf '%s' "$ADV_POINT" | grep -q '9 of 10'
+check "docs/GUARDRAILS.md's advisory point states the measured count (9 of 10) (AB3)" "$?"
 printf '%s' "$ADV_POINT" | grep -qE '\*\*Corrected [0-9]{4}-[0-9]{2}-[0-9]{2}'
 check "  and dates the correction, the way docs/LIMITS.md's own W2/W3 notes do (AB3)" "$?"
 # Normalised, because the sentence wraps: a literal grep for 'reports that arithmetic on every run'

@@ -78,13 +78,10 @@ grep -qE '^ratchet\.name: [a-z_]+$' AGENTS.md \
 check "  and the ratchet carries a hermetic metric of its own (the bundle bytes, not the FPS)" "$?"
 grep -q '^electron: true$' AGENTS.md
 check "  and electron: true is DECLARED in the config" "$?"
-# v2: the CI lane is GONE from the product (no .github/workflows payload is written, the
-# part is a class-level opt-out) — the placement pin becomes its absence pin, and the
-# PG-05/PG-06 rows report SKIP on a repo with no workflow (never a vacuous pass).
+# v3: the CI lane is GONE from the product (no .github/workflows payload is written, and the
+# PG-04/PG-05/PG-06 rows are cut) — the placement pin becomes an absence pin.
 [ ! -e .github/workflows ]
-check "  and the v2 install ships no CI lane (the workflows dir stays untouched)" "$?"
-printf '%s' "$FOUT" | grep -q 'PASS  PG-05' && printf '%s' "$FOUT" | grep -q 'SKIP  PG-06'
-check "  and PG-05/PG-06 report their no-workflow lines (never a vacuous gate)" "$?"
+check "  and the install ships no CI lane (the workflows dir stays untouched)" "$?"
 printf '%s' "$FOUT" | grep -q 'SKIP  BN-06'
 check "  and an electron ban the class lists still skips on a tree with no renderer" "$?"
 printf '%s' "$FOUT" | grep -qE 'ADV   PF-01|PASS  PF-01|SKIP  PF-01'

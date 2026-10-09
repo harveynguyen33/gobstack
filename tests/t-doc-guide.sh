@@ -19,8 +19,8 @@
 #   D5  §1's network claim must be scoped the way every other copy of it is (GUARDRAILS: "No
 #       network at verify time"; README/CONTRACTS: under "Dependencies").
 #   §3/§9  the guide's own reproducible numbers, re-measured here on a fresh class-A install: the
-#       `created 23` line, the day-one line (`36 passed, 1 failed, 11 advisory, 32 skipped`) and the
-#       green-path line (`37 passed, 0 failed, 11 advisory, 32 skipped`) — the v2 shapes (the CI
+#       `created 23` line, the day-one line (`35 passed, 1 failed, 10 advisory, 31 skipped`) and the
+#       green-path line (`36 passed, 0 failed, 10 advisory, 31 skipped`) — the v2 shapes (the CI
 #       payload is gone, so PG-06 SKIPs where it passed vacuously: pass 38 -> 37, skip 33 -> 34;
 #       before that skills opt-in moved the pass count 43 -> 38 and the skip count 28 -> 33). A
 #       number no run prints is the defect this half exists to catch.
@@ -232,14 +232,14 @@ check "  and the same paragraph now scopes it to verify time" "$?"
 # shapes against the guide); the plain installer path is re-measured here. The tight set control
 # below accepts BOTH paths' shapes — every line the guide quotes must be one EITHER run printed.
 DAYONE=$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$DAYONE" | grep -qE '^36 passed, 1 failed, 11 advisory, 32 skipped$'
+printf '%s\n' "$DAYONE" | grep -qE '^35 passed, 1 failed, 10 advisory, 31 skipped$'
 check "the day-one run prints the shape the guide documents ($DAYONE)" "$?"
 
 HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$GREEN" | grep -qE '^37 passed, 0 failed, 11 advisory, 32 skipped$'
+printf '%s\n' "$GREEN" | grep -qE '^36 passed, 0 failed, 10 advisory, 31 skipped$'
 check "naming a real commit makes it green ($GREEN)" "$?"
 
 # EVERY summary-shaped line in the guide must be one a real run printed — on this path or the
@@ -261,9 +261,9 @@ SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0
 # measurement — the plain installer this file walks never prints it. The guide teaches the wizard
 # path in §8's table, so the set this SUBSET accepts is both paths' union.
 WIZ_SHAPES=$(printf '%s\n' \
-  "35 passed, 2 failed, 11 advisory, 32 skipped" \
-  "36 passed, 1 failed, 11 advisory, 32 skipped" \
-  "37 passed, 0 failed, 11 advisory, 32 skipped")
+  "34 passed, 2 failed, 10 advisory, 31 skipped" \
+  "35 passed, 1 failed, 10 advisory, 31 skipped" \
+  "36 passed, 0 failed, 10 advisory, 31 skipped")
 MEASURED=$(printf '%s\n%s\n%s\n' "$DAYONE" "$GREEN" "$WIZ_SHAPES" | sort -u)
 SUBSET=0
 while IFS= read -r s; do

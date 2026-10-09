@@ -15,10 +15,10 @@ Use when adopting goblin-stack in a repo, or starting one.
 2. **`goblin-install --target <dir> --class <x>`** — the default install is a NEUTRAL harness:
    no agent skills. Vendor the Hermes project tier with `--skills yes` if you want them installed.
 3. **`goblin-verify`** — a default software-class install (no agent skills) verifies green:
-   `37 passed, 0 failed, 11 advisory, 32 skipped`, exit 0, once `HANDOFF.md` names a commit that
+   `36 passed, 0 failed, 10 advisory, 31 skipped`, exit 0, once `HANDOFF.md` names a commit that
    exists; before that edit the
-   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`37 passed, 1 failed`).
-   Thirty-two rows skip with a reason, and the reason matters: the five skill rows
+   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`36 passed, 1 failed`).
+   Thirty-one rows skip with a reason, and the reason matters: the five skill rows
    (`SK-01`..`SK-04`, `AU-04`) skip on the `playbooks` opt-out a skills-free install records,
    then `HS-02`
    (no pinned pre-change commit yet, so the REPLAY is not provable), `AU-02`/`AU-03` (no report

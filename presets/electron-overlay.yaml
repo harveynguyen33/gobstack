@@ -28,7 +28,7 @@ perf_cmd: find dist out release -type f -exec cat {} + 2>/dev/null | wc -c
 # THE FPS NUMBER IS A HOST GATE, not the ratchet: the instrument that produces
 # main_thread_busy_pct needs Playwright or Electron plus a GUI, which the no-npm contract
 # forbids a shipped rule to launch. It is DECLARED here and carried in the HANDOFF with its date
-# (docs/LIMITS.md #34, docs/CI.md carries the sweep). `electron: true` with this empty FAILs PF-01.
+# (docs/LIMITS.md #34). `electron: true` with this empty FAILs PF-01.
 perf_host_gate: "Electron run - main_thread_busy_pct with a window open (app.getAppMetrics()[i].cpu.percentCPUUsage, or CDP Performance.getMetrics), on a machine with a display"
 # The nine electron bans (G5's mechanism, G6's failure surface): nodeIntegration, context
 # isolation / sandbox, the dangerous webPreferences, and synchronous IPC / @electron/remote. An
