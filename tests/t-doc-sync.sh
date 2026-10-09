@@ -464,6 +464,13 @@ norm_text docs/GUIDE.md | grep -q 'the extras catalogue'
 check "docs/GUIDE.md has the extras section" "$?"
 norm_text docs/GUIDE.md | grep -q 'init suggests, the catalogue allows, you install'
 check "docs/GUIDE.md states the one extras rule" "$?"
+# the license gate (W-license) is promised where the verdicts are taught
+norm_text README.md | grep -q 'the license gate is hard'
+check "README states the hard license gate (extras)" "$?"
+norm_text README.md | grep -q 'license pending verification'
+check "README names the gate refusal verbatim (extras)" "$?"
+norm_text docs/GUIDE.md | grep -q 'the license gate rides on top, hard'
+check "docs/GUIDE.md states the gate rides on the verdicts (extras)" "$?"
 # the CLI table carries the verb on both front doors
 for f in README.md docs/GUIDE.md; do
   grep -qF 'gob extras' "$f"
