@@ -1461,7 +1461,7 @@ fm_feature_files() {
 
 check_fm_01() {
   [ -n "$FEATURE_MAP" ] || {
-    printf 'feature_map: is empty - no map is declared, so there is nothing to index\n'
+    printf 'feature_map: is empty - this state is UNREACHABLE through `gob init --write`, which always declares a live map; the repo was installed by the low-level goblin-install, or hand-edited. There is nothing to index.\n'
     return 3
   }
   local readme; readme=$(fm_readme)
@@ -1502,7 +1502,7 @@ check_fm_01() {
 
 check_fm_02() {
   [ -n "$FEATURE_MAP" ] || {
-    printf 'feature_map: is empty - no map is declared, so there are no entry paths to resolve\n'
+    printf 'feature_map: is empty - this state is UNREACHABLE through `gob init --write`, which always declares a live map; the repo was installed by the low-level goblin-install, or hand-edited. There are no entry paths to resolve.\n'
     return 3
   }
   local readme; readme=$(fm_readme)
