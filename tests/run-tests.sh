@@ -65,7 +65,7 @@ fi
 
 # ---- the test scripts --------------------------------------------------------
 for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
-         t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin \
+         t-extend t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin \
          t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-version-sync \
          t-init t-banner-stderr t-shim t-mcp; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
