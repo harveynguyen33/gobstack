@@ -72,8 +72,14 @@ check "no empty directory is left behind (pre-fix: 15)" \
 check "the verifier's own record is gone" "$([ ! -f .gob/installed.json ] && echo 0 || echo 1)"
 check "the project's HANDOFF.md survives" "$([ -f HANDOFF.md ] && echo 0 || echo 1)"
 check "the project's AGENTS.md survives" "$([ -f AGENTS.md ] && echo 0 || echo 1)"
-check "the project's ROUND-000-SPEC.md survives" "$([ -f ROUND-000-SPEC.md ] && echo 0 || echo 1)"
-check "reviews/ survives with its .gitkeep" "$([ -f reviews/.gitkeep ] && echo 0 || echo 1)"
+# FIX 3: a default install ships neither a *-SPEC.md nor reviews/ — the SP-*/PG-* rows that
+# police them are LIBRARY rows (off by default), so nothing a default install writes is
+# unverified. Asserted here (and post-uninstall, trivially) so a regression that re-scaffolds an
+# unchecked artefact is caught.
+check "the default install wrote NO *-SPEC.md (nothing ships unverified)" \
+  "$([ -z "$(ls ./*-SPEC.md 2>/dev/null)" ] && echo 0 || echo 1)"
+check "the default install wrote NO reviews/ (nothing ships unverified)" \
+  "$([ ! -d reviews ] && echo 0 || echo 1)"
 check "the .gitignore block is left, with the uninstalled marker" \
   "$(grep -q 'goblin-stack uninstalled' .gitignore && echo 0 || echo 1)"
 

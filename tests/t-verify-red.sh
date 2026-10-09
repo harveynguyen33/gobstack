@@ -62,7 +62,6 @@ cp -a AGENTS.md "$BK/agents.md"
 cp -a .gob/installed.json "$BK/installed.json"
 cp -a .gob/manifest/enforcement.tsv "$BK/enforcement.tsv"
 cp -a .hermes/skills/goblin-mode/SKILL.md "$BK/SKILL.md"
-cp -a ROUND-000-SPEC.md "$BK/ROUND-000-SPEC.md"
 cp -a "$WORK/standard.md" "$BK/standard.md"
 cp -a .hermes/skills/goblin-drift-audit/SKILL.md "$BK/drift-audit-SKILL.md"
 cp -a .hermes/skills/goblin-bugreporter/SKILL.md "$BK/bugreporter-SKILL.md"
@@ -95,13 +94,12 @@ restore_all() {
   cp -a "$BK/bin" .gob/bin
   cp -a "$BK/manifest" .gob/manifest
   cp -a "$BK/SKILL.md" .hermes/skills/goblin-mode/SKILL.md
-  cp -a "$BK/ROUND-000-SPEC.md" ROUND-000-SPEC.md
   cp -a "$BK/standard.md" "$WORK/standard.md"
   cp -a "$BK/drift-audit-SKILL.md" .hermes/skills/goblin-drift-audit/SKILL.md
   cp -a "$BK/bugreporter-SKILL.md" .hermes/skills/goblin-bugreporter/SKILL.md
   cp -a "$BK/gitignore" .gitignore
   rm -f checks/green.mjs checks/red.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
-        .gob/state.json .gob/last-gate-line .gob/.ds-report \
+        ROUND-000-SPEC.md .gob/state.json .gob/last-gate-line .gob/.ds-report \
         .envrc package.json reference-manifest.json
   # P15: the four RC- controls declare a corpus in directories a class-A install does not have, so
   # the last thing each leaves behind is removed here (the r_rc03_git hook only handles the index).
@@ -226,7 +224,10 @@ m_no_head()       { sed -i -E 's/`[0-9a-f]{7,40}`/`deadbee`/' HANDOFF.md; }
 
 m_drop_spec()     { rm -f ./*-SPEC.md; git add -A >/dev/null 2>&1; git commit -q -m "test: drop spec" >/dev/null 2>&1; }
 m_untracked_spec() { printf '# a round nobody committed\n\n- AC1: `x` prints `y`\n' > ROUND-001-SPEC.md; }
-m_feely_ac()      { printf '\n- AC9: the panel feels right\n' >> ROUND-000-SPEC.md; }
+# FIX 3: a default install ships no *-SPEC.md (the SP-* rows are library rows). The control
+# therefore PLANTS the artefact the row reads, with the exact defect, rather than appending to an
+# installed file. SP-03 scans ./*-SPEC.md for an AC bullet that is uncheckable (no backticks/ops).
+m_feely_ac()      { printf '# a round spec\n\n- AC9: the panel feels right\n' > ROUND-000-SPEC.md; }
 
 # v2 gate shape: one flat `gate_<name>_cmd:` line per gate, so dropping the gates is
 # dropping every such line (GT-01: `no gate declared`).

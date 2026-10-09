@@ -127,7 +127,7 @@ then install it:
 
 Expected output (this is a real transcript, trimmed):
 
-    created 26 · updated 0 · unchanged 0 · skipped 0
+    created 24 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
@@ -135,7 +135,7 @@ Expected output (this is a real transcript, trimmed):
       3. edit AGENTS.md: replace the default gate with your real commands (P8 step 3)
       4. agent skills are opt-in
 
-**`created 26`** is the installer's count of the files it **tracks**. It writes **27**: the 27th
+**`created 24`** is the installer's count of the files it **tracks**. It writes **25**: the 25th
 is `.gob/installed.json`, the record it keeps for itself, which it writes but does not count. It
 has written nothing outside this directory — and nothing under `.github/`: **v2 installs no
 CI, ever.** The default install ships **no agent skills** — the harness is neutral.
@@ -819,8 +819,10 @@ Each step is independently useful and the later ones build on the earlier:
 ### What a first install actually gives you
 
 `goblin-install` exits 0 and creates `.gob/` (the verifier, the manifest, the config), `HANDOFF.md`,
-`AGENTS.md`, and — when the parts are on — `ROUND-000-SPEC.md`, `reviews/`, and the harness
-scaffold in `checks/`. A default install ships **no** agent skills: skills are opt-in (W6 neutral-first).
+`AGENTS.md`, and — only when the parts are on (`--parts spec,reviews`) — `ROUND-000-SPEC.md`,
+`reviews/`, and the harness scaffold in `checks/`. A default install ships the seven-skill core
+procedure tier under `.gob/skills/`; **agent skills are opt-in** — the `.hermes/` project tier
+arrives only with `--skills yes` (W6 neutral-first).
 
 Then, in order:
 
@@ -1334,7 +1336,7 @@ them: it reads the path from config, so moving the standard is a one-line config
     git init -b main
     gob init --heuristic                   # the brief + schema; answer it in a proposal file
     gob init --write .gob-init-proposal.md --yes
-                                           # expect: created 26 (the core tier vendors; the Hermes tier is opt-in)
+                                           # expect: created 24 (the core tier vendors; the Hermes tier is opt-in; FIX 3 drops the unchecked SPEC/reviews)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"

@@ -4,9 +4,10 @@
 # teaches: an EMPTY repo, a hand-written proposal (the schema the brief prints), `--write`, then
 # the day-one commits.
 #
-#   UX-i   §3's transcript is the installer's: `created 26` — it writes 27, because
+#   UX-i   §3's transcript is the installer's: `created 24` — it writes 25, because
 #          `.gob/installed.json` is written but not counted and the seven-skill core procedure
-#          tier now vendors under `.gob/skills/`. v2 writes no `.github/` anything.
+#          tier now vendors under `.gob/skills/` (FIX 3 dropped the two unchecked default
+#          artefacts, ROUND-000-SPEC.md and reviews/.gitkeep). No `.github/` anything.
 #   UX-ii  the day-one table: the pre-commit run is `34 passed, 2 failed` (uncommitted install +
 #          the HP-05 placeholder), and the green-path run — after naming a real
 #          HEAD in HANDOFF.md and committing it — is `36 passed, 0 failed, 10 advisory,
@@ -100,11 +101,11 @@ EOF
 git add -A && git commit -q -m "chore: the proposal and its gate"
 OUT=$(HOME="$HOMEDIR" bash "$SRC/bin/goblin-init" --write proposal.md --yes 2>&1); RC=$?
 check "gob init --write exits 0 on the guide's proposal shape" "$RC"
-printf '%s' "$OUT" | grep -qF "created 26 · updated 0 · unchanged 0 · skipped 0"
-check "UX-i the install prints created 26 (installed.json is written but not counted)" "$?"
+printf '%s' "$OUT" | grep -qF "created 24 · updated 0 · unchanged 0 · skipped 0"
+check "UX-i the install prints created 24 (installed.json is written but not counted)" "$?"
 [ ! -e .github ]
 check "UX-i and writes NO .github anything (v2 installs no CI)" "$?"
-grep -qF "created 26" "$GUIDE"
+grep -qF "created 24" "$GUIDE"
 check "  and the guide quotes the created line" "$?"
 
 # ---- UX-ii: the day-one shapes -----------------------------------------------------------------

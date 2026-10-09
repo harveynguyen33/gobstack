@@ -206,16 +206,16 @@ if [ "$UNINSTALL" -eq 1 ]; then
       printf '%s' "$PARENTS"
       printf '.goblin\n.gob/bin\n.gob/manifest\n.gob/bans\n.hermes\n.hermes/skills\n'
     } | awk 'NF' | awk -F/ '{print NF " " $0}' | sort -rn | cut -d' ' -f2- | awk '!seen[$0]++')
-  g_info "removed $n file(s) and $nd empty director(y|ies). Left in place: HANDOFF.md, AGENTS.md, ROUND-000-SPEC.md, reviews/, the .gitignore block${KEPT:+, and the decision record(s) you edited:$KEPT}."
+  g_info "removed $n file(s) and $nd empty director(y|ies). Left in place: HANDOFF.md, AGENTS.md, the .gitignore block${KEPT:+, and the decision record(s) you edited:$KEPT}."
   # QA fix (v2-qa issue 10): honesty about what the uninstall leaves UNTOUCHED. Two
   # by-design residues a reader could otherwise read as a clean sweep:
   #   - the .gitignore block the install appended stays (removing it could eat a
   #     line the project added inside the block; the preimage is untracked text),
-  #   - prose in kept files (HANDOFF.md, AGENTS.md body, SPECs) may still name
+  #   - prose in kept files (HANDOFF.md, AGENTS.md body) may still name
   #     now-deleted paths (.gob/bin/goblin-verify, checks/) — those references are
   #     dead after this command.
   g_info "  note: the .gitignore ignore-rules block stays (by design: it may carry lines the project added; remove it by hand if you want it gone)"
-  g_info "  note: prose that names .gob/ paths (HANDOFF.md, AGENTS.md body, SPECs) now points at removed files — those references are dead"
+  g_info "  note: prose that names .gob/ paths (HANDOFF.md, AGENTS.md body) now points at removed files — those references are dead"
   exit 0
 fi
 
@@ -375,8 +375,17 @@ DISABLED=""
 if [ -n "$OPT_OUT" ]; then DISABLED="$DISABLED$OPT_OUT,"; fi
 DISABLED=$(printf '%s' "$DISABLED" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
 
-WANT_SPEC=1
-WANT_REVIEWS=1
+# FIX 3: a *-SPEC.md and reviews/ are policed by LIBRARY rows (SP-01..03, PG-01..03, off by
+# default), so a default install ships NEITHER: an artefact nothing checks on this repo is a false
+# promise ("the installer scaffolds rows that are off by default"). They come back only on an
+# explicit opt-in, `--parts spec` / `--parts reviews` — the same surface a repo turns the library
+# rows on through — because "create them when the row is enabled" is not knowable at install time
+# (enablement is a POST-install edit of .gob/manifest/enforcement.local.tsv). The installed file
+# set therefore matches what the ENABLED (default) rows actually need.
+WANT_SPEC=0
+WANT_REVIEWS=0
+case ",${PARTS}," in *,spec,*)    WANT_SPEC=1 ;; esac
+case ",${PARTS}," in *,reviews,*) WANT_REVIEWS=1 ;; esac
 WANT_RATCHET=1
 # The CI lane is GONE (v2 product decision): no .github/workflows file is written and no flag
 # configures it.
