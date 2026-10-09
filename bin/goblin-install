@@ -366,10 +366,11 @@ BANS=$(default_ bans)
 # and BN-05 SKIPs with that reason until the project declares a from/to pair.
 LAYERS_BLOCK=""
 
-# Every part is on by default (there is no class turning parts off). Agent skills are the one
-# opt-out: the playbooks part is disabled when skills are not installed.
+# Every part is on by default (there is no class turning parts off). The CORE procedure
+# tier is vendored on EVERY install (.gob/skills/), so the product never disables its own
+# skill rows (SK-01/02/04) — a fresh repo's harness runs them instead of skipping. An
+# explicit --opt-out is the only thing that records a part in disabled:.
 DISABLED=""
-[ "$SKILLS" = "no" ] && DISABLED="$DISABLED""playbooks,"
 if [ -n "$OPT_OUT" ]; then DISABLED="$DISABLED$OPT_OUT,"; fi
 DISABLED=$(printf '%s' "$DISABLED" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
 
@@ -656,6 +657,17 @@ if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
     put ".hermes/skills/$name/SKILL.md" "$d/SKILL.md"
   done
 fi
+
+# The CORE procedure tier (GAP-2): the seven skills whose rows (SK-01/02/04) ride every
+# install are vendored under .gob/skills/ UNCONDITIONALLY, so a default install never
+# disables its own rows. The full Hermes tier above stays an explicit --skills yes opt-in
+# under .hermes/skills/; these are the product's own procedures and install with the
+# harness (put: hash-checked, so IN-02/SK-02 see them like any other payload file).
+CORE_SKILLS="goblin-mode goblin-investigation goblin-bugfix goblin-feature goblin-handoff goblin-verify-author practice"
+for name in $CORE_SKILLS; do
+  [ -f "$SRC/skills/$name/SKILL.md" ] || continue
+  put ".gob/skills/$name/SKILL.md" "$SRC/skills/$name/SKILL.md"
+done
 
 # W6 neutral-first: an EXPLICIT --skills no re-install of a repo that HAS recorded skills
 # removes them — the switch stays real in both directions. The paths come from the previous

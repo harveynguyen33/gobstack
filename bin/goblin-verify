@@ -473,18 +473,14 @@ row_part() {
     HS-01|HS-03) echo gate ;;
     HS-02) echo replay ;;
     PG-*) echo pr-gate ;;
-    # SK-04 rides the `playbooks` part: its artifact is the shipped skills, and --skills no
-    # disables that part. An unmapped prefix returns "" and the row can never honour an opt-out
-    # (G3 section 4.3).
+    # SK-04 rides the `playbooks` part: its artifact is the shipped skills, and an explicit
+    # --opt-out playbooks disables that part. The CORE tier (.gob/skills/) is vendored on
+    # every install (GAP-2), so the row runs by default and only an explicit opt-out skips it.
     SK-04) echo playbooks ;;
-    # SK-01 rides the same part (W1 made it a builtin for the global-mode clause): with
-    # --skills no there is no shipped skill to frontmatter-check, and a vacuous pass proves
-    # nothing - the row honours the opt-out like its SK-02/SK-04 siblings.
+    # SK-01 rides the same part. The core tier gives it subjects on every install — it no
+    # longer has to skip on a default (no .hermes tier) repo.
     SK-01) echo playbooks ;;
-    # SK-02 keys off the same part: with --skills no there are no installed skills to hash, and
-    # the row used to FAIL there (measured at v0.2.0-dev: "32 passed, 1 failed ... SK-02 0
-    # installed skill file(s) hashed"). An opt-out is the honest report; a FAIL on a repo that
-    # opted out of skills is not.
+    # SK-02 keys off the same part; it hashes the .gob/skills/ core tier too.
     SK-02) echo playbooks ;;
     *) echo "" ;;
   esac
@@ -589,7 +585,7 @@ check_in_02() {
     [ -n "$p" ] || continue
     if [ "$ENGINE_MODE" = "global" ]; then
       case "$p" in
-        .gob/bin/*|.gob/manifest/*|.gob/bans/*)
+        .gob/bin/*|.gob/manifest/*|.gob/bans/*|.gob/skills/*)
           [ -e "$ROOT/$p" ] || continue ;;   # engine removed by design: not drift
         # W4a (§5.3/§5.2): the procedure tier is EMITTED per platform, not carried in the
         # repo - a recorded .hermes/skills/ file absent from disk is the tier living at its
@@ -1369,7 +1365,7 @@ sk_proc_skip() {
 # without it, a global repo with no skills passes the loop vacuously — a green that proves
 # nothing, exactly the shape §2.5 exists to kill).
 sk01_cell() {
-  n=0; for f in .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); head -n 1 "$f" | grep -qx -- '---' || exit 1; awk 'NR==1{next} /^---/{exit} /^name:/{a=1} /^description:/{b=1} END{exit !(a&&b)}' "$f" || exit 1; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
+  n=0; for f in .gob/skills/*/SKILL.md .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); head -n 1 "$f" | grep -qx -- '---' || exit 1; awk 'NR==1{next} /^---/{exit} /^name:/{a=1} /^description:/{b=1} END{exit !(a&&b)}' "$f" || exit 1; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
 }
 
 check_sk_01() {
@@ -1380,7 +1376,7 @@ check_sk_01() {
 # sk04_cell — SK-04's original check cell. Kept verbatim so the row's declared text and
 # its executed behaviour stay the same thing; the builtin only adds the mode clause.
 sk04_cell() {
-  n=0; for f in .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); grep -q "^## What this cannot see" "$f" || { echo "missing cannot-see section: $f"; exit 1; }; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
+  n=0; for f in .gob/skills/*/SKILL.md .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); grep -q "^## What this cannot see" "$f" || { echo "missing cannot-see section: $f"; exit 1; }; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
 }
 
 check_sk_04() {
@@ -1392,7 +1388,7 @@ check_sk_02() {
   sk_proc_skip && return 3
   local p h cur n=0 bad=0
   while IFS=$'\t' read -r p h; do
-    case "$p" in .hermes/skills/*) ;; *) continue ;; esac
+    case "$p" in .gob/skills/*|.hermes/skills/*) ;; *) continue ;; esac
     n=$((n + 1))
     cur=$(g_sha256_file "$ROOT/$p")
     [ "$cur" = "$h" ] || { printf 'skill drift: %s\n' "$p"; bad=1; }

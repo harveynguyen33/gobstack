@@ -9,12 +9,14 @@ Use when adopting goblin-stack in a repo, or starting one.
 
 1. **`goblin-install --target <dir>`** — the default install is a NEUTRAL harness:
    no agent skills. Vendor the Hermes project tier with `--skills yes` if you want them installed.
-2. **`goblin-verify`** — a default install (no agent skills) verifies green:
-   `14 passed, 0 failed, 0 advisory, 13 skipped`, exit 0, once `HANDOFF.md` names a commit that
+2. **`goblin-verify`** — a default install (core procedure tier vendored under `.gob/skills/`)
+   verifies green:
+   `17 passed, 0 failed, 0 advisory, 10 skipped`, exit 0, once `HANDOFF.md` names a commit that
    exists; before that edit the
-   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`13 passed, 1 failed`).
-   Thirteen rows skip with a reason, and the reason matters: the three active-out skill rows
-   (`SK-01`, `SK-02`, `SK-04`) skip on the `playbooks` opt-out a skills-free install records;
+   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`16 passed, 1 failed`).
+   Ten rows skip with a reason, and the reason matters: `SK-01`, `SK-02` and `SK-04` **run** (the
+   core procedure tier is vendored on every install, so the product no longer disables its own
+   rows);
    `BN-01`/`BN-02`/`BN-05` (this fresh repo has no `.ts` file for a ban's `applies_when` glob, so each reports
    *not applicable*) and `BN-03` with the four electron
    bans `BN-06`..`BN-09` (not in the `bans:` list `[BN-01, BN-02, BN-05]`, so they skip as
