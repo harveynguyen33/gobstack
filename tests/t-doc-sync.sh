@@ -118,12 +118,12 @@ check "no shipped doc or skill claims a fresh install is not automatically green
   "$([ -z "$FALSE_CLAIM" ] && echo 0 || echo 1)"
 
 # The three prose docs and the shipped bootstrap skill must carry the measured line; the other
-# shipped skills do not discuss a verify run and are not required to. v2: the measured green
-# path is the DEFAULT install's (34/0/6/21 — the model/role/loop rows, CL-01 and the CI payload are cut
-# in v3).
+# shipped skills do not discuss a verify run and are not required to. Batch 2b-ii: the measured
+# green path is the DEFAULT install's, over the ~19-row core (14/0/0/13; the 32 not-for-every-repo
+# rows moved to the library, so the advisory count is now 0).
 GREEN_CLAIM=""
 for f in README.md docs/GUIDE.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '32 passed, 0 failed, 6 advisory, 21 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+  norm_text "$f" | grep -q '14 passed, 0 failed, 0 advisory, 13 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
 check "README, GUIDE and the shipped bootstrap skill state the measured green path" \
@@ -203,15 +203,15 @@ awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /ban/) found = 1 } END { exit !foun
 check "the verifier's 'cannot see' footer names the ban lane's blind spots (V3-8)" "$?"
 
 # ---- AB3: the LIVE copies of the advisory arithmetic must match the run -----------------------
-# `advisory_ceiling` is 10 and `SK-03` prints `advisory 6 of ceiling 10 (4 free slots: the next
-# advisory row FAILs)`. docs/LIMITS.md's third design constraint and docs/LIMITS.md #26 both
+# `advisory_ceiling` is 10 and `SK-03` prints `advisory 0 of ceiling 10 (10 free slots: ...)`.
+# docs/LIMITS.md's third design constraint and docs/LIMITS.md #26 both
 # presented 9 of 10 as what the run reports - LIMITS in the present tense ("reports that arithmetic
 # on every run"), GUARDRAILS with no way to date it. Both are read here; the dated history
 # (CHANGELOG entries, docs/GUIDE.md's chronology, t-verify-red.sh's pre-change note) is not,
 # and keeps its own tense.
 ADV_POINT=$(awk '/The guard rails/{ c = 40 } c > 0 { print; c-- }' docs/LIMITS.md)
-printf '%s' "$ADV_POINT" | grep -q '6 of 10'
-check "docs/LIMITS.md's advisory point states the measured count (6 of 10) (AB3)" "$?"
+printf '%s' "$ADV_POINT" | grep -q '0 of 10'
+check "docs/LIMITS.md's advisory point states the measured count (0 of 10) (AB3)" "$?"
 printf '%s' "$ADV_POINT" | grep -qE '\*\*Corrected [0-9]{4}-[0-9]{2}-[0-9]{2}'
 check "  and dates the correction, the way docs/LIMITS.md's own W2/W3 notes do (AB3)" "$?"
 # Normalised, because the sentence wraps: a literal grep for 'reports that arithmetic on every run'

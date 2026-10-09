@@ -10,23 +10,19 @@ Use when adopting goblin-stack in a repo, or starting one.
 1. **`goblin-install --target <dir>`** — the default install is a NEUTRAL harness:
    no agent skills. Vendor the Hermes project tier with `--skills yes` if you want them installed.
 2. **`goblin-verify`** — a default install (no agent skills) verifies green:
-   `32 passed, 0 failed, 6 advisory, 21 skipped`, exit 0, once `HANDOFF.md` names a commit that
+   `14 passed, 0 failed, 0 advisory, 13 skipped`, exit 0, once `HANDOFF.md` names a commit that
    exists; before that edit the
-   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`31 passed, 1 failed`).
-   Twenty-one rows skip with a reason, and the reason matters: the four skill rows
-   (`SK-01`..`SK-04`) skip on the `playbooks` opt-out a skills-free install records,
-   then `HS-02`
-   (no pinned pre-change commit yet, so the REPLAY is not provable), `SC-06` (no dependency manifest or lockfile), `PF-01` (no perf baseline measured yet), `BN-01`/`BN-02`/`BN-05` (the ban table is
-   installed but this fresh repo has no `.ts` file for a ban's `applies_when` glob, so each reports
+   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`13 passed, 1 failed`).
+   Thirteen rows skip with a reason, and the reason matters: the three active-out skill rows
+   (`SK-01`, `SK-02`, `SK-04`) skip on the `playbooks` opt-out a skills-free install records;
+   `BN-01`/`BN-02`/`BN-05` (this fresh repo has no `.ts` file for a ban's `applies_when` glob, so each reports
    *not applicable*) and `BN-03` with the four electron
    bans `BN-06`..`BN-09` (not in the `bans:` list `[BN-01, BN-02, BN-05]`, so they skip as
-   *not enabled* rather than as *unread*),
-   `FM-01`/`FM-02`/`VA-01` (no feature map and no declared `verify_doctor:` yet), `RC-01`..`RC-04`
-   (no reference corpus declared: `reference_manifest:` ships empty and there is no lab
-   `manifests/`). Each is a *not yet*, not a pass.
-   The parts
-   that only a round can produce (a first review, a real gate) pass *vacuously*, and that list
-   is the repo's first-step list, not a defect.
+   *not enabled* rather than as *unread*);
+   and `FM-01`/`FM-02` (no feature map yet). Each is a *not yet*, not a pass. The other 32 target
+   rows are held in the **library** (`gob verify --library`), off by default — the rows that are
+   not right for every repo. The round-shaped rows (a first review, a real gate) are library rows
+   now; the first-step list is a list of work, not a defect.
 4. **Fix `.gitignore` BEFORE any `git init`.** A credentials file already in the tree is
    committed by the first `git add -A` and is then in history forever.
 5. **First HANDOFF, first SPEC, first check script** — in that order, each independently

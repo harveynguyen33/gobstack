@@ -607,6 +607,10 @@ fi
 put ".gob/bin/goblin-verify" "$SRC/bin/goblin-verify"
 put ".gob/bin/goblin-lib.sh" "$SRC/bin/goblin-lib.sh"
 put ".gob/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
+# The library (batch 2b-ii): the off-by-default rows, held next to the matrix so `gob verify
+# --library` can list them and the summary can count them. Data, not a check: it ships whole
+# or not at all with the manifest it is the complement of.
+put ".gob/manifest/library.tsv" "$SRC/manifest/library.tsv"
 put ".gob/manifest/playbooks.tsv" "$SRC/manifest/playbooks.tsv"
 put ".gob/manifest/glossary.tsv" "$SRC/manifest/glossary.tsv"
 # The ban list (G5): the table, the engine, and the two probes. A ban with no mechanism is a

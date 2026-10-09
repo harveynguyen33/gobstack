@@ -331,6 +331,7 @@ fi
 # ===============================================================================================
 PB_SRC="$SRC/manifest/playbooks.tsv"
 ENF_SRC="$SRC/manifest/enforcement.tsv"
+LIB_SRC="$SRC/manifest/library.tsv"
 PLAYBOOKS=$(awk -F'\t' 'NR>1 && NF>1 {n++} END{print n+0}' "$PB_SRC")
 
 BAD_PB=$(printf '%s\n' "$RECORDS" \
@@ -392,11 +393,14 @@ c_green=$(printf '%s\n' "$c_sites" | grep -c expect_green)
 c_calls=$(( c_red + c_green ))
 c_ids=$(printf '%s\n' "$c_sites" | grep -oE '[A-Z]{2,3}-[0-9]{2}$' | sort -u)
 c_nids=$(printf '%s\n' "$c_ids" | grep -c .)
+# batch 2b-ii: a control id is legitimate if it names a row of the shipped MATRIX or a row of the
+# shipped LIBRARY (the moved rows keep their controls). 'every target row carries a control' now
+# spans both files: the 27 on-by-default target rows AND the 32 library rows.
 c_phantom=$(comm -23 <(printf '%s\n' "$c_ids") \
-              <(awk -F'\t' 'NR>1 && NF>1 {print $1}' "$ENF_SRC" | grep -oE '[A-Z]{2,3}-[0-9]{2}' | sort -u) \
+              <({ awk -F'\t' 'NR>1 && NF>1 {print $1}' "$ENF_SRC"; awk -F'\t' 'NR>1 && NF>1 {print $1}' "$LIB_SRC"; } | grep -oE '[A-Z]{2,3}-[0-9]{2}' | sort -u) \
             | tr -d '[:space:]')
 c_nocontrol=$(comm -13 <(printf '%s\n' "$c_ids") \
-              <(awk -F'\t' 'NR>1 && $2=="target" {print $1}' "$ENF_SRC" | grep -oE '[A-Z]{2,3}-[0-9]{2}' | sort -u) \
+              <({ awk -F'\t' 'NR>1 && $2=="target" {print $1}' "$ENF_SRC"; awk -F'\t' 'NR>1 && NF>1 {print $1}' "$LIB_SRC"; } | grep -oE '[A-Z]{2,3}-[0-9]{2}' | sort -u) \
               | tr -d '[:space:]')
 # v3: the CI lane is out of the product and its rows (PG-04/PG-05/PG-06) are cut, so there is
 # nothing to exclude — the census reads the matrix as it now stands.

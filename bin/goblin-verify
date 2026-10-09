@@ -27,6 +27,7 @@ SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ONLY=""
 JSON=0
 LIST=0
+LIBRARY_LIST=0
 SOURCE=""
 VERBOSE=0
 # PASS details collapse to (ok) in the default listing; --verbose (or --only, which is a
@@ -40,7 +41,9 @@ goblin-verify — prove a goblin-stack install is still what it says it is.
   --only <id[,id...]>   run only these manifest rows
   --verbose             print every row full-width (the default collapses PASS payloads
                         to a count; FAIL and ADV always print in full)
-  --list                list the manifest rows and exit
+  --list                list the on-by-default rows and exit
+  --library             list the OFF-by-default rows (the library) and exit — each with a
+                        one-line purpose and the exact line that turns it on
   --json                machine-readable output
   --source <path>       read the manifest from a goblin-stack checkout instead of .gob/
 
@@ -53,6 +56,7 @@ while [ $# -gt 0 ]; do
     --only)   ONLY="${2:-}"; VERBOSE=1; shift 2 ;;
     --json)   JSON=1; shift ;;
     --list)   LIST=1; shift ;;
+    --library) LIBRARY_LIST=1; shift ;;
     --verbose) VERBOSE=1; shift ;;
     --source) SOURCE="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -200,6 +204,18 @@ fi
   exit 2
 }
 
+# ---- the library (batch 2b-ii) -----------------------------------------------
+# The OFF-by-default row set lives in manifest/library.tsv next to the resolved manifest.
+# Its rows are NOT executed by a default run: the runner above reads $MANIFEST only. The
+# library is shipped data (a moved row keeps its full check text and remedy — nothing is
+# deleted or commented out, and no check function is removed from this verifier); a repo
+# turns a row ON by writing its id (the row's `enable` column) into its local override
+# .gob/manifest/enforcement.local.tsv, which batch 3 wires into the run. Until then the
+# library is a discovery surface: what exists, is held back, and how to enable each row.
+MANIFEST_DIR=$(dirname "$MANIFEST")
+LIBRARY_FILE="$MANIFEST_DIR/library.tsv"
+[ -f "$LIBRARY_FILE" ] || LIBRARY_FILE=""
+
 INSTALLED="$ROOT/.gob/installed.json"
 
 # engine_block_field <key> — one field of installed.json's engine: block (empty if absent).
@@ -235,6 +251,21 @@ manifest_check || { g_err "manifest is broken (exit 3)"; exit 3; }
 
 if [ "$LIST" -eq 1 ]; then
   awk -F'\t' 'NR>1 {printf "%-7s %-7s %-9s %s\n", $1, $2, $4, $3}' "$MANIFEST"
+  exit 0
+fi
+
+# --library: the discovery surface for the extend mechanism. It lists what the default run
+# does NOT check, so a green run is never mistaken for the whole story. Each line: the row id,
+# its one-line purpose (the rule cell), and the exact line that turns it on.
+if [ "$LIBRARY_LIST" -eq 1 ]; then
+  if [ -z "$LIBRARY_FILE" ]; then
+    g_err "no library.tsv next to $MANIFEST - this engine ships no off-by-default row set"
+    exit 2
+  fi
+  g_info "the library: $(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$LIBRARY_FILE") off-by-default row(s) - NOT run by a default verify."
+  g_info "enable one by writing its id on a line of .gob/manifest/enforcement.local.tsv."
+  printf '\n'
+  awk -F'\t' 'NR>1 && $1!="" {printf "%-7s %s\n          enable: %s -> .gob/manifest/enforcement.local.tsv\n", $1, $3, $8}' "$LIBRARY_FILE"
   exit 0
 fi
 
@@ -1965,8 +1996,10 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
 done < "$MANIFEST"
 
 if [ "$JSON" -eq 1 ]; then
-  printf '{"root":"%s","passed":%d,"failed":%d,"advisory":%d,"skipped":%d,"rows":[%s]}\n' \
-    "$(json_escape "$ROOT")" "$PASS" "$FAIL" "$ADV" "$SKIP" "${JSON_ROWS%,}"
+  _lib_n=0
+  [ -n "$LIBRARY_FILE" ] && _lib_n=$(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$LIBRARY_FILE")
+  printf '{"root":"%s","passed":%d,"failed":%d,"advisory":%d,"skipped":%d,"library":%d,"rows":[%s]}\n' \
+    "$(json_escape "$ROOT")" "$PASS" "$FAIL" "$ADV" "$SKIP" "$_lib_n" "${JSON_ROWS%,}"
 else
   printf '      %d passed, %d failed, %d advisory, %d skipped\n' "$PASS" "$FAIL" "$ADV" "$SKIP"
   # Day-one framing: a fresh clone is not your debt. One banner line, after the
@@ -1985,6 +2018,14 @@ else
   else
     printf '      of those %d advisory: the matrix labels %d row(s) advisory\n' \
       "$ADV" "$adv_labelled"
+  fi
+  # The library census (batch 2b-ii). A green default run must never read as the whole story:
+  # the rows this run did NOT check are counted here, with the surface that lists them. The
+  # count is read from library.tsv, so it tracks the shipped row set rather than a typed number.
+  if [ -n "$LIBRARY_FILE" ]; then
+    _lib_n=$(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$LIBRARY_FILE")
+    printf '      library: %d off-by-default row(s) held but NOT run - discover them with `gob verify --library`\n' \
+      "$_lib_n"
   fi
   # The collapsed listing keeps one line per row (a SKIP's reason is the row's whole
   # point and scripts read them by id); the width discipline lives in the lib's printers.

@@ -97,7 +97,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     drift check — `IN-02`, `SK-02`, and `HS-01`'s hash of the harness dir — reads its expected
     hash out of that one file, and that file is the one file no check protects. Measured: append a
     byte to `.gob/bin/goblin-verify`, rewrite its recorded hash in `installed.json`, commit, and
-    the run is **fully GREEN** (`38 passed, 0 failed`, exit 0). One edit defeats three rows at
+    the run is **fully GREEN** (`14 passed, 0 failed`, exit 0). One edit defeats three rows at
     once, and it is the cheapest way to fake a green run. Doing better needs an anchor the target
     cannot edit — a signature, or a hash held outside the repo — and goblin-stack has no such
     trust root: the source checkout is not guaranteed to exist at verify time, and any value
@@ -120,8 +120,9 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     with `SC-07`.
 25. **`SC-04` reads one statement, not one program.** A cookie write spread over three lines (or
     assembled through a helper) is not seen, and the row says so in its own cell.
-26. **The advisory slots are a count, not a strict bound.** Measured (v3): 6 advisory rows at a
-    ceiling of 10, so `SK-03` reports `advisory 6 of ceiling 10 (4 free slots)`. A row is advisory
+26. **The advisory slots are a count, not a strict bound.** Measured (v3): 0 advisory rows in the
+    default matrix at a ceiling of 10 (all six moved to the library), so `SK-03` reports
+    `advisory 0 of ceiling 10 (10 free slots)`. A row is advisory
     if its `check` cell says so OR its `enforced_by` cell does; the cap is a count — 10 advisory
     rows at a ceiling of 10 **pass**, and the 11th FAILs (10 at a ceiling of 9 FAILs). The v3 cuts
     (the dependency-audit and CI rows) returned the slots earlier advisory rows had spent, so the
@@ -503,9 +504,9 @@ rung below must be *demonstrably unable* to see it - the reason is recorded in t
 2. **`enforced_by` is a closed enum** (`script`, `lint`, `gate`, `advisory`) and `check` is one of:
    a real command, the literal `advisory`, or `goblin-verify --only <ID>` for a multi-line body.
    Every row here obeys that, and `IN-03` fails the manifest otherwise.
-3. **`advisory_ceiling` is 10 and the labelled count is 6.** The matrix labels six rows
-   `advisory`, and the ceiling caps that count at **6 of 10** — the model/role/loop, dependency-audit
-   and CI cuts moved it off `10 of 10`. **Corrected 2026-10-10 (v3).** Nothing else in this lane is
+3. **`advisory_ceiling` is 10 and the labelled count is 0.** The matrix labels no row
+   `advisory`, and the ceiling caps that count at **0 of 10** — every advisory row moved to the
+   library (off by default), so a default run spends no slot. **Corrected 2026-10-10 (v3).** Nothing else in this lane is
    prose dressed as a check.
 
 ### T1 - secrets and the config surface (`SC-01`..`SC-04`)

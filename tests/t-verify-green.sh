@@ -37,10 +37,10 @@ printf '%s' "$OUT" | grep -q 'cannot see'
 check "the run states what it cannot see" "$?"
 printf '%s' "$OUT" | grep -q 'not signed'
 check "the run says the record every drift check trusts is not signed (F2-3)" "$?"
-printf '%s' "$OUT" | grep -q 'SKIP  HS-02'
-check "HS-02 is skipped with a reason while no pre-change commit is pinned" "$?"
-check "a repo with no reviews yet does not fail the PR gate" \
-  "$(printf '%s' "$OUT" | grep -q 'PASS  PG-03' && echo 0 || echo 1)"
+printf '%s' "$OUT" | grep -q 'library: 32 off-by-default row(s)'
+check "the summary counts the off-by-default library (HS-02/PG-03 live there, held back)" "$?"
+printf '%s' "$OUT" | grep -q 'gob verify --library'
+check "  and the summary names the discovery surface for the off rows" "$?"
 
 # ---- the ban table self-selects per row (the class/electron opt-in is GONE) -------------------
 # A ban is code-shaped: it runs only when a real file matches its applies_when glob, and a ban

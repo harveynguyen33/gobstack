@@ -3,12 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 98 `expect_red` call sites and 21 `expect_green`
-# — 119 calls over all 62 of the matrix's target rows (the four source-scope rows
-# carry controls of their own in tests/run-tests.sh). Measured at this revision: 62 distinct ids
-# against the matrix, 0 phantom ids (every id used here is a row in the matrix) and 0 target row
-# left without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `119 over 62 target rows`.
+# One control per target-scope row: 93 `expect_red` call sites and 21 `expect_green`
+# — 114 calls over all 59 of the rule set's target rows (the four source-scope rows
+# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 59 rows are
+# off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
+# them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
+# this revision: 59 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
+# without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
+# README's census sentence must read `114 over 59 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -116,12 +118,24 @@ restore_all() {
   git commit -q -m "test: restore fixture" >/dev/null 2>&1 || true
 }
 
+# enable_lib_row <id> — batch 2b-ii: a moved row is OFF by default, so its negative control must
+# first ENABLE it the way a repo would: append the row (from library.tsv, its 7 matrix columns)
+# to the matrix the run reads. Called BEFORE the mutation so m_row_fails — which edits a row of
+# the matrix — can find the row it means. The restore (restore_all rebuilds .gob/manifest from
+# $BK, which holds library.tsv too) removes it again, so no control leaks a row into the next.
+enable_lib_row() {
+  local id="$1"
+  awk -F'\t' -v x="$id" 'NR>1 && $1==x {f=1} END{exit !f}' .gob/manifest/enforcement.tsv && return 0
+  awk -F'\t' -v x="$id" 'NR>1 && $1==x {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7}' \
+    .gob/manifest/library.tsv >> .gob/manifest/enforcement.tsv
+}
+
 # expect_red <label> <row id> <expected exit> <mutate fn> [workdir] [restore fn]
 # (declared with `function` so that `grep -c '^expect_red'` counts controls, not the definition)
 function expect_red {
   local label="$1" id="$2" want="$3" mutate="$4" dir="${5:-}" restore="${6:-restore_all}"
   local out rc
-  if [ -n "$dir" ]; then ( cd "$dir" && "$mutate" ); else "$mutate"; fi
+  if [ -n "$dir" ]; then ( cd "$dir" && enable_lib_row "$id" && "$mutate" ); else enable_lib_row "$id"; "$mutate"; fi
   if [ -n "$dir" ]; then out=$( cd "$dir" && bash .gob/bin/goblin-verify --only "$id" 2>&1 ); rc=$?
   else out=$(bash .gob/bin/goblin-verify --only "$id" 2>&1); rc=$?; fi
   if [ "$rc" = "$want" ]; then
@@ -141,7 +155,7 @@ function expect_red {
 function expect_green {
   local label="$1" id="$2" mutate="$3" dir="${4:-}" restore="${5:-restore_all}"
   local out rc
-  if [ -n "$dir" ]; then ( cd "$dir" && "$mutate" ); else "$mutate"; fi
+  if [ -n "$dir" ]; then ( cd "$dir" && enable_lib_row "$id" && "$mutate" ); else enable_lib_row "$id"; "$mutate"; fi
   if [ -n "$dir" ]; then out=$( cd "$dir" && bash .gob/bin/goblin-verify --only "$id" 2>&1 ); rc=$?
   else out=$(bash .gob/bin/goblin-verify --only "$id" 2>&1); rc=$?; fi
   if [ "$rc" = "0" ]; then
@@ -388,7 +402,11 @@ set_bn01_probe() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "test \"$GO
 
 m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
-m_adv_ceiling()   { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 5/' AGENTS.md; }
+# batch 2b-ii: the default matrix carries NO advisory rows — every advisory row (HP-04, HS-03,
+# CM-02, DOC-01/02, SC-09) moved to the library. So the ceiling can only be exceeded once an
+# advisory row is present in the run. This control enables the advisory library row HP-04 and
+# sets the ceiling BELOW the resulting count (1) — the exact condition SK-03 must FAIL on.
+m_adv_ceiling()   { awk -F'\t' -v x="HP-04" 'NR>1 && $1==x {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7}' .gob/manifest/library.tsv >> .gob/manifest/enforcement.tsv; sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 0/' AGENTS.md; }
 # V1/G8-5: a ceiling that is not a number made `[ n -le ten ]` return 2, and the runner reads 2
 # as ADV - so the cap silently stopped capping and the run still exited 0. It is a FAIL now.
 m_adv_ceiling_bad() { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: ten/' AGENTS.md; }
@@ -499,6 +517,7 @@ expect_red "a client-visible secret-shaped name"    SC-03 1 m_sc_03
 # string), so ONE matching line was reported as "the length of that line client-visible
 # secret-shaped name(s)". The half-done fix left these two lines behind.
 m_sc_03
+enable_lib_row SC-03
 out=$(bash .gob/bin/goblin-verify --only SC-03 2>&1)
 printf '%s' "$out" | grep -q '1 client-visible secret-shaped name(s)'
 check "W5-11: SC-03 reports ONE hit, not the character count of the matching line" "$?"
@@ -690,11 +709,13 @@ m_va_01_fail()      { sed -i 's|^verify_doctor:\([[:space:]]*\).*|verify_doctor:
 # the config key itself now.
 for pair in "FM-01:feature_map: is empty" "FM-02:feature_map: is empty" "VA-01:no doctor is declared"; do
   rid=${pair%%:*}; want=${pair#*:}
+  enable_lib_row "$rid"
   out=$(bash .gob/bin/goblin-verify --only "$rid" 2>&1); rc=$?
   printf '%s' "$out" | grep -q "^SKIP  $rid.*$want"; hit=$?
   check "$rid with an empty config SKIPs with its reason (not a vacuous pass)" \
     "$([ "$rc" -eq 0 ] && [ "$hit" -eq 0 ] && echo 0 || echo 1)"
 done
+restore_all
 
 # The fixture is GREEN again after the last of these: every mutation is reverted by restore_all,
 # which also removes the seeded map (nothing below is measured against a planted tree).
@@ -782,6 +803,10 @@ r_rc03_git() {
   git rm -q --cached refs/payload.bin >/dev/null 2>&1
   rm -f reference-manifest.json
   rm -rf manifests refs notes
+  # batch 2b-ii: this is the one restore that does NOT go through restore_all, and RC-03 is a
+  # library row — the control enabled it by appending to the matrix, so put the matrix back.
+  rm -rf .gob/manifest
+  cp -a "$BK/manifest" .gob/manifest
   git add -A >/dev/null 2>&1
   git commit -q -m "test: restore fixture" >/dev/null 2>&1 || true
 }

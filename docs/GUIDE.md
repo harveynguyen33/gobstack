@@ -127,7 +127,7 @@ then install it:
 
 Expected output (this is a real transcript, trimmed):
 
-    created 18 · updated 0 · unchanged 0 · skipped 0
+    created 19 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is a change like any other
@@ -135,7 +135,7 @@ Expected output (this is a real transcript, trimmed):
       3. edit AGENTS.md: replace the default gate with your real commands (P8 step 3)
       4. agent skills are opt-in
 
-**`created 18`** is the installer's count of the files it **tracks**. It writes **19**: the 19th
+**`created 19`** is the installer's count of the files it **tracks**. It writes **20**: the 20th
 is `.gob/installed.json`, the record it keeps for itself, which it writes but does not count. It
 has written nothing outside this directory — and nothing under `.github/`: **v2 installs no
 CI, ever.** The default install ships **no agent skills** — the harness is neutral.
@@ -155,12 +155,12 @@ You will see one line per rule. The shape:
     PASS  IN-01  the install record exists and names its version
     PASS  IN-02  13 installed files hashed
     FAIL  HP-05  HANDOFF.md names no commit that exists in this repo
-    SKIP  HS-02  no pinned pre-change commit yet - the REPLAY is not provable
-    ADV   HP-04  A stale sentence is corrected in place... (advisory)
+    SKIP  FM-01  feature_map: is empty - this state is UNREACHABLE ...
+    SKIP  SK-01  Every shipped skill has name + description frontmatter. (opt-out: playbooks)
 
 and a summary line at the bottom:
 
-    34 passed, 2 failed, 6 advisory, 17 skipped     # the uncommitted install, below
+    13 passed, 1 failed, 0 advisory, 13 skipped     # the HP-05 placeholder, before you name a real commit
 
 ### How to read that output
 
@@ -172,7 +172,7 @@ and a summary line at the bottom:
 | `ADV` | advisory — a rule with no runnable check, **counted** | nothing, but know it is not enforced |
 
 **`SKIP` is not success and not failure.** It is the harness telling you the truth: "this rule has
-nothing to read yet." On a brand-new install, three dozen rows skip — because there is no `src/` for a
+nothing to read yet." On a brand-new install, thirteen rows skip — because there is no `src/` for a
 ban to scan, no feature map, no pinned pre-change commit. That is correct on day
 one. The list of what is still skipping *is* your onboarding checklist.
 
@@ -202,9 +202,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `34 passed, 2 failed, 6 advisory, 17 skipped` | the install is uncommitted (`CM-03`) and the shipped SPEC is untracked (`SP-02`) |
-| 2. the first commit | `git add -A && git commit` | `35 passed, 1 failed, 6 advisory, 17 skipped` | `HP-05` (the placeholder) — plus `GT-02` if your gate names a script the repo does not have |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `36 passed, 0 failed, 6 advisory, 17 skipped` | none — green |
+| 1. the install ran | `gob init --write ... --yes` | `18 passed, 0 failed, 0 advisory, 9 skipped` | none — the installer fills `HANDOFF.md`'s HEAD from the seed commit, and the uncommitted-install / untracked-SPEC reds (`CM-03`, `SP-02`) are now library rows, off by default |
+| 2. the first commit | `git add -A && git commit` | `18 passed, 0 failed, 0 advisory, 9 skipped` | none — green |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `18 passed, 0 failed, 0 advisory, 9 skipped` | none — `CM-03` is a library row, so a dirty tree no longer re-reds by default |
 
 One of those deserves its name spelled out:
 
@@ -212,9 +212,9 @@ One of those deserves its name spelled out:
   proposal (`bash tests/run-tests.sh`) does not exist in a throwaway repo — the shell's own
   *command not found*. Replace it with a command that can run (or create the script). The failure
   line tells you this: `gate check: bash tests/run-tests.sh -> exit 127`.
-- **Step 3 is two steps on purpose.** Naming a real HEAD in `HANDOFF.md` without committing it
-  re-reds `CM-03` (`1 dirty entr(y|ies)`) — commit-as-you-go starts on minute one. Edit, commit,
-  then verify.
+- **Step 3 is two steps on purpose.** `CM-03` (commit-as-you-go) is a library row now, so a
+  dirty tree no longer re-reds by default — but the discipline is unchanged: edit, commit, then
+  verify. Enable `CM-03` from the library if you want the gate to hold you to it.
 
 ### The three-day-one failures, and why they are not a broken harness
 
@@ -327,7 +327,7 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 12 files it
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 13 files it
 tracks — not the ones it `owns` (including `AGENTS.md`, whose gob block §5 has you editing) and not
 `.gob/installed.json`; edit one of the tracked — the exercise below uses `.gob/bans/README.md`.
 
@@ -404,29 +404,29 @@ the next session.
 
 ## 9. What to expect on day one (so you do not misread it)
 
-A default install lands on a specific shape. The first reds are
+A default install lands on a specific shape. The first red is
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    34 passed, 2 failed, 6 advisory, 17 skipped     # straight after the install (CM-03 + SP-02)
-    35 passed, 1 failed, 6 advisory, 17 skipped     # editing HANDOFF.md re-reds CM-03 (commit-as-you-go)
-    36 passed, 0 failed, 6 advisory, 17 skipped     # committed: green
+    13 passed, 1 failed, 0 advisory, 13 skipped     # straight after the install (the HP-05 placeholder)
+    14 passed, 0 failed, 0 advisory, 13 skipped     # name a real commit in HANDOFF.md, commit, and it is green
 
-Name a real commit in `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is
-green:
+(On the older `gob init` walk the uncommitted-install and untracked-SPEC reds — `CM-03`, `SP-02`
+— were the first two FAILs; both are library rows now, off by default.) Name a real commit in
+`HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is green:
 
-    36 passed, 0 failed, 6 advisory, 17 skipped     (on a real project; your numbers will differ)
+    14 passed, 0 failed, 0 advisory, 13 skipped     (on a real project; your numbers will differ)
 
-**Twenty-one rows skipping is correct**, and each skip prints its reason. In plain terms: the
+**Thirteen rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
 scolding.
 
 Two readings that are easy to get wrong:
 
-- **Advisory rows are not passes.** Six rules are labelled `advisory` — counted, not enforced, and
-  all six carry no executable check at all. The count is capped by `advisory_ceiling: 10`, and a
-  default install sits at 6 of 10: adding unenforceable rules eventually fails verify until
-  one is removed. That is intentional.
+- **Advisory rows are not passes.** No row of the shipped matrix is labelled `advisory` — the
+  six advisory rows moved to the library (`gob verify --library`), so a default install sits at
+  0 of 10 on `advisory_ceiling: 10`. Enabling one from the library spends a slot: adding
+  unenforceable rules eventually fails verify until one is removed. That is intentional.
 - **Vacuously-passing rows are not proven.** A rule about "the first review note" passes when there
   is no review note yet. It is not lying — it is passing on an empty set. `docs/GUIDE.md`
   names which rows do this.
@@ -692,10 +692,12 @@ Output is one line per executed row, in manifest order, plus a summary line at t
 
     PASS  HP-01  (test -f HANDOFF.md)
     FAIL  GT-02  gate commit: false -> exit 1
-    ADV   SC-09  auth is applied consistently across sibling routes
-    SKIP  HS-02  no pinned pre-change commit yet - REPLAY not provable
+    SKIP  FM-01  feature_map: is empty - this state is UNREACHABLE ...
+    SKIP  SK-01  Every shipped skill has name + description frontmatter. (opt-out: playbooks)
 
-Those four lines are one row of each marking. The summary line of a green default run is `32 passed, 0 failed, 6 advisory, 21 skipped`.
+Those three lines are one row of each marking a default run can show (no row of the shipped
+matrix is advisory — the advisory rows live in the library). The summary line of a green default
+run is `14 passed, 0 failed, 0 advisory, 13 skipped`.
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -718,24 +720,20 @@ workflow file is not a gate still holds (`docs/LIMITS.md` #34).
 #### A fresh install verifies green
 
 Measured on a fresh DEFAULT install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`32 passed, 0 failed, 6 advisory, 21 skipped`, exit 0.** Twenty-one rows skip with
-a reason — the same not-yet rows as before, plus the four skill rows (`SK-01`..`SK-04`)
-that skip on the `playbooks` opt-out a skills-free install records: `HS-02` — no pre-change commit
-is pinned yet, so the REPLAY is not provable (`docs/LIMITS.md` #11) — `SC-06`, which
-has no dependency manifest or lockfile to read yet — `PF-01`, which has
-no measured perf baseline — `BN-01`/`BN-02`/`BN-05`, which have no `.ts` file for a ban's `applies_when` glob, so they report
-*not applicable*, and `BN-03` with the four electron bans
-`BN-06`..`BN-09`, which the `bans:` list does not enable (`bans: [BN-01, BN-02, BN-05]`), so they skip as
-*not enabled* rather than as *unread* — `FM-01`/`FM-02`/`VA-01`, which have no feature map and no declared
-`verify_doctor:` yet (`feature_map:` and `verify_doctor:` ship empty on purpose: a fresh install
-must not be born RED — G1, `docs/LIMITS.md` #30) — `RC-01`..`RC-04`, which read a declared
-reference corpus and a lab `manifests/` directory a fresh install has neither of
-(`reference_manifest:` and `quarantine_root:` ship empty on purpose: a repo with no corpus must
-not be born RED). Every skip above is a *not yet*, not a pass.
+hand edit: **`14 passed, 0 failed, 0 advisory, 13 skipped`, exit 0.** Thirteen rows skip with
+a reason — the three active-out skill rows (`SK-01`, `SK-02`, `SK-04`) that skip on the
+`playbooks` opt-out a skills-free install records: `BN-01`/`BN-02`/`BN-05`, which have no `.ts`
+file for a ban's `applies_when` glob, so they report *not applicable*, and `BN-03` with the four
+electron bans `BN-06`..`BN-09`, which the `bans:` list does not enable
+(`bans: [BN-01, BN-02, BN-05]`), so they skip as *not enabled* rather than as *unread* — and
+`FM-01`/`FM-02`, which have no feature map yet (`feature_map:` ships empty on purpose: a fresh
+install must not be born RED — G1, `docs/LIMITS.md` #30). Thirty-two further rows are **not
+skipped but OFF** — they live in the library (`gob verify --library`), the rows that are not
+right for every repo. Every skip above is a *not yet*, not a pass.
 
-The parts that only a round can produce do **not** fail on a fresh install; they
-pass **vacuously**, and that is the honest reading: `PG-01`..`PG-03` iterate over `reviews/*.md`
-and there are none, and the declared gate *is* the shipped floor until step 3 replaces it. `P8`
+The parts that only a round can produce do **not** fail on a fresh install; the round-shaped
+rows (`PG-01`..`PG-03`) are library rows now — off by default — and the declared gate *is* the
+shipped floor until step 3 replaces it. `P8`
 (`goblin-bootstrap`) walks that first-step list because the work is not done, not because the
 verifier is reporting FAILs.
 
@@ -745,11 +743,11 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a part's off state real.
 - **The opt-out numbers are pinned (V3-3).** A default install with an explicit `--skills no`
-  verifies `32 passed, 0 failed, 6 advisory, 21 skipped`, exit 0, and
+  verifies `14 passed, 0 failed, 0 advisory, 13 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
   at v0.2 as the ban and feature-map rows landed; in v3 the model/role/loop and CI rows are cut,
-  so the shape is `34/0/6/21`).
+  and the 32 not-for-every-repo rows moved to the library, so the shape is `14/0/0/13`).
 - **Skills, W6 neutral-first.** A default install ships no agent skills. A repo whose record has
   `skills: yes` keeps them through every flag-less re-install and `--upgrade` (the installer
   reads the record's choice and says so out loud); an explicit `--skills no` removes exactly the
@@ -825,24 +823,22 @@ scaffold in `checks/`. A default install ships **no** agent skills: skills are o
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .gob/bin/goblin-verify            # 33 passed, 2 failed - CM-03 + SP-02, until the install is committed
+    .gob/bin/goblin-verify            # 14 passed, 0 failed - the uncommitted-install red (CM-03) is a library row now
 
-A default install (no agent skills) is **green** — `34 passed, 0 failed, 6 advisory,
-21 skipped`, exit 0 — once
+A default install (no agent skills) is **green** — `14 passed, 0 failed, 0 advisory,
+13 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
-the one expected red (`33 passed, 1 failed`). Both numbers are measured, not assumed
-(`docs/GUIDE.md`; step 2 of `docs/GUIDE.md`). Twenty-one rows skip with a reason: the
-four skill rows (`SK-01`..`SK-04`) skip on the `playbooks` opt-out a skills-free
-install records, plus the not-yet rows: `HS-02` (no
-pinned pre-change commit yet), `SC-06` (no dependency manifest, no lockfile), `PF-01` (no measured perf baseline), `BN-01`/`BN-02`/`BN-05` (no `src/` for a ban
-to read) and `BN-03` with the four
+the one expected red (`13 passed, 1 failed`). Both numbers are measured, not assumed
+(`docs/GUIDE.md`; step 2 of `docs/GUIDE.md`). Thirteen rows skip with a reason: the
+three active-out skill rows (`SK-01`, `SK-02`, `SK-04`) skip on the `playbooks` opt-out a
+skills-free install records, plus the not-yet rows: `BN-01`/`BN-02`/`BN-05` (no `.ts` file
+for a ban's `applies_when` glob, so each reports *not applicable*), `BN-03` with the four
 electron bans `BN-06`/`BN-07`/`BN-08`/`BN-09` (not in the `bans:` list `[BN-01, BN-02, BN-05]`, so
-they skip as *not enabled* rather than as *unread*), `FM-01`/`FM-02`/`VA-01`
-(no feature map and no declared `verify_doctor:` yet) and `RC-01`..`RC-04` (no reference corpus
-declared: `reference_manifest:` ships empty and a fresh repo has no lab `manifests/`). The parts
-that only a round can produce pass *vacuously* (zero `reviews/*.md` to check; the
-declared gate is still the shipped floor), so the first-step list is a list of work, not a list of
-FAILs.
+they skip as *not enabled* rather than as *unread*), and `FM-01`/`FM-02`
+(no feature map yet). Thirty-two further rows are held in the **library** (`gob verify
+--library`) — off by default, each with the line that turns it on. The round-shaped rows
+(`PG-*`) and the corpus rows (`RC-*`) are library rows now, so the first-step list is a list of
+work, not a list of FAILs.
 
 ### Adopting into a repo that already has a `HANDOFF.md`
 
@@ -882,7 +878,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .gob/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the full green path (`32 passed, 0 failed, 6 advisory, 21 skipped`, exit 0)
+   Success is the full green path (`14 passed, 0 failed, 0 advisory, 13 skipped`, exit 0)
    with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three
@@ -893,11 +889,13 @@ removed.
 
 ## 16. The rule matrix
 
-`.gob/manifest/enforcement.tsv` is the matrix: **one row per rule**. The `check` column holds a
-real command that `goblin-verify` runs, or the literal `advisory`, or the marker
+`.gob/manifest/enforcement.tsv` is the matrix: **one row per on-by-default rule**. The `check`
+column holds a real command that `goblin-verify` runs, or the literal `advisory`, or the marker
 `goblin-verify --only <ID>` for a check that needs more than one shell line (those are
 builtins in `bin/goblin-verify`, so the row stays self-describing and the matrix stays the
-single source of truth).
+single source of truth). `.gob/manifest/library.tsv` holds the **off-by-default** rows — the shipped
+rules that are not right for every repo — and `gob verify --library` lists each with the line
+that turns it on.
 
 Some `if_not_why` cells carry internal workstream tags — `W1`, `W5`, `W6` — recording which
 redesign of this toolkit last touched that rule's check (W1 the global-engine split, W5 the
@@ -917,7 +915,7 @@ closed and now ENFORCED (`IN-03`'s third clause, Z1-5): `script`, `lint`, `gate`
 plus `test` for a source-scope row, whose check is a script under `tests/` run by
 `tests/run-tests.sh`.
 
-Measured shape of this table: **63 rows** - 59 target, 4 source; advisory 6, gate 16, lint 24, script 14, test 3.
+Measured shape of this table: **31 rows** - 27 target, 4 source; advisory 0, gate 4, lint 16, script 8, test 3 (the on-by-default matrix, `.gob/manifest/enforcement.tsv`). The **library** (`library.tsv`) holds a further **32 rows**, all `scope:target`, off by default. The table below renders the **full 63-rule set** (matrix + library) so a reader sees the whole contract; the 32 library rows are the ones `gob verify --library` names.
 
 ### The rows
 
@@ -964,7 +962,7 @@ Measured shape of this table: **63 rows** - 59 target, 4 source; advisory 6, gat
 | `SC-04` | target | lint | Every cookie write carries its flags. | goblin-verify --only SC-04 | Builtin, same-statement only: a write spread over three lines is not seen, and the row says so. It REPORTS that a JS-written cookie is readable by any script rather than failing on it - that is a design fact, not a bug - so the pass is about the flags, never about the choice. |
 | `SC-05` | target | gate | Every write route validates its input, or is waived. | goblin-verify --only SC-05 | Builtin: it proves a validator is CALLED (`safeParse\|zod\|valibot\|yup\|ajv\|superstruct\|validate(`), never that the schema is right - a schema that accepts everything passes. `.gob/boundary-waivers` is the escape hatch, and the waived count is printed, so a silent pile-up is visible. |
 | `SC-06` | target | gate | A lockfile exists, and the repo tracks it. | goblin-verify --only SC-06 | Builtin: presence, then `git ls-files --error-unmatch`. It cannot see that the lockfile is STALE relative to `package.json` - resolving that needs the package manager, which is a deliberate network-shaped step, not a check. SKIPs with a reason when there is no `package.json`. |
-| `SC-09` | target | advisory | Auth is applied consistently across sibling routes. | advisory | Prose on purpose: "consistently" is a semantic judgement about a private surface no repo here has yet. Counted (6 of ceiling 10) so the matrix cannot quietly grow prose. |
+| `SC-09` | target | advisory | Auth is applied consistently across sibling routes. | advisory | Prose on purpose: "consistently" is a semantic judgement about a private surface no repo here has yet. Counted (advisory; the library holds it now) so the matrix cannot quietly grow prose. |
 | `PF-01` | target | lint | The perf baseline names the commit it measured. | goblin-verify --only PF-01 | Builtin: the metric must equal `ratchet.name` so the budget and the measurement cannot silently disagree, the value must be numeric, the date must exist, the baseline commit must exist AND be an ancestor of HEAD (`HP-05`'s mechanic, reused rather than re-derived), and `ratchet.ceiling` must equal `perf.baseline_value` - otherwise a one-line ceiling raise passes while the row prints the contradiction, which is `I raised the budget and never measured again` (G8-6b). It cannot see whether the metric is the right one for the product, and it never re-measures: re-anchoring is a deliberate operator action. SKIPs with a reason when no perf metric is declared, or none has been recorded yet. |
 | `BN-00` | target | script | Every ban has an enforcement row, every ban row names a replacement, and the ban table is not empty. | goblin-verify --only BN-00 | — (this row is the reason the ban list cannot decay into prose: IN-03's shape applied to bans.tsv, and it agrees in both directions) |
 | `BN-01` | target | lint | No `any` in application TypeScript. | goblin-verify --only BN-01 | Text probe, not an AST: a `: any` inside a string or a comment is reported, and `Record<string, any>` (no leading colon) is missed. The AST form needs a parser the no-npm contract (docs/GUIDE.md) forbids (docs/LIMITS.md #27). SKIPs when the ban is not in `bans:` or its globs match no file. |
@@ -989,8 +987,10 @@ Measured shape of this table: **63 rows** - 59 target, 4 source; advisory 6, gat
 
 ### Advisory rows, named
 
-6 of the 59 rows are labelled `advisory`. 6 of them carry no executable check at all
-(they are prose the matrix refuses to pretend about).
+0 of the 27 rows are labelled `advisory`. 0 of them carry no executable check at all — the six
+advisory rows (`HP-04`, `HS-03`, `CM-02`, `DOC-01`, `DOC-02`, `SC-09`) all moved to the library
+(`gob verify --library`), so a default run carries no prose row (they are prose the matrix
+refuses to pretend about).
 
 - **HP-04** (no check at all) - A stale sentence is corrected in place with a dated parenthetical, never deleted.
 - **HS-03** (no check at all) - Source probes read text with comments blanked first.
@@ -1322,7 +1322,7 @@ them: it reads the path from config, so moving the standard is a one-line config
     git init -b main
     gob init --heuristic                   # the brief + schema; answer it in a proposal file
     gob init --write .gob-init-proposal.md --yes
-                                           # expect: created 18 (no skills — those are opt-in)
+                                           # expect: created 19 (no skills — those are opt-in)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"

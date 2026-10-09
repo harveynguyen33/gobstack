@@ -52,16 +52,22 @@ After installing, in this order:
     cd <target> && git add -A && git commit   # the install is a change like any other
     .gob/bin/goblin-verify                    # or gob verify, anywhere in the target
 
-**A default install verifies green — `32 passed, 0 failed, 6 advisory,
-21 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
-scaffold's `0000000` placeholder is the one expected red.** Twenty-one rows skip: the four
-skill rows (`SK-01`..`SK-04`) skip on the `playbooks` opt-out a skills-free install
-records, then the not-yet rows (`HS-02` has no pinned pre-change commit yet;
-`SC-06` has no dependency manifest to read; `PF-01` has no
-measured perf baseline; `BN-01`/`BN-02`/`BN-05` have no `.ts` file for a ban to read, so each
-reports itself *not applicable*, and `BN-06`–`BN-09` are not in this tree's `bans:` list
+**A default install verifies green — `14 passed, 0 failed, 0 advisory,
+13 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
+scaffold's `0000000` placeholder is the one expected red.** Thirteen rows skip: the three
+active-out skill rows (`SK-01`, `SK-02`, `SK-04`) skip on the `playbooks` opt-out a skills-free
+install records; `BN-01`/`BN-02`/`BN-05` have no `.ts` file for a ban to read, so each
+reports itself *not applicable*; `BN-03` and `BN-06`–`BN-09` are not in this tree's `bans:` list
 (`bans: [BN-01, BN-02, BN-05]`), so they skip as *not enabled*;
-`FM-01`/`FM-02`/`VA-01` have no feature map; `RC-01`..`RC-04` have no reference corpus). The
+and `FM-01`/`FM-02` have no feature map yet. **Thirty-two further rows are OFF by default** —
+they are not skipped, they are held in the **library** (`gob verify --library`), the discovery
+surface for the extend mechanism: the spec/round rows (`SP-01`..`SP-03`), the ratchet rows
+(`GT-04`/`GT-05`), the replay rows (`HS-01`..`HS-03`), commit hygiene (`CM-02`/`CM-03`),
+the PR-gate rows (`PG-01`..`PG-03`), the runtime-data rows (`DS-01`/`DS-02`), the doc rows
+(`DOC-01`/`DOC-02`), the security rows (`SC-02`..`SC-06`, `SC-09`), the perf baseline (`PF-01`),
+the reference corpus (`RC-01`..`RC-04`), the archive switch (`CL-02`), the portability row
+(`PT-01`) and the doctor row (`VA-01`). A default run states the library count in its summary, so
+a green run is never the whole story. Full inventory: `gob verify --library`. The
 parts that only a round can produce — a first review note, a gate that is not the shipped floor —
 pass *vacuously* rather than failing, and `P8` (`goblin-bootstrap`) still walks them as work to
 do. The measurement and the vacuous-pass reading are in `docs/GUIDE.md`.
@@ -334,8 +340,9 @@ state), and CI and `goblin-verify` were free to report different truths about on
 
 ### The advisory rows, named
 
-Six rows are labelled `advisory`, and the count is capped by `SK-03` (default ceiling 10 — the
-cap is now **6 of 10**). All six carry **no executable check at all**:
+No row of the shipped matrix is labelled `advisory` — the **six advisory rows moved to the
+library**, so a default run sits at **0 of 10** on the `SK-03` cap (`gob verify --library` lists
+them). Those six carry **no executable check at all**:
 
 - **HP-04** — a stale sentence is corrected in place with a dated parenthetical, never deleted.
 - **HS-03** — source probes read text with comments blanked first.

@@ -72,11 +72,11 @@ printf '%s' "$NS_OUT" | grep -q 'SKIP  SK-02'
 check "  and SK-02 is opt-out rather than FAIL (the pre-fix defect)" "$?"
 # V3-3: the opt-out path had a number no file recorded (the count moved from `37/0/9/11` at v0.2
 # as rows joined - the ban rows, G1's FM-01/FM-02/VA-01, W3's judge/loop rows and the v2 CI-payload
-# removal each shifted it). In v3 the model/role/loop rows and the CI lane are cut, so the shape is
-# `32/0/6/21`. Pin the line so the next silent shift is caught here. The number is measured, not
-# copied: see the note line the run prints above.
-printf '%s' "$NS_OUT" | grep -q '32 passed, 0 failed, 6 advisory, 21 skipped'
-check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 32/0/6/21)" "$?"
+# removal each shifted it). In v3 the model/role/loop rows and the CI lane are cut, and the 32
+# not-for-every-repo rows moved to the library, so the shape is `14/0/0/13`. Pin the line so the
+# next silent shift is caught here. The number is measured, not copied: see the note line above.
+printf '%s' "$NS_OUT" | grep -q '14 passed, 0 failed, 0 advisory, 13 skipped'
+check "  and the --skills no numbers are pinned (V3-3 + W1: SK-01 opt-out SKIPs, 14/0/0/13)" "$?"
 
 # ---- W6 migration safety: an upgrade must not strip previously-installed skills ---------------
 # The pre-W6 default was --skills yes, so every existing install carries .hermes/skills recorded
