@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # t-render-tokens.sh — Z1-3's control: a RENDERED install carries no unsubstituted template token.
 #
-# The defect this exists for. `templates/goblin.yaml.tmpl` held a `{{GATE2}}` line that no
-# `render` call replaced, so every one of the classes' installed `.gob/goblin.yaml`
+# The defect this exists for. `templates/AGENTS.md.tmpl` held a `{{GATE2}}` line that no
+# `render` call replaced, so every one of the classes' installed `AGENTS.md` config
 # carried a raw template token - visible to the operator in their own config, two waves after it
 # was first reported (W5-8). `grep -rl '{{GATE2}}' tests docs manifest bin` was 0 files, which is
 # exactly why nothing caught it: no test, no document, and no row read the rendered output.
@@ -50,7 +50,7 @@ for c in $CLASSES; do
   # The positive control: the scan below is over a tree that HAS the rendered gate block. Without
   # this, an install that wrote nothing (or a scan that read nothing) would pass the token check
   # vacuously - the shape this suite exists to refuse. v2: the gates live in the AGENTS.md
-  # frontmatter block (flat gate_<name>_cmd: keys), there is no .gob/goblin.yaml.
+  # frontmatter block (flat gate_<name>_cmd: keys), there is no separate config file.
   [ -s "$t/AGENTS.md" ] && grep -q '^gate_.*_cmd: ' "$t/AGENTS.md"
   check "  and class $c's config carries a rendered gate block (so the scan reads a real file)" "$?"
 done

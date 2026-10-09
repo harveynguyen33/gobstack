@@ -42,7 +42,7 @@ Use when adopting goblin-stack in a repo, or starting one.
 
 ## Verification
 
-- `goblin-verify` exit 0, and the created-file list matches `.goblin/installed.json`.
+- `goblin-verify` exit 0, and the created-file list matches `.gob/installed.json`.
 - A repo with no gate declares one and records its first measured numbers.
 - `.gitignore` is verified before the first commit, not after.
 - The perf baseline exists, and it names a commit that exists (`PF-01`), rather than the ratchet

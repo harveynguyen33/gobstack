@@ -19,6 +19,22 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   promotes them into catalogue.tsv by PR or edit. `--write` honours only the proposal's TICKED
   rows, through `gob extras install` itself — one allowlist, one code path.
 
+## 0.6.0-alpha.4
+
+The v2 QA-fixes wave. Ten issues found against the v2 surface, all resolved: the extras
+payload-aware pre-tick and a pre-flight validation so a partial install cannot happen; the
+GUIDE's own `Version:` stamp caught up with the tree; v2 command names in every user-facing
+string; neutral machine-defaults; `map --write` accepting the brief's own state and the
+README-as-feature stem fix; the MCP `gob_verify` tool honouring its target and echoing the
+verified path; and a gawk-5.2 fatal in the remedy word-fold.
+
+## 0.6.0-alpha.3
+
+The license gate for the curated extras catalogue. Every `catalogue.tsv` row carries a
+`license_status` (`verified` / `pending` / `proprietary-confirmed-ok`) and install REFUSES any
+row whose status is not `verified` - a data-driven gate that flips with a column edit, not a
+code change. Two rows (vercel / anthropics) are held LICENSE-PENDING by decision.
+
 ## 0.6.0-alpha.2
 
 The v2 breaking release: rules-first. The rules a repo is judged by move from a config file the

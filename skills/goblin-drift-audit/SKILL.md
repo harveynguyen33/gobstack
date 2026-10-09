@@ -13,7 +13,7 @@ disagreement; you do not re-derive it from memory.
    detail line the producer computed. Re-run that exact check yourself and confirm it is still
    RED:
 
-       <repo>/.goblin/bin/goblin-verify --only <check-id>
+       <repo>/.gob/bin/goblin-verify --only <check-id>
 
    A drift that is no longer reproducible is a stale card, and closing it with that fact is a
    complete run.

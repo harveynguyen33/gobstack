@@ -14,7 +14,7 @@
 #         markdown, because a literal grep is defeated by the claim's own emphasis: restored to
 #         docs/GUIDE.md as "A fresh install is **not** automatically green", the round-1
 #         control printed ok and exited 0.
-#   F2-3  docs/LIMITS.md must admit that .goblin/installed.json is not signed, because one edit
+#   F2-3  docs/LIMITS.md must admit that .gob/installed.json is not signed, because one edit
 #         to it (plus the matching edit to the file it protects) yields a fully green run.
 #   V3-1  templates/AGENTS.md.tmpl must name the ban engine, because that template is the only
 #         source of the installed AGENTS.md - the file a session reads first. Without it a ban is
@@ -415,7 +415,7 @@ done
 
 # ---- gob map: the standalone generator is documented where a reader decides -----
 # The docs must teach BOTH halves of the product decision (2026-10): the generator is
-# standalone (works with no .goblin/ install and no goblin.yaml), AND the FM-01/FM-02
+# standalone (works with no .gob/ install and no AGENTS.md gob block), AND the FM-01/FM-02
 # rows stay opt-in through the feature_map: declaration — generating a map never forces
 # the rows on. Each asserted sentence is the pin for its own edit; the generator
 # behaviour itself is t-map.sh and the shim's SH9.

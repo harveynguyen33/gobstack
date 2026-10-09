@@ -152,7 +152,7 @@ check "  and the guide's walked-path transcript is the installer's created-19 li
 check "  and the false gloss ('created 50 means it wrote 50 files') is gone (D4)" "$?"
 GLOSS_LINE=$(grep -n "created 19" "$GUIDE" | head -1 | cut -d: -f1)
 if [ -n "$GLOSS_LINE" ] && sed -n "${GLOSS_LINE},$((GLOSS_LINE + 12))p" "$GUIDE" | grep -q 'installed\.json'; then
-  note "ok   the gloss names the file the counter does not count (.goblin/installed.json)"
+  note "ok   the gloss names the file the counter does not count (.gob/installed.json)"
 else
   note "FAIL the gloss on 'created $CREATED' does not say which file the installer omits from the count"
   fail=1
@@ -161,7 +161,7 @@ fi
 # ---- AB3: the guide's own file-count claim must equal the map a real install writes -------------
 # §8's rule tells the reader which row to break, and until AB3 it said `IN-02` "hashes every file the
 # installer wrote" - measured false: the installer writes 51 files into an empty repo and the row's
-# `files` map is 40, so the ten it does not hash (including `.goblin/goblin.yaml`, the file §5 step 3
+# `files` map is 40, so the ten it does not hash (including the `AGENTS.md` gob block, the file §5 step 3
 # has the reader edit) drift nothing and the exercise "confirms" a check that never moved. The count
 # the sentence quotes is compared with the map THIS install wrote, and the universal is compared with
 # absence. Both are RED at 58a6fe6, where the sentence carries no count at all.
@@ -276,7 +276,7 @@ check "every summary line the guide quotes is one a run printed ($(printf '%s' "
 
 # ---- the exercise must not destroy the reader's own uncommitted work ---------------------------
 # The block is path-limited on purpose, and the guide says so in its own parenthetical ("your own
-# edits stay put"). §5 step 3 leaves an uncommitted `.goblin/goblin.yaml` edit in a real reading, so
+# edits stay put"). §5 step 3 leaves an uncommitted the `AGENTS.md` gob block edit in a real reading, so
 # an unqualified `git stash` + `git stash drop` would silently delete the reader's config. Measured
 # here rather than claimed.
 mkdir -p "$WORK/reader" && cd "$WORK/reader"

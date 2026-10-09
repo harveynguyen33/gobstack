@@ -39,11 +39,11 @@
 #       * a bare command name with no directory (`goblin-verify`, `goblin-install`). It resolves on
 #         PATH or as `.gob/bin/<name>`, and the docs use all three forms; the promise being
 #         checked is about a PATH, and a bare name makes no path claim.
-#       * a `.goblin/`-rooted path that is not a command. `.goblin/loop/...` is the loop's own
-#         committed record, and `.goblin/last-gate-line` is written by a RUN (`GT-02`'s gate
+#       * a `.gob/`-rooted path that is not a command. `.gob/loop/...` is the loop's own
+#         committed record, and `.gob/last-gate-line` is written by a RUN (`GT-02`'s gate
 #         line). The docs promise that a run produces
 #         them, never that an install ships them, so "must exist right after install" is the wrong
-#         assertion. `.goblin/manifest/*.tsv` is an installed DATA table, not a command: the
+#         assertion. `.gob/manifest/*.tsv` is an installed DATA table, not a command: the
 #         business half below and `tests/t-doc-sync.sh`'s cell comparison cover it.
 #       * a path inside a fenced transcript that the reader is told to CREATE (`reports/<slug>/`,
 #         `reviews/<slug>-<head7>.md`, `evals/<slug>/`). Those are outputs of the reader's own
@@ -66,7 +66,7 @@
 #     fragment is a token.
 #
 #     STILL NOT REJOINED, named here rather than implied away:
-#       * a path broken BETWEEN its own directories (`.goblin/` + `bin/x`) or in the MIDDLE of a
+#       * a path broken BETWEEN its own directories (`.gob/` + `bin/x`) or in the MIDDLE of a
 #         name (`.gob/bin/gob` + `lin-bans`). One fragment still carries a NAME, so it is
 #         asserted as an ordinary token and a fragment that is not a shipped command still FAILs -
 #         `bin/x` is read as a checkout path, `.gob/bin/gob` as an installed one. A break that
@@ -82,13 +82,13 @@
 #         line ending on the bare directory is silent with or without a continuation. Measured
 #         (AB7): 0 such lines in this tree, and a plant of that form in `docs/CI.md` PASSes rc 0,
 #         plant unmentioned.
-#       * a bare command name with no directory, and a `.goblin/`-rooted non-command path, as
+#       * a bare command name with no directory, and a `.gob/`-rooted non-command path, as
 #         above. Wrap tolerance changes how a claim is READ, never which claims are in scope.
 #
 # (a2) The same walk gives the guide's own half, because the guide is the one document written FOR
 #     the reader's repo: a `manifest/<file>` token in `docs/GUIDE.md` names a file of THIS
 #     checkout, which is not where the reader's copy lives (the guide's own section 1 writes
-#     `.goblin/manifest/enforcement.tsv`). The rule is scoped to the guide because the other
+#     `.gob/manifest/enforcement.tsv`). The rule is scoped to the guide because the other
 #     documents address this checkout as well as the reader's repo - measured: `docs/GUIDE.md`
 #     and `docs/LIMITS.md` each name `manifest/bans.tsv` in a sentence about the source table - so
 #     the same assertion there would be false. RED case (B3): `docs/GUIDE.md:517` wrote

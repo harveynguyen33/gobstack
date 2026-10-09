@@ -31,7 +31,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
    escalated.
 7. **The staleness of a fleet-config repo is detectable and not fixable here** — the E-class gate
    notices it, and the underlying job bug belongs to another repository.
-8. **A new surface to maintain.** Per-repo vendored `.goblin/` plus `.hermes/skills/` means
+8. **A new surface to maintain.** Per-repo vendored `.gob/` plus `.hermes/skills/` means
    upgrade debt in every adopted repo, plus one more command pair to learn. The counter is that
    the alternative — profile copies — already failed.
 9. **Six rows are labelled `advisory`, and all six are prose with no check at all:**
@@ -46,7 +46,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     replaced with real probes.
 12. **`HP-03` proves a date exists, not that a number is fresh.** A HANDOFF can carry yesterday's
     number with today's date and pass. Since V1 the row is anchored on the gate names
-    `.goblin/goblin.yaml` DECLARES and skips the template's own example sentence, so a real gate
+    the `AGENTS.md` gob block DECLARES and skips the template's own example sentence, so a real gate
     line can no longer lose its `measured <date>` in silence (G8-2 measured the old row passing
     exactly that); but nothing re-measures the number, and a gate-bearing line that names no
     declared gate and carries no gate-shaped keyword is still unseen.
@@ -93,10 +93,10 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     mechanised as *the HANDOFF names a commit that exists in this repo and is an ancestor of
     HEAD*, which still catches the defect the rule exists for (an artifact that names no commit
     at all). The deviation and its reason are in the row's own `if_not_why` column.
-18. **`.goblin/installed.json` is not signed, so nothing here proves it was not rewritten.** Every
+18. **`.gob/installed.json` is not signed, so nothing here proves it was not rewritten.** Every
     drift check — `IN-02`, `SK-02`, and `HS-01`'s hash of the harness dir — reads its expected
     hash out of that one file, and that file is the one file no check protects. Measured: append a
-    byte to `.goblin/bin/goblin-verify`, rewrite its recorded hash in `installed.json`, commit, and
+    byte to `.gob/bin/goblin-verify`, rewrite its recorded hash in `installed.json`, commit, and
     the run is **fully GREEN** (`38 passed, 0 failed`, exit 0). One edit defeats three rows at
     once, and it is the cheapest way to fake a green run. Doing better needs an anchor the target
     cannot edit — a signature, or a hash held outside the repo — and goblin-stack has no such
@@ -179,8 +179,8 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
 28. **The ban table's integrity rides on `IN-02`, and `IN-02` rides on an unsigned record.** A
     project could empty `manifest/bans.tsv` (or edit a `detect` command) and the ban gate would
     pass vacuously — `BN-00` fails closed on an *empty* table, but it cannot see a table whose
-    rows were weakened, because `.goblin/manifest/bans.tsv` is hashed by `IN-02` and
-    `.goblin/installed.json` is not signed (`docs/LIMITS.md` #18). The ban list is not
+    rows were weakened, because `.gob/manifest/bans.tsv` is hashed by `IN-02` and
+    `.gob/installed.json` is not signed (`docs/LIMITS.md` #18). The ban list is not
     tamper-proof; it is as strong as the record every drift check trusts. **Measured (W5-12):** with
     `BN-01`'s `detect` cell set to `true`, `BN-00` and `BN-01` both PASS and the only row that
     changes verdict is `IN-02`'s drift check — the `W5-12` control in `tests/t-verify-red.sh` pins
@@ -234,9 +234,9 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
     choice makes. The engine's own stdout is no longer filtered at all, so a probe that ignores the
     contract prints the exempted lines it reported — loud, and still a FAIL.
 37. **`FM-02` refuses the harness, not every non-source file.** The search skips `.git/`,
-    `.goblin/`, `.hermes/`, the declared `harness_dir` and the map's own directory, so a stub map
+    `.gob/`, `.hermes/`, the declared `harness_dir` and the map's own directory, so a stub map
     whose token occurs only in the install no longer resolves (W5-4: `entry_paths: [export]` used to
-    "resolve" to `./.goblin/bin/goblin-verify`). It does **not** exclude the target's own `docs/`,
+    "resolve" to `./.gob/bin/goblin-verify`). It does **not** exclude the target's own `docs/`,
     `tests/` or build output: a token that occurs only there still reads as resolved, and excluding
     them would be a guess about a layout goblin-stack does not know. Nor is there a frequency bound
     — a common token ("export", "main") is satisfied by the first of hundreds of files.
@@ -287,21 +287,21 @@ Electron perf number is a host gate, and the ratchet deliberately carries a diff
         the lane is gone, so no control is owed.
     **W5-10 is answered here too.** The tenant strings `PT-01` forbids do not reach `docs/`, because
     `docs/` is never installed: the row's directory list is `skills manifest bin templates presets
-    .goblin .hermes`, so a string under `docs/` is source-tree prose that no operator's repo ever
+    .gob .hermes`, so a string under `docs/` is source-tree prose that no operator's repo ever
     receives. That is the whole reason, it is deliberate, and the row is not weakened by it — Y1
     agreed, and Z1 leaves it. This is the sentence Z1 added so the reason is visible in the shipped
     artifact rather than only in the wave's own notes.
 
 42. **The doc walk cannot read a path broken at the directory/name boundary.**
-    `tests/t-doc-promises.sh` reads a command directory only as `.goblin/bin/` or `bin/` **with its
-    trailing slash**; when a line ends on the bare directory (`.goblin/bin`, `bin`) and the slash
+    `tests/t-doc-promises.sh` reads a command directory only as `.gob/bin/` or `bin/` **with its
+    trailing slash**; when a line ends on the bare directory (`.gob/bin`, `bin`) and the slash
     leads the next line (`/goblin-verify`) or is dropped (`goblin-verify`), the directory and its
     continuation are both invisible — the first fragment stops before the name the grammar needs, the
     second is not preceded by `bin/`, so neither is a token and neither is asserted. Measured
     2026-09-26 (AB7): a plant of that form is reported **`PASS`, rc 0**, mentioning
     the plant **zero** times, and a line that ends on the bare directory with nothing after it is
     silent too, because the `dangling()` guard needs the trailing slash as well. **0 live instances**
-    — measured: `grep -rnE '\.goblin/bin$|bin/$' $(git ls-files)` → **no output, exit 1**. **What it
+    — measured: `grep -rnE '\.gob/bin$|bin/$' $(git ls-files)` → **no output, exit 1**. **What it
     costs:** a false path written in that form — the exact defect this file's whole species is named
     for — passes the watch silently, so a future document could hand a reader a command that does not
     exist and nothing in the walk would say so. **Ticketed, not gated:** reading the form is a change
@@ -416,7 +416,7 @@ the Node the gates ran under.
     friction: a script that treats every stdout line as a verdict line trips on the banner and
     footer lines, which are not `PASS`/`FAIL` rows. The contract is the EXIT CODE, never the line
     set: 0 green, 1 red, 2 refuse — parse the exit code, or filter to `^[A-Z]{2}-[0-9]{2}` before
-    reading lines. Measured: `./.goblin/bin/goblin-verify > out.txt` on a probe install puts
+    reading lines. Measured: `./.gob/bin/goblin-verify > out.txt` on a probe install puts
     `engine: mode=vendored cli_sha256=… enforcement_tsv_sha256=…` in the captured file
     (`tests/t-engine-dir.sh` itself asserts the footer IN captured output, so removing it or
     tty-gating it would break the engine's own suite). Recorded so the pitfall is findable from
@@ -437,8 +437,8 @@ the Node the gates ran under.
     boundary; no row change implied. `docs/GUIDE.md`'s CM-01 row carries the same one-line
     scope statement.
 
-51. **`gob init` writes its three added values into `goblin.yaml` itself, not through a
-    template.** Install renders `.goblin/goblin.yaml` from `templates/goblin.yaml.tmpl` and
+51. **`gob init` writes its three added values into the `AGENTS.md` gob block itself, not through a
+    template.** Install renders the `AGENTS.md` gob block from `templates/AGENTS.md.tmpl` and
     owns it (`put_once`: never rewritten after the first install) — and install correctly
     carries no `--branch/--email/--gate` flags, because those keys are the project's to edit.
     The wizard therefore `sed`-patches `branch:` and `owner_email:` and rewrites the first
@@ -467,7 +467,7 @@ the Node the gates ran under.
     `bans:`, the `perf.host_gate:`, the `app_bundle_bytes` ratchet, the `dist out release`
     build-output scope), never a part. Measured on the merge tree (2026-10-02): the tsv is 50 rows
     over five classes; `gob init --class desktop`, `--class F` and `--class software --electron`
-    render byte-identical `goblin.yaml` (`class: software`, `electron: true`); and a pre-merge repo
+    render byte-identical the `AGENTS.md` gob block (`class: software`, `electron: true`); and a pre-merge repo
     carrying `class: F` with no `electron:` key verifies unchanged, `37 passed, 0 failed, 10
     advisory, 31 skipped`, exit 0, with `git status --porcelain` empty — zero writes, because its
     bans and host gate live in its own config. What this costs, recorded rather than fixed: such a
@@ -502,7 +502,7 @@ the Node the gates ran under.
 
 `manifest/enforcement.tsv` is the machine-readable form; this is the prose for the ten rows it
 gained in v0.2 (`SC-01`..`SC-09`, `PF-01`). Every one of them is **declared** in
-`.gob/goblin.yaml` under `security:` and `perf:` - a stack-specific rule guessed from the
+the `AGENTS.md` gob block under `security:` and `perf:` - a stack-specific rule guessed from the
 files on disk is how a matrix starts lying, so nothing here infers a stack.
 
 ### The rung ladder, and the rule for choosing a rung

@@ -1,6 +1,6 @@
 ---
 name: practice
-description: The composition hook: read the referenced standard at the path pinned in .goblin/goblin.yaml.
+description: The composition hook: read the referenced standard at the path pinned in the AGENTS.md gob block.
 ---
 
 # practice
@@ -15,7 +15,7 @@ standard this repo references. goblin-stack carries **no copy of it**.
 
 ## Mandate
 
-1. Read `.goblin/goblin.yaml` and take `practice:`.
+1. Read the `AGENTS.md` gob block and take `practice:`.
 2. If that path exists, **read the standard before starting work** in this repo. Its hash is
    pinned in `practice_sha256:`; `goblin-verify` re-checks it, so a silently edited standard
    is visible rather than assumed. If the standard has been edited **deliberately**, re-record

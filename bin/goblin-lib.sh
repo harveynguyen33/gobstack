@@ -273,7 +273,7 @@ g_part_disabled() {
 # ------------------------------------------------------------- class data ----
 # ------------------------------------------------------------- agents.md -----
 # v2 config engine: the project config lives in AGENTS.md FRONTMATTER, delimited by
-# fixed markers. There is no goblin.yaml. One file is the single source of truth:
+# fixed markers. There is no separate config file. One file is the single source of truth:
 #
 #   <!-- gob:begin (gobstack config) -->
 #   class: software
@@ -436,7 +436,7 @@ g_agents_write() {
 # g_class_canon <spelling> -> the canonical class NAME
 #   software | service | game | research | fleet
 # The taxonomy is five domain-named classes. The letters A-E and the older taught domain names
-# (app, agent, desktop) stay as READ-TIME aliases so every existing installed.json / goblin.yaml
+# (app, agent, desktop) stay as READ-TIME aliases so every existing installed.json / the AGENTS.md gob block
 # - which record a letter or an old name - keeps verifying with no rewrite. `desktop` / `F` / `f`
 # resolve to `software`: F was merged into A (their classes.tsv need columns are identical), and
 # what made a desktop shell different is the `electron:` opt-in + ban list, config keys the repo
@@ -556,7 +556,7 @@ ratchet:
   name: hex
   ceiling: 160
 runtime_data:
-  - .goblin/state.json
+  - .gob/state.json
 YAML
 
   local got
@@ -586,7 +586,7 @@ YAML
   got=$(g_yaml_gate_names "$tmp/g2.yaml" | tr '\n' ',')
   [ "$got" = "typecheck,reindented," ] || { g_err "gate-names: got '$got'"; rc=1; }
   got=$(g_yaml_list "$tmp/g.yaml" runtime_data | tr '\n' ',')
-  [ "$got" = ".goblin/state.json," ] || { g_err "list: got '$got'"; rc=1; }
+  [ "$got" = ".gob/state.json," ] || { g_err "list: got '$got'"; rc=1; }
   got=$(g_yaml_disabled "$tmp/g.yaml" | tr '\n' ',')
   [ "$got" = "spec,tokens," ] || { g_err "disabled: got '$got'"; rc=1; }
 

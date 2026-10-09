@@ -88,12 +88,16 @@ check "  and it is the class-A green path (35/0/6/25, the default skills=no inst
 
 # ---- W1 §5.1: an engine_dir declaration must not leak across the boundary ----------------
 # The OUTER repo declares engine_dir; the inner repo (sub2) must resolve its own engine and
-# must not inherit the outer declaration - the resolution chain reads $ROOT/.gob/goblin.yaml,
+# must not inherit the outer declaration - the resolution chain reads $ROOT/AGENTS.md,
 # never the enclosing repo's, so the outer declaration is invisible to the inner verify.
 mkdir -p "$WORK/engine/manifest" "$WORK/engine/bin"
 cp "$SRC/manifest/enforcement.tsv" "$SRC/manifest/classes.tsv" "$SRC/manifest/bans.tsv" "$WORK/engine/manifest/"
 cp "$SRC/bin/goblin-bans" "$SRC/bin/goblin-lib.sh" "$WORK/engine/bin/"
-sed -i "s|^models_file:|engine_dir: $WORK/engine\nmodels_file:|" "$WORK/outer/.gob/goblin.yaml"
+cat > "$WORK/outer/AGENTS.md" <<EOF
+<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->
+engine_dir: $WORK/engine
+<!-- gob:end -->
+EOF
 git -C "$WORK/outer" add -A && git -C "$WORK/outer" commit -q -m "declare engine_dir in the outer repo"
 OUT3=$(bash .gob/bin/goblin-verify 2>&1); RC3=$?
 check "an inner repo verify is unaffected by the OUTER repo's engine_dir (exit 0)" "$([ "$RC3" -eq 0 ] && echo 0 || echo 1)"

@@ -6,13 +6,13 @@ description: P10: an unattended run over a checkable predicate written before it
 # goblin-overnight (P10)
 
 1. **The exit condition is a checkable predicate written before iteration 1**, and it is a
-   command — in the card body, or in `.goblin/loop/predicate`. Run it once before starting, so
-   you know it is runnable; record that run as `exit=<n> ts=<ISO8601>` in `.goblin/loop/first-run`
+   command — in the card body, or in `.gob/loop/predicate`. Run it once before starting, so
+   you know it is runnable; record that run as `exit=<n> ts=<ISO8601>` in `.gob/loop/first-run`
    and pin the predicate.
 2. **It never gets relaxed.** If the predicate turns out to be wrong, stop and write up why; do
    not edit the predicate to fit the result. Relaxing it is closing this loop and opening
-   another, with the old predicate archived under `.goblin/loop/closed-<date>/`.
-3. **An escape hatch.** A genuine dead end writes up why and stops: `.goblin/loop/stuck.md`, at
+   another, with the old predicate archived under `.gob/loop/closed-<date>/`.
+3. **An escape hatch.** A genuine dead end writes up why and stops: `.gob/loop/stuck.md`, at
    least three non-blank lines naming the predicate, committed. The exit a worker can actually
    reach is **`kanban_block`** (naming the predicate) — there is no `kanban_edit` tool in a
    worker's toolset. An unattended run that cannot stop is a runaway.

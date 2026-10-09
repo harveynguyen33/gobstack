@@ -667,7 +667,7 @@ files whose hash changed and prints `created C · updated U · unchanged N · sk
 | kind | recorded as | overwritten? | hash-checked? | removed by `--uninstall`? |
 |---|---|---|---|---|
 | installed artifact (bin, manifest, opt-in skills, harness scaffold) | `files` | yes, on upgrade | yes — IN-02, SK-02 | yes |
-| created once, then yours (`.gob/goblin.yaml`, `HANDOFF.md`, `AGENTS.md`, `*-SPEC.md`, `reviews/.gitkeep`) | `owned` | never | no — you are meant to edit them | no, except the config |
+| created once, then yours (the `AGENTS.md` gob block, `HANDOFF.md`, `AGENTS.md`, `*-SPEC.md`, `reviews/.gitkeep`) | `owned` | never | no — you are meant to edit them | no, except the config |
 | pre-existing, left alone | `refused` | never | no — IN-04 only proves it was not taken over | no |
 
 A `refused` path is not a dead end. For `HANDOFF.md` the remedy is the reconciliation in
@@ -681,13 +681,13 @@ repo. The remedy is the explicit re-pin below — not a hand-edit of the hash, a
 automatic one.
 
 `.gitignore` is not a file gobstack owns: it appends **one marked block** and never rewrites
-the rest. `.gob/goblin.yaml` is generated once and is gobstack's own config, so
+the rest. The `AGENTS.md` gob block is generated once and is gobstack's own config, so
 `--uninstall` removes it; `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md` and `reviews/` are the
 project's record, not the harness's, and are left in place.
 
 #### An edited standard is not a dead end
 
-`.gob/goblin.yaml` records `practice:` and `practice_sha256:`, and `IN-02` re-checks that hash.
+the `AGENTS.md` gob block records `practice:` and `practice_sha256:`, and `IN-02` re-checks that hash.
 The pin has exactly one purpose: to make a **silently** edited standard visible rather than
 assumed. The standard itself is a living document, corrected in place, so an edit that is
 *intended* needs a deliberate way to re-record the pin. That is all `--re-pin` is:
@@ -701,7 +701,7 @@ It rewrites one line of the config — nothing else — and prints both hashes:
       now      8334ac24f056c94c35fa97831253e7e12bace68ae5747c81ae3b696c42ddd33a
 
 `.gob/bin/goblin-verify --only IN-02` then reports `practice pin ok`. Every other line of
-`goblin.yaml`, comments included, is untouched, so the `owned` contract holds for everything
+the `AGENTS.md` gob block, comments included, is untouched, so the `owned` contract holds for everything
 except the one value you just asked to re-record. Commit the config like any other change.
 `--dry-run` prints the plan and writes nothing; when there is nothing to do it prints
 `practice pin already current` and exits 0.
@@ -718,7 +718,7 @@ Four things it deliberately is not:
 - **not a re-point.** It re-records the hash of the path already in `practice:`. Pointing the repo
   at a *different* standard is a deliberate config edit, not a re-pin.
 
-Refusals are exit `2`, each naming the path: no `.gob/goblin.yaml`, no `practice:` recorded, the
+Refusals are exit `2`, each naming the path: no the `AGENTS.md` gob block, no `practice:` recorded, the
 recorded path absent, or no `practice_sha256:` line to rewrite. A failed write is exit `1`, with
 the path — the command never reports a re-pin that did not land. One refusal guards the mode
 itself: `--uninstall --re-pin` is exit `2` with `--uninstall and --re-pin are different jobs; run
@@ -803,7 +803,7 @@ verifier is reporting FAILs.
   recorded skill files; `--uninstall` removes everything recorded, as always.
   `tests/t-install-off-switch.sh` walks that migration: install `--skills yes`, upgrade flag-less,
   the skills survive byte-identical; uninstall, and they are all gone.
-- **Whole harness:** `--uninstall` deletes the `files` list plus `.gob/goblin.yaml`, removes
+- **Whole harness:** `--uninstall` deletes the `files` list plus the `AGENTS.md` gob block, removes
   every directory that leaves empty (deepest first, after `installed.json` itself is gone — the
   order that used to leave `.gob/` and the sixteen `.hermes/skills/*` directories behind),
   leaves `HANDOFF.md`, `AGENTS.md`, `ROUND-000-SPEC.md`, `reviews/` and the `.gitignore` block
@@ -890,7 +890,7 @@ Four consequences that follow from measurement, not taste:
    inferred command is wrong for a repo with no runner, a repo that cannot run its own typecheck
    read-only, and a repo whose runner lives in a skill — all at once. The shipped gate is a
    **floor**, and `P8` step 3 is "replace it".
-4. **The default branch is not always `main`.** It is declared in `.gob/goblin.yaml` and
+4. **The default branch is not always `main`.** It is declared in the `AGENTS.md` gob block and
    compared against the real branch by `PT-02`; a preset that assumes `main` silently skips a
    repo on `master`.
 
@@ -1432,7 +1432,7 @@ The one mechanical thing gobstack can do is lint its own artifacts: a source tes
 
 ### The referenced standard
 
-Referenced and hash-pinned, never moved, never superseded, never vendored. the AGENTS.md gob block
+Referenced and hash-pinned, never moved, never superseded, never vendored. The `AGENTS.md` gob block
 carries `practice:` and `practice_sha256:`; `goblin-verify` compares. The `practice` skill's body
 is a pointer and a mandate — read the standard at the configured path before starting work; if
 the path is absent, say so and continue with the gobstack rules alone.

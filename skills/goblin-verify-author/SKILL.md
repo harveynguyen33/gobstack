@@ -21,7 +21,7 @@ Use when a project has no live lane, or its gates have drifted from what it actu
 5. **Seed the feature map.** The harness needs a list of what there is to drive, and the map is
    that list (`goblin-feature-map`): one file per user-facing feature, each with its entry points
    and the exact command that drives it. Declare `feature_map:` and `source_root:` in
-   `.goblin/goblin.yaml`. An **empty `feature_map:` is the honest state of a project with no map
+   the `AGENTS.md` gob block. An **empty `feature_map:` is the honest state of a project with no map
    yet** (`FM-01`/`FM-02` then skip with that reason); a declared path that names no map is a hole
    and is reported as one.
 6. **Hand the generated skill to P12 before calling it verified.** goblin-stack installs
@@ -35,7 +35,7 @@ Use when a project has no live lane, or its gates have drifted from what it actu
 
 - The harness prints `PASS`/`FAIL` per assertion and exits non-zero on any failure.
 - The REPLAY shows RED pre-change, with the commit named.
-- The gate set is declared in `.goblin/goblin.yaml`, never inferred.
+- The gate set is declared in the `AGENTS.md` gob block, never inferred.
 - The map's index and four-H2 entry contract hold (`FM-01`), every declared entry path still
   resolves under `source_root:` and none changed after its `verified:` date (`FM-02`), and the
   declared `verify_doctor:` exits 0 (`VA-01`).

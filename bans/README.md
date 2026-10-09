@@ -7,9 +7,9 @@ probes. Dune's rule 2, made a gate: **a ban without a mechanism is a wish.** A b
 ## How a ban is run
 
 ```
-.goblin/bin/goblin-bans              # every ban the config's `bans:` list turns on
-.goblin/bin/goblin-bans --only BN-01 # one ban
-.goblin/bin/goblin-bans --list       # the table
+.gob/bin/goblin-bans              # every ban the config's `bans:` list turns on
+.gob/bin/goblin-bans --only BN-01 # one ban
+.gob/bin/goblin-bans --list       # the table
 ```
 
 A `detect` command runs from the repo root and exits
@@ -32,7 +32,7 @@ every violation inside an exempted path would be a permanent RED with no remedy 
 **W5-1**, measured `rc 0` at `72490f0` → `rc 1` at `7fec08f`).
 
 ```
-bans_exempt:                 # in .goblin/goblin.yaml — a path prefix, or a whole path
+bans_exempt:                 # in the AGENTS.md gob block — a path prefix, or a whole path
   - BN-03 src/legacy         # <ban id> <path prefix>: that ban, that path, nothing else
 ```
 

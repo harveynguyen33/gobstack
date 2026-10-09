@@ -40,7 +40,7 @@ if out=$(bash bin/goblin-lib.sh --self-test 2>&1); then line "goblin-lib --self-
 
 # ---- PR-04 / PT-01 over the SOURCE tree -------------------------------------
 # PT-01's own directory list is the set an INSTALL writes (skills manifest bin templates presets
-# .goblin .hermes). This body is the same rule over the SOURCE tree, which also owns tests/ — the
+# .gob .hermes). This body is the same rule over the SOURCE tree, which also owns tests/ — the
 # directory the negative control lives in, and where a tenant string sat until F2-5 (1 repo-wide
 # hit at f23b371, 0 at b100b44, and PT-01 could not see it). tests/ is deliberately NOT added to
 # PT-01 itself: a target's own tests are its code, and a project may legitimately name its own

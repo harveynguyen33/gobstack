@@ -160,7 +160,7 @@ check "MP5 the regenerated index still links the kept slug" "$?"
 
 # ---- MP6: standalone — no .gob/ anywhere ---------------------------------------
 [ ! -e "$NX/.gob" ] && [ ! -e "$NX/.goblin" ]
-check "MP6 the fixture has no .gob/ or .goblin/ (generation never needed one)" "$?"
+check "MP6 the fixture has no .gob/ (generation never needed one)" "$?"
 
 # ---- MP7: idempotent --force (nothing changed) ---------------------------------
 OUT7=$(bash "$MAP" --heuristic "$NX" --force 2>&1); RC7=$?

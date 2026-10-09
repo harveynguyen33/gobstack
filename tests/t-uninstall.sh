@@ -3,7 +3,7 @@
 #
 # F2-7: the rmdir pass ran BEFORE `rm -f "$INSTALLED"`, so `.gob/` was never empty when it was
 # tested, and the list never tried `.hermes/skills/goblin-*`. Measured pre-fix (b100b44): 15
-# unnamed empty directories survived (.goblin, .hermes, .hermes/skills and 13 skill dirs) and the
+# unnamed empty directories survived (.gob, .hermes, .hermes/skills and 13 skill dirs) and the
 # summary named none of them.
 #
 # F2-8: the same fixture pins what the installer does NOT install. `.gob/bin` holds exactly the
