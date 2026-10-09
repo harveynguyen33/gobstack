@@ -3,6 +3,18 @@
 One line per released version. `goblin-install --upgrade` prints the delta between the
 version recorded in a target's `.goblin/installed.json` and the source `VERSION`.
 
+## Unreleased (v3 core: a default row set + a library)
+
+- **The default verifier is the ~19-row core; the rest lives in a library.** `verify` now runs a
+  row set that is right for every repo — `IN-01..04`, `HP-01/02/03/05`, `GT-01/02/03`,
+  `FM-01/02`, `SC-01`, `SK-01..04`, `BN-00`, plus the 8 `applies_when`-gated bans. The other 32
+  target rows moved to `manifest/library.tsv` (off by default, available-but-off); nothing was
+  deleted or commented out. `gob verify --library` lists each off row with its id, a one-line
+  purpose and the enable hint — the discovery surface for the extend mechanism. The default run
+  never executes a library row and its summary counts them, so a green run is never the whole
+  story. No moved check lost its control: `t-verify-red.sh` enables a library row before running
+  its negative control.
+
 ## Unreleased (feat/extras-catalogue)
 
 - **`gob extras`: the curated catalogue (the surface is seven verbs).** The catalogue
