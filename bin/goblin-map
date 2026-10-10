@@ -1,70 +1,29 @@
 #!/usr/bin/env bash
-# goblin-map — `gob map`: the AI-DRIVEN feature map (v2 prompt engine) + the heuristic starter.
+# goblin-map — the feature-map VALIDATOR (INTERNAL helper).
 #
-#   gob map                                  print the AGENT BRIEF + feature-file schema
-#   gob map --heuristic [target] [--force]   run the starter scanner (the fallback)
-#   gob map --write <dir> [--force]          validate the agent-written map and install it
-#   gob map [target] --force                 shorthand: heuristic --force (kept for scripts)
+# This file is NOT a verb: `gob map` no longer exists. The map is authored by the agent
+# inside the `gob init` proposal and installed in the same pass. `gob init --write` extracts
+# the embedded feature files and calls THIS validator on them before it writes anything, so
+# the FM-01 shape and FM-02 resolvability are checked by one code path (here), never
+# re-implemented in the init flow.
 #
-# v2 SURFACE (AI-driven development): a bare `gob map` prints:
-#   1. the AGENT BRIEF — a structured prompt telling whichever agent is already running in
-#      this repo exactly what to inventory (routes, entry points, user-visible features)
-#      and how to justify each entry;
-#   2. the SCHEMA of the feature files it must write under a directory it chooses (for
-#      example features/) — the same frontmatter + four-H2 contract the heuristic starter
-#      renders and FM-01/FM-02 verify.
-# The agent writes the files with its own tools, then (or a human does) runs
-# `gob map --write <dir>` to validate: every file carries the frontmatter block, >=1
-# entry_paths, the four H2s in order, and a `verified:` line that is either a date or the
-# never-driven form. Exit 0 validated | 2 bad input (the named file + the fix).
+#   goblin-map --validate <mapdir> [--root <reporoot>]
 #
-# NEVER-CLOBBER (both modes, mirror of the heuristic contract):
-#   --write into a dir that is already a map WITHOUT --force -> refusal, exit 1, nothing
-#   written, the path and the remedy named;
-#   --write --force -> regenerate ONLY the README index (indexing every existing feature
-#   file too) and ADD files for new slugs; hand-written feature files are never touched.
+#     <mapdir>  the directory holding README.md (the index) and the <slug>.md feature files.
+#     --root    the repo root the declared entry paths resolve against and `git ls-files`
+#               runs in (default: $PWD). `gob init --write` passes the target repo.
 #
-# The heuristic detector (package.json scripts + route tokens) is the --heuristic
-# FALLBACK: a starter skeleton, never the answer. Its never-clobber rules are unchanged.
+# What it validates (fail closed, exit 2 the moment anything is wrong):
+#   FM-01 shape   README.md exists and indexes every feature via `](./<slug>.md)`; every
+#                 relative link in the index resolves; >=1 feature file; each feature file
+#                 carries frontmatter, `feature:` equals its filename stem, >=1 entry_paths
+#                 item each a single whitespace-free token, EXACTLY the four contract H2s in
+#                 order, and a `verified:` that is a date or the never-driven form.
+#   FM-02 resolve every entry path EXISTS under <root> AND is tracked by git (`git ls-files`),
+#                 so a map cannot claim a `verified:` date over uncommitted source.
 #
-# Standalone by design: works in ANY git repo with NO .gob/ install and NEVER reads the
-# AGENTS.md gob block. The verify rows FM-01/FM-02 stay opt-in through a `feature_map:`
-# declaration in AGENTS.md frontmatter (empty = SKIP — unchanged). See docs/GUIDE.md, the
-# feature-map section, and skills/goblin-feature-map/SKILL.md (the format contract).
-#
-# What it scans (best-effort, honest about being a STARTER):
-#   next-app      app/**/page.tsx|page.jsx|route.ts  -> one feature per top-level route segment
-#   pages-router  pages/**/*.tsx|jsx                  -> same grouping
-#   nuxt          pages/**/*.vue                      -> same grouping
-#   routes        directories named routes/ or *route* files -> one feature per file
-#   modules       no framework: top-level src/ or lib/ module dirs -> candidate slugs, TODOs
-# The first detector that fires wins; hybrids keep only the first hit. Deliberately ignored:
-# node_modules, .git, dist/build output, test and fixture directories, files whose names carry
-# whitespace. A scan that finds nothing still writes the README index, with the Features
-# section saying so — an honest hole, not an invented feature.
-#
-# Never-clobber contract:
-#   features/ absent (or empty of .md)  -> generate README + one file per slug, exit 0
-#   features/ already a map, no --force -> validate only; the index is kept (never rewritten)
-#   --force                             -> regenerate ONLY README.md (indexing every existing
-#                                          feature file too) and add files for NEW slugs;
-#                                          existing feature files are never touched, exit 0
-#   --force, nothing would change       -> write nothing, say so, exit 0 (nothing-to-do)
-#
-# Exit codes: 0 generated or nothing-to-do | 1 refusal (existing map without --force) |
-#             2 bad input.
-#
-# Frontmatter: `verified:` is NOT a drive claim — the generation run drives the generator,
-# not the features — so it reads `never-driven (generated <date>)` until a human pass replaces
-# it with a date. FM-01 does not read the verified line at all; FM-02, once a map is declared,
-# treats any non-date as never-stale (string compare), so a starter cannot fail freshness it
-# never earned — the dishonesty guard is the wording, and the per-file body repeats it.
-#
-# Entry paths are repo-relative paths that EXIST under the target (checked at generation
-# time). Caveat, stated in every generated file: FM-02 greps file CONTENTS for a token, so
-# after the human pass prefer a token that occurs in source text.
-#
-# No npm, no jq, no network. bash/awk/sed/grep/find only (the repo constraint, mirrored).
+# Exit codes: 0 the map validates | 2 bad input or a failed clause (a reason is printed).
+# No npm, no jq, no yq, no network. bash/awk/sed/grep/find only (the repo constraint).
 
 set -uo pipefail
 
@@ -72,544 +31,136 @@ g_err() { printf 'error: map: %s\n' "$*" >&2; }
 
 usage() {
   cat <<'USAGE'
-gob map — the AI-driven feature map (prompt + schema), with a heuristic starter fallback.
+goblin-map --validate <mapdir> [--root <reporoot>]
 
-  gob map                          print the AGENT BRIEF + the feature-file schema
-  gob map --write <dir> [--force]  validate the agent-written map in <dir>
-  gob map --heuristic [target] [--force]
-                                   run the starter scanner (the fallback)
-  gob map [target] --force         shorthand for the heuristic --force path
-
-The brief tells the agent already running in this repo what to inventory (routes, entry
-points, user-visible features) and the schema its feature files must follow (frontmatter,
->=1 entry_paths, the four H2 sections, verified: date-or-never-driven). The agent writes
-the files with its own tools; `gob map --write <dir>` validates them.
-
-NEVER-CLOBBER: --write (or the heuristic path) into a dir that is already a map without
---force is a refusal — the path and the remedy are named, nothing is written. --force
-regenerates ONLY the README index and adds NEW files; existing feature files are never
-touched.
-
-Standalone: no .gob/ install needed, none created; FM-01/FM-02 stay opt-in through a
-feature_map: declaration in the AGENTS.md gob block.
-
-Exit codes: 0 generated/validated/nothing-to-do | 1 refusal (existing map, no --force) |
-2 bad input.
+The INTERNAL feature-map validator. `gob map` is not a verb — `gob init --write` runs this
+against the map embedded in the proposal, before it installs. You do not call it by hand
+unless you are debugging the map the proposal asked for.
 USAGE
 }
 
-# ------------------------------------------------------------- the brief ------
-# `gob map` with no --write and no --heuristic: print the prompt + schema.
-print_brief() {
-  cat <<'BRIEF'
-
-== gob map — AGENT BRIEF =======================================================
-
-You are the agent running inside this repository. gobstack is an AI-driven-development
-harness: the CLI does not scan this repo — YOU do, with your own tools, and you write the
-feature map directly. Do this now:
-
-1. INVENTORY the repository:
-   - routes and entry points (app/ or pages/ trees, routes/ dirs, *route* files)
-   - the user-visible features behind them (what a user can DO, not what a file contains)
-   - the test/harness layout, so each feature names how it is driven
-
-2. WRITE the map under a directory you choose (the convention is features/):
-   - features/README.md — the index: baseline preconditions (launch/seed/health-check
-     commands), driving conventions, proof and skip reporting, one line per feature
-   - one features/<slug>.md per feature (slug: lowercase [a-z0-9-]), exactly in the
-     SCHEMA below
-
-3. VALIDATE what you wrote:
-
-       npx @techgoblin/gobstack map --write features/
-
-Notes:
-   - `verified:` is NOT a drive claim: write `never-driven (generated <date>)` until a
-     human pass has actually driven the feature once.
-   - entry_paths tokens must be repo-relative paths that EXIST, and should occur in
-     source text (a route literal, an import) so FM-02 can grep for them.
-   - --write validates and never rewrites: your hand-written README index is KEPT
-     (pass --force only if you want the index REGENERATED from the feature files);
-     existing feature files are never touched either way.
-
-== FEATURE-FILE SCHEMA =========================================================
-
----
-feature: <slug — lowercase [a-z0-9-], equals the filename stem>
-entry_paths:
-  - <repo-relative path that exists, one or more>
-verified: never-driven (generated <today>)
----
-
-# <slug>
-
-<one paragraph of user-visible behaviour, no implementation detail>
-
-## Sub-features
-
-- <the sub-behaviours, one `<id>` per line>
-
-## How to get to it (user POV)
-
-- <how a user reaches this feature, and what they should see>
-
-## Driving it with <harness>
-
-Preconditions: <what must be true first>.
-**<action>.** Run `<exact command>`. <the observable result.>
-
-## Gotchas
-
-- <what commonly breaks, or what the entry-path token does and does not prove>
-============================================================================== =
-BRIEF
-}
-
-# ----------------------------------------------------------------- input ----
-TARGET="" FORCE=0 AGENT=0 HEURISTIC=0 WRITE_DIR=""
+MAPDIR=""
+ROOT=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --force)  FORCE=1; shift ;;
-    --agent)  AGENT=1; shift ;;
-    --heuristic) HEURISTIC=1; shift ;;
-    --write)  [ -n "$WRITE_DIR" ] && { g_err "write-dir given twice"; exit 2; }
-              WRITE_DIR="${2:-}"; shift 2 ;;
-    --target) [ -z "$TARGET" ] || { g_err "target given twice"; exit 2; }
-              TARGET="${2:-}"; shift 2 ;;
-    -h|--help) usage; exit 0 ;;
-    --)       shift; break ;;
-    -*)       g_err "unknown option: $1"; usage >&2; exit 2 ;;
-    *)        if [ -z "$TARGET" ]; then TARGET="$1"; shift
-              else g_err "unexpected argument: $1"; exit 2; fi ;;
+    --validate) [ -n "$MAPDIR" ] && { g_err "validate dir given twice"; exit 2; }
+                MAPDIR="${2:-}"; shift 2 ;;
+    --root)     [ -n "$ROOT" ] && { g_err "root given twice"; exit 2; }
+                ROOT="${2:-}"; shift 2 ;;
+    -h|--help)  usage; exit 0 ;;
+    *) g_err "unknown argument: $1"; usage >&2; exit 2 ;;
   esac
 done
 
-# ------------------------------------------------------------ mode split ------
-# Bare invocation (no --write, no --heuristic): the agent brief. This IS the product.
-# `--agent` is the explicit spelling of the same thing; a --write suppresses it.
-if [ "$HEURISTIC" -eq 0 ] && [ -z "$WRITE_DIR" ]; then
-  print_brief
-  printf '%s\n' "== end of brief — the agent writes the map; gob map --write <dir> validates it =="
-  exit 0
-fi
+[ -n "$MAPDIR" ] || { g_err "--validate <mapdir> is required"; usage >&2; exit 2; }
+[ -d "$MAPDIR" ] || { g_err "map dir does not exist: $MAPDIR"; exit 2; }
+MAPDIR=$(cd "$MAPDIR" && pwd) || { g_err "cannot enter: $MAPDIR"; exit 2; }
+ROOT="${ROOT:-$PWD}"
+[ -d "$ROOT" ] || { g_err "--root is not a directory: $ROOT"; exit 2; }
+ROOT=$(cd "$ROOT" && pwd) || { g_err "cannot enter root: $ROOT"; exit 2; }
 
-# --write <dir>: validate the agent-written map. Needs --force semantics from the
-# never-clobber contract; --heuristic and --write are separate modes, never both.
-if [ -n "$WRITE_DIR" ]; then
-  [ "$HEURISTIC" -eq 0 ] || { g_err "--write and --heuristic are separate modes"; exit 2; }
-  [ -d "$WRITE_DIR" ] || { g_err "--write dir does not exist (the agent creates it): $WRITE_DIR"; exit 2; }
-  WDIR=$(cd "$WRITE_DIR" && pwd) || { g_err "cannot enter: $WRITE_DIR"; exit 2; }
-  # A map, for --write purposes, is the README index: --write never writes feature
-  # files (they are its INPUT), so the only thing it could clobber is the index.
-  # QA fix (v2-qa issue 5): an existing index used to be a refusal ("pass --force") —
-  # but the AGENT BRIEF itself tells the agent to WRITE features/README.md before
-  # running --write, so the first --write of the brief's own prescribed flow demanded
-  # the scary flag. The coherent contract: --write VALIDATES and never rewrites the
-  # index without --force; an existing index is the author's own output and is kept,
-  # named in the done line. (The never-clobber promise is unchanged: --write still
-  # writes NOTHING without --force — the refusal was protecting an empty write.)
-  HAVE_WMAP=0
-  if [ -f "$WDIR/README.md" ]; then HAVE_WMAP=1; fi
-  # Validation: the frontmatter + H2 + verified contract, per file, fail closed.
-  BAD=0; N=0
-  for f in "$WDIR"/*.md; do
-    [ -f "$f" ] || continue
-    case "$(basename "$f")" in README.md) continue ;; esac
-    N=$((N + 1))
-    slug=$(basename "$f"); slug=${slug%.md}
-    # frontmatter block present
-    sed -n '1,2p' "$f" | grep -q '^---[[:space:]]*$' \
-      || { g_err "$f: no frontmatter block (must start: ---)"; BAD=1; continue; }
-    fm=$(awk 'BEGIN{fm=0} /^---[[:space:]]*$/ {fm++; if (fm==1) next; else exit} fm==1 {print}' "$f")
-    printf '%s\n' "$fm" | grep -q "^feature:[[:space:]]*$slug[[:space:]]*$" \
-      || { g_err "$f: feature: must equal the filename stem ($slug)"; BAD=1; }
-    printf '%s\n' "$fm" | awk '/^entry_paths:/{f=1;next} f&&/^  - /{found=1} END{exit !found}' \
-      || { g_err "$f: entry_paths: carries no item (>=1 existing repo-relative path)"; BAD=1; }
-    # every entry path exists under the CWD (repo-relative) and is a single token
-    while IFS= read -r tok; do
-      [ -n "$tok" ] || continue
-      case "$tok" in *" "*) g_err "$f: entry path with whitespace: $tok"; BAD=1; continue ;; esac
-      [ -e "$tok" ] || { g_err "$f: entry path does not exist: $tok"; BAD=1; }
-    done < <(printf '%s\n' "$fm" | awk '/^entry_paths:/{f=1;next} f&&/^  - /{sub(/^  - /,"");print;next} f&&!/^[[:space:]]/{f=0}')
-    v=$(printf '%s\n' "$fm" | sed -n 's/^verified:[[:space:]]*//p')
-    case "$v" in
-      ""|"")
-        g_err "$f: no verified: line"; BAD=1 ;;
-      "never-driven"*)
-        : ;;
-      *) # a date, or anything else is refused — the line is either a date or never-driven
-        case "$v" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) : ;; *)
-          g_err "$f: verified: must be a date or the never-driven form (got: $v)"; BAD=1 ;;
-        esac ;;
+BAD=0
+
+# fm_frontmatter <file> - the body of the leading --- block.
+fm_frontmatter() {
+  awk 'BEGIN{fm=0} /^---[[:space:]]*$/ {fm++; if (fm==1) next; else exit} fm==1 {print}' "$1"
+}
+
+# fm_entry_paths <file> - one declared entry path per line.
+fm_entry_paths() {
+  fm_frontmatter "$1" | awk '
+    /^entry_paths:/      { inb = 1; next }
+    inb && /^  - /       { v = $0; sub(/^  - /, "", v); sub(/[[:space:]]+$/, "", v); print v; next }
+    inb && !/^[[:space:]]/ { inb = 0 }
+  '
+}
+
+# fm_h2_ok <file> - exactly the four contract H2s, in order. The third is a PREFIX match: the
+# map names the project's own harness ("Driving it with <harness>"), so a literal would make the
+# rule un-portable.
+fm_h2_ok() {
+  local n=0 ok=1 line
+  while IFS= read -r line; do
+    n=$((n + 1))
+    case "$n" in
+      1) [ "$line" = "Sub-features" ] || ok=0 ;;
+      2) [ "$line" = "How to get to it (user POV)" ] || ok=0 ;;
+      3) case "$line" in "Driving it with "*) ;; *) ok=0 ;; esac ;;
+      4) [ "$line" = "Gotchas" ] || ok=0 ;;
+      *) ok=0 ;;
     esac
-    # the four H2s, in order
-    hn=0; hok=1
-    while IFS= read -r line; do
-      hn=$((hn + 1))
-      case "$hn" in
-        1) [ "$line" = "Sub-features" ] || hok=0 ;;
-        2) [ "$line" = "How to get to it (user POV)" ] || hok=0 ;;
-        3) case "$line" in "Driving it with "*) ;; *) hok=0 ;; esac ;;
-        4) [ "$line" = "Gotchas" ] || hok=0 ;;
-        *) hok=0 ;;
-      esac
-    done < <(grep -n '^## ' "$f" | sed 's/^[0-9]*:## //; s/[[:space:]]*$//')
-    [ "$hn" -eq 4 ] && [ "$hok" -eq 1 ] || { g_err "$f: the four H2 sections are missing or out of order (Sub-features / How to get to it (user POV) / Driving it with <harness> / Gotchas)"; BAD=1; }
-  done
-  [ "$N" -ge 1 ] || { g_err "$WDIR carries no feature file (only README.md) — the map is the features"; exit 2; }
-  [ "$BAD" -eq 0 ] || { g_err "validation failed — fix the named file(s) and re-run"; exit 2; }
-  # --write --force: regenerate ONLY the README index (every existing feature file is
-  # listed; the files themselves are never touched). Without --force, the index is
-  # untouched.
-  if [ "$FORCE" -eq 1 ]; then
-    SLUGS_TSV="$WDIR/.wmap.tsv"; : > "$SLUGS_TSV"
-    for f in "$WDIR"/*.md; do
-      [ -f "$f" ] || continue
-      slug=$(basename "$f"); slug=${slug%.md}
-      # QA fix (v2-qa issue 6): $slug is the STEM (README, not README.md) — the old
-      # pattern compared README against README.md, never matched, and the regenerated
-      # index listed the index itself as a feature.
-      case "$slug" in README) continue ;; esac
-      printf '%s\t%s\n' "$slug" "$(printf '%s' "${f#"$WDIR"/}" | sed 's#^#./#')" >> "$SLUGS_TSV"
-    done
-    TODAY=$(date +%F)
-    {
-      printf '%s\n' '# Features'
-      printf '%s\n' ''
-      printf '%s\n' "regenerated by gob map --write ${TODAY} — the index only; every feature file was written by hand (or by an agent) and is never touched by --write."
-      printf '%s\n' ''
-      printf '%s\n' '## Features'
-      printf '%s\n' ''
-      while IFS= read -r row; do
-        [ -n "$row" ] || continue
-        slug=${row%%	*}
-        printf '%s\n' "- [${slug}](./${slug}.md) — entry listed in the file's frontmatter"
-      done < "$SLUGS_TSV"
-    } > "$WDIR/README.md"
-    rm -f "$SLUGS_TSV"
-    printf 'map --write: validated %d feature file(s) in %s and regenerated the README index (feature files untouched; declare feature_map: in AGENTS.md to opt FM-01/FM-02 in)\n' "$N" "$WDIR"
-  else
-    printf 'map --write: validated %d feature file(s) in %s (index untouched; declare feature_map: in AGENTS.md to opt FM-01/FM-02 in)\n' "$N" "$WDIR"
-  fi
-  exit 0
-fi
-
-[ -n "$TARGET" ] || TARGET="$PWD"
-[ -d "$TARGET" ] || { g_err "not a directory: $TARGET"; exit 2; }
-T=$(cd "$TARGET" && pwd) || { g_err "cannot enter: $TARGET"; exit 2; }
-FEAT="$T/features"
-README_F="$FEAT/README.md"
-TODAY=$(date +%F)
-
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/goblin-map.XXXXXX") || { g_err "mktemp failed"; exit 2; }
-trap 'rm -rf "$WORK"' EXIT
-SLUGS_TSV="$WORK/slugs.tsv"; : > "$SLUGS_TSV"
-
-# ---------------------------------------------------------------- helpers ----
-# slug form: lowercase, [a-z0-9-], no leading/trailing dash. Empty output = unusable.
-sanitize_slug() {
-  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' \
-    | sed -e 's/[^a-z0-9]/-/g' -e 's/-\{2,\}/-/g' -e 's/^-*//' -e 's/-*$//'
+  done < <(grep -n '^## ' "$1" | sed 's/^[0-9]*:## //; s/[[:space:]]*$//')
+  [ "$n" -eq 4 ] && [ "$ok" -eq 1 ]
 }
 
-scan_add() { # <slug> <repo-relative token> — single-token, deduped
-  case "$2" in
-    *" "*|""|"${2}"[[:space:]]*) return ;;
+# ---------------------------------------------------------------- FM-01 shape ---
+READMEF="$MAPDIR/README.md"
+if [ ! -f "$READMEF" ]; then
+  g_err "$MAPDIR carries no README.md index — the map is the index plus one <slug>.md per feature"
+  exit 2
+fi
+
+N=0
+for f in "$MAPDIR"/*.md; do
+  [ -f "$f" ] || continue
+  case "$(basename "$f")" in README.md) continue ;; esac
+  N=$((N + 1))
+  b=$(basename "$f")
+  slug=${b%.md}
+  # index hygiene: this feature file is linked from README.md in the (./<slug>.md) form.
+  grep -qF "](./$b)" "$READMEF" \
+    || { g_err "$b is not linked from README.md as (./$b)"; BAD=1; }
+  # frontmatter block present
+  sed -n '1,2p' "$f" | grep -q '^---[[:space:]]*$' \
+    || { g_err "$b: no frontmatter block (must start: ---)"; BAD=1; continue; }
+  fm=$(fm_frontmatter "$f")
+  printf '%s\n' "$fm" | grep -q "^feature:[[:space:]]*$slug[[:space:]]*\$" \
+    || { g_err "$b: feature: must equal the filename stem ($slug)"; BAD=1; }
+  eps=$(fm_entry_paths "$f" | grep -c . || true)
+  [ "${eps:-0}" -ge 1 ] \
+    || { g_err "$b: entry_paths: carries no item (>=1 repo-relative path that exists)"; BAD=1; }
+  while IFS= read -r tok; do
+    [ -n "$tok" ] || continue
+    case "$tok" in *[[:space:]]*) g_err "$b: entry path is not a single token: $tok"; BAD=1; continue ;; esac
+  done < <(fm_entry_paths "$f")
+  v=$(printf '%s\n' "$fm" | sed -n 's/^verified:[[:space:]]*//p')
+  case "$v" in
+    "") g_err "$b: no verified: line"; BAD=1 ;;
+    never-driven*) : ;;
+    *) case "$v" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) : ;; *)
+         g_err "$b: verified: must be a date or the never-driven form (got: $v)"; BAD=1 ;;
+       esac ;;
   esac
-  case "$1" in ""|"-") return ;; esac
-  grep -qF "$(printf '%s\t%s' "$1" "$2")" "$SLUGS_TSV" \
-    || printf '%s\t%s\n' "$1" "$2" >> "$SLUGS_TSV"
-}
+  fm_h2_ok "$f" \
+    || { g_err "$b: the H2s are not the contract four, in order (Sub-features / How to get to it (user POV) / Driving it with <harness> / Gotchas)"; BAD=1; }
+done
+[ "$N" -ge 1 ] \
+  || { g_err "$MAPDIR indexes no feature file — an empty map is a hole, not a pass"; BAD=1; }
 
-# one feature per TOP-LEVEL route segment under <rootdir>/; the segment is the first path
-# component (a Next route group `(marketing)` sanitizes to `marketing`); files sitting
-# directly in <rootdir>/ are the root route and group under `home`.
-group_slug_for() { # <relative path under the scan root> <scan root name>
-  local rest="$1" root="$2" seg
-  rest=${rest#"$root"/}
-  case "$rest" in
-    */*) seg=${rest%%/*} ;;
-    *)   seg=home ;;
-  esac
-  sanitize_slug "$seg"
-}
+# every relative link in the index must resolve inside the map dir
+while IFS= read -r link; do
+  [ -e "$MAPDIR/$link" ] || { g_err "README.md links $link, which does not resolve"; BAD=1; }
+done < <(sed -n 's/.*](\.\/\([^)]*\.md\)).*/\1/p' "$READMEF")
 
-prune_find=(\( -name node_modules -o -name .git -o -name dist -o -name build -o -name .next -o -name .nuxt \) -prune -o)
-
-# --------------------------------------------------------------- detectors ----
-MODE=""
-SLUG_CAP=40
-
-if [ -d "$T/app" ]; then
-  while IFS= read -r f; do
-    [ -n "$f" ] || continue
-    rel=${f#"$T"/}
-    slug=$(group_slug_for "$rel" "app")
-    scan_add "$slug" "$rel"
-  done < <(find "$T/app" -type f \( -name 'page.tsx' -o -name 'page.jsx' -o -name 'route.ts' \) 2>/dev/null)
-  grep -q . "$SLUGS_TSV" && MODE=next-app
-fi
-
-if [ -z "$MODE" ] && [ -d "$T/pages" ]; then
-  # .vue under pages/ is Nuxt; .tsx/.jsx is the Next pages router. Same grouping either way.
-  while IFS= read -r f; do
-    [ -n "$f" ] || continue
-    rel=${f#"$T"/}
-    rest=${rel#pages/}
-    case "$rest" in
-      */*) slug=$(sanitize_slug "${rest%%/*}") ;;
-      *)   slug=$(sanitize_slug "${rest%.*}") ;;
-    esac
-    scan_add "$slug" "$rel"
-  done < <(find "$T/pages" -type f \( -name '*.tsx' -o -name '*.jsx' -o -name '*.vue' \) 2>/dev/null)
-  grep -q . "$SLUGS_TSV" && MODE=pages-router
-fi
-
-if [ -z "$MODE" ]; then
-  # React Router and friends: any routes/ directory (or *route* file) within reach. Capped,
-  # because a repo with generated route tables would otherwise grow one slug per row.
-  while IFS= read -r d; do
-    [ -n "$d" ] || continue
-    while IFS= read -r f; do
-      [ -n "$f" ] || continue
-      rel=${f#"$T"/}
-      b=$(basename "$f"); stem=${b%.*}
-      stem=$(printf '%s' "$stem" | sed -e 's/[-.]route$//' -e 's/^route[-.]//')
-      case "$stem" in
-        index|routes) stem=$(basename "$d") ;;
-      esac
-      slug=$(sanitize_slug "$stem")
-      scan_add "$slug" "$rel"
-    done < <(find "$d" -maxdepth 2 -type f \( -name '*.js' -o -name '*.ts' -o -name '*.jsx' -o -name '*.tsx' -o -name '*.vue' \) 2>/dev/null)
-  done < <(find "$T" "${prune_find[@]}" -type d -name routes -print 2>/dev/null | head -n 8)
-  if [ -z "$MODE" ]; then
-    while IFS= read -r f; do
-      [ -n "$f" ] || continue
-      rel=${f#"$T"/}
-      b=$(basename "$f"); stem=${b%.*}
-      stem=$(printf '%s' "$stem" | sed -e 's/[-.]route$//' -e 's/^route[-.]//' -e 's/^routes$//')
-      slug=$(sanitize_slug "$stem")
-      scan_add "$slug" "$rel"
-    done < <(find "$T" "${prune_find[@]}" -type f -name '*route*' \
-               \( -name '*.js' -o -name '*.ts' -o -name '*.jsx' -o -name '*.tsx' \) -print 2>/dev/null | head -n 40)
-  fi
-  grep -q . "$SLUGS_TSV" && MODE=routes
-fi
-
-if [ -z "$MODE" ]; then
-  # Fallback: top-level src/ or lib/ module dirs become candidate slugs with TODO bodies.
-  for base in src lib; do
-    [ -d "$T/$base" ] || continue
-    for d in "$T/$base"/*/; do
-      [ -d "$d" ] || continue
-      b=$(basename "$d")
-      case "$b" in
-        test|tests|spec|specs|__tests__|fixtures|mocks|node_modules|dist|build|types|typings) continue ;;
-      esac
-      slug=$(sanitize_slug "$b")
-      scan_add "$slug" "$base/$b"
-    done
-  done
-  grep -q . "$SLUGS_TSV" && MODE=modules
-fi
-
-# Cap the map: a detector gone wild (generated routes) must not write 300 stub files.
-if grep -q . "$SLUGS_TSV"; then
-  awk -F'\t' 'NR==FNR { if (!seen[$1]++ && n < 40) { n++; keep[$1]=1 } next } $1 in keep' \
-    "$SLUGS_TSV" "$SLUGS_TSV" > "$WORK/capped.tsv" && mv "$WORK/capped.tsv" "$SLUGS_TSV"
-fi
-
-SLUG_N=$(awk -F'\t' '!seen[$1]++ {n++} END {print n + 0}' "$SLUGS_TSV")
-
-# ------------------------------------------------------------ existing map ----
-HAVE_MAP=0
-if [ -f "$README_F" ]; then
-  HAVE_MAP=1
-elif [ -d "$FEAT" ] && ls "$FEAT"/*.md >/dev/null 2>&1; then
-  HAVE_MAP=1   # feature files without an index is still a map — the refusal must fire
-fi
-
-if [ "$HAVE_MAP" -eq 1 ] && [ "$FORCE" -ne 1 ]; then
-  g_err "refusing to overwrite an existing feature map: $FEAT"
-  printf 'error: map: pass --force to regenerate the README index and add NEW slugs only; existing feature files are never rewritten\n' >&2
-  exit 1
-fi
-
-# ------------------------------------------------------------ rendering ----
-script_cmd() { # <script name> — the flat "name": "cmd" shape from package.json, no jq
-  local pk="$T/package.json" v
-  [ -f "$pk" ] || return 0
-  v=$(sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$pk" | head -n 1)
-  printf '%s' "$v"
-}
-
-# the H1 of an existing feature file, for the regenerated index line (fallback: the slug)
-file_title() {
-  local t
-  t=$(sed -n 's/^#[[:space:]]//p' "$1" | head -n 1)
-  printf '%s' "${t:-$2}"
-}
-
-first_token() { # <slug>
-  awk -F'\t' -v s="$1" '$1 == s { print $2; exit }' "$SLUGS_TSV"
-}
-
-render_readme() { # > $WORK/readme.md
-  local slug tok title f
-  {
-    printf '%s\n' '# Features'
-    printf '%s\n' ''
-    printf '%s\n' "generated by gob map ${TODAY} — a STARTER; each feature file needs a human pass before its verified: date means anything."
-    printf '%s\n' ''
-    printf '%s\n' '## Baseline preconditions'
-    printf '%s\n' ''
-    if [ -f "$T/package.json" ]; then
-      got=0
-      for s in dev build test lint; do
-        c=$(script_cmd "$s")
-        if [ -n "$c" ]; then
-          printf '%s\n' "- $s: \`npm run $s\`"
-          got=1
-        fi
-      done
-      if [ "$got" -eq 1 ]; then
-        printf '%s\n' ''
-        printf '%s\n' '(read from package.json by the generator; edit by hand)'
-      else
-        printf '%s\n' '- TODO: package.json found, but no dev/build/test/lint script — write the launch + health-check commands here.'
-      fi
-    else
-      printf '%s\n' '- TODO: how to launch, isolate, seed, health-check (no package.json found — write your own commands here).'
+# ---------------------------------------------------------------- FM-02 resolve -
+for f in "$MAPDIR"/*.md; do
+  [ -f "$f" ] || continue
+  case "$(basename "$f")" in README.md) continue ;; esac
+  b=$(basename "$f")
+  while IFS= read -r e; do
+    [ -n "$e" ] || continue
+    if [ ! -e "$ROOT/$e" ]; then
+      g_err "$b: entry path \"$e\" does not exist under $ROOT"
+      BAD=1
+      continue
     fi
-    cat <<'MID'
-
-## Driving conventions
-
-TODO: the stable-handle rule, the literal-command rule, the restore rule
-(skills/goblin-feature-map/SKILL.md defines all three; write this repo's own forms here).
-
-## Proof and skip reporting
-
-TODO: what counts as proof that a feature was driven, and how a skip is reported.
-
-## Features
-MID
-    printf '%s\n' ''
-    if [ "$SLUG_N" -eq 0 ] && [ "$HAVE_MAP" -eq 0 ]; then
-      printf '%s\n' '- (none detected — this index is a STARTER; add features/<slug>.md by hand)'
+    if ! git -C "$ROOT" ls-files --error-unmatch -- "$e" >/dev/null 2>&1; then
+      g_err "$b: entry path \"$e\" is not tracked by git — commit it before the map claims it"
+      BAD=1
     fi
-    while IFS= read -r slug; do
-      [ -n "$slug" ] || continue
-      tok=$(first_token "$slug")
-      if [ -f "$FEAT/$slug.md" ]; then
-        title=$(file_title "$FEAT/$slug.md" "$slug")
-        printf '%s\n' "- [${title}](./${slug}.md) covers TODO — starter entry: \`${tok}\` (never driven)"
-      else
-        printf '%s\n' "- [${slug}](./${slug}.md) covers TODO — starter entry: \`${tok}\` (never driven)"
-      fi
-    done < <(awk -F'\t' '!seen[$1]++ {print $1}' "$SLUGS_TSV")
-    # --force keeps files the scanner no longer detects: they stay indexed (FM-01 would
-    # red an unlinked file), marked as existing rather than re-described.
-    if [ "$HAVE_MAP" -eq 1 ]; then
-      for f in "$FEAT"/*.md; do
-        [ -f "$f" ] || continue
-        slug=$(basename "$f"); slug=${slug%.md}
-        # QA fix (v2-qa issue 6): stem comparison, same bug as the --write index loop —
-        # the slug is README after .md is stripped, so the old README.md pattern never fired.
-        case "$slug" in README) continue ;; esac
-        awk -F'\t' -v s="$slug" '$1 == s { found=1 } END { exit !found }' "$SLUGS_TSV" && continue
-        title=$(file_title "$f" "$slug")
-        printf '%s\n' "- [${title}](./${slug}.md) covers TODO — existing feature file kept by --force (not re-described)"
-      done
-    fi
-  } > "$WORK/readme.md"
-}
+  done < <(fm_entry_paths "$f")
+done
 
-render_feature() { # <slug> — writes $FEAT/<slug>.md, never called on an existing file.
-  # The body renders in ONE pass: the entry_paths list is looped in awk (a bash body cannot
-  # loop the tab data cleanly), every other placeholder is data this function already holds.
-  # The awk program is single-quoted with no apostrophe inside (the repo's own rule).
-  local slug="$1"
-  awk -F'\t' -v slug="$slug" -v today="$TODAY" '
-    BEGIN {
-      print "---"
-      print "feature: " slug
-      print "entry_paths:"
-      eps = 0
-    }
-    $1 == slug && !seen[$2]++ {
-      print "  - " $2
-      eps++
-    }
-    END {
-      if (eps == 0) print "  - TODO: name one entry-path token"
-      print "verified: never-driven (generated " today ")"
-      print "---"
-      print ""
-      print "# " slug
-      print ""
-      print "TODO (human pass): one paragraph of user-visible behaviour, no implementation"
-      print "detail. Generated by gob map; nothing in this file has been driven."
-      print ""
-      print "## Sub-features"
-      print ""
-      print "- TODO: list the sub-behaviours, one `<id>` per line"
-      print ""
-      print "## How to get to it (user POV)"
-      print ""
-      print "- TODO: how a user reaches this feature, and what they should see"
-      print ""
-      print "## Driving it with <harness>"
-      print ""
-      print "Preconditions: TODO - what must be true first (see the README Baseline section)."
-      print "**TODO action.** Run `<exact command>`. TODO: the observable result."
-      print ""
-      print "## Gotchas"
-      print ""
-      print "- This file is GENERATED: the verified line above is not a drive claim - replace"
-      print "  it with a date only after a human or an agent has driven the feature once."
-      print "- The entry path is a PATH that existed at generation time. If you declare this map"
-      print "  later, FM-02 greps file CONTENTS for the token - prefer one that occurs in source"
-      print "  text (a route literal, an import) so the tripwire can actually fire."
-    }' "$SLUGS_TSV" > "$FEAT/${slug}.md"
-}
-
-# ------------------------------------------------------------------ write ----
-mkdir -p "$FEAT"
-
-NEW_N=0
-render_readme
-
-if [ "$FORCE" -eq 1 ] && [ -f "$README_F" ]; then
-  KEPT_EXISTING=1
-else
-  KEPT_EXISTING=0
-fi
-
-# new feature files: detected slugs with no file yet (in --force, or fresh generation)
-NEW_LIST="$WORK/new.list"; : > "$NEW_LIST"
-while IFS= read -r slug; do
-  [ -n "$slug" ] || continue
-  [ -f "$FEAT/$slug.md" ] || printf '%s\n' "$slug" >> "$NEW_LIST"
-done < <(awk -F'\t' '!seen[$1]++ {print $1}' "$SLUGS_TSV")
-NEW_N=$(wc -l < "$NEW_LIST" | tr -d '[:space:]')
-
-if [ "$FORCE" -eq 1 ] && [ -f "$README_F" ] && [ "$NEW_N" -eq 0 ] \
-   && cmp -s "$WORK/readme.md" "$README_F"; then
-  printf '%s\n' "map: nothing to do — the index and every detected slug are already in place (${SLUG_N} slug(s), mode: ${MODE:-none})"
-  exit 0
-fi
-
-cp "$WORK/readme.md" "$README_F"
-while IFS= read -r slug; do
-  [ -n "$slug" ] || continue
-  render_feature "$slug"
-done < "$NEW_LIST"
-
-if [ "$KEPT_EXISTING" -eq 1 ]; then
-  printf '%s\n' "map: regenerated ${README_F}; added ${NEW_N} new feature file(s), existing files untouched (${SLUG_N} slug(s), mode: ${MODE:-none})"
-else
-  printf '%s\n' "map: generated ${README_F} + ${NEW_N} feature file(s) — a STARTER; hand-pass each file before trusting it (mode: ${MODE:-none})"
-fi
+[ "$BAD" -eq 0 ] || exit 2
+printf 'map valid: %s — %d feature file(s), every entry path resolves and is tracked\n' "$MAPDIR" "$N"
 exit 0

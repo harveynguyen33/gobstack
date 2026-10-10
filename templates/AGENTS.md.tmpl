@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This repository uses **gobstack** (class `{{CLASS}}`, installed {{DATE}}). It is a pointer,
+This repository uses **gobstack** (installed {{DATE}}). It is a pointer,
 not a rule dump — the rules live in one executable place, and facts beat requirements.
 
 - **Harness entry point:** `.gob/bin/goblin-verify` — exit 0 pass, 1 a check failed,
@@ -8,16 +8,16 @@ not a rule dump — the rules live in one executable place, and facts beat requi
   same run.
 - **Rules and their checks:** `.gob/manifest/enforcement.tsv` (one row per rule; every row
   carries a runnable check or the literal `advisory`).
-- **Forbidden code (the ban list):** `.gob/bin/goblin-bans` runs the bans named by `bans:` in
-  this file's gob block; each ban's mechanism lives in `.gob/manifest/bans.tsv`. Run it before
+- **Forbidden code (the ban list):** `.gob/bin/goblin-bans` runs the bans whose `applies_when`
+  glob matches a real file in this tree; each ban's mechanism lives in `.gob/manifest/bans.tsv`.
+  To turn one off, name it in `bans_disabled:` in this file's gob block. Run it before
   you write the line, not after — a ban is a gate, and `goblin-verify` only reports it once the
   code exists.
 - **Session state:** `HANDOFF.md` at the repo root. Read it before touching anything.
 - **Project config:** the `<!-- gob:begin --> … <!-- gob:end -->` block in this file
-  (class, branch, gates, ratchet, runtime data, replay, opt-outs). Edit it in place; the
+  (gates, ratchet, runtime data, replay, opt-outs). Edit it in place; the
   installer never rewrites the block after the first install and never touches the prose.
 - **The referenced standard**, if configured, is named by `practice:` in the gob block.
   Read it before starting work; this repo carries no copy of it.
 
-Two things this repo does not do: it does not choose models (a role resolves through the
-mapping file named by `models_file:`), and it does not write outside its own tree.
+One thing this repo does not do: it does not write outside its own tree.

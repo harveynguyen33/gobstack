@@ -9,7 +9,6 @@ fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n  reviewer:\n    model: model-review\n    provider: prov-review\n    effort: high\n' > "$WORK/models.yaml"
 printf 'the referenced standard\n' > "$WORK/standard.md"
 
 mkdir -p "$WORK/target" && cd "$WORK/target"
@@ -19,7 +18,7 @@ git config user.email "runner@example.com"
 printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 
-bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$WORK/target" --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install exits 0" "$?"
 git add -A && git commit -q -m "chore: install gobstack"
 
@@ -38,93 +37,53 @@ printf '%s' "$OUT" | grep -q 'cannot see'
 check "the run states what it cannot see" "$?"
 printf '%s' "$OUT" | grep -q 'not signed'
 check "the run says the record every drift check trusts is not signed (F2-3)" "$?"
-printf '%s' "$OUT" | grep -q 'SKIP  HS-02'
-check "HS-02 is skipped with a reason while no pre-change commit is pinned" "$?"
-printf '%s' "$OUT" | grep -q 'ADV   MD-02'
-check "MD-02 reports the model families as ADV, never a failure" "$?"
-check "a class-A repo with no reviews yet does not fail the PR gate" \
-  "$(printf '%s' "$OUT" | grep -q 'PASS  PG-03' && echo 0 || echo 1)"
+printf '%s' "$OUT" | grep -q 'library: 32 off-by-default row(s)'
+check "the summary counts the off-by-default library (HS-02/PG-03 live there, held back)" "$?"
+printf '%s' "$OUT" | grep -q 'gob verify --library'
+check "  and the summary names the discovery surface for the off rows" "$?"
 
-# ---- W6: the electron opt-in (merged from class F) installs green, and its CI lane is real ---
-# F was merged into software (§W6-TAXONOMY-SPEC): a desktop shell is `--class software --electron`.
-# It has to reach the same green path as every other install: a class whose ratchet command cannot
-# run would be born RED, which is the one thing the install path must not produce. The FPS number
-# itself is a HOST gate (it needs a display and a probe the no-npm contract forbids goblin-stack to
-# ship) - the point of this block is that the hermetic half is green and the host half is DECLARED
-# rather than silently absent.
-mkdir -p "$WORK/f" && cd "$WORK/f"
-git init -q -b main
-git config user.name "Test Runner"
-git config user.email "runner@example.com"
-printf '# desktop shell\n' > README.md
-git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$WORK/f" --class software --electron --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
-check "software+electron install exits 0" "$?"
-git add -A && git commit -q -m "chore: install gobstack"
-F_HEAD=$(git rev-parse --short HEAD)
-sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$F_HEAD\`/" HANDOFF.md
-git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
+# ---- the ban table self-selects per row: GLOB or `dep:` PREDICATE (FIX 1) ---------------------
+# A ban is code-shaped: it runs only when the repo actually HAS the stack it polices, and a ban
+# with no surface REPORTS itself not applicable, never silently green. Two applicability forms:
+#   * a GLOB (BN-01/02/03/05): the ban runs when at least one real file matches;
+#   * `dep:<pkg>` (BN-06..09): the ban runs only when package.json names the package under
+#     dependencies or devDependencies. This tree has NEITHER .ts source NOR a package.json, so ALL
+#     eight bans report themselves not applicable. This is the FIX-1 false green: the electron
+#     bans' globs used to include `**/*.mjs`, which matched the harness's OWN shipped
+#     checks/*.mjs, so on a repo with no electron they RAN and PASSED vacuously.
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-01 .*not applicable: no file matches applies_when'
+check "a ban the tree has no surface for reports itself NOT APPLICABLE" "$?"
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-06 .*not applicable: no package' && \
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-07 .*not applicable: no package' && \
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-08 .*not applicable: no package' && \
+printf '%s' "$OUT" | grep -qE 'SKIP  BN-09 .*not applicable: no package'
+check "FIX 1: the four electron bans report NOT APPLICABLE on a repo with no package.json" "$?"
+printf '%s' "$OUT" | grep -qE '^PASS  BN-06'
+check "FIX 1: and NONE of them RUNS on the harness's own shipped checks/*.mjs (no false green)" \
+  "$([ $? -ne 0 ] && echo 0 || echo 1)"
+# The predicate's positive half: declare electron and the SAME ban RUNS (no file matches its scope,
+# so it PASSes on a clean tree, but the point is it is no longer not-applicable).
+printf '{"name":"x","devDependencies":{"electron":"^30"}}\n' > package.json
+git add -A >/dev/null 2>&1; git commit -q -m "test: declare electron"
+printf '%s' "$(bash .gob/bin/goblin-verify --only BN-06 2>&1)" | grep -qE '^PASS  BN-06'
+check "FIX 1: once package.json names electron, the same ban RUNS (predicate selects it)" "$?"
+rm -f package.json; git add -A >/dev/null 2>&1; git commit -q -m "test: drop the electron dep"
 
-FOUT=$(bash .gob/bin/goblin-verify 2>&1); FRC=$?
-check "software+electron verify exits 0" "$FRC"
-printf '%s' "$FOUT" | grep -qE '[0-9]+ passed, 0 failed, [0-9]+ advisory'
-check "  and its summary line reports passed/failed/advisory" "$?"
-awk '/^perf\.host_gate:/{print; exit}' AGENTS.md | grep -q 'Electron run' \
-  && awk '/^perf\.host_gate:/{print; exit}' AGENTS.md | grep -q 'main_thread_busy_pct'
-check "  and the FPS number is DECLARED as a host gate, not silently absent" "$?"
-grep -qE '^ratchet\.name: [a-z_]+$' AGENTS.md \
-  && grep -qE '^ratchet\.name: app_bundle_bytes$' AGENTS.md \
-  && ! grep -qE '^ratchet\.name: (main_thread_busy_pct|fps|frame_time_ms)$' AGENTS.md
-check "  and the ratchet carries a hermetic metric of its own (the bundle bytes, not the FPS)" "$?"
-grep -q '^electron: true$' AGENTS.md
-check "  and electron: true is DECLARED in the config" "$?"
-# v2: the CI lane is GONE from the product (no .github/workflows payload is written, the
-# part is a class-level opt-out) — the placement pin becomes its absence pin, and the
-# PG-05/PG-06 rows report SKIP on a repo with no workflow (never a vacuous pass).
-[ ! -e .github/workflows ]
-check "  and the v2 install ships no CI lane (the workflows dir stays untouched)" "$?"
-printf '%s' "$FOUT" | grep -q 'PASS  PG-05' && printf '%s' "$FOUT" | grep -q 'SKIP  PG-06'
-check "  and PG-05/PG-06 report their no-workflow lines (never a vacuous gate)" "$?"
-printf '%s' "$FOUT" | grep -q 'SKIP  BN-06'
-check "  and an electron ban the class lists still skips on a tree with no renderer" "$?"
-printf '%s' "$FOUT" | grep -qE 'ADV   PF-01|PASS  PF-01|SKIP  PF-01'
-check "  and the perf pin reports itself (ADV/PASS/SKIP), never silently" "$?"
-
-# ---- W6: the desktop/F alias resolves to software+electron, byte-identically -----------------
-# The merged class kept the old spellings: `--class desktop` (and F/f) must produce the SAME
-# config a `--class software --electron` install does, not a silently weaker software install.
-mkdir -p "$WORK/falias" && cd "$WORK/falias"
-git init -q -b main
-git config user.name "Test Runner"
-git config user.email "runner@example.com"
-printf '# desktop shell\n' > README.md
-git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$WORK/falias" --class desktop --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
-check "the desktop alias install exits 0" "$?"
-cmp -s "$WORK/f/AGENTS.md" "$WORK/falias/AGENTS.md" \
-  && grep -q '"class": "software"' "$WORK/falias/.gob/installed.json"
-check "  and its config is identical to software+electron (class recorded as software)" "$?"
 
 # ---- UX pass: remedy lines, day-one banners, recovery lines, GT-03's sentence --------------
 # (review 1 scope 4-7) Five print contracts live in the printers and the summary block:
 #   R1  the matrix's remedy column rides under a FAIL (g_fail -> g_remedy, _GOB_MANIFEST) -
 #       absent under every PASS, whole under --only, width-truncated in the default listing.
-#       A GREEN RUN still prints one remedy: the JG-02 lane FAILs nothing but its unresolved
-#       judge lane is ADV BY DESIGN (no judge profile in the fixture's models.yaml), and an ADV
-#       remedy is part of that row's print contract since before this pass - so the pin is on
-#       the remedy-bearing ROWS, not the whole output: every row above the summary is PASS/SKIP
+#       A GREEN RUN prints no `remedy:` line at all: every row above the summary is PASS/ADV/SKIP
 #       and none of the three RED-direction remedy lines may appear.
-#   R2  the owner-mismatch note (owner_mismatch) - only under a red run, names the email
 #   R3  the fresh-clone banner (fresh_clone) - only under a red run, commit-count keyed
 #   R4  GT-03's failure line is a sentence, not the raw test(1) dump
 # Pinned here in the GREEN direction (the red direction is t-verify-red.sh's, which must
 # produce the violation itself): a green run prints none of it.
-BAD_REMEDIES=$(printf '%s' "$OUT" | grep '^remedy:' | grep -vc 'add the missing profile to the file declared as models_file')
+BAD_REMEDIES=$(printf '%s' "$OUT" | grep -c '^remedy:')
 [ -z "$OUT" ] && BAD_REMEDIES=0
 [ "$BAD_REMEDIES" -eq 0 ]
-check "R1 the only remedy: on a green run is the unresolved-lane ADV remedy (none under a PASS/FAIL row)" "$?"
-printf '%s' "$OUT" | grep -q 'note: this repo records a different owner'
-check "R2 a green run prints no owner-mismatch note" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+check "R1 a green run prints no remedy: line (none under a PASS/ADV/SKIP row)" "$?"
 printf '%s' "$OUT" | grep -q 'fresh clone detected'
 check "R3 a green run prints no fresh-clone banner" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 printf '%s' "$OUT" | grep -q 'the gate line is older than the last commit'
@@ -140,15 +99,13 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 printf '# fresh\n' > README.md
 git add -A && git commit -q -m "seed"
-bash "$SRC/bin/goblin-install" --target . --class A --models "$WORK/models.yaml" >/dev/null 2>&1
-sed -i 's/^owner_email:.*/owner_email: other@owner.example/' AGENTS.md
+bash "$SRC/bin/goblin-install" --target . >/dev/null 2>&1
+rm HANDOFF.md
 git add -A && git commit -q -m "install gobstack"
 FOUT2=$(bash .gob/bin/goblin-verify 2>&1); FRC2=$?
-check "R5a the 2-commit probe fails for the planted reason (CM-01, exit 1)" "$([ "$FRC2" -eq 1 ] && echo 0 || echo 1)"
+check "R5a the 2-commit probe fails for the planted reason (HP-01, exit 1)" "$([ "$FRC2" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$FOUT2" | grep -q 'fresh clone detected: some of these fails are not yours'
 check "R5b the fresh-clone banner fires under 3 commits" "$?"
-printf '%s' "$FOUT2" | grep -q 'note: this repo records a different owner'
-check "R5c the owner-mismatch note fires beside it (same red run)" "$?"
 git commit -q --allow-empty -m "third commit"
 git commit -q --allow-empty -m "fourth commit"
 FOUT3=$(bash .gob/bin/goblin-verify 2>&1)

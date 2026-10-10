@@ -4,16 +4,15 @@
 #   B1  the bare brief: `gob init` prints the AGENT BRIEF + proposal schema, exit 0;
 #       heuristic mode appends pre-scanned hints; nothing is written anywhere
 #   B2  the --write path on a fresh probe: a proposal file in the brief's schema
-#       validates and installs (class software, the proposal's first gate replaces the
-#       class default, proposal keys merge over the class defaults), writes AGENTS.md
-#       with the gob block, .gob/, HANDOFF.md — and NO .hermes unless the proposal
-#       names sync_platforms
-#   B3  the validation refusals: no block, unknown key, bad class, no gate -> exit 2,
+#       validates and installs (the proposal's first gate replaces the default, proposal
+#       keys merge over the installer's defaults), writes AGENTS.md
+#       with the gob block, .gob/, HANDOFF.md — and NO .hermes (the neutral-first install)
+#   B3  the validation refusals: no block, unknown key, no gate -> exit 2,
 #       nothing written; a refusal names the input it refused
 #   B4  --dry-run validates and writes nothing
 #   B5  idempotent re-`--write`: the second identical write is the installer's no-op
-#   B6  the dispatcher: `bin/goblin init --help` exits 0; `goblin.js init --help`
-#       reaches the same usage; `gob init` (bare) prints the brief
+#   B6  the shim: `goblin.js init --help` reaches the engine usage; `gob init` (bare)
+#       prints the brief
 #   B7  the post-install GREEN line: after the day-one commit the probe verifies at the
 #       measured green line
 #   B8  the source gates (moved here from the deleted t8 pty family, still relevant):
@@ -55,16 +54,73 @@ init_env() { # the engine's environment: sandbox HOME, no host anchors, no tty o
         timeout 120 bash "$SRC/bin/goblin-init" "$@"; } 2>&1
 }
 
-proposal() { # <file> <class> [extra lines...] — a minimal valid proposal
-  local f="$1" cls="$2"; shift 2
+proposal() { # <file> [extra lines...] — a minimal valid proposal (with a feature map)
+  local f="$1"; shift 1
   {
     printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-    printf 'class: %s\n' "$cls"
-    printf 'branch: main\n'
-    printf 'owner_email: runner@example.com\n'
     printf 'gate_commit_cmd: bash tests/run-tests.sh\n'
+    printf 'feature_map: features/README.md\n'
     [ $# -eq 0 ] || printf '%s\n' "$@"
     printf '<!-- gob:end -->\n'
+    printf '\n## gob init summary\n\n- the probe: one real gate, a one-feature map\n'
+    map_block
+  } > "$f"
+}
+
+map_block() { # the `## feature-map` half every proposal now carries
+  cat <<'MAPEOF'
+## feature-map
+
+### features/README.md
+
+```md
+# Features
+
+- [readme](./readme.md) — the probe README
+```
+
+### features/readme.md
+
+```md
+---
+feature: readme
+entry_paths:
+  - README.md
+verified: never-driven (2024-01-01)
+---
+# readme
+
+The probe repository's README.
+
+## Sub-features
+
+- the readme file
+
+## How to get to it (user POV)
+
+- open the repository root
+
+## Driving it with bash
+
+Preconditions: a checkout.
+**Read.** Run `cat README.md`. The file prints.
+
+## Gotchas
+
+- nothing has been driven yet; the verified line says so.
+```
+MAPEOF
+}
+
+proposal_gate() { # <file> <gate-cmd> — a valid proposal with a chosen gate command
+  local f="$1" gate="$2"
+  {
+    printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
+    printf 'gate_commit_cmd: %s\n' "$gate"
+    printf 'feature_map: features/README.md\n'
+    printf '<!-- gob:end -->\n'
+    printf '\n## gob init summary\n\n- the probe with a chosen gate\n'
+    map_block
   } > "$f"
 }
 
@@ -78,8 +134,6 @@ printf '%s' "$OUT" | grep -qF "PROPOSAL SCHEMA"
 check "the brief carries the proposal schema" "$?"
 printf '%s' "$OUT" | grep -qF "gate_commit_cmd"
 check "the schema names the gate key the reader parses" "$?"
-printf '%s' "$OUT" | grep -qF "software|service|game|research|fleet"
-check "the schema names the class enum" "$?"
 B1_FILES=$( cd "$REPO" && find . -path ./.git -prune -o -type f -print | sort )
 [ "$B1_FILES" = "./README.md"$'\n'"./tests/run-tests.sh" ]
 check "a bare brief writes NOTHING into the target" "$?"
@@ -94,39 +148,66 @@ check "the heuristic brief still carries the schema" "$?"
 # ---- B2: the --write path --------------------------------------------------------
 new_repo b2
 P2="$WORK/proposal-b2.md"
-proposal "$P2" software
+proposal "$P2"
 OUT2=$(init_env --target "$REPO" --write "$P2" --yes < /dev/null); RC2=$?
 check "--write with a valid proposal exits 0" "$RC2"
 printf '%s' "$OUT2" | grep -qF "gob init [run] goblin-install"
 check "the run names the install engine call" "$?"
 [ -f "$REPO/AGENTS.md" ] && [ -f "$REPO/HANDOFF.md" ] && [ -x "$REPO/.gob/bin/goblin-verify" ]
 check "the harness landed (AGENTS.md, HANDOFF.md, .gob/bin/goblin-verify)" "$?"
-grep -qF "owner_email: runner@example.com" "$REPO/AGENTS.md"
-check "the declared email landed in the AGENTS.md gob block" "$?"
-grep -qxF "branch: main" "$REPO/AGENTS.md"
-check "the declared branch landed in the AGENTS.md gob block" "$?"
 GATE_DECLARED=$(awk '/^<!-- gob:begin/{ing=1;next} /^<!-- gob:end/{ing=0} ing && /^gate_commit_cmd:/{sub(/^gate_commit_cmd: */,"");print;exit}' "$REPO/AGENTS.md")
 [ "$GATE_DECLARED" = "bash tests/run-tests.sh" ]
 check "the proposal gate is the declared first gate (got '$GATE_DECLARED')" "$?"
 [ ! -e "$REPO/.hermes" ]
-check "no sync_platforms in the proposal writes NO .hermes (neutral-first)" "$?"
+check "a neutral proposal writes NO .hermes (neutral-first)" "$?"
 grep -qF '"skills": "no"' "$REPO/.gob/installed.json"
 check "the install record carries the skills opt-out" "$?"
-# the proposal's keys merge over the class defaults: the installer rendered the class
+# the proposal's keys merge over the installer defaults: the installer rendered its
 # defaults, then --write merged the proposal's own keys over them.
-grep -qF "class: software" "$REPO/AGENTS.md"
-check "the declared class landed in the gob block" "$?"
+grep -qxF "feature_map: features/README.md" "$REPO/AGENTS.md"
+check "feature_map landed in the AGENTS.md gob block" "$?"
+[ -f "$REPO/features/README.md" ] && [ -f "$REPO/features/readme.md" ]
+check "the embedded feature map was materialised at features/ (index + readme.md)" "$?"
+printf '%s' "$OUT2" | grep -qF "measured exit code: 0"
+check "the declared gate was RUN and its exit code printed" "$?"
 
-# ---- B2b: the sync path — sync_platforms emits platform files --------------------
+# ---- B2b: the gate is RUN, not guessed (P7) ----------------------------------------
+# A command that CANNOT be run at all is not a gate: refuse, write nothing. A command that
+# RUNS and exits non-zero is a legitimate day-one red: accept it and install.
 new_repo b2b
-P2B="$WORK/proposal-b2b.md"
-proposal "$P2B" software 'sync_platforms: [hermes]'
-OUT2B=$(init_env --target "$REPO" --write "$P2B" --yes < /dev/null); RC2B=$?
-check "--write with sync_platforms [hermes] exits 0" "$RC2B"
-[ -e "$REPO/.hermes" ]
-check "sync_platforms emits the platform files under the target" "$?"
-printf '%s' "$OUT2B" | grep -qF "sync --platform hermes"
-check "the run names the sync engine call" "$?"
+# (a) a gate command that does not exist
+P2B="$WORK/proposal-b2b-badgate.md"
+proposal_gate "$P2B" "no-such-command-xyz-42"
+OUT2B=$(init_env --target "$REPO" --write "$P2B" < /dev/null); RC2B=$?
+check "a proposal whose gate command does not exist exits 2" "$([ "$RC2B" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT2B" | grep -qF "exit 127"
+check "the refusal names the exit-127 not-found" "$?"
+printf '%s' "$OUT2B" | grep -qF "no-such-command-xyz-42"
+check "  and names the command it could not run" "$?"
+[ ! -e "$REPO/AGENTS.md" ] && [ ! -e "$REPO/features" ]
+check "  and it wrote NOTHING" "$?"
+
+# (b) a gate that RUNS and exits 1: accepted, installed, and the measured code is printed
+P2C="$WORK/proposal-b2c-redgate.md"
+proposal_gate "$P2C" "bash tests/red.sh"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$REPO/tests/red.sh"
+chmod +x "$REPO/tests/red.sh"
+OUT2C=$(init_env --target "$REPO" --write "$P2C" --yes < /dev/null); RC2C=$?
+check "a gate that exits 1 is ACCEPTED (exit 0, installed)" "$([ "$RC2C" -eq 0 ] && echo 0 || echo 1)"
+printf '%s' "$OUT2C" | grep -qF "measured exit code: 1"
+check "  and the measured exit code is printed (1)" "$?"
+[ -x "$REPO/.gob/bin/goblin-verify" ] && [ -f "$REPO/features/README.md" ]
+check "  and the harness + map were installed" "$?"
+
+# (c) --dry-run must NOT execute the gate
+P2D="$WORK/proposal-b2d-dry.md"
+proposal_gate "$P2D" "bash tests/sideeffect.sh"
+printf '#!/usr/bin/env bash\ntouch "$(dirname "$0")/RAN"\n' > "$REPO/tests/sideeffect.sh"
+chmod +x "$REPO/tests/sideeffect.sh"
+OUT2D=$(init_env --target "$REPO" --write "$P2D" --dry-run --yes < /dev/null); RC2D=$?
+check "--dry-run on a gate that would run exits 0" "$([ "$RC2D" -eq 0 ] && echo 0 || echo 1)"
+[ ! -e "$REPO/tests/RAN" ]
+check "  and the gate was NOT executed (no side-effect file)" "$?"
 
 # ---- B3: the validation refusals --------------------------------------------------
 new_repo b3
@@ -138,25 +219,16 @@ printf '%s' "$OUT3" | grep -qF "carries no gob block"
 check "the refusal names the missing block" "$?"
 
 P3B="$WORK/proposal-b3-badkey.md"
-proposal "$P3B" software 'not_a_real_key: 42'
+proposal "$P3B" 'not_a_real_key: 42'
 OUT3B=$(init_env --target "$REPO" --write "$P3B" < /dev/null); RC3B=$?
 check "an unknown key exits 2" "$([ "$RC3B" -eq 2 ] && echo 0 || echo 1)"
 printf '%s' "$OUT3B" | grep -qF "not_a_real_key"
 check "the refusal names the key it refused" "$?"
 
-P3C="$WORK/proposal-b3-badclass.md"
-proposal "$P3C" zebra
-OUT3C=$(init_env --target "$REPO" --write "$P3C" < /dev/null); RC3C=$?
-check "a nonsense class exits 2" "$([ "$RC3C" -eq 2 ] && echo 0 || echo 1)"
-printf '%s' "$OUT3C" | grep -qF "software|service|game|research|fleet"
-check "the refusal names the class enum" "$?"
-printf '%s' "$OUT3C" | grep -qF "unknown class 'zebra'"
-check "  and names the input it refused (W6 review F1)" "$?"
-
 P3D="$WORK/proposal-b3-nogate.md"
 {
   printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
-  printf 'class: software\nbranch: main\nowner_email: runner@example.com\n'
+  printf 'archive: false\n'
   printf '<!-- gob:end -->\n'
 } > "$P3D"
 OUT3D=$(init_env --target "$REPO" --write "$P3D" < /dev/null); RC3D=$?
@@ -172,7 +244,7 @@ new_repo b3b
 printf '# my own handoff, written before goblin ever saw this repo\n' > "$REPO/HANDOFF.md"
 OWN_HANDOFF=$(sha256sum "$REPO/HANDOFF.md" | awk '{print $1}')
 P3E="$WORK/proposal-b3e.md"
-proposal "$P3E" software
+proposal "$P3E"
 OUT3E=$(init_env --target "$REPO" --write "$P3E" --yes < /dev/null); RC3E=$?
 check "init --write exits 1 on the installer HANDOFF refusal" "$([ "$RC3E" -eq 1 ] && echo 0 || echo 1)"
 printf '%s' "$OUT3E" | grep -qF "HANDOFF.md"
@@ -180,15 +252,77 @@ check "the refusal names the path" "$?"
 [ "$(sha256sum "$REPO/HANDOFF.md" | awk '{print $1}')" = "$OWN_HANDOFF" ]
 check "the project's own HANDOFF.md is byte-identical" "$?"
 
+# ---- B3c: one proposal, one pass — the feature map is REQUIRED and validated --------
+# (folded from the deleted t-map.sh: the map is no longer made by a standalone verb; it is
+# validated inside `gob init --write`, in the same pass as the config block.)
+new_repo b3c
+# (a) no feature_map key at all
+P3F="$WORK/proposal-b3f-nomap.md"
+{
+  printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
+  printf 'gate_commit_cmd: bash tests/run-tests.sh\n'
+  printf '<!-- gob:end -->\n\n## gob init summary\n\n- no map\n'
+} > "$P3F"
+OUT3F=$(init_env --target "$REPO" --write "$P3F" < /dev/null); RC3F=$?
+check "a proposal with no feature_map exits 2" "$([ "$RC3F" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3F" | grep -qF "declares no feature_map"
+check "the refusal names feature_map as the missing key" "$?"
+[ ! -e "$REPO/AGENTS.md" ] && [ ! -e "$REPO/.gob" ] && [ ! -e "$REPO/features" ]
+check "  and it wrote NOTHING" "$?"
+
+# (b) feature_map declared, but the `## feature-map` section is absent
+P3G="$WORK/proposal-b3g-nosection.md"
+{
+  printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
+  printf 'gate_commit_cmd: bash tests/run-tests.sh\nfeature_map: features/README.md\n'
+  printf '<!-- gob:end -->\n'
+} > "$P3G"
+OUT3G=$(init_env --target "$REPO" --write "$P3G" < /dev/null); RC3G=$?
+check "a proposal with feature_map but no feature-map section exits 2" "$([ "$RC3G" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3G" | grep -qF "feature-map blocks"
+check "the refusal names the missing section" "$?"
+[ ! -e "$REPO/AGENTS.md" ] && [ ! -e "$REPO/features" ]
+check "  and it wrote NOTHING" "$?"
+
+# (c) a map whose entry path does not resolve (FM-02 at write time)
+P3H="$WORK/proposal-b3h-badpath.md"
+{
+  printf '<!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->\n'
+  printf 'gate_commit_cmd: bash tests/run-tests.sh\nfeature_map: features/README.md\n'
+  printf '<!-- gob:end -->\n\n## gob init summary\n\n- a broken entry path\n\n## feature-map\n\n'
+  printf '### features/README.md\n\n```md\n# Features\n\n- [ghost](./ghost.md) — a feature that does not resolve\n```\n\n'
+  printf '### features/ghost.md\n\n```md\n---\nfeature: ghost\nentry_paths:\n  - does-not-exist.ts\nverified: never-driven (2024-01-01)\n---\n'
+  printf '# ghost\n\nA feature whose entry path is not committed.\n\n## Sub-features\n\n- x\n\n## How to get to it (user POV)\n\n- x\n\n## Driving it with bash\n\nRun `true`.\n\n## Gotchas\n\n- x\n```\n'
+} > "$P3H"
+OUT3H=$(init_env --target "$REPO" --write "$P3H" < /dev/null); RC3H=$?
+check "a map with an unresolvable entry path exits 2" "$([ "$RC3H" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3H" | grep -qF "does-not-exist.ts"
+check "the refusal names the entry path that does not resolve" "$?"
+[ ! -e "$REPO/AGENTS.md" ] && [ ! -e "$REPO/features" ]
+check "  and it wrote NOTHING" "$?"
+
+# (d) an empty repo (no committed file to map) refuses with the named remedy
+EMPTY="$WORK/b3c-empty"
+mkdir -p "$EMPTY"
+( cd "$EMPTY" && git init -q -b main && git config user.name "Test Runner" && git config user.email runner@example.com ) >/dev/null 2>&1
+P3I="$WORK/proposal-b3i.md"
+proposal "$P3I"
+OUT3I=$(init_env --target "$EMPTY" --write "$P3I" < /dev/null); RC3I=$?
+check "an empty repo (no committed file) exits 2" "$([ "$RC3I" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT3I" | grep -qF "commit at least one file, then run again"
+check "the refusal names the remedy" "$?"
+[ "$( cd "$EMPTY" && find . -path ./.git -prune -o -type f -print )" = "" ]
+check "  and it invented no bootstrap feature" "$?"
+
 # ---- B4: --dry-run validates and writes nothing ------------------------------------
 new_repo b4
 P4="$WORK/proposal-b4.md"
-proposal "$P4" research
+proposal "$P4"
 BEFORE4=$( cd "$REPO" && find . -path ./.git -prune -o -type f -print | sort )
 OUT4=$(init_env --target "$REPO" --write "$P4" --dry-run --yes < /dev/null); RC4=$?
 check "--dry-run exits 0" "$RC4"
 printf '%s' "$OUT4" | grep -qF "validated OK"
-check "the plan names the validated class and the write set" "$?"
+check "the plan names the validated proposal and the write set" "$?"
 printf '%s' "$OUT4" | grep -qF "would write"
 check "the plan says what it would write" "$?"
 AFTER4=$( cd "$REPO" && find . -path ./.git -prune -o -type f -print | sort )
@@ -197,18 +331,14 @@ check "the tree is byte-list unchanged after --dry-run" "$?"
 
 # ---- B5: idempotent re-write --------------------------------------------------------
 P5="$WORK/proposal-b5.md"
-proposal "$P5" software
+proposal "$P5"
 init_env --target "$WORK/b2" --write "$P5" --yes < /dev/null >/dev/null 2>&1
 OUT5=$(init_env --target "$WORK/b2" --write "$P5" --yes < /dev/null); RC5=$?
 check "the identical re-write exits 0" "$RC5"
 printf '%s' "$OUT5" | grep -qE "no-op: .* unchanged"
 check "the re-write is the installer's no-op" "$?"
 
-# ---- B6: the dispatcher routes --------------------------------------------------------
-OUT8=$( cd "$WORK" && env PATH="$BARE_PATH" bash "$SRC/bin/goblin" init --help 2>&1 ); RC8=$?
-check "gob init --help exits 0 through the dispatcher" "$RC8"
-printf '%s' "$OUT8" | grep -q -- "--write"
-check "the usage names the --write flag" "$?"
+# ---- B6: the shim routes ---------------------------------------------------------------
 OUT9=$( cd "$WORK" && env PATH="$BARE_PATH:$HOME/.local/bin" node "$SRC/bin/goblin.js" init --help 2>&1 ); RC9=$?
 check "the npm shim routes init to goblin-init" "$RC9"
 printf '%s' "$OUT9" | grep -qF "gob init"
@@ -217,13 +347,54 @@ check "the shim run reaches the engine's usage" "$?"
 # ---- B7: the post-install GREEN line ----------------------------------------------------
 new_repo b7
 P7="$WORK/proposal-b7.md"
-proposal "$P7" software
+proposal "$P7"
 init_env --target "$REPO" --write "$P7" --yes < /dev/null >/dev/null 2>&1
 ( cd "$REPO" && git add -A && git commit -q -m "chore: install gobstack via gob init --write" )
 VOUT=$( cd "$REPO" && env PATH="$BARE_PATH" bash .gob/bin/goblin-verify 2>&1 ); VRC=$?
 check "verify exits 0 after the commit" "$VRC"
 printf '%s' "$VOUT" | grep -qE '[0-9]+ passed, 0 failed'
 check "verify reports 0 failed" "$?"
+
+# ---- B9: the external-categories inventory is vendored, hash-pinned, and adjudicated ----
+# v3 §4.1: the inventory is DATA vendored to .gob/engine/categories.tsv; the agent is the
+# reader. The zero-fit contract: a repo that fits no row must still produce a decisions
+# file with a declined line + a concrete reason per row, and .gob/skills/ stays empty
+# (an unrecorded row is an init-brief violation — the brief says so, this proves the
+# artefact side: the file the adjudicator writes exists, parses, and covers every row).
+new_repo b9
+P9="$WORK/proposal-b9.md"
+proposal "$P9"
+init_env --target "$REPO" --write "$P9" --yes < /dev/null >/dev/null 2>&1
+[ -f "$REPO/.gob/engine/categories.tsv" ]
+check "B9a the inventory is vendored at .gob/engine/categories.tsv" "$?"
+CMP=$(awk -F'\t' 'NR>1 && NF>1 {print $1}' "$SRC/manifest/categories.tsv" | sort)
+VEN=$(awk -F'\t' 'NR>1 && NF>1 {print $1}' "$REPO/.gob/engine/categories.tsv" | sort)
+[ "$CMP" = "$VEN" ] && [ -n "$VEN" ]
+check "B9b the vendored copy carries the same rows as the source manifest" "$?"
+grep -qF '".gob/engine/categories.tsv":' "$REPO/.gob/installed.json"
+check "B9c the vendored copy is hash-pinned in installed.json like every engine file" "$?"
+grep -q 'EXTERNAL CATEGORIES' <(init_env --target "$REPO" < /dev/null)
+check "B9d the brief carries the fixed external-categories adjudication section" "$?"
+NROWS=$(awk -F'\t' '$1 !~ /^#/ && $1!="category" && NF>1 {n++} END{print n+0}' "$REPO/.gob/engine/categories.tsv")
+# The zero-fit adjudication itself is AGENT work (the brief instructs it; code cannot read
+# a repo). What the harness proves here is the CONTRACT the brief imposes: the decisions
+# file format the adjudicator must produce, checked against the inventory's row count.
+printf 'date\tcategory\tdecision\treason\n' > "$REPO/.gob/manifest/compose-decisions.tsv"
+while IFS=$'\t' read -r cat pack source license provides fits; do
+  [ -n "$cat" ] || continue
+  case "$cat" in \#*|category) continue ;; esac
+  printf '2026-10-10\t%s\tdeclined\tthis probe repo is a single-file gate fixture with no feature surface: %s\n' "$cat" "fits_when='${fits}' fails on it"
+done < "$REPO/.gob/engine/categories.tsv" >> "$REPO/.gob/manifest/compose-decisions.tsv"
+DEC=$(awk -F'\t' 'NR>1 && NF>1 {n++} END{print n+0}' "$REPO/.gob/manifest/compose-decisions.tsv")
+[ "$DEC" = "$NROWS" ]
+check "B9e the decisions file covers EVERY inventory row ($DEC of $NROWS)" "$?"
+awk -F'\t' 'NR>1 && ($3!="installed" && $3!="declined") {bad=1} NR>1 && $3=="declined" && length($4)<20 {short=1} END{exit bad||short}' "$REPO/.gob/manifest/compose-decisions.tsv"
+check "B9f every declined row carries a decision in the enum and a concrete (>=20 char) reason" "$?"
+# "stays empty" means: no EXTERNAL pack landed — the 5 core skills are the payload the
+# install itself ships (SK-02 hashes them), and adjudication adds nothing.
+NSK=$(ls "$REPO/.gob/skills" 2>/dev/null | grep -vc '^goblin-\|^practice$')
+[ "$NSK" = "0" ]
+check "B9g a zero-fit adjudication adds NO external pack to .gob/skills/ (only the 5-skill payload)" "$?"
 
 # ---- B8: the source gates (from the deleted t8 pty family, still relevant) ----------
 # The class of bug these guard is visible in the SOURCE; the pty was only where the

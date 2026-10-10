@@ -5,27 +5,35 @@
 #   gob init --heuristic                      append the heuristic detection (fallback)
 #   gob init --write <proposal> [--yes]       validate the proposal and install it
 #   gob init --target <dir>                   aim at a directory that is not $PWD
-#   gob init --with-mcp-config                write .mcp.json (repo-distributed MCP
-#                                             registration; ask-once, never overwrites)
-#   gob init --dry-run                        --write without writing anything
+#   gob init --skills <spec>                  which skills to vendor into .gob/skills/:
+#                                             no|yes = the 5 core skills (default), all =
+#                                             every skill, or a comma-separated name list
+#   gob init --write ... --with-mcp-config    also write the repo-root .mcp.json (OPT-IN
+#                                             since the v3 enhance layer: the named
+#                                             removal that pays for hooks emission)
+#   gob init --list-skills                    print the skill library and exit
+#   gob init --dry-run                        --write without writing anything (and without
+#                                             running the declared gate)
 #
 # The CLI calls NO AI API. A bare `gob init` prints:
 #   1. the AGENT BRIEF — a structured prompt telling whichever agent is already running
-#      in this repo (the coding agent the developer already uses) exactly what to scan
-#      (package.json, routes, tests, CI configs) and what to decide (class, branch,
-#      owner email, the first gate command);
-#   2. the SCHEMA of the proposal file the agent must write — AGENTS.md frontmatter
-#      pre-filled + a `## gob init summary` section.
+#      in this repo exactly what to scan (package.json, routes, tests, CI configs) and
+#      what to decide (the first gate command, the feature map, the source root);
+#   2. the SCHEMA of the proposal file the agent must write — the gob block + a
+#      `## gob init summary` section + a `## feature-map` section embedding the files.
 # The agent fulfils the brief with its own tools, writes the proposal, and the human (or
 # the agent's own next step) runs `gob init --write <proposal>` to validate and install:
 #   - the frontmatter keys are validated against the engine's key set (unknown key,
-#     bad class, non-boolean archive -> exit 2, nothing written);
-#   - AGENTS.md (body + gob block) and .gob/engine (the vendored verifier + manifest)
-#     are written; HANDOFF.md is written once; the sync-translator step runs to emit
-#     platform files for the proposal's `sync:` line. CI is never part of any output.
+#     an unknown key, non-boolean archive -> exit 2, nothing written);
+#   - the declared gate is RUN in the working tree (a non-zero exit is a day-one red, a
+#     command that cannot be run is refused);
+#   - the embedded feature map is validated by bin/goblin-map (FM-01 shape + FM-02
+#     resolvability) in the SAME pass, before anything is written;
+#   - AGENTS.md (body + gob block), .gob/engine (the vendored verifier + manifest) and
+#     features/ are written; HANDOFF.md is written once. CI is never part of any output.
 #
-# The heuristic detector (package.json scripts + route tokens, from bin/goblin-map) is
-# the --heuristic FALLBACK: appended to the brief as pre-scanned hints, never the answer.
+# The heuristic detector (package.json scripts + route tokens) is the --heuristic FALLBACK:
+# appended to the brief as pre-scanned hints, never the answer.
 #
 # Exit codes: 0 printed or installed | 1 a refusal (named path + fix) | 2 bad input.
 # No npm, no jq, no yq, no network, no AI API. bash/awk/sed/grep only.
@@ -37,23 +45,22 @@ SRC=$(cd "$SELF_DIR/.." && pwd)
 # shellcheck source=goblin-lib.sh
 . "$SELF_DIR/goblin-lib.sh"
 VERSION=$(cat "$SRC/VERSION" 2>/dev/null || printf 'unknown')
-# The extras catalogue (overridable for tests, the same env var goblin-extras reads).
-CATALOGUE_TSV="${GOB_EXTRAS_CATALOGUE:-$SRC/extras-catalogue/catalogue.tsv}"
 
 g_info() { printf '%s\n' "$*"; }
 
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 # ------------------------------------------------------------------ flags -----
-TARGET="" WRITE="" HEURISTIC=0 DRYRUN=0 RESYNC=0 WITH_MCP=0
+TARGET="" WRITE="" HEURISTIC=0 DRYRUN=0 SKILLS_OPT="no" WITH_MCP=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --target)    TARGET="${2:-}"; shift 2 ;;
     --write)     WRITE="${2:-}"; shift 2 ;;
+    --skills)    SKILLS_OPT="${2:-}"; shift 2 ;;
+    --list-skills) exec bash "$SRC/bin/goblin-install" --list-skills ;;
     --heuristic) HEURISTIC=1; shift ;;
-    --resync)    RESYNC=1; shift ;;   # init-internal: re-run the sync step (hidden)
-    --with-mcp-config) WITH_MCP=1; shift ;;
     --dry-run)   DRYRUN=1; shift ;;
+    --with-mcp-config) WITH_MCP=1; shift ;;
     --yes)       shift ;;             # accepted for pipe parity; --write is already explicit
     -h|--help)   usage; exit 0 ;;
     *) g_err "unknown option: $1"; usage >&2; exit 2 ;;
@@ -63,7 +70,6 @@ done
 for dep in git awk sed grep; do
   command -v "$dep" >/dev/null 2>&1 || { g_err "missing dependency: $dep"; exit 2; }
 done
-command -v python3 >/dev/null 2>&1 || { g_err "missing dependency: python3 (the extras .mcp.json merge needs it)"; exit 2; }
 [ -f "$SRC/VERSION" ] || { g_err "no VERSION at $SRC — is this a gobstack checkout?"; exit 2; }
 TARGET="${TARGET:-$PWD}"
 TARGET=$(g_expand_tilde "$TARGET")
@@ -71,29 +77,87 @@ TARGET=$(g_expand_tilde "$TARGET")
 TARGET=$(cd "$TARGET" && pwd)
 TODAY=$(date +%F)
 
-# The repo-distributed MCP registration (.mcp.json), written by --with-mcp-config in
-# BOTH modes (bare and --write). Ask-once semantics: an existing file is never
-# overwritten — the generated bytes again are a named no-op, anything else is a
-# refusal with exit 1 (the installer's preimage shape). The major coding agents
-# auto-detect a repo-root .mcp.json.
-# MD-01: the agent CLI's family name is ASSEMBLED at run time — a literal agent-family
-# name in bin/ source is the exact string MD-01 exists to catch (the run-tests MD_SLUG
-# precedent). The printed line still reads the way the docs quote it.
+# The repo-distributed MCP registration (.mcp.json): OPT-IN since the v3 enhance layer
+# (--with-mcp-config) — the named removal that pays for hooks emission. A registration a
+# repo never asked for was the default; hooks are what init --write writes by default now.
+# Ask-once semantics either way: an existing file is never overwritten — the generated
+# bytes again are a named no-op, anything else is KEPT (a registration you customized is
+# the project's). The major coding agents auto-detect a repo-root .mcp.json.
+# The agent CLI's family name is ASSEMBLED at run time, so no rule here spells the
+# tool's own name literally. The printed line still reads the way the docs quote it.
 AGENT_CLI="cl"; AGENT_CLI="${AGENT_CLI}aude"
+MCP_BYTES='{"mcpServers":{"gob":{"command":"npx","args":["-y","@techgoblin/gobstack","mcp"]}}}'
 do_mcp_config() {
   local f="$TARGET/.mcp.json"
-  local bytes='{"mcpServers":{"gob":{"command":"npx","args":["-y","@techgoblin/gobstack","mcp"]}}}'
   if [ -f "$f" ]; then
-    if [ "$(cat "$f")" = "$bytes" ]; then
+    if [ "$(cat "$f")" = "$MCP_BYTES" ]; then
       g_info "gob init: $TARGET/.mcp.json already carries the generated registration (left as is)"
       return 0
     fi
-    g_err "refusing to write $TARGET/.mcp.json: the file exists and is not the generated registration — edit it by hand or remove it first"
-    return 1
+    g_info "kept $TARGET/.mcp.json (not the generated registration: a registration you customized stays)"
+    return 0
   fi
-  printf '%s\n' "$bytes" > "$f" || { g_err "could not write $f"; return 1; }
+  printf '%s\n' "$MCP_BYTES" > "$f" || { g_err "could not write $f"; return 1; }
   g_info "wrote $TARGET/.mcp.json (the gob MCP server is repo-distributed; ${AGENT_CLI} Code and Cursor auto-detect it)"
   return 0
+}
+
+# The agent hooks payload (v3 enhance layer): the verify/init surface lands in a vendor
+# hooks file the agent ALREADY reads — written into an EXISTING .claude/ or .cursor/
+# directory only (DETECTION, never creation: creating the vendor dir is how an installer
+# becomes malware-shaped; a repo with neither dir simply gets no hooks, named out loud).
+# The snippet's sha256 is recorded next to .mcp.json's own preimage clause, in
+# .gob/manifest/hooks.tsv; --uninstall removes a hook ONLY when the file on disk still
+# hashes to the recorded value — a snippet the project edited is the project's.
+HOOKS_TSV=".gob/manifest/hooks.tsv"
+hook_entry() { # hook_entry <vendor> <relfile> <bytes> -> vendor<TAB>rel<TAB>sha256
+  # The hash is of the FILE AS WRITTEN (printf '%s\n' appends a newline), so the recorded
+  # value is the one g_sha256_file computes at uninstall time — never hash one form and
+  # check the other.
+  local tmp; tmp=$(mktemp) && printf '%s\n' "$3" > "$tmp" && \
+    printf '%s\t%s\t%s\n' "$1" "$2" "$(g_sha256_file "$tmp")" && rm -f "$tmp"
+}
+write_hook_file() { # write_hook_file <relpath> <bytes> — ask-once, like .mcp.json
+  local f="$TARGET/$1"
+  if [ -f "$f" ]; then
+    if [ "$(cat "$f")" = "$2" ]; then
+      g_info "gob init: $1 already carries the generated hooks (left as is)"
+      return 0
+    fi
+    g_info "kept $1 (not the generated hooks: a hook file you customized stays)"
+    return 0
+  fi
+  printf '%s\n' "$2" > "$f" || { g_err "could not write $f"; return 1; }
+  g_info "wrote $1 (gobstack hooks: the verify surface reachable inside the agent session)"
+  return 0
+}
+do_hooks() {
+  local claude="$TARGET/.claude" cursor="$TARGET/.cursor" wrote=0 entries="" rc=0
+  # Claude Code: the vendor's documented hooks file (hooks/SessionStart, command type).
+  if [ -d "$claude" ]; then
+    local bytes='{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"bash .gob/bin/goblin-verify --brief || true"}]}]}}'
+    write_hook_file ".claude/hooks.json" "$bytes" || rc=1
+    entries+="$(hook_entry claude .claude/hooks.json "$bytes")"$'\n'
+    wrote=1
+  fi
+  # Cursor: the same snippet in the shape its hooks reader documents (sessionStart).
+  if [ -d "$cursor" ]; then
+    local bytes='{"hooks":{"sessionStart":[{"command":"bash .gob/bin/goblin-verify --brief || true"}]}}'
+    write_hook_file ".cursor/hooks.json" "$bytes" || rc=1
+    entries+="$(hook_entry cursor .cursor/hooks.json "$bytes")"$'\n'
+    wrote=1
+  fi
+  [ "$wrote" -eq 1 ] || { g_info "no .claude/ or .cursor/ directory at $TARGET — no hooks written (gobstack creates no vendor directory; the MCP registration is the --with-mcp-config opt-in)"; return 0; }
+  # The hash record: one row per hook file covered, written ask-once like the files.
+  local rec="$TARGET/$HOOKS_TSV"
+  if [ -f "$rec" ]; then
+    g_info "kept $HOOKS_TSV (a hook record already exists)"
+  else
+    mkdir -p "$TARGET/.gob/manifest"
+    { printf 'vendor\tfile\tsha256\n'; printf '%s' "$entries"; } > "$rec" || { g_err "could not write $HOOKS_TSV"; return 1; }
+    g_info "recorded $HOOKS_TSV (the hash --uninstall checks before removing a hook)"
+  fi
+  return $rc
 }
 
 # ------------------------------------------------------------------ the brief --
@@ -114,95 +178,148 @@ back one proposal file. Do this now:
    - the test layout (tests/, *.test.*, run-tests.sh or equivalent gate scripts)
    - CI configs (.github/workflows, .gitlab-ci.yml) — to READ what the project already
      gates on. gobstack installs no CI.
-   - the git identity this repo commits with (git config user.email)
 
 2. DECIDE, and be ready to justify each line:
-   - class: software | service | game | research | fleet
-   - branch: the default branch (main/master/…)
-   - owner_email: the commit identity this repo expects
-   - gate_commit_cmd: ONE command that proves the repo is healthy and must stay green
-     (a real test/lint command from package.json — never a placeholder)
+   - gate_commit_cmd: ONE command that proves the repo is healthy and must stay green.
+     RUN it yourself first: a command that does not exist is not a gate (--write refuses
+     an exit-127 command); a command that runs and exits non-zero is a legitimate day-one
+     red (--write accepts it and the harness reports it as one).
+   - feature_map: the map's README path (the convention is features/README.md). REQUIRED —
+     there is no "no map declared" state.
 
-3. THE CATALOGUE — `catalogue_suggestions` (init SUGGESTS, it never installs):
-
-   Read the bundled catalogue (`gob extras list` shows it; the file is
-   `extras-catalogue/catalogue.tsv` in the package). From it, build the
-   `catalogue_suggestions:` list for this repo:
-
-   - rows whose `matches:` column names this repo's detected stack (the words you
-     found in step 1 — react, vue, playwright, godot, unity, node, postgres, …);
-   - RECOMMEND rows are pre-ticked (write `- id` with `[x]`); MAYBE rows are
-     listed but NOT pre-ticked (`[ ]`) — they are visible choices, never defaults;
-   - a row with NO vendored payload (no `extras-catalogue/payload/<id>/` directory)
-     must NOT be pre-ticked even when RECOMMEND — print it as `[ ]` instead;
-     `--write` installs through `gob extras install`, which refuses a
-     payload-missing id and fails the whole --write;
-   - a row whose `conflicts:` names an id you also picked: pick at most one of them;
-   - SKIP rows are never suggested and refuse install; leave them out entirely.
-
-   Record the picks in the proposal's summary section under `catalogue_suggestions:`
-   (one `- [x] <id>  # <why>` line each). NOTHING installs at init: installing is a
-   separate, explicit step the human runs —
-
-       npx @techgoblin/gobstack extras install <id...>
-
-4. DISCOVER — `discover_extras` (proposals only, nothing auto-installs):
-
-   ALSO search the web with your own tools for agent skills / MCP servers / workflows
-   that match this repo's stack and are NOT in the bundled catalogue. For each
-   discovery, propose one entry in the summary under `discover_extras:` with exactly
-   these keys:
-
-       discover_extras:
-         - id: <short-kebab-id>
-           source_url: <the repo or docs URL you actually fetched>
-           license: <spdx or "unknown — verify">
-           rationale: <one line — what it adds to THIS repo>
-           suggested_kind: <skill|mcp|workflow>
-
-   Rules: verify the URL is live before proposing it; state the license you found;
-   never propose anything you did not actually read. Proposals are INERT — nothing
-   auto-installs from discovery, and no discovery reaches this repo from the CLI.
-   A human reviews the proposals, then the curator promotes accepted discoveries
-   into catalogue.tsv by PR or direct edit. Until a row exists in the
-   catalogue, `gob extras install` refuses it — the catalogue is the allowlist.
-
-5. WRITE the proposal file exactly in the SCHEMA below, at a path you choose (for
+3. WRITE the proposal file exactly in the SCHEMA below, at a path you choose (for
    example .gob-init-proposal.md), then run:
 
        npx @techgoblin/gobstack init --write <proposal-path>
 
 Notes:
-   - Class letters A-E and the names app/agent/desktop are accepted aliases
-     (app->software, agent->fleet, desktop->software+electron).
    - A second gate is optional: gate_<name>_cmd, e.g. gate_todo_cmd.
-   - Keys you do not set are filled from the class default by --write.
+   - Keys you do not set are filled from the installer's default block by --write.
+   - --write validates BOTH halves in one pass: the config block AND the embedded feature
+     map (FM-01 shape + FM-02 resolvability: every entry path exists AND is committed).
+     A repo with no committed file to map REFUSES — commit at least one file, then run again.
+   - The repo-root .mcp.json registration is OPT-IN: add --with-mcp-config to the
+     --write line. Without it the install writes no registration; it DOES write the
+     agent hooks (.claude/hooks.json / .cursor/hooks.json) into existing vendor dirs.
+
+== EXTERNAL CATEGORIES (adjudication — do this before writing the proposal) =====
+
+The install vendored (or, at brief time, ships at manifest/categories.tsv) an inventory of
+external composition categories at .gob/engine/categories.tsv (source: manifest/categories.tsv
+in the gobstack repo of origin). It is DATA — gobstack's code never reads it; you are the
+reader and the adjudicator, because you can see this repo and its code cannot.
+
+For EACH row in that file, in order:
+
+1. EVALUATE the row's fits_when predicate against THIS repository (its actual work, its
+   actual shape — not what a repo like it might want). A row you cannot evaluate, say so
+   in the decision record with that reason.
+2. PROPOSE every row that FITS to the user before installing anything: name, source URL,
+   license, and what it would concretely add here. A fit is a proposal, never an install.
+3. INSTALL only on the user's explicit approval, through the SK-checked lane: fetch the
+   pack, drop it in .gob/skills/<name>/ (SK-01/02/04 hash and police it like any shipped
+   skill), and record the row in .gob/manifest/compose-decisions.tsv with added_by = the
+   source URL and why = the license + the fit reason. Nothing lands without a license line.
+4. RECORD EVERY evaluated row — installed or declined — in .gob/manifest/compose-decisions.tsv
+   (create it if absent; header: date<TAB>category<TAB>decision<TAB>reason; one row per
+   category, tab-separated):
+   - installed rows: decision=installed, reason names the license and the concrete fit;
+   - declined rows: decision=declined, reason names the CONCRETE property of this repo that
+     fails the predicate ("no user-facing feature surface", "single-session CLI", ...) —
+     "not applicable" is not a reason;
+   - a row left unrecorded is a VIOLATION of this brief: an adjudication that left no
+     trace is indistinguishable from an adjudication that never happened.
+
+The gate only ever runs the repo's own checks; an external pack may AUTHOR rows (LX-*),
+and then the check is the repo's, proof and all.
 
 == PROPOSAL SCHEMA =============================================================
 
 <!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->
-class: <software|service|game|research|fleet>
-branch: <default branch>
-owner_email: <commit identity>
 gate_<name>_cmd: <one shell command that must stay green>
-sync_platforms: <optional array — the agent platform ids the sync reads>
+feature_map: features/README.md
+source_root: .
 <!-- gob:end -->
 
 ## gob init summary
 
 - <one bullet per decision: what you scanned, what you chose, why>
 - <framework / package manager / test command found>
-- catalogue_suggestions:
-    - [x] <catalogue id>  # <one line why — RECOMMEND rows pre-ticked>
-    - [ ] <catalogue id>  # <a MAYBE row: visible, never pre-ticked>
-- discover_extras:
-    - id: <kebab-id>
-      source_url: <live URL>
-      license: <spdx or "unknown — verify">
-      rationale: <one line>
-      suggested_kind: <skill|mcp|workflow>
+
+## feature-map
+
+### features/README.md
+
+```md
+# Features
+
+- [<slug>](./<slug>.md) — <one line>
+```
+
+### features/<slug>.md
+
+```md
+---
+feature: <slug — lowercase [a-z0-9-], equals the filename stem>
+entry_paths:
+  - <repo-relative path that exists AND is committed (git ls-files)>
+verified: never-driven (<today>)
+---
+# <slug>
+
+<one user-visible paragraph, no implementation detail>
+
+## Sub-features
+
+- <the sub-behaviours, one per line>
+
+## How to get to it (user POV)
+
+- <how a user reaches this feature, and what they should see>
+
+## Driving it with <harness>
+
+Preconditions: <what must be true first>.
+**<action>.** Run `<exact command>`. <the observable result.>
+
+## Gotchas
+
+- <what commonly breaks, or what the entry-path token does and does not prove>
+```
+
+(embed one `### <dir>/<slug>.md` block per feature; every feature must be linked from the
+README index in the `(./<slug>.md)` form. `feature:` must equal the filename stem, and the
+four H2s above are required, in order.)
 ============================================================================== ==
 BRIEF
+  print_skill_library
+}
+
+# print_skill_library — the discovery surface for the skill LIBRARY (the repo's skills/
+# directory), appended to the brief. The 5 CORE skills are vendored into .gob/skills/ by
+# default; the rest are selectable through --skills, exactly as the rule LIBRARY holds rows
+# that are off by default. Prints name, tier and the one-line purpose (the frontmatter
+# `description:`), so a reader knows what exists without opening the repo.
+# The core set is read from the installer (goblin-install's CORE_SKILLS) rather than
+# restated here — one source of truth, so a tier change cannot fork the two surfaces.
+print_skill_library() {
+  local d name desc tier core_list
+  core_list=$(bash "$SRC/bin/goblin-install" --print-core-skills 2>/dev/null)
+  [ -n "$core_list" ] || core_list="goblin-handoff goblin-verify-author goblin-feature-map practice goblin-bootstrap"
+  printf '\n== SKILL LIBRARY =============================================================\n\n'
+  printf 'A default install writes the 5 CORE skills into .gob/skills/. Every other skill is\n'
+  printf 'available on request. Choose the set with --skills:\n\n'
+  printf '    --skills all                             every skill in the repo\n'
+  printf '    --skills goblin-handoff,goblin-bootstrap  exactly those (comma-separated)\n\n'
+  printf 'Available skills:\n'
+  for d in "$SRC"/skills/*/; do
+    [ -f "$d/SKILL.md" ] || continue
+    name=$(basename "$d")
+    desc=$(awk 'NR==1{f=1;next} /^---/{f=0} f&&/^description:/{sub(/^description:[[:space:]]*/,"");print;exit}' "$d/SKILL.md")
+    case " $core_list " in
+      *" $name "*) tier=core ;; *) tier=optional ;; esac
+    printf '  %-22s %-9s %s\n' "$name" "$tier" "$desc"
+  done | sort
 }
 
 # The heuristic fallback: pre-scanned hints appended to the brief (--heuristic).
@@ -225,67 +342,54 @@ print_heuristic() {
   for d in app pages routes src; do
     [ -d "$TARGET/$d" ] && printf 'route/entry root candidate: %s/\n' "$d"
   done
-  # The catalogue_suggestions fallback: rows whose `matches:` cell names a token the
-  # heuristic scan actually saw in this repo (package.json deps + lockfile + config
-  # files). The SAME matches column the agent brief reads — the fallback suggests from
-  # the catalogue, never from its own private list. Verdicts are respected: only
-  # RECOMMEND rows pre-tick; MAYBE rows print unticked; SKIP rows never appear.
-  # QA fix (v2-qa): a row pre-ticks ONLY when its vendored payload exists —
-  # extras-catalogue/payload/<id>/ — because --write installs through
-  # `gob extras install`, which refuses a payload-missing row and fails the whole
-  # --write after everything else was already written. A RECOMMEND row with no
-  # payload prints as a visible, unticked `[ ]` choice instead. (41 researched rows,
-  # 1 vendored payload: the old pre-tick turned a day-one init into a guaranteed
-  # exit 2 halfway through writing.)
-  if [ -f "$CATALOGUE_TSV" ]; then
-    local scan
-    scan=$(cat "$TARGET/package.json" "$TARGET"/*.lock "$TARGET"/pnpm-lock.yaml \
-              "$TARGET"/vue.config.* "$TARGET"/nuxt.config.* "$TARGET"/godot/project.godot \
-              "$TARGET"/unity/ProjectSettings/ProjectVersion.txt 2>/dev/null | tr 'A-Z' 'a-z')
-    if [ -n "$scan" ]; then
-      local ticked="" maybe="" payload_root
-      payload_root="${GOB_EXTRAS_PAYLOAD:-$SRC/extras-catalogue/payload}"
-      while IFS=$'\t' read -r cid ccat ckind cname crepo cpath chmd clic cstars cpush \
-                          cmatches cconf creq chint cverdict cby cdate; do
-        [ -n "$cid" ] || continue
-        case "$cverdict" in RECOMMEND|MAYBE) ;; *) continue ;; esac
-        local hit=0 tok
-        for tok in $cmatches; do
-          case "$scan" in *"$tok"*) hit=1; break ;; esac
-        done
-        [ "$hit" -eq 1 ] || continue
-        if [ ! -d "$payload_root/$cid" ]; then
-          # no vendored payload: the row stays visible but never pre-ticks —
-          # a tick --write cannot honour is a refusal waiting to happen
-          maybe="$maybe    - [ ] $cid  # matches this repo, NO VENDORED PAYLOAD yet (gob extras install would refuse — vendor it under extras-catalogue/payload/$cid/ first)"$'\n'
-          continue
-        fi
-        case "$cverdict" in
-          RECOMMEND) ticked="$ticked    - [x] $cid  # matches this repo ($cmatches)"$'\n' ;;
-          MAYBE)     maybe="$maybe    - [ ] $cid  # matches, verdict MAYBE (not pre-ticked)"$'\n' ;;
-        esac
-      done < "$CATALOGUE_TSV"
-      if [ -n "$ticked$maybe" ]; then
-        printf 'catalogue_suggestions (heuristic — verify the matches before trusting):\n'
-        printf '%s' "$ticked"
-        printf '%s' "$maybe"
-        printf 'install later with: gob extras install <id...> (init itself installs nothing)\n'
-      fi
-    fi
-  fi
   if [ "$got" -eq 0 ] && [ ! -d "$TARGET/src" ]; then
     printf 'no package.json, no src/ — the scan above is empty; say so in the summary\n'
   fi
   printf '\n'
 }
 
+# ------------------------------------------------------------------ the map -----
+# Extract the proposal's `## feature-map` section. Each `### <path>` heading is followed
+# by a fenced code block whose body is the file at <path> (repo-relative). Writes into
+# <stage-dir>/<path> and prints the number of `### ` blocks found. This is the ONLY reader
+# of the map half of the proposal; the SHAPE is then validated by bin/goblin-map (the same
+# code path `gob map --write` used), never re-implemented here.
+extract_feature_map() {  # <proposal> <stage-dir> -> block count on stdout
+  local prop="$1" stage="$2" p
+  # awk cannot mkdir: create every declared path's parent directory first.
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    mkdir -p "$stage/$(dirname "$p")" || return 1
+  done < <(awk '
+    /^```/ { fence = !fence; next }
+    !inmap { if (!fence && $0 ~ /^##[[:space:]]+[Ff]eature-map[[:space:]]*$/) inmap=1; next }
+    !fence {
+      if ($0 ~ /^##[[:space:]]/) { inmap=0; next }
+      if ($0 ~ /^###[[:space:]]+/) { p=$0; sub(/^###[[:space:]]+/,"",p); sub(/[[:space:]]+$/,"",p); print p }
+    }
+  ' "$prop")
+  # then write the fenced-block bodies. Fence-aware: a feature file's own `## ` H2s and any
+  # `### ` inside its fenced body are CONTENT, never the section's structure.
+  awk -v stage="$stage" '
+    function flush() { if (out != "") { close(out); out="" } }
+    /^```/ { fence = !fence; next }
+    !inmap { if (!fence && $0 ~ /^##[[:space:]]+[Ff]eature-map[[:space:]]*$/) inmap=1; next }
+    !fence {
+      if ($0 ~ /^##[[:space:]]/) { inmap=0; flush(); next }
+      if ($0 ~ /^###[[:space:]]+/) {
+        flush(); p=$0; sub(/^###[[:space:]]+/,"",p); sub(/[[:space:]]+$/,"",p)
+        out = stage "/" p; n++; next
+      }
+      next
+    }
+    { if (out != "") print >> out }
+    END { print n+0 }
+  ' "$prop"
+}
+
 if [ -z "$WRITE" ]; then
-  if [ "$WITH_MCP" -eq 1 ]; then
-    do_mcp_config || exit 1
-  fi
   print_brief
   [ "$HEURISTIC" -eq 1 ] && print_heuristic
-  printf 'register the verify tool for your agent: %s mcp add gob -- npx -y @techgoblin/gobstack mcp (or run gob init --with-mcp-config)\n' "$AGENT_CLI"
   g_info "== end of brief — the agent writes the proposal; gob init --write installs it =="
   exit 0
 fi
@@ -298,17 +402,16 @@ BLOCK_KEYS=$(g_agents_keys "$PROP")
 
 # Unknown keys are refused: the proposal is machine-read, and a typo'd key would
 # otherwise be silently ignored forever (fail closed, like --only does).
-KNOWN_KEYS="class electron branch models_file practice practice_sha256 owner_email archive
+KNOWN_KEYS="practice practice_sha256 archive
 max_dirty advisory_ceiling security.gitignore_family security.build_output
-security.audit_cmd security.audit_max_age_days security.waiver_max_age_days
 security.write_routes perf.metric perf.cmd perf.baseline_commit perf.baseline_value
 perf.measured perf.host_gate harness_dir scaffold_checks feature_map source_root
-verify_doctor reference_manifest quarantine_root loop_max_turns_ceiling sync_platforms
-ratchet.name ratchet.cmd ratchet.ceiling runtime_data bans bans_exempt layers
+verify_doctor reference_manifest quarantine_root
+ratchet.name ratchet.cmd ratchet.ceiling runtime_data bans_disabled bans_exempt layers
 replay.env replay.cmd replay.commit disabled engine_dir"
 BAD_KEYS=""
 # Token-by-token, not a whole-string case: KNOWN_KEYS is a multi-line word list and a
-# `case` pattern cannot span the newlines (measured: sync_platforms read as unknown).
+# `case` pattern cannot span the newlines.
 while IFS= read -r k; do
   [ -n "$k" ] || continue
   case "$k" in gate_*_cmd) continue ;; esac
@@ -320,98 +423,95 @@ while IFS= read -r k; do
 done <<< "$BLOCK_KEYS"
 [ -z "$BAD_KEYS" ] || { g_err "$PROP names unknown key(s):$BAD_KEYS — fix or drop them"; exit 2; }
 
-CLASS_RAW=$(g_agents_read "$PROP" class)
-CLASS=$(g_class_canon "$CLASS_RAW") \
-  || { g_err "unknown class '$CLASS_RAW' in $PROP (expected software|service|game|research|fleet, or A-E / app / agent / desktop)"; exit 2; }
-ELECTRON=0
-g_class_is_electron_alias "$CLASS_RAW" && ELECTRON=1
-[ "$(g_agents_read "$PROP" electron)" = "true" ] && ELECTRON=1
-
 GATE_NAME=$(g_agents_gates "$PROP" | head -n 1 | awk -F'\t' '{print $1}')
 GATE_CMD=$(g_agents_gates "$PROP" | head -n 1 | awk -F'\t' '{print $2}')
 [ -n "$GATE_CMD" ] || { g_err "$PROP declares no gate — the brief requires at least one gate_<name>_cmd"; exit 2; }
-BRANCH=$(g_agents_read "$PROP" branch)
-[ -n "$BRANCH" ] || BRANCH=$( cd "$TARGET" && git rev-parse --abbrev-ref HEAD 2>/dev/null )
-[ -n "$BRANCH" ] || BRANCH=main
-EMAIL=$(g_agents_read "$PROP" owner_email)
-[ -n "$EMAIL" ] || EMAIL=$( cd "$TARGET" && git config user.email 2>/dev/null )
-[ -n "$EMAIL" ] || EMAIL="you@example.com"
-SYNC_SEL=$(g_agents_list "$PROP" sync_platforms | tr '\n' ' ')
-# The extras the proposal's human approved (catalogue_suggestions tick lines in the
-# summary). Only TICKED ids count — an unticked MAYBE line is a visible choice the
-# human did not make. Every id is re-resolved through the catalogue's own allowlist
-# gate in goblin-extras (unknown id -> refusal; SKIP verdict -> refusal): a proposal
-# cannot install anything the catalogue does not carry.
-EXTRAS_SEL=$(sed -n '/catalogue_suggestions:/,/^[^ -]/{s/^[[:space:]]*-[[:space:]]*\[x\][[:space:]]*\([A-Za-z0-9_-]*\).*/\1/p;}' "$PROP" | sort -u | tr '\n' ' ')
 
-# ---------------------------------------------------------------- pre-flight ---
-# QA fix (v2-qa issue 1b): the TICKED extras are validated BEFORE anything is written.
-# The old order installed the harness first and ran `gob extras install` last, so a
-# missing vendored payload refused AFTER 23 files were already in the tree (the day-one
-# exit 2 with the repo half-initialized). Here every ticked id is resolved through the
-# same allowlist path goblin-extras uses (row exists, verdict installable, license gate,
-# vendored payload present) while the target is still untouched; a refusal names the id
-# and the fix and exits before the first write.
-if [ -n "$EXTRAS_SEL" ] && [ "$DRYRUN" -eq 0 ]; then
-  PAYLOAD_ROOT="${GOB_EXTRAS_PAYLOAD:-$SRC/extras-catalogue/payload}"
-  for xid in $EXTRAS_SEL; do
-    row=$(awk -F'\t' -v id="$xid" 'NR>1 && $1==id { print; exit }' "$CATALOGUE_TSV" 2>/dev/null)
-    [ -n "$row" ] || { g_err "pre-flight: catalogue has no row '$xid' — fix the proposal's catalogue_suggestions (gob extras list names the allowlist)"; exit 2; }
-    verdict=$(printf '%s' "$row" | awk -F'\t' '{print $15}')
-    lic=$(printf '%s' "$row" | awk -F'\t' '{print $18}')
-    case "$verdict" in
-      RECOMMEND|MAYBE) ;;
-      *) g_err "pre-flight: '$xid' carries verdict '$verdict' — untick it in the proposal's catalogue_suggestions"; exit 2 ;;
-    esac
-    # the same license gate goblin-extras enforces, read before any write
-    case "$lic" in
-      verified) ;;
-      *) g_err "pre-flight: '$xid' refuses install: license pending verification — untick it in the proposal's catalogue_suggestions"; exit 2 ;;
-    esac
-    [ -d "$PAYLOAD_ROOT/$xid" ] || {
-      g_err "pre-flight: no vendored payload for '$xid' at $PAYLOAD_ROOT/$xid — untick it in the proposal's catalogue_suggestions, or vendor the payload there first";
-      exit 2;
-    }
-  done
+# feature_map is REQUIRED (DECISION, 2026-10-09): the map is mandatory, so there is no
+# "no map declared" state. A proposal without it, or with it empty, refuses here.
+FEATURE_MAP=$(g_agents_read "$PROP" feature_map)
+[ -n "$FEATURE_MAP" ] || { g_err "$PROP declares no feature_map — add 'feature_map: features/README.md' to the gob block and a '## feature-map' section (the brief's SCHEMA); the map is mandatory"; exit 2; }
+
+# The map's directory, relative to the repo root. feature_map names the README (the value
+# verify reads); the map lives in a directory of its own, never the repo root.
+MAPDIR_REL=$(dirname "$FEATURE_MAP")
+[ "$MAPDIR_REL" != "." ] || { g_err "feature_map must name a directory of its own (e.g. features/README.md), not the repo root"; exit 2; }
+
+# Empty repo: no committed file to map. The map's entry paths are committed files, so a repo
+# with nothing committed cannot carry a resolvable map. Refuse with the named remedy — no
+# bootstrap feature is invented (a feature with no resolvable entry path is an assertion,
+# not a count).
+if [ -z "$( cd "$TARGET" && git ls-files 2>/dev/null | head -n 1 )" ]; then
+  g_err "the target has no committed file to map — commit at least one file, then run again"; exit 2
+fi
+
+# Validate BOTH halves in ONE pass, before anything is written. The map the proposal embeds
+# is extracted to a staging dir and handed to bin/goblin-map (the SAME validator `gob map
+# --write` used): the FM-01 shape plus FM-02 resolvability (exists AND tracked) against the
+# target. Nothing is written unless it validates.
+STAGE=$(mktemp -d "${TMPDIR:-/tmp}/goblin-init.map.XXXXXX") || { g_err "mktemp failed"; exit 2; }
+trap 'rm -rf "$STAGE"' EXIT
+BLOCKS=$(extract_feature_map "$PROP" "$STAGE") || { g_err "could not read the proposal's feature-map section"; exit 2; }
+[ "${BLOCKS:-0}" -ge 1 ] || { g_err "$PROP carries no feature-map blocks — the SCHEMA needs a '### $MAPDIR_REL/README.md' block and one '### $MAPDIR_REL/<slug>.md' per feature"; exit 2; }
+[ -d "$STAGE/$MAPDIR_REL" ] || { g_err "the proposal's feature-map blocks are not under '$MAPDIR_REL' (the directory of the declared feature_map: $FEATURE_MAP)"; exit 2; }
+if ! MAP_OUT=$(bash "$SRC/bin/goblin-map" --validate "$STAGE/$MAPDIR_REL" --root "$TARGET" 2>&1); then
+  printf '%s\n' "$MAP_OUT" >&2
+  g_err "the proposal's feature map failed validation (FM-01/FM-02) — fix the file(s) named above; nothing was written"
+  exit 2
 fi
 
 if [ "$DRYRUN" -eq 1 ]; then
-  g_info "gob init --write --dry-run: validated OK (class $CLASS, branch $BRANCH, owner $EMAIL, 1+ gate)"
-  g_info "  sync: ${SYNC_SEL:-none}"
-  g_info "  extras: ${EXTRAS_SEL:-none}"
-  g_info "  would write: AGENTS.md (body + gob block), .gob/engine/, HANDOFF.md"
+  g_info "gob init --write --dry-run: validated OK (1+ gate, feature map '$FEATURE_MAP')"
+  g_info "  would write: AGENTS.md (body + gob block), .gob/engine/, HANDOFF.md, $MAPDIR_REL/"
+  g_info "  the declared gate was NOT run (--dry-run)"
   exit 0
 fi
+
+# ------------------------------------------------------------------- the gate ---
+# The gate is RUN, not guessed (DECISION, 2026-10-09). Execute the declared first gate in the
+# working tree before installing, and report the measured exit code and the command's first
+# output line. A non-zero exit is ACCEPTED — a legitimate day-one red that GT-02 re-runs from
+# the installed config. A command that CANNOT be run at all (exit 127) is not a gate: refuse.
+GATE_RAW=$( cd "$TARGET" && bash -c "$GATE_CMD" 2>&1 ); GATE_RC=$?
+if [ "$GATE_RC" -eq 127 ]; then
+  g_err "gate_${GATE_NAME}_cmd is not a runnable command (exit 127): $GATE_CMD — name a command that exists, or author one at checks/gate.sh"
+  exit 2
+fi
+GATE_LINE=$(printf '%s\n' "$GATE_RAW" | sed '/^[[:space:]]*$/d' | head -n 1)
+g_info "gob init [gate] $GATE_CMD"
+g_info "  measured exit code: $GATE_RC"
+if [ -n "$GATE_LINE" ]; then g_info "  first output line: $GATE_LINE"; fi
 
 # ------------------------------------------------------------------- install ---
 # One engine call writes the vendored payload (.gob/), AGENTS.md body + gob block and
 # HANDOFF.md. Its refusal contract applies verbatim: an existing HANDOFF.md is never
 # overwritten; an edited AGENTS.md body is kept (put_once) and only the block is rewritten.
-INSTALL_ARGS=(--target "$TARGET" --class "$CLASS" --skills no --yes)
+INSTALL_ARGS=(--target "$TARGET" --skills "$SKILLS_OPT" --yes)
 # The first gate is the proposal's own: its name AND command. The name rides along so the
 # HANDOFF template renders the declared name — HP-03 anchors on declared gate names, and a
 # HANDOFF that names a gate the config does not declare is the day-one red (GT-04/HP-03
 # anchoring). GATE_NAME comes from the same key the reader parses (gate_<name>_cmd).
 GATE_NAME=$(g_agents_gates "$PROP" | head -n 1 | awk -F'\t' '{print $1}')
 INSTALL_ARGS+=(--gate "$GATE_CMD" "$GATE_NAME")
-[ "$ELECTRON" -eq 1 ] && INSTALL_ARGS+=(--electron)
-printf 'gob init [run] goblin-install --target %s --class %s\n' "$TARGET" "$CLASS"
-bash "$SRC/bin/goblin-install" "${INSTALL_ARGS[@]}"
+printf 'gob init [run] goblin-install --target %s\n' "$TARGET"
+# The engine is told to DEFER the next-steps block: this front-door command prints the ONE list
+# itself, at the very end (g_next_block). Without this the user saw two `next:` lists.
+GOB_NEXT_DEFER=1 bash "$SRC/bin/goblin-install" "${INSTALL_ARGS[@]}"
 RC=$?
 [ "$RC" -eq 0 ] || { g_err "install failed (exit $RC) — the refusals above name the path and the fix"; exit "$RC"; }
 
 CONFIG="$TARGET/AGENTS.md"
 [ -f "$CONFIG" ] || { g_err "install wrote no AGENTS.md at $TARGET"; exit 1; }
 
-# The proposal MERGES over the class defaults the installer rendered: the proposal's keys
+# The proposal MERGES over the defaults the installer rendered: the proposal's keys
 # win, every default key the proposal did not set stays (a proposal carrying only the
 # brief's required keys must not blank archive/ratchet/replay — the schema is a minimum,
 # not the whole block). Proposal keys the config did not have are appended.
-# EXCEPT the gate keys: the proposal's first gate REPLACES the class default gate_<name>_cmd
-# (the default names a class-taxonomy gate the project never declared), and every OTHER
+# EXCEPT the gate keys: the proposal's first gate REPLACES the installer's default gate_<name>_cmd
+# (the default names a taxonomy gate the project never declared), and every OTHER
 # default gate_* key is dropped — a gate the config declares must be one the proposal chose,
-# never a leftover default naming a gate the HANDOFF does not render. The second class gate
-# (e.g. the software class's todo_ceiling) is opt-IN: the proposal may declare it itself.
+# never a leftover default naming a gate the HANDOFF does not render. The second default gate
+# (the todo_ceiling) is opt-IN: the proposal may declare it itself.
 {
   first_gate=1
   while IFS= read -r k; do
@@ -425,8 +525,8 @@ CONFIG="$TARGET/AGENTS.md"
     esac
     # An ABSENT key prints "key<TAB><TAB>", which renders as "key:: key:" - a key that
     # reads back as its own name twice and fails IN-02/PF-01/FM-01 on a fresh install.
-    # A proposal line with an empty value carries no merge information (the class
-    # default the installer rendered already covers it): drop it here.
+    # A proposal line with an empty value carries no merge information (the installer
+    # default already covers it): drop it here.
     k_val=$(g_agents_read "$PROP" "$k")
     [ -n "$k_val" ] && printf '%s\t%s\n' "$k" "$k_val"
   done <<< "$BLOCK_KEYS"
@@ -441,47 +541,33 @@ CONFIG="$TARGET/AGENTS.md"
 # Fail closed: the declared gate must read back through the engine's own reader.
 GOT_GATE=$(g_agents_gates "$CONFIG" | head -n 1 | awk -F'\t' '{print $2}')
 [ "$GOT_GATE" = "$GATE_CMD" ] || { g_err "the first gate did not land in $CONFIG (reader sees '$GOT_GATE', wanted '$GATE_CMD')"; exit 1; }
-[ "$(g_agents_read "$CONFIG" owner_email)" = "$EMAIL" ] || { g_err "owner_email did not land in $CONFIG"; exit 1; }
+[ "$(g_agents_read "$CONFIG" feature_map)" = "$FEATURE_MAP" ] || { g_err "feature_map did not land in $CONFIG (reader sees '$(g_agents_read "$CONFIG" feature_map)', wanted '$FEATURE_MAP')"; exit 1; }
 
-# ------------------------------------------------------------- sync (hidden) ---
-# The sync-translator step (existing emit engine) runs for the platforms the proposal
-# named. A proposal that names none emits nothing — the neutral-first contract.
-for p in $SYNC_SEL; do
-  printf 'gob init [run] sync --platform %s --scope project\n' "$p"
-  bash "$SRC/bin/goblin-emit" --platform "$p" --scope project --target "$TARGET" || {
-    RC=$?; g_err "sync $p failed (exit $RC)"; exit "$RC"; }
-done
+# --------------------------------------------------------------- feature map ----
+# Materialise the map the proposal embedded (validated above, before anything was written).
+mkdir -p "$TARGET/$MAPDIR_REL" || { g_err "could not create $TARGET/$MAPDIR_REL"; exit 1; }
+cp -R "$STAGE/$MAPDIR_REL/." "$TARGET/$MAPDIR_REL/" 2>/dev/null \
+  || { g_err "could not write the feature map into $TARGET/$MAPDIR_REL"; exit 1; }
+[ -f "$TARGET/$FEATURE_MAP" ] || { g_err "the feature map did not land at $TARGET/$FEATURE_MAP"; exit 1; }
 
-# ------------------------------------------------------------- extras ----------
-# The proposal's TICKED catalogue_suggestions install through the goblin-extras
-# allowlist itself — one code path, one set of refusals (unknown id, SKIP verdict,
-# missing payload). init --write never copies an extra by its own hand: the catalogue
-# is the allowlist, and the CLI is the only installer. A refusal fails the whole
-# --write (the human re-ticks).
-#
-# ORDER MATTERS: --with-mcp-config writes the gob registration FIRST, then the mcp-kind
-# extras merge INTO it — the other order would leave .mcp.json carrying only the extra
-# and do_mcp_config would refuse it (the generated-bytes ask-once check). Extras mcp
-# merges are themselves ask-once: an entry you customized is never overwritten.
+# ------------------------------------------------------- mcp config + hooks ----
+# The user runs NO gob command after install. The MCP registration is now OPT-IN
+# (--with-mcp-config): the named removal that pays for hooks emission (proposal §3).
+# The hooks payload runs by default, into existing vendor directories only.
 if [ "$WITH_MCP" -eq 1 ]; then
   do_mcp_config || exit 1
 fi
-if [ -n "$EXTRAS_SEL" ]; then
-  for xid in $EXTRAS_SEL; do
-    printf 'gob init [run] extras install %s\n' "$xid"
-    bash "$SRC/bin/goblin-extras" install "$xid" --target "$TARGET" || {
-      RC=$?; g_err "extras install $xid failed (exit $RC) — fix the proposal's catalogue_suggestions and re-run"; exit "$RC"; }
-  done
-fi
+do_hooks || exit 1
 
 # --------------------------------------------------------------------- done ----
 printf '\n'
-printf 'gob init: installed — class %s, branch %s, owner %s\n' "$CLASS" "$BRANCH" "$EMAIL"
+printf 'gob init: installed — feature map %s\n' "$FEATURE_MAP"
 printf '  harness: %s/.gob/bin/goblin-verify\n' "$TARGET"
-printf 'next:\n'
-printf '  1. git add -A && git commit   # the install is uncommitted by design\n'
-printf '  2. run .gob/bin/goblin-verify — the skipped rows are the day-one checklist\n'
-printf '  3. features/: gob map (agent brief) then gob map --write features/\n'
-printf '  4. register the verify tool for your agent: %s mcp add gob -- npx -y @techgoblin/gobstack mcp (or run gob init --with-mcp-config)\n' "$AGENT_CLI"
-[ -n "$SYNC_SEL" ] || printf '  5. agent skills are opt-in per platform\n'
+if [ "$WITH_MCP" -eq 0 ]; then
+  printf '  no .mcp.json written — the MCP registration is opt-in: re-run with --with-mcp-config\n'
+fi
+printf '\n'
+# The ONE ordered next-steps list (the engine deferred its own copy). The gate is the one this
+# command declared and MEASURED above, so the list does not tell the user to replace it.
+g_next_block "$TARGET" "$SKILLS_OPT" "$GATE_NAME: $GATE_CMD"
 exit 0

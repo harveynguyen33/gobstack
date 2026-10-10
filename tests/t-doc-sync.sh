@@ -1,22 +1,20 @@
 #!/usr/bin/env bash
 # t-doc-sync.sh — the documents that claim to render the matrix must still render it.
 #
-#   F2-4  README calls docs/ENFORCEMENT.md "the matrix rendered for a human". Every row's check
+#   F2-4  README calls docs/GUIDE.md "the matrix rendered for a human". Every row's check
 #         cell AND its "if it cannot be enforced, why" cell must equal manifest/enforcement.tsv.
 #         Measured stale at f23b371: checks IN-03, HP-02, SP-03, PT-01; whys IN-03, IN-04, HP-02,
 #         SP-03, HS-01, PT-01, CL-02.
-#   F2-8  docs/ROLES.md must say bin/goblin-model is checkout-only, because the installer does
-#         not install it (measured in t-uninstall.sh) and it has no enforcement.tsv row.
 #   F2-9  "A fresh install is not automatically green" is false as measured - a fresh class-A
 #         install verifies 43 passed, 0 failed, 11 advisory, 28 skipped, exit 0. The claim was
-#         written in FOUR places, not three: README.md, docs/CONTRACTS.md, docs/ADOPTION.md and
+#         written in FOUR places, not three: README.md, docs/GUIDE.md, docs/GUIDE.md and
 #         skills/goblin-bootstrap/SKILL.md - the last one being the copy the installer writes
 #         into every target (bin/goblin-install:357-360), so a green target shipped the claim
 #         that a fresh install is not green. All four are scanned, on text normalised for
 #         markdown, because a literal grep is defeated by the claim's own emphasis: restored to
-#         docs/ADOPTION.md as "A fresh install is **not** automatically green", the round-1
+#         docs/GUIDE.md as "A fresh install is **not** automatically green", the round-1
 #         control printed ok and exited 0.
-#   F2-3  docs/LIMITS.md must admit that .goblin/installed.json is not signed, because one edit
+#   F2-3  docs/LIMITS.md must admit that .gob/installed.json is not signed, because one edit
 #         to it (plus the matching edit to the file it protects) yields a fully green run.
 #   V3-1  templates/AGENTS.md.tmpl must name the ban engine, because that template is the only
 #         source of the installed AGENTS.md - the file a session reads first. Without it a ban is
@@ -25,7 +23,7 @@
 #         unsigned ban table, the text-probe gap, a ban that is invisible until verify runs).
 #   AB3   the advisory arithmetic is a number THIS matrix owns (`advisory_ceiling`), and it is
 #         quoted as prose in five places. Three are dated history (the CHANGELOG entries,
-#         docs/ENFORCEMENT.md's chronology, t-verify-red.sh's pre-change note) and keep their own
+#         docs/GUIDE.md's chronology, t-verify-red.sh's pre-change note) and keep their own
 #         tense; the two LIVE claim sites stated 9 of 10 as what the run prints, one with no
 #         dating at all. The live copies are read here, and only they.
 #
@@ -54,7 +52,7 @@ FALSE_RE='not[[:space:]]+automatically[[:space:]]+green'
 
 # The documents a user receives: the three prose docs plus every SHIPPED skill
 # (skills/*/SKILL.md is the installer's write set — bin/goblin-install:357-360).
-CLAIM_DOCS="README.md docs/CONTRACTS.md docs/ADOPTION.md"
+CLAIM_DOCS="README.md docs/GUIDE.md docs/LIMITS.md"
 for f in skills/*/SKILL.md; do [ -f "$f" ] && CLAIM_DOCS="$CLAIM_DOCS $f"; done
 
 # doc_cell <file> <row id> <field index> — the nth pipe-separated cell of the row whose first
@@ -65,6 +63,7 @@ doc_cell() {
       line = $0
       gsub(/\\\|/, "\001", line)
       n = split(line, f, "|")
+      if (n < 7) next   # only the six-cell rule matrix matches; shorter tables reuse row ids
       first = f[2]; gsub(/[` ]/, "", first)
       if (first != id) next
       cell = f[idx]
@@ -81,19 +80,15 @@ while IFS=$'\t' read -r id scope rule by artifact check why; do
   [ "$id" = "id" ] && continue
   [ -n "$id" ] || continue
   CELLS=$((CELLS + 1))
-  [ "$(norm "$(doc_cell docs/ENFORCEMENT.md "$id" 6)")" = "$(norm "$check")" ] || DRIFT="$DRIFT $id/check"
-  [ "$(norm "$(doc_cell docs/ENFORCEMENT.md "$id" 7)")" = "$(norm "$why")" ] || DRIFT="$DRIFT $id/why"
+  [ "$(norm "$(doc_cell docs/GUIDE.md "$id" 6)")" = "$(norm "$check")" ] || DRIFT="$DRIFT $id/check"
+  [ "$(norm "$(doc_cell docs/GUIDE.md "$id" 7)")" = "$(norm "$why")" ] || DRIFT="$DRIFT $id/why"
 done < manifest/enforcement.tsv
 if [ -n "$DRIFT" ]; then
-  note "docs/ENFORCEMENT.md has drifted from manifest/enforcement.tsv:$DRIFT"
+  note "docs/GUIDE.md has drifted from manifest/enforcement.tsv:$DRIFT"
   note "  (re-sync the cell, not the doc: the tsv is the source of truth)"
 fi
-check "docs/ENFORCEMENT.md renders all $CELLS rows of the matrix, both columns" \
+check "docs/GUIDE.md renders all $CELLS rows of the matrix, both columns" \
   "$([ -z "$DRIFT" ] && echo 0 || echo 1)"
-
-# ---- F2-8: the checkout-only statement ---------------------------------------
-grep -qi 'checkout-only' docs/ROLES.md
-check "docs/ROLES.md states that bin/goblin-model is checkout-only (F2-8)" "$?"
 
 # ---- F2-9: the false claim is gone, the measured one is there ----------------
 # The control's own control: the normalised matcher must still catch the claim wearing emphasis
@@ -123,15 +118,18 @@ check "no shipped doc or skill claims a fresh install is not automatically green
   "$([ -z "$FALSE_CLAIM" ] && echo 0 || echo 1)"
 
 # The three prose docs and the shipped bootstrap skill must carry the measured line; the other
-# shipped skills do not discuss a verify run and are not required to. v2: the measured green
-# path is the DEFAULT install's (37/0/11/34 — the CI payload is gone, so PG-06 SKIPs where it
-# passed vacuously; before that W6 neutral-first moved 43/0/11/28 -> 38/0/11/33).
+# shipped skills do not discuss a verify run and are not required to. Batch 2b-ii + GAP-2/3: the
+# measured green path is the DEFAULT install's, over the ~19-row core with the seven-skill core
+# procedure tier vendored under .gob/skills/ and bans self-selected by glob OR the dep: predicate
+# (17/0/0/10; the 32 not-for-every-repo rows moved to the library, so the advisory count is 0,
+# SK-01/02/04 RUN, and the electron bans BN-06..09 report NOT APPLICABLE with no package.json —
+# FIX 1 removed the false green where they ran off the harness's own shipped .mjs/.json).
 GREEN_CLAIM=""
-for f in README.md docs/CONTRACTS.md docs/ADOPTION.md skills/goblin-bootstrap/SKILL.md; do
-  norm_text "$f" | grep -q '37 passed, 0 failed, 11 advisory, 34 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
+for f in README.md docs/GUIDE.md skills/goblin-bootstrap/SKILL.md; do
+  norm_text "$f" | grep -q '17 passed, 0 failed, 0 advisory, 10 skipped' || GREEN_CLAIM="$GREEN_CLAIM $f"
 done
 [ -z "$GREEN_CLAIM" ] || note "does not state the measured green path:$GREEN_CLAIM"
-check "README, CONTRACTS, ADOPTION and the shipped bootstrap skill state the measured green path" \
+check "README, GUIDE and the shipped bootstrap skill state the measured green path" \
   "$([ -z "$GREEN_CLAIM" ] && echo 0 || echo 1)"
 
 # ---- W6 neutral-first: the docs teach skills as an opt-in, never as an install default --------
@@ -143,33 +141,32 @@ for f in README.md docs/GUIDE.md; do
   norm_text "$f" | grep -q 'agent skills are opt-in'
   check "$f states agent skills are opt-in (W6 neutral-first)" "$?"
 done
-# v2: the per-platform sync surface is UNWIRED. The docs name it as a later alpha, never as a
-# working verb — the shim refuses emit/sync today (t-shim SH1), and a doc teaching it would
-# send a reader into exit 2.
+# v3: the per-platform sync surface is CUT — the docs must not teach `gob sync/emit` as a
+# working verb (the shim refuses emit/sync today, t-shim SH1).
 SYNC_TAUGHT=""
 for f in README.md docs/GUIDE.md; do
   norm_text "$f" | grep -qE 'gob (sync|emit) --platform' && SYNC_TAUGHT="$SYNC_TAUGHT $f"
 done
-[ -z "$SYNC_TAUGHT" ] || note "still teaches the unwired sync verb:$SYNC_TAUGHT"
-check "no doc teaches gob sync/emit as a working verb (v2: the surface is unwired)" \
+[ -z "$SYNC_TAUGHT" ] || note "still teaches the cut sync verb:$SYNC_TAUGHT"
+check "no doc teaches gob sync/emit as a working verb (v3: the surface is cut)" \
   "$([ -z "$SYNC_TAUGHT" ] && echo 0 || echo 1)"
-norm_text README.md | grep -q 'the per-platform emit surface returns in a later alpha'
-check "README states the emit surface is a later alpha (v2 unwired)" "$?"
 # v2 installs no CI: no doc may teach a ci opt-in that does not exist, and the absence must be
-# STATED (the strongest form of the old default-no pin).
+# STATED (the strongest form of the old default-no pin). The record that the `ci-gate` part is a cut
+# W4 remnant (folded into GUIDE with the rest of the matrix) is a noun, not an opt-in: the pattern
+# matches only the flag/`ci-gate: on` forms a reader could act on.
 norm_text README.md | grep -q 'not a ci product: nothing is installed under .github/'
 check "README states the no-CI contract (v2)" "$?"
 norm_text docs/GUIDE.md | grep -q 'v2 installs no ci'
 check "docs/GUIDE.md states the no-CI contract (v2)" "$?"
 CI_TAUGHT=""
 for f in README.md docs/GUIDE.md; do
-  norm_text "$f" | grep -qE 'ci[- ]gate|--ci-gate|workflows/goblin-gate' && CI_TAUGHT="$CI_TAUGHT $f"
+  norm_text "$f" | grep -qE '--ci-gate|ci[- ]gate: |workflows/goblin-gate' && CI_TAUGHT="$CI_TAUGHT $f"
 done
 [ -z "$CI_TAUGHT" ] || note "still teaches a ci opt-in:$CI_TAUGHT"
 check "no doc teaches a ci opt-in (v2: CI is out of the product)" "$([ -z "$CI_TAUGHT" ] && echo 0 || echo 1)"
 # The stale claim, normalised like every matcher above: 'install' as subject of copying skills.
 STALE_INSTALL_SKILLS=""
-for f in README.md docs/GUIDE.md docs/CONTRACTS.md docs/ADOPTION.md; do
+for f in README.md docs/GUIDE.md; do
   norm_text "$f" | grep -qE 'install(s|ed)? (the )?(manifest, )?skills' && STALE_INSTALL_SKILLS="$STALE_INSTALL_SKILLS $f"
   norm_text "$f" | grep -q 'install .hermes/skills (default yes' && STALE_INSTALL_SKILLS="$STALE_INSTALL_SKILLS $f"
 done
@@ -177,96 +174,17 @@ done
 check "no user-facing doc claims the install copies skills by default (W6 neutral-first)" \
   "$([ -z "$STALE_INSTALL_SKILLS" ] && echo 0 || echo 1)"
 
-# ---- W4-A: the CI lane's blind spots are stated where a run will see them --------------------
-# The lane's own finding is that a workflow file is not a gate: GitHub reports a SKIPPED job as
-# Success, and an admin can push straight past a protection rule. PROJECT-PRACTICE section 3
-# requires every claim to say what it CANNOT see, and the "cannot see" footer is the place a run
-# shows it - the V3-8 precedent, one lane over. The four settings a workflow needs to BE a gate
-# live in docs/CI.md, because a template cannot arm a check.
-awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /CI lane/) found = 1 } END { exit !found }' bin/goblin-verify
-check "the verifier's 'cannot see' footer names the CI lane (W4-A)" "$?"
-awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /required check/) found = 1 } END { exit !found }' bin/goblin-verify
-check "  and says a required check is not the same thing as a gate" "$?"
-for marker in 'required check' 'Do not allow bypassing' 'sole admin' 'skipped'; do
-  grep -qi -- "$marker" docs/CI.md
-  check "docs/CI.md states '$marker' - the settings that make a workflow a gate" "$?"
-done
-grep -q 'main_thread_busy_pct' docs/CI.md && grep -q 'app_bundle_bytes' docs/CI.md
-check "docs/CI.md carries the Electron perf deviation, both metrics named" "$?"
-
-# ---- W4-B / W6: the class matrix is rendered from manifest/classes.tsv ------------------------
-# The part/class table is where a reader decides what a class owes, so it is the one place a class
-# can rot in silence. W6 merged the sixth (desktop/F) class into `software` - five domain-named
-# columns now, with A-E as read-time aliases. The tsv is one row per (class, part) pair -
-# `class<TAB>part<TAB>need` - and the doc renders a missing part as an em dash, so normalise.
-# v2: the `ci-gate` rows stay in the tsv as the recorded W4 remnant (every class `-`, CI is out of
-# the product), and the DOC intentionally renders no ci-gate row — its absence IS the statement,
-# made in prose right under the table. So the loop walks the tsv parts MINUS ci-gate, and the
-# prose note is pinned separately below.
-CLASS_DRIFT=""
-CLS=$(awk -F'\t' 'NR>1 { if (!seen[$2]++) print $2 }' manifest/classes.tsv | grep -v '^ci-gate$')
-for part in $CLS; do
-  want=$(for c in software service game research fleet; do
-           need=$(awk -F'\t' -v c="$c" -v p="$part" '$1==c && $2==p { print $3 }' manifest/classes.tsv)
-           printf '%s|' "${need:--}"
-         done | sed 's/|$//')
-  got=$(grep -m1 "^| *$part *|" docs/ENFORCEMENT.md | tr -d ' `' \
-        | awk -F'|' '{ out=""; for (i=3; i<=NF; i++) { gsub(/[ \t]/,"",$i); if ($i == "") continue; out = out "|" $i } sub(/^\|/,"",out); print out }')
-  [ "$got" = "$want" ] || CLASS_DRIFT="$CLASS_DRIFT $part(doc=$got tsv=$want)"
-done
-[ -z "$CLASS_DRIFT" ] || note "class matrix drifted from manifest/classes.tsv:$CLASS_DRIFT"
-check "docs/ENFORCEMENT.md renders the class matrix from manifest/classes.tsv (W4-B)" \
-  "$([ -z "$CLASS_DRIFT" ] && echo 0 || echo 1)"
-# The ci-gate remnant is pinned BOTH ways: every class off in the tsv, and the doc says why the
-# row is not rendered (so the absence reads as a decision, not a rendering gap).
-[ "$(awk -F'\t' '$2=="ci-gate" { print $3 }' manifest/classes.tsv | sort -u | tr -d '\n')" = "-" ]
-check "manifest/classes.tsv carries ci-gate as off for EVERY class (the v2 remnant shape)" "$?"
-grep -q 'ci-gate' docs/ENFORCEMENT.md && grep -q 'v2 installs no CI' docs/ENFORCEMENT.md
-check "  and the doc states in prose why ci-gate renders no row (v2 installs no CI)" "$?"
-# W6 review guard: the matrix loop above iterates the tsv's PARTS, so it cannot see a re-added
-# CLASS - a silently restored sixth class passed the whole suite. Pin the class SET itself.
-CLS_SET=$(awk -F'\t' 'NR>1 { if (!seen[$1]++) print $1 }' manifest/classes.tsv | sort | tr '\n' ' ')
-[ "$CLS_SET" = "fleet game research service software " ] || note "classes.tsv class set is not the canonical five: '$CLS_SET'"
-check "manifest/classes.tsv carries exactly the five canonical classes (W6)" \
-  "$([ "$CLS_SET" = "fleet game research service software " ] && echo 0 || echo 1)"
-# W6: the sixth (desktop/F) class is merged into software; ADOPTION now teaches five domain-named
-# classes and carries the electron opt-in that replaced F. The old pin measured the F row itself.
-grep -q '^| \*\*software\*\* (A) |' docs/ADOPTION.md
-check "docs/ADOPTION.md names the software class (W6: the F class merged in)" "$?"
-grep -qi 'electron opt-in' docs/ADOPTION.md
-check "  and states the electron opt-in that replaced the sixth class (W6)" "$?"
-# W4-B, v2: the CI lane is OUT of the product — no workflow is written, docs/CI.md is a LIMITS
-# candidate, not a promise in the doc table, and ADOPTION's preset matrix carries no CI-lane row.
-# The controls assert the ABSENCE (the W4-B pin as it now reads) plus the LIMITS note that keeps
-# the decision from looking like an accident, and the verifier footer still says what the old
-# lane could not see (the prose survives even though the lane does not).
-! grep -q 'docs/CI.md' README.md
-check "README's document table does NOT promise a CI doc (v2: CI is out of the product)" "$?"
-! grep -qi '^| CI lane |' docs/ADOPTION.md
-check "  and the preset matrix carries no CI-lane row (the part is off for every class)" "$?"
-grep -q 'docs/CI.md' docs/LIMITS.md
-check "  and docs/LIMITS.md records CI.md as a v2 LIMITS candidate" "$?"
-
-# ---- W6: desktop/F is a legacy ALIAS, never a class a reader picks ----------------------------
-# W6 merged the sixth (desktop/F) class into software — their classes.tsv need columns were
-# identical on all ten parts. The CLI still accepts `desktop`/`F` as a read-time alias, documented
-# once on docs/CONTRACTS.md's --class line; no doc that teaches the class CHOICE may carry it. Same
-# shape as the W5-D clone-install absence assertions below.
-DESKTOP_TAUGHT=""
-for f in README.md docs/GUIDE.md docs/ADOPTION.md docs/ENFORCEMENT.md docs/CI.md skills/goblin-bootstrap/SKILL.md; do
-  grep -qi 'desktop' "$f" && DESKTOP_TAUGHT="$DESKTOP_TAUGHT $f"
-done
-if [ -z "$DESKTOP_TAUGHT" ]; then
-  note "ok   no class-choice doc teaches 'desktop' as a class (W6: desktop/F is a legacy alias)"
-else
-  note "FAIL still presents 'desktop' as a class:$DESKTOP_TAUGHT"
-  grep -ni 'desktop' $DESKTOP_TAUGHT | head -3
+# ---- W4-A (v3): the footer names NO lane the product cut ---------------------
+# The V3-8 precedent, one lane over, INVERTED: v3 cut the CI lane and DELETED docs/CI.md, so
+# a footer that still names a lane no rule walks is a false statement on every run. The
+# forward statements stay (V3-8 names the ban lane below); this control is their inverse — the
+# footer must NOT name the deleted CI lane.
+if awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /CI lane/) found = 1 } END { exit !found }' bin/goblin-verify; then
+  note "FAIL the verifier's 'cannot see' footer still names the cut CI lane (W4-A)"
   fail=1
+else
+  note "ok   the verifier's 'cannot see' footer names no cut CI lane (W4-A)"
 fi
-# And the alias is still documented, once, where the CLI surface is described - so the absence
-# above cannot be satisfied by deleting the back-compat story.
-grep -qi 'desktop' docs/CONTRACTS.md
-check "docs/CONTRACTS.md documents desktop/F as a read-time alias (W6)" "$?"
 
 # ---- F2-3: the unsigned record is admitted -----------------------------------
 grep -qi 'is not signed' docs/LIMITS.md
@@ -289,15 +207,15 @@ awk '/^      cannot see:/,/^SEE$/ { if ($0 ~ /ban/) found = 1 } END { exit !foun
 check "the verifier's 'cannot see' footer names the ban lane's blind spots (V3-8)" "$?"
 
 # ---- AB3: the LIVE copies of the advisory arithmetic must match the run -----------------------
-# `advisory_ceiling` is 10 and `SK-03` prints `advisory 10 of ceiling 10 (0 free slots: the next
-# advisory row FAILs)`. docs/GUARDRAILS.md's third design constraint and docs/LIMITS.md #26 both
+# `advisory_ceiling` is 10 and `SK-03` prints `advisory 0 of ceiling 10 (10 free slots: ...)`.
+# docs/LIMITS.md's third design constraint and docs/LIMITS.md #26 both
 # presented 9 of 10 as what the run reports - LIMITS in the present tense ("reports that arithmetic
 # on every run"), GUARDRAILS with no way to date it. Both are read here; the dated history
-# (CHANGELOG entries, docs/ENFORCEMENT.md's chronology, t-verify-red.sh's pre-change note) is not,
+# (CHANGELOG entries, docs/GUIDE.md's chronology, t-verify-red.sh's pre-change note) is not,
 # and keeps its own tense.
-ADV_POINT=$(awk '/advisory_ceiling/ { c = 6 } c > 0 { print; c-- }' docs/GUARDRAILS.md)
-printf '%s' "$ADV_POINT" | grep -q '10 of 10'
-check "docs/GUARDRAILS.md's advisory point states the measured count (10 of 10) (AB3)" "$?"
+ADV_POINT=$(awk '/The guard rails/{ c = 40 } c > 0 { print; c-- }' docs/LIMITS.md)
+printf '%s' "$ADV_POINT" | grep -q '0 of 10'
+check "docs/LIMITS.md's advisory point states the measured count (0 of 10) (AB3)" "$?"
 printf '%s' "$ADV_POINT" | grep -qE '\*\*Corrected [0-9]{4}-[0-9]{2}-[0-9]{2}'
 check "  and dates the correction, the way docs/LIMITS.md's own W2/W3 notes do (AB3)" "$?"
 # Normalised, because the sentence wraps: a literal grep for 'reports that arithmetic on every run'
@@ -311,7 +229,7 @@ else
 fi
 
 # ---- W4-C: the INTEGRATION hook claim states the measured mechanism ---------------------------
-# docs/INTEGRATION.md's recovery paragraph is the project's bootstrap position. The W4a probe
+# docs/GUIDE.md's recovery paragraph is the project's bootstrap position. The W4a probe
 # measured the mechanism on the real docs (hooks reference + the platform hooks pages): on this
 # runtime on_session_start EXISTS and cannot inject (an observer's return is discarded), and
 # pre_llm_call CAN inject into the user message. The old sentence claimed recovery was needed
@@ -322,14 +240,14 @@ fi
 # control below restores the old sentence and must go RED, or this asserts nothing.
 # Normalisation strips emphasis and ticks but KEEPS underscores (the hook names are
 # snake_case identifiers; a matcher that spaced them out could not see them at all).
-INT_FLAT=$(sed 's/[*`]//g' docs/INTEGRATION.md | tr -s '[:space:]' ' ' | tr 'A-Z' 'a-z')
+INT_FLAT=$(sed 's/[*`]//g' docs/GUIDE.md | tr -s '[:space:]' ' ' | tr 'A-Z' 'a-z')
 printf '%s' "$INT_FLAT" | grep -q 'pre_llm_call can inject into the user message'
-check "docs/INTEGRATION.md names pre_llm_call as the hook that can inject (W4-C)" "$?"
+check "docs/GUIDE.md names pre_llm_call as the hook that can inject (W4-C)" "$?"
 if printf '%s' "$INT_FLAT" | grep -q 'hook that does not exist'; then
-  note "FAIL docs/INTEGRATION.md still claims a hook does not exist (W4-C)"
+  note "FAIL docs/GUIDE.md still claims a hook does not exist (W4-C)"
   fail=1
 else
-  note "ok   no hook claim in docs/INTEGRATION.md rests on 'does not exist' (W4-C)"
+  note "ok   no hook claim in docs/GUIDE.md rests on 'does not exist' (W4-C)"
 fi
 # the mutation control: the OLD sentence must be caught by the matcher above
 OLD_INT='the mode skill is loadable on demand and AGENTS.md names it, so recovery is reading one file rather than depending on a hook that does not exist.'
@@ -427,60 +345,23 @@ for f in README.md docs/GUIDE.md; do
   fi
 done
 
-# ---- gob map: the standalone generator is documented where a reader decides -----
-# The docs must teach BOTH halves of the product decision (2026-10): the generator is
-# standalone (works with no .goblin/ install and no goblin.yaml), AND the FM-01/FM-02
-# rows stay opt-in through the feature_map: declaration — generating a map never forces
-# the rows on. Each asserted sentence is the pin for its own edit; the generator
-# behaviour itself is t-map.sh and the shim's SH9.
-norm_text README.md | grep -q 'gob map . the feature-map prompt . schema'
-check "README's command table carries the gob map row" "$?"
-norm_text README.md | grep -q 'never clobbers . an existing map refuses until --force'
-check "README's gob map row states the never-clobber contract" "$?"
-norm_text docs/GUIDE.md | grep -q 'feature maps: generate with gob map , then opt in'
-check "docs/GUIDE.md has the feature-map section" "$?"
-norm_text docs/GUIDE.md | grep -q 'no install needed'
-check "the GUIDE section states the standalone contract (no install)" "$?"
-norm_text docs/GUIDE.md | grep -q 'that declaration is the verify opt-in, never forced'
-check "the GUIDE section states FM-01/FM-02 stay opt-in (the declaration decides)" "$?"
+# ---- the feature map: authored in the init proposal, no standalone verb ---------------------
+# v3 folds the map into `gob init`: the docs must teach the mandatory map authored INSIDE the
+# proposal, and must NOT hand a reader a `gob map` command (the verb is gone). Each asserted
+# sentence is the pin for its own edit; the validation itself is bin/goblin-map + t-init.sh.
+if norm_text README.md | grep -q 'gob map . the feature-map prompt . schema'; then RM=1; else RM=0; fi
+check "README's command table carries no gob map row" "$RM"
+norm_text docs/GUIDE.md | grep -q 'feature maps: authored in the gob init proposal, mandatory'
+check "docs/GUIDE.md has the v3 feature-map section" "$?"
+norm_text docs/GUIDE.md | grep -q 'no .no map declared. state'
+check "the GUIDE section states the map is mandatory (no empty state)" "$?"
 norm_text docs/GUIDE.md | grep -q 'verified: never-driven'
 check "the GUIDE section teaches the never-driven verified form is not a drive claim" "$?"
 
-# ---- gob extras: the catalogue system is documented where a reader decides ------
-# The same shape as the map/mcp pins: the allowlist rule, the offline payload
-# contract, the suggestions-never-install contract, the discover_extras tier
-# (proposals only) and the curation surface. The behaviour itself is t-extras.sh.
-norm_text README.md | grep -q 'the catalogue is the allowlist'
-check "README states the catalogue-is-the-allowlist rule (extras)" "$?"
-norm_text README.md | grep -q 'installs are offline by contract'
-check "README states the offline payload contract (extras)" "$?"
-norm_text README.md | grep -q 'suggests; it never installs'
-check "README states init-suggests-never-installs (extras)" "$?"
-norm_text README.md | grep -q 'the discover extras tier is proposals only'
-check "README states the discover tier is proposals-only (extras)" "$?"
-norm_text README.md | grep -q 'by pr or direct edit'
-check "README names the curation surface (a row = PR or edit)" "$?"
-norm_text docs/GUIDE.md | grep -q 'the extras catalogue'
-check "docs/GUIDE.md has the extras section" "$?"
-norm_text docs/GUIDE.md | grep -q 'init suggests, the catalogue allows, you install'
-check "docs/GUIDE.md states the one extras rule" "$?"
-# the license gate (W-license) is promised where the verdicts are taught
-norm_text README.md | grep -q 'the license gate is hard'
-check "README states the hard license gate (extras)" "$?"
-norm_text README.md | grep -q 'license pending verification'
-check "README names the gate refusal verbatim (extras)" "$?"
-norm_text docs/GUIDE.md | grep -q 'the license gate rides on top, hard'
-check "docs/GUIDE.md states the gate rides on the verdicts (extras)" "$?"
-# the CLI table carries the verb on both front doors
-for f in README.md docs/GUIDE.md; do
-  grep -qF 'gob extras' "$f"
-  check "$f names the gob extras command" "$?"
-done
-
 # ---- gob mcp: the MCP server is documented where an agent owner decides ----------
 # The same shape as the gob map pins: the docs teach the registration one-liners (the
-# claude one-liner, the Cursor json, the repo-distributed --with-mcp-config flag), the
-# three-tool surface with the gob_verify trigger, and the local-only clause. Each
+# claude one-liner, the Cursor json, and the repo-root .mcp.json that init --write writes),
+# the three-tool surface with the gob_verify trigger, and the local-only clause. Each
 # asserted sentence is the pin for its own edit; the server behaviour itself is t-mcp.sh.
 GOB_MCP_CMD='claude mcp add gob -- npx -y @techgoblin/gobstack mcp'
 for f in README.md docs/GUIDE.md; do
@@ -493,10 +374,10 @@ norm_text README.md | grep -q 'gob mcp . serve the harness to your coding agent 
 check "README's command table carries the gob mcp row" "$?"
 norm_text README.md | grep -q 'no sdk and no network'
 check "README's MCP section states the local-only clause" "$?"
-norm_text README.md | grep -q 'gob init --with-mcp-config'
-check "README names the repo-distributed registration flag" "$?"
-norm_text README.md | grep -q 'refuses a file that carries anything else'
-check "README states the ask-once refusal (a customized .mcp.json is never overwritten)" "$?"
+norm_text README.md | grep -q 'init --write writes the repo-root .mcp.json'
+check "README states init --write writes the repo-root .mcp.json (GAP-1: no second step)" "$?"
+norm_text README.md | grep -q "a registration you customized is the project's and is never overwritten"
+check "README states the ask-once keep (a customized .mcp.json is never overwritten)" "$?"
 norm_text README.md | grep -q 'gob uninstall removes it only when it still matches the generated bytes'
 check "README states the uninstall hash-compare clause" "$?"
 for tool in gob_verify gob_map_status gob_init_status; do
@@ -509,10 +390,10 @@ norm_text docs/GUIDE.md | grep -q 'it calls no api and opens no socket'
 check "the GUIDE section states the local-only clause" "$?"
 norm_text docs/GUIDE.md | grep -q 'gob mcp . the mcp stdio server .three tools, local only.'
 check "the GUIDE reference block lists gob mcp" "$?"
-# the init brief/done-screen one-liner is discoverability for the server (t-mcp M10 pins
-# the screens; here the docs name the same command a reader would run)
-grep -qF -- '--with-mcp-config' docs/GUIDE.md
-check "the GUIDE names the --with-mcp-config flag" "$?"
+# the docs name the registration the install performs (GAP-1: init --write writes it; the
+# brief/done-screen one-liner is gone, so a reader learns the path from the docs)
+norm_text docs/GUIDE.md | grep -q 'init --write writes a repo-root .mcp.json as part of the install'
+check "the GUIDE names the automatic repo-root .mcp.json write" "$?"
 
 if [ "$fail" -eq 0 ]; then note "t-doc-sync: PASS"; else note "t-doc-sync: FAIL"; fi
 exit "$fail"

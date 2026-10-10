@@ -11,9 +11,8 @@
 #   V5  the GUIDE Version: stamp check still exists in t-doc-guide.sh — the AB4 matcher
 #       lives, so a refactor cannot silently drop the one stamp assertion that predates
 #       this file (its logic is asserted to EXIST here, not duplicated)
-#   V6  goblin --version prints VERSION byte-for-byte through BOTH CLIs — the bash
-#       dispatcher (W1) and the node shim (W2); a shim or constant bypassing the source
-#       fails byte-for-byte
+#   V6  goblin --version prints VERSION byte-for-byte through the npm shim (the one
+#       CLI); a shim or constant bypassing the source fails byte-for-byte
 #
 # Dependency contract: python3 for JSON (no jq), bash/awk/sed/grep only.
 
@@ -60,7 +59,7 @@ check "V2 package.json.version equals VERSION byte-for-byte ($PKG_VER vs $VERSIO
 # ---- V3: every bin version constant equals VERSION -----------------------------------------
 # Match only the declaration shape, same one the plan pins:  ^GOBLIN_[A-Z_]*_VERSION="x.y.z"
 DRIFT=$(grep -hE '^GOBLIN_[A-Z_]+_VERSION=' bin/goblin-install bin/goblin-verify bin/goblin-bans \
-          bin/goblin-lib.sh bin/goblin-audit 2>/dev/null \
+          bin/goblin-lib.sh 2>/dev/null \
         | grep -v "^GOBLIN_[A-Z_]*_VERSION=\"$VERSION\"$")
 if [ -z "$DRIFT" ]; then
   check "V3 every GOBLIN_*_VERSION constant in bin/ equals VERSION" 0
@@ -69,17 +68,15 @@ else
   check "V3 every GOBLIN_*_VERSION constant in bin/ equals VERSION" 1
 fi
 
-# ---- V4: the count is pinned at 6 (the load-bearing assertion) ------------------------------
-# A value comparison cannot stop a SIXTH copy being added — even one that agrees today.
+# ---- V4: the count is pinned at 4 (the load-bearing assertion) ------------------------------
+# A value comparison cannot stop another copy being added — even one that agrees today.
 # Pinning the COUNT converts the next unread copy into a red run (the IN-03 move, applied
-# to the version). The five, measured in PLAN-V1 §4.4's table, plus W3's sixth:
+# to the version). The four, measured in PLAN-V1 §4.4's table:
 #   bin/goblin-install  GOBLIN_INSTALL_VERSION
 #   bin/goblin-verify   GOBLIN_VERIFY_VERSION
 #   bin/goblin-bans     GOBLIN_BANS_VERSION
 #   bin/goblin-lib.sh   GOBLIN_LIB_VERSION
-#   bin/goblin-audit    GOBLIN_AUDIT_VERSION
-#   bin/goblin-upgrade  GOBLIN_UPGRADE_VERSION   (W3 — caught by this very pin at 5, moved to 6)
-EXPECTED_COUNT=6
+EXPECTED_COUNT=4
 COUNT=$(grep -hE '^GOBLIN_[A-Z_]+_VERSION=' bin/* 2>/dev/null | wc -l | tr -d ' ')
 check "V4 the GOBLIN_*_VERSION constant count is pinned ($COUNT declared vs $EXPECTED_COUNT pinned)" \
   "$([ "$COUNT" -eq "$EXPECTED_COUNT" ] && echo 0 || echo 1)"
@@ -101,14 +98,11 @@ fi
 # byte-for-byte (round-2 review, LOW-1). Each CLI's stdout goes to a file untouched;
 # the expectation is VERSION's own bytes copied verbatim, no re-formatting.
 cp VERSION /tmp/v6-want
-bash bin/goblin --version 2>/dev/null > /tmp/v6-bash.out
-check "V6 bash bin/goblin --version prints VERSION byte-for-byte" \
-  "$(cmp -s /tmp/v6-bash.out /tmp/v6-want && echo 0 || echo 1)"
 
 node bin/goblin.js --version 2>/dev/null > /tmp/v6-node.out
 check "V6 node bin/goblin.js --version prints VERSION byte-for-byte" \
   "$(cmp -s /tmp/v6-node.out /tmp/v6-want && echo 0 || echo 1)"
-rm -f /tmp/v6-want /tmp/v6-bash.out /tmp/v6-node.out
+rm -f /tmp/v6-want /tmp/v6-node.out
 
 if [ "$FAIL" -eq 0 ]; then
   printf 't-version-sync: all checks passed\n'

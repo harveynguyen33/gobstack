@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# t-shim.sh — the npm shim's dispatch table (v2 surface: init/map/verify/bans/uninstall).
+# t-shim.sh — the npm shim's dispatch table (v2 surface: init/verify/bans/mcp/uninstall).
 #
 #   SH1  no args: the shim prints the short usage and exits 2 — the v2 verb set, and a
-#        verb absent from it (audit/upgrade/doctor/emit/sync/install, the unwired
-#        commands) is named as unrecognized, never routed
+#        verb absent from it (map/audit/upgrade/doctor/emit/sync/install, the unwired
+#        or folded commands) is named as unrecognized, never routed
 #   SH2  a leading flag (-h/--help): the same usage, exit 2
 #   SH3  an unrecognized first arg (`inti`): exit 2, and the usage NAMES the word
 #   SH4  `install ...` is REFUSED in v2 (init replaced it): exit 2, the word named
@@ -11,9 +11,8 @@
 #        plan (`would remove ...`) and exits 0 — the dispatcher's uninstall job is real
 #   SH6  --version is byte-identical to VERSION (the V6 property, re-pinned here so a
 #        shim edit cannot move it)
-#   SH7  `map` routes to the standalone feature-map generator: --help exits 0; on a
-#        fixture repo with an app/page.tsx `map --heuristic` generates features/ (exit 0);
-#        on a repo with an existing features/ it refuses with exit 1 naming --force
+#   SH7  `map` is FOLDED into init: the verb is gone from the usage and `gob map` is
+#        refused as unrecognized (exit 2) — there is no standalone generator any more
 #
 # Everything runs against the checkout's bin/goblin.js; the uninstall probe installs
 # into a mktemp repo under a throwaway HOME, like t-init.sh does.
@@ -36,11 +35,11 @@ printf '%s' "$OUT1" | grep -q 'start here: npx @techgoblin/gobstack init'
 check "SH1 the usage names the npx first step" "$?"
 printf '%s' "$OUT1" | grep -q 'uninstall: npm uninstall -g @techgoblin/gobstack'
 check "SH1 the usage names the npm uninstall" "$?"
-for sub in init verify bans map uninstall; do
+for sub in init verify bans uninstall; do
   printf '%s' "$OUT1" | grep -q "gob $sub"
   check "SH1 the usage lists $sub" "$?"
 done
-for gone in audit upgrade doctor emit sync install; do
+for gone in map audit upgrade doctor emit sync install; do
   node "$SRC/bin/goblin.js" "$gone" >/dev/null 2>&1
   check "SH1 the unwired verb $gone is refused (exit 2)" "$([ $? -eq 2 ] && echo 0 || echo 1)"
 done
@@ -76,7 +75,7 @@ mkdir -p "$P"
   printf '# probe\n' > README.md
   git add -A && git commit -q -m seed
 ) >/dev/null 2>&1
-HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target "$P" --class A >/dev/null 2>&1
+HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target "$P" >/dev/null 2>&1
 OUT5=$(HOME="$HOMEDIR" node "$SRC/bin/goblin.js" uninstall --dry-run --target "$P" 2>&1); RC5=$?
 check "SH5 goblin uninstall --dry-run exits 0" "$([ "$RC5" -eq 0 ] && echo 0 || echo 1)"
 printf '%s' "$OUT5" | grep -q 'would remove'
@@ -87,24 +86,15 @@ node "$SRC/bin/goblin.js" --version > "$WORK/v.out" 2>/dev/null
 cmp -s "$WORK/v.out" "$SRC/VERSION"
 check "SH6 --version prints VERSION byte-for-byte" "$?"
 
-# ---- SH7: `map` routes to the standalone generator ------------------------------
-node "$SRC/bin/goblin.js" map --help > "$WORK/map9h.out" 2>&1; RC9H=$?
-check "SH7 gob map --help exits 0" "$([ "$RC9H" -eq 0 ] && echo 0 || echo 1)"
-grep -qc 'error:' "$WORK/map9h.out"
-check "SH7 gob map --help prints no error line" "$([ $? -eq 1 ] && echo 0 || echo 1)"
-printf '%s' "$OUT1" | grep -q 'gob map'
-check "SH7 the short usage lists map" "$?"
-MP="$WORK/maprepo"
-mkdir -p "$MP/app"
-printf 'export default function Home() { return <div>home</div> }\n' > "$MP/app/page.tsx"
-OUT9=$(cd "$MP" && HOME="$HOMEDIR" node "$SRC/bin/goblin.js" map --heuristic 2>&1); RC9=$?
-check "SH7 gob map --heuristic on a fixture with app/page.tsx exits 0" "$([ "$RC9" -eq 0 ] && echo 0 || echo 1)"
-[ -f "$MP/features/README.md" ] && [ -f "$MP/features/home.md" ]
-check "SH7 and generates features/ (index + home.md)" "$?"
-OUT9B=$(cd "$MP" && HOME="$HOMEDIR" node "$SRC/bin/goblin.js" map --heuristic 2>&1); RC9B=$?
-check "SH7 a second gob map --heuristic on the same repo refuses, exit 1" "$([ "$RC9B" -eq 1 ] && echo 0 || echo 1)"
-printf '%s' "$OUT9B" | grep -qF -- '--force'
-check "SH7 and the refusal names --force" "$?"
+# ---- SH7: `map` is folded into init — the verb is gone ---------------------------
+if printf '%s' "$OUT1" | grep -q 'gob map'; then MAPLIST=1; else MAPLIST=0; fi
+check "SH7 the short usage does NOT list map (folded into init)" "$MAPLIST"
+OUT7=$(node "$SRC/bin/goblin.js" map 2>&1); RC7=$?
+check "SH7 gob map is refused (exit 2)" "$([ "$RC7" -eq 2 ] && echo 0 || echo 1)"
+printf '%s' "$OUT7" | grep -q 'unrecognized command: map'
+check "SH7 and the refusal names the word it did not know" "$?"
+printf '%s' "$OUT7" | grep -q 'gob init'
+check "SH7 and the usage points at init" "$?"
 
 # Count the failure file BEFORE the workdir is removed, and with wc (grep -c prints 0
 # AND exits 1 on an empty file; with `|| true` that made FAIL_N empty, `${FAIL_N:-0}`

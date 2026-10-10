@@ -27,6 +27,7 @@ SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ONLY=""
 JSON=0
 LIST=0
+LIBRARY_LIST=0
 SOURCE=""
 VERBOSE=0
 # PASS details collapse to (ok) in the default listing; --verbose (or --only, which is a
@@ -40,7 +41,9 @@ goblin-verify — prove a goblin-stack install is still what it says it is.
   --only <id[,id...]>   run only these manifest rows
   --verbose             print every row full-width (the default collapses PASS payloads
                         to a count; FAIL and ADV always print in full)
-  --list                list the manifest rows and exit
+  --list                list the on-by-default rows and exit
+  --library             list the OFF-by-default rows (the library) and exit — each with a
+                        one-line purpose and the exact line that turns it on
   --json                machine-readable output
   --source <path>       read the manifest from a goblin-stack checkout instead of .gob/
 
@@ -53,6 +56,7 @@ while [ $# -gt 0 ]; do
     --only)   ONLY="${2:-}"; VERBOSE=1; shift 2 ;;
     --json)   JSON=1; shift ;;
     --list)   LIST=1; shift ;;
+    --library) LIBRARY_LIST=1; shift ;;
     --verbose) VERBOSE=1; shift ;;
     --source) SOURCE="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -83,7 +87,7 @@ if [ -z "$ROOT" ]; then
 fi
 
 # ---- engine resolution (W1, §2.3): one chain, stated once --------------------
-# Every engine-path lookup (enforcement.tsv, classes.tsv, bans.tsv, bans/*.sh, the ban
+# Every engine-path lookup (enforcement.tsv, bans.tsv, bans/*.sh, the ban
 # engine) resolves through this chain, first hit wins:
 #   1. --source <path>            (existing flag; highest, for tests and pinned CI)
 #   2. $ROOT/.gob/...             (vendored per-repo engine — today's default)
@@ -164,14 +168,11 @@ ENGINE_CHAIN_VENDORED="\$ROOT/.gob/manifest/enforcement.tsv"
 GOBLIN_ENGINE=""                       # the resolved engine root, when NOT vendored/--source
 if [ -n "$SOURCE" ]; then
   MANIFEST="$SOURCE/manifest/enforcement.tsv"
-  CLASSES="$SOURCE/manifest/classes.tsv"
 elif [ -f "$ROOT/.gob/manifest/enforcement.tsv" ]; then
   MANIFEST="$ROOT/.gob/manifest/enforcement.tsv"
-  CLASSES="$ROOT/.gob/manifest/classes.tsv"
 elif [ -n "$ENGINE_DECLARED" ]; then
   GOBLIN_ENGINE="$ENGINE_DECLARED"
   MANIFEST="$GOBLIN_ENGINE/manifest/enforcement.tsv"
-  CLASSES="$GOBLIN_ENGINE/manifest/classes.tsv"
 elif [ -n "$ENGINE_FAIL" ]; then
   # §2.4: an explicit engine_dir: that does not resolve is exit 2, and nothing falls
   # back. The refusal names the declared value and every path the chain tried.
@@ -193,10 +194,8 @@ else
   if [ -n "$_cli_default" ] && [ -f "$_cli_default/manifest/enforcement.tsv" ]; then
     GOBLIN_ENGINE="$_cli_default"
     MANIFEST="$GOBLIN_ENGINE/manifest/enforcement.tsv"
-    CLASSES="$GOBLIN_ENGINE/manifest/classes.tsv"
   else
     MANIFEST="$SELF_DIR/../manifest/enforcement.tsv"
-    CLASSES="$SELF_DIR/../manifest/classes.tsv"
   fi
 fi
 [ -f "$MANIFEST" ] || {
@@ -204,6 +203,35 @@ fi
   g_err "no manifest at any of: \$SOURCE (${SOURCE:-unset}), $ENGINE_CHAIN_VENDORED (absent), $SELF_DIR/../manifest/enforcement.tsv"
   exit 2
 }
+
+# ---- the library (batch 2b-ii) -----------------------------------------------
+# The OFF-by-default row set lives in manifest/library.tsv next to the resolved manifest.
+# Its rows are NOT executed by a default run: the runner above reads $MANIFEST only. The
+# library is shipped data (a moved row keeps its full check text and remedy — nothing is
+# deleted or commented out, and no check function is removed from this verifier); a repo
+# turns a row ON by writing its id (the row's `enable` column) into its local override
+# .gob/manifest/enforcement.local.tsv, which batch 3 wires into the run. Until then the
+# library is a discovery surface: what exists, is held back, and how to enable each row.
+MANIFEST_DIR=$(dirname "$MANIFEST")
+LIBRARY_FILE="$MANIFEST_DIR/library.tsv"
+[ -f "$LIBRARY_FILE" ] || LIBRARY_FILE=""
+
+# ---- the repo-local override (batch 3): .gob/manifest/enforcement.local.tsv ----
+# A repo turns a library row ON by writing that row's exact line (the snippet `gob verify
+# --library` prints) into .gob/manifest/enforcement.local.tsv, which is VERSIONED WITH THE REPO
+# (under $ROOT, not the engine). A local row behaves exactly like a matrix row: PASS, FAIL
+# (its remedy: line is printed from this file), or SKIP (reported not-applicable). The file is
+# OPTIONAL: absent means the default set only, and nothing is said about it.
+#
+# THE HONESTY GATE (the product's core rule: a repo must not be able to certify a rule nothing
+# verifies). A local entry is REFUSED - exit 3, with a named remedy - when it names a row id the
+# engine has no check for, or when its check cannot produce a verdict. Both are handled in
+# setup_local_override below, before any row runs: a false green is the one failure this
+# product must never produce. RUN_MANIFEST is $MANIFEST until a local override merges rows in.
+LOCAL_FILE="$ROOT/.gob/manifest/enforcement.local.tsv"
+[ -f "$LOCAL_FILE" ] || LOCAL_FILE=""
+LOCAL_IDS=""
+RUN_MANIFEST="$MANIFEST"
 
 INSTALLED="$ROOT/.gob/installed.json"
 
@@ -243,16 +271,39 @@ if [ "$LIST" -eq 1 ]; then
   exit 0
 fi
 
+# --library: the discovery surface for the extend mechanism. It lists what the default run
+# does NOT check, so a green run is never mistaken for the whole story. Each line: the row id,
+# its one-line purpose (the rule cell), and the exact line that turns it on.
+if [ "$LIBRARY_LIST" -eq 1 ]; then
+  if [ -z "$LIBRARY_FILE" ]; then
+    g_err "no library.tsv next to $MANIFEST - this engine ships no off-by-default row set"
+    exit 2
+  fi
+  g_info "the library: $(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$LIBRARY_FILE") off-by-default row(s) - NOT run by a default verify."
+  g_info "enable a row by pasting its line below into .gob/manifest/enforcement.local.tsv (repo-local, committed with the repo)."
+  printf '\n'
+  awk -F'\t' 'NR>1 && $1!="" {
+    printf "%-7s %s\n", $1, $3
+    printf "          paste this line into .gob/manifest/enforcement.local.tsv:\n"
+    printf "          %s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4, $5, $6, $7
+  }' "$LIBRARY_FILE"
+  exit 0
+fi
+
 # --only must name rows the manifest actually has: a typo used to select nothing, emit no
 # rows and exit 0, turning a pipeline gate into a no-op (D15).
 if [ -n "$ONLY" ]; then
   UNKNOWN=""
   for want in $(printf '%s' "$ONLY" | tr ',' ' '); do
     [ -n "$want" ] || continue
-    awk -F'\t' -v x="$want" 'NR>1 && $1==x {f=1} END{exit !f}' "$MANIFEST" \
-      || UNKNOWN="$UNKNOWN $want"
+    _hit=0
+    awk -F'\t' -v x="$want" 'NR>1 && $1==x {f=1} END{exit !f}' "$MANIFEST" && _hit=1
+    if [ "$_hit" -eq 0 ] && [ -n "$LOCAL_FILE" ]; then
+      awk -F'\t' -v x="$want" '$1==x {f=1} END{exit !f}' "$LOCAL_FILE" && _hit=1
+    fi
+    [ "$_hit" -eq 1 ] || UNKNOWN="$UNKNOWN $want"
   done
-  [ -z "$UNKNOWN" ] || { g_err "--only names id(s) not in the manifest:$UNKNOWN"; exit 2; }
+  [ -z "$UNKNOWN" ] || { g_err "--only names id(s) in neither the manifest nor the local override:$UNKNOWN"; exit 2; }
   # A valid id that is SOURCE-scope (PR-01..PR-04) selects no target row: the run emits
   # nothing and exits 0, which is the same no-op gate D15 closed for a typo (F2-6).
   TARGET_ROWS=0
@@ -260,6 +311,10 @@ if [ -n "$ONLY" ]; then
     [ -n "$want" ] || continue
     awk -F'\t' -v x="$want" 'NR>1 && $1==x && $2=="target" {f=1} END{exit !f}' "$MANIFEST" \
       && TARGET_ROWS=1
+    if [ "$TARGET_ROWS" -eq 0 ] && [ -n "$LOCAL_FILE" ]; then
+      awk -F'\t' -v x="$want" '$1==x && $2=="target" {f=1} END{exit !f}' "$LOCAL_FILE" \
+        && TARGET_ROWS=1
+    fi
   done
   if [ "$TARGET_ROWS" -eq 0 ]; then
     g_err "--only $ONLY selects no target-scope row, so this run would execute nothing and"
@@ -283,14 +338,6 @@ if [ ! -f "$CONFIG" ]; then
   exit 2
 fi
 
-# The class is read-time resolved: the gob block records the canonical name on new installs, but
-# every repo installed before the 5-class merge records a letter (A..F) or an old name
-# (app/agent/desktop). g_class_canon maps them all to the five canonical names; the tsv carries
-# the canonical names, so nothing else in this file has to know about letters. `desktop`/F -> software.
-CLASS_RAW=$(g_agents_read "$CONFIG" class)
-CLASS=$(g_class_canon "$CLASS_RAW") \
-  || { g_err "unknown class '${CLASS_RAW:-<empty>}' in $CONFIG (expected software|service|game|research|fleet, or A-E / app / agent / desktop)"; exit 2; }
-
 # Root vs git toplevel. find_installed_root resolves the CONFIG lookup correctly, but the
 # rows that shell out to git run in $ROOT and git resolves that to the ENCLOSING repo when
 # the target is not a repository of its own: a nested target then reports the outer repo's
@@ -300,7 +347,7 @@ ROOT_PHYS=$(cd "$ROOT" && pwd -P)
 GIT_TOP=$(cd "$ROOT" && git rev-parse --show-toplevel 2>/dev/null)
 if [ -n "$GIT_TOP" ] && [ "$GIT_TOP" != "$ROOT_PHYS" ]; then
   g_err "target $ROOT_PHYS is inside the git repository $GIT_TOP but is not a repository of"
-  g_err "its own. CM-01 CM-03 GT-03 SP-02 PG-01 PG-03 DS-01 PT-02 and HP-05 shell out to git,"
+  g_err "its own. CM-03 GT-03 SP-02 PG-01 PG-03 DS-01 and HP-05 shell out to git,"
   g_err "and git would resolve every one of them to $GIT_TOP - the numbers would describe the"
   g_err "outer repo, not this target."
   g_err "fix: cd $ROOT_PHYS && git init   (make the target its own repo), or move it out of"
@@ -308,13 +355,11 @@ if [ -n "$GIT_TOP" ] && [ "$GIT_TOP" != "$ROOT_PHYS" ]; then
   exit 2
 fi
 
-BRANCH=$(g_agents_read "$CONFIG" branch)
 ARCHIVE=$(g_agents_read "$CONFIG" archive)
 MAX_DIRTY=$(g_agents_read "$CONFIG" max_dirty)
 ADV_CEILING=$(g_agents_read "$CONFIG" advisory_ceiling)
 HARNESS_DIR_RAW=$(g_agents_read "$CONFIG" harness_dir)
 SCAFFOLD_CHECKS=$(g_agents_read "$CONFIG" scaffold_checks)
-MODELS_FILE=$(g_expand_tilde "$(g_agents_read "$CONFIG" models_file)")
 PRACTICE=$(g_expand_tilde "$(g_agents_read "$CONFIG" practice)")
 PRACTICE_SHA=$(g_unquote "$(g_agents_read "$CONFIG" practice_sha256)")
 [ -n "$MAX_DIRTY" ] || MAX_DIRTY=0
@@ -346,17 +391,6 @@ export FEATURE_MAP SOURCE_ROOT VERIFY_DOCTOR
 REFERENCE_MANIFEST=$(g_unquote "$(g_agents_read "$CONFIG" reference_manifest)")
 export REFERENCE_MANIFEST
 
-# The loop ceiling (G2, LP-03). The most turns ONE loop record may declare in its budget; 20 is
-# the engine's own default for a kanban goal loop, so a ceiling that disagreed with the engine
-# would be a number someone made up. A config written before this key existed keeps the default
-# (the SCAFFOLD_CHECKS shape): an absent key is not a broken config.
-LOOP_MAX_TURNS_CEILING=$(g_agents_read "$CONFIG" loop_max_turns_ceiling)
-[ -n "$LOOP_MAX_TURNS_CEILING" ] || LOOP_MAX_TURNS_CEILING=20
-# The loop record (G2): a COMMITTED artifact of one unattended run. Nothing in this section
-# re-runs the predicate and nothing writes: the record IS the evidence, and what that costs is
-# stated in docs/LOOP.md and docs/LIMITS.md.
-LOOP_DIR="$ROOT/.gob/loop"
-export LOOP_MAX_TURNS_CEILING LOOP_DIR
 
 if [ -d "$ROOT/$HARNESS_DIR_RAW" ]; then
   export GOBLIN_HARNESS_DIR="$ROOT/$HARNESS_DIR_RAW"
@@ -365,8 +399,8 @@ if [ -d "$ROOT/$HARNESS_DIR_RAW" ]; then
 else
   export GOBLIN_HARNESS_DIR=""
   export GOBLIN_HARNESS_REL="$HARNESS_DIR_RAW"
-  # 'absent' = the class scaffolds a harness dir and the declared one is missing -> FAIL.
-  # 'none'   = the class ships no harness dir -> SKIP with a reason (D7).
+  # 'absent' = scaffold_checks is yes and the declared harness dir is missing -> FAIL.
+  # 'none'   = scaffold_checks is no, so there is no harness dir to assert -> SKIP (D7).
   if [ "$SCAFFOLD_CHECKS" = "yes" ]; then
     export GOBLIN_HARNESS_STATE=absent
   else
@@ -393,24 +427,15 @@ export GOBLIN_CONFIG="$CONFIG"
 # reason, never a silent pass.
 SEC_GITIGNORE_FAMILY=$(g_agents_read "$CONFIG" security.gitignore_family)
 SEC_BUILD_OUTPUT=$(g_agents_read "$CONFIG" security.build_output)
-SEC_AUDIT_CMD=$(g_agents_read "$CONFIG" security.audit_cmd)
-SEC_AUDIT_MAX_AGE=$(g_agents_read "$CONFIG" security.audit_max_age_days)
-SEC_WAIVER_MAX_AGE=$(g_agents_read "$CONFIG" security.waiver_max_age_days)
 SEC_WRITE_ROUTES=$(g_agents_read "$CONFIG" security.write_routes)
-[ -n "$SEC_AUDIT_MAX_AGE" ] || SEC_AUDIT_MAX_AGE=90
-[ -n "$SEC_WAIVER_MAX_AGE" ] || SEC_WAIVER_MAX_AGE=180
 PERF_METRIC=$(g_agents_read "$CONFIG" perf.metric)
 PERF_CMD=$(g_agents_read "$CONFIG" perf.cmd)
 PERF_BASELINE_COMMIT=$(g_unquote "$(g_agents_read "$CONFIG" perf.baseline_commit)")
 PERF_BASELINE_VALUE=$(g_agents_read "$CONFIG" perf.baseline_value)
 PERF_MEASURED=$(g_unquote "$(g_agents_read "$CONFIG" perf.measured)")
 PERF_HOST_GATE=$(g_agents_read "$CONFIG" perf.host_gate)
-# The electron opt-in (software class): true means the electron ban set stays on regardless of a
-# hand-edited bans: list, and a perf host gate must be declared (PF-01). Absent on a repo
-# installed before the merge — read as off, so a legacy class-F repo verifies with no rewrite.
-ELECTRON=$(g_agents_read "$CONFIG" electron)
-export SEC_GITIGNORE_FAMILY SEC_BUILD_OUTPUT SEC_AUDIT_CMD SEC_AUDIT_MAX_AGE SEC_WAIVER_MAX_AGE
-export SEC_WRITE_ROUTES PERF_METRIC PERF_CMD PERF_BASELINE_VALUE PERF_HOST_GATE ELECTRON
+export SEC_GITIGNORE_FAMILY SEC_BUILD_OUTPUT
+export SEC_WRITE_ROUTES PERF_METRIC PERF_CMD PERF_BASELINE_VALUE PERF_HOST_GATE
 
 # Whole days between an ISO date and today, or empty when the date does not parse on this host
 # (`date -d` is GNU; the row FAILS rather than assuming, because an unreadable date is not a
@@ -438,7 +463,7 @@ only_selected() {
   return 1
 }
 
-# ---- part mapping: a row id's prefix names the class-controlled part ---------
+# ---- part mapping: a row id's prefix names the part a row belongs to ---------
 row_part() {
   case "$1" in
     HP-*) echo handoff ;;
@@ -448,20 +473,17 @@ row_part() {
     HS-01|HS-03) echo gate ;;
     HS-02) echo replay ;;
     PG-*) echo pr-gate ;;
-    # The automation rows and SK-04 ride the `playbooks` part: their artifacts are the shipped
-    # skills and the automation producers, and --skills no disables that part. An unmapped
-    # prefix returns "" and the row can never honour an opt-out (G3 section 4.3).
-    AU-*) echo playbooks ;;
-    SK-04) echo playbooks ;;
-    # SK-01 rides the same part (W1 made it a builtin for the global-mode clause): with
-    # --skills no there is no shipped skill to frontmatter-check, and a vacuous pass proves
-    # nothing - the row honours the opt-out like its SK-02/SK-04 siblings.
-    SK-01) echo playbooks ;;
-    # SK-02 keys off the same part: with --skills no there are no installed skills to hash, and
-    # the row used to FAIL there (measured at v0.2.0-dev: "32 passed, 1 failed ... SK-02 0
-    # installed skill file(s) hashed"). An opt-out is the honest report; a FAIL on a repo that
-    # opted out of skills is not.
-    SK-02) echo playbooks ;;
+    # SK-04 rides the `skills` part: its artifact is the shipped skills, and an explicit
+    # --opt-out skills disables that part. The CORE tier (.gob/skills/) is vendored on
+    # every install (GAP-2), so the row runs by default and only an explicit opt-out skips it.
+    # (v3: the part was named `playbooks` for the manifest that indexed the cut skills; the
+    # rail follows its list — manifest/playbooks.tsv is gone.)
+    SK-04) echo skills ;;
+    # SK-01 rides the same part. The core tier gives it subjects on every install — it no
+    # longer has to skip on a default (no .hermes tier) repo.
+    SK-01) echo skills ;;
+    # SK-02 keys off the same part; it hashes the .gob/skills/ core tier too.
+    SK-02) echo skills ;;
     *) echo "" ;;
   esac
 }
@@ -550,10 +572,10 @@ check_in_04() {
 check_in_02() {
   # The W1 semantic split (§2.2). Clause 1 - the per-repo mode: hash every recorded file,
   # the practice pin rides along - is byte-for-byte what this row has always done, and a
-  # fresh install of any class keeps it (installed.json carries no engine: block).
+  # fresh install keeps it (installed.json carries no engine: block).
   # Clause 2 - engine.mode=global with file entries remaining: hash what IS recorded;
-  # an entry under the engine paths (.gob/bin, .gob/manifest, .gob/bans,
-  # .gob/automations, .gob/roles.yaml) that is still present is hashed too
+  # an entry under the engine paths (.gob/bin, .gob/manifest, .gob/bans) that is
+  # still present is hashed too
   # (harmless), and one that is MISSING is not drift - the engine is no longer the repo's.
   # Clause 3 - global with no file entries: the declaration + practice pin only; never
   # FAIL for absence of install artifacts (a declaration-only repo is not born RED).
@@ -565,12 +587,12 @@ check_in_02() {
     [ -n "$p" ] || continue
     if [ "$ENGINE_MODE" = "global" ]; then
       case "$p" in
-        .gob/bin/*|.gob/manifest/*|.gob/bans/*|.gob/automations/*|.gob/roles.yaml)
+        .gob/bin/*|.gob/manifest/*|.gob/bans/*|.gob/skills/*)
           [ -e "$ROOT/$p" ] || continue ;;   # engine removed by design: not drift
         # W4a (§5.3/§5.2): the procedure tier is EMITTED per platform, not carried in the
         # repo - a recorded .hermes/skills/ file absent from disk is the tier living at its
         # emitted paths, not drift. A copy that IS present must still hash true (a stale or
-        # hand-edited shadow is exactly what --unshadow/doctor exist to surface).
+        # hand-edited shadow is exactly what the drift check exists to surface).
         .hermes/skills/*)
           [ -e "$ROOT/$p" ] || continue ;;
       esac
@@ -607,7 +629,7 @@ check_in_02() {
         printf 'practice standard edited: %s\n  recorded %s\n  now      %s\n' "$PRACTICE" "$PRACTICE_SHA" "$cur"
         # The remedy, in the place the operator actually meets the failure. The pin exists to
         # catch a SILENT edit, so re-pinning is a deliberate act: one explicit command, which
-        # prints the old and new hash (docs/CONTRACTS.md, "An edited standard is not a dead end").
+        # prints the old and new hash (docs/GUIDE.md, "An edited standard is not a dead end").
         printf '  if the edit is yours and intended, re-pin it deliberately:\n'
         printf '    goblin-install --target %s --re-pin   # from the gobstack checkout/install tree\n' "$ROOT"
         bad=1; pin=" | practice EDITED"
@@ -815,7 +837,7 @@ check_gt_05() {
   n=$(g_agents_read "$CONFIG" ratchet.name)
   c=$(g_agents_read "$CONFIG" ratchet.cmd)
   ceil=$(g_agents_read "$CONFIG" ratchet.ceiling)
-  [ -n "$n" ] && [ -n "$c" ] || { printf 'no ratchet declared for this class - skipped\n'; return 3; }
+  [ -n "$n" ] && [ -n "$c" ] || { printf 'no ratchet declared - skipped\n'; return 3; }
   val=$( cd "$ROOT" && bash -c "$c" 2>/dev/null | tr -d '[:space:]' )
   case "$val" in ''|*[!0-9]*) printf 'ratchet cmd produced a non-number: %s\n' "$val"; return 1 ;; esac
   if [ -f "$ROOT/.gob/ratchet-last" ]; then prev=$(cat "$ROOT/.gob/ratchet-last"); fi
@@ -833,16 +855,16 @@ check_gt_05() {
 check_hs_01() {
   local d="$GOBLIN_HARNESS_DIR" f base asserting=0 reporting=0 bad=0
   if [ -z "$d" ]; then
-    # A declared harness dir that is missing is a FAIL when the class scaffolds one; a class
-    # that ships none skips with a reason. Keying the skip off the PATH let a one-line config
+    # A declared harness dir that is missing is a FAIL when scaffold_checks is yes; when it is
+    # no the row skips with a reason. Keying the skip off the PATH alone let a one-line config
     # edit switch both HS rows off (D7).
     if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
-      printf 'harness_dir %s is declared and class %s scaffolds it, but the directory is absent\n' \
-        "$GOBLIN_HARNESS_REL" "$CLASS"
+      printf 'harness_dir %s is declared and scaffold_checks is yes, but the directory is absent\n' \
+        "$GOBLIN_HARNESS_REL"
       return 1
     fi
-    printf 'no harness dir (%s absent, class %s scaffolds none) - nothing to assert\n' \
-      "$GOBLIN_HARNESS_REL" "$CLASS"
+    printf 'no harness dir (%s absent, scaffold_checks is no) - nothing to assert\n' \
+      "$GOBLIN_HARNESS_REL"
     return 3
   fi
   for f in "$d"/*; do
@@ -891,8 +913,8 @@ check_hs_02() {
   d="$GOBLIN_HARNESS_DIR"
   if [ -z "$d" ]; then
     if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
-      printf 'harness_dir %s is declared and class %s scaffolds it, but the directory is absent\n' \
-        "$GOBLIN_HARNESS_REL" "$CLASS"
+      printf 'harness_dir %s is declared and scaffold_checks is yes, but the directory is absent\n' \
+        "$GOBLIN_HARNESS_REL"
       return 1
     fi
     printf 'no harness dir to replay\n'; return 3
@@ -939,67 +961,6 @@ check_cm_03() {
   n=$(cd "$ROOT" && git status --porcelain 2>/dev/null | wc -l | tr -d '[:space:]')
   printf '%s dirty entr(y|ies), max_dirty %s\n' "$n" "$MAX_DIRTY"
   [ "$n" -le "$MAX_DIRTY" ]
-}
-
-resolve_role_models() {
-  # prints "role<TAB>profile<TAB>provider<TAB>model<TAB>effort" for each lane of a role
-  local role="$1" f="$SELF_DIR/../roles.yaml"
-  [ -f "$f" ] || f="$ROOT/.gob/roles.yaml"
-  local profiles
-  profiles=$(g_yaml_block_scalar "$f" "role-$role" profiles)
-  [ -n "$profiles" ] || profiles=$(g_yaml_block_scalar "$f" "$role" profiles)
-  local p prov model eff
-  for p in $(printf '%s' "$profiles" | tr -d '[]' | tr ',' ' '); do
-    prov=$(g_models_field "$MODELS_FILE" "$p" provider)
-    model=$(g_models_field "$MODELS_FILE" "$p" model)
-    eff=$(g_models_field "$MODELS_FILE" "$p" effort)
-    printf '%s\t%s\t%s\t%s\t%s\n' "$role" "$p" "${prov:-?}" "${model:-?}" "${eff:-?}"
-  done
-}
-
-check_md_02() {
-  local code_line panel_line judge_line code_fam panel_fam judge_fam
-  if [ ! -f "$MODELS_FILE" ]; then
-    printf 'no model mapping configured (%s absent) - advisory\n' "$MODELS_FILE"
-    return 2
-  fi
-  code_line=$(resolve_role_models code | head -n 1)
-  panel_line=$(resolve_role_models review-panel | head -n 1)
-  judge_line=$(resolve_role_models judge | head -n 1)
-  code_fam=$(printf '%s' "$code_line" | cut -f4)
-  panel_fam=$(printf '%s' "$panel_line" | cut -f4)
-  judge_fam=$(printf '%s' "$judge_line" | cut -f4)
-  if [ -z "$code_line" ] || [ -z "$panel_line" ]; then
-    printf 'roles.yaml did not resolve both lanes - advisory\n'
-    return 2
-  fi
-  if [ "$code_fam" = "$panel_fam" ]; then
-    printf 'code lane and review lane both resolve to %s (same family) - goblin-stack cannot change this\n' "$code_fam"
-  else
-    printf 'code lane %s, review lane %s - different family\n' "$code_fam" "$panel_fam"
-  fi
-  # W5-6: the JUDGE lane's family is compared too. JG-02 proves the declared profile NAMES are
-  # disjoint and nothing more, so a `judge:` profile mapped to the author's own model passed it:
-  # the judge was distinct by name only, which is exactly what the judge role's claim cannot
-  # tolerate. The comparison is the same one the panel gets, and the row stays ADVISORY (`return
-  # 2`): goblin-stack cannot choose the fleet's models, it can only make the state loud. Measured
-  # on this box, every profile the mapping names resolves to ONE model - recorded, not faked, in
-  # docs/LIMITS.md #38.
-  if [ -z "$judge_line" ]; then
-    printf 'the judge lane does not resolve - add a `judge:` entry beside the code lane in %s\n' "$MODELS_FILE"
-    return 2
-  fi
-  case "$judge_fam" in
-    ''|'?'|unknown)
-      printf 'the judge lane resolves to no model in %s - add a `judge:` entry beside the code lane\n' "$MODELS_FILE"
-      return 2 ;;
-  esac
-  if [ "$judge_fam" = "$code_fam" ]; then
-    printf 'the judge lane resolves to %s, the SAME family as the code lane - JG-02 proves only that the declared profile names differ\n' "$judge_fam"
-  else
-    printf 'judge lane %s, code lane %s - different family\n' "$judge_fam" "$code_fam"
-  fi
-  return 2
 }
 
 check_pg_01() {
@@ -1069,142 +1030,6 @@ check_pg_03() {
   [ "$bad" -eq 0 ]
 }
 
-check_pg_05() {
-  # PG-05 - "No required check that self-skips". The old body counted only "every step is
-  # guarded", so the REAL shape passed: in the estate's one existing workflow a deliberately
-  # UNGUARDED credential step decides whether the guarded compile step runs, so
-  # `guarded < steps` and the
-  # row reported PASS on the workflow it exists to catch (G8 section 3, re-measured V3-4). G6
-  # section A.6 named the mechanisable tell - a job whose GATE STEP is conditional can reach its
-  # end without running the gate while the required check still reports Success - so the row now
-  # carries three clauses per job:
-  #   (a) the job declares at least one run:/uses: step (otherwise the check runs nothing);
-  #   (b) the JOB carries no `if:` (otherwise the whole required check self-skips);
-  #   (c) no STEP carries an `if:` (otherwise that step - possibly the gate step - self-skips,
-  #       and GitHub reports a skipped job as Success: docs S1/S2, RISKS.md K7).
-  # It is a TEXT reading, deliberately strict, and says so in its own why-cell: a `#` inside a
-  # quoted string is read as a comment, a flow-style `jobs:` mapping is refused rather than read
-  # as clean, and a condition that is genuinely needed belongs in the command or in a second
-  # job that is not the required check.
-  local f n=0 bad=0
-  for f in "$ROOT"/.github/workflows/*.yml "$ROOT"/.github/workflows/*.yaml; do
-    [ -e "$f" ] || continue
-    n=$((n + 1))
-    awk -v FILE="$(basename "$f")" '
-      function closejob() {
-        if (jobname == "") return
-        if (steps == 0) { printf "%s: job \"%s\" declares no run:/uses: step - the required check runs nothing and still reports Success\n", FILE, jobname; bad = 1 }
-        if (jobif > 0)  { printf "%s: job \"%s\" carries a job-level if: (%d) - the whole required check self-skips and reports Success\n", FILE, jobname, jobif; bad = 1 }
-        if (stepif > 0) { printf "%s: job \"%s\" has %d conditional step(s) - a skipped step reports Success, and a skipped gate step green-lights a commit whose gate never ran\n", FILE, jobname, stepif; bad = 1 }
-        jobname = ""
-      }
-      {
-        line = $0
-        sub(/[ \t]+#.*$/, "", line)          # blank a trailing comment
-        if (line ~ /^[ \t]*#/) next
-        if (line ~ /^[ \t]*$/) next
-        if (!injobs) {
-          if (line ~ /^jobs:[ \t]*$/) { injobs = 1; jind = -1 }
-          else if (line ~ /^jobs:[ \t]*[^ \t]/) { printf "%s: the jobs: block is a flow mapping - it cannot be read here, so it is refused rather than read as clean\n", FILE; bad = 1; injobs = 1; jind = -1 }
-          next
-        }
-        lead = match(line, /[^ \t]/) - 1
-        if (jind >= 0 && lead == jind && line !~ /^[ \t]*-/) {
-          closejob()
-          jobname = line; sub(/^[ \t]*/, "", jobname); sub(/[ \t]*:.*/, "", jobname)
-          steps = 0; stepregion = 0; jobif = 0; stepif = 0
-          next
-        }
-        if (jind < 0) {
-          jind = lead
-          jobname = line; sub(/^[ \t]*/, "", jobname); sub(/[ \t]*:.*/, "", jobname)
-          steps = 0; stepregion = 0; jobif = 0; stepif = 0
-          next
-        }
-        if (lead <= jind) next
-        if (line ~ /^[ \t]*-/) stepregion = 1
-        if (line ~ /(^|[ \t-])(run|uses):/) { steps++; next }
-        if (line ~ /^[ \t]*-?[ \t]*if:/) { if (stepregion) stepif++; else jobif++ }
-      }
-      END {
-        closejob()
-        if (!injobs) { printf "%s: no jobs: block - the workflow declares no check at all\n", FILE; bad = 1 }
-        exit bad
-      }
-    ' "$f" || bad=1
-  done
-  if [ "$n" -eq 0 ]; then
-    printf '0 workflow file(s) - no required check here to skip (vacuous by design: nothing declares one)\n'
-  else
-    printf '%d workflow file(s) checked for a self-skipping required check\n' "$n"
-  fi
-  [ "$bad" -eq 0 ]
-}
-
-check_pg_06() {
-  # PG-06 (G6 section A.6, row 2) - "The gate CI runs is the gate the project declares." The
-  # failure mode is R5 section 1.1 measured: review and CI and goblin-verify reporting different
-  # truths about one SHA, so a green required check says nothing about the gate the project
-  # actually declares. The declared set comes from g_agents_gates - GT-01's own reader, reused
-  # rather than re-derived, so a gate cannot vanish from the comparison in silence (G8-3).
-  # A workflow satisfies the row when the whole declared set is RUN: either the verifier with no
-  # `--only` (a full run executes every declared gate through GT-02), or each declared gate
-  # command appearing verbatim. Comments are blanked first, so a commented-out verifier call is
-  # not a run, and key lines other than `run:` are dropped, so a command sitting in a `name:`
-  # cannot satisfy it. Partial by construction: it proves the gate is INVOKED in a file under
-  # `.github/workflows/`, never that GitHub marks that job required, and never that the invoker
-  # is the job the forge waits on.
-  local f n=0 bad=0 gname gcmd ngates=0 gates="" runtext miss="" nrun nc
-  while IFS=$'\t' read -r gname gcmd; do
-    [ -n "$gname" ] || continue
-    ngates=$((ngates + 1))
-    [ -n "$gcmd" ] && gates="$gates$gcmd"$'\n'
-  done < <(g_agents_gates "$CONFIG")
-  for f in "$ROOT"/.github/workflows/*.yml "$ROOT"/.github/workflows/*.yaml; do
-    [ -e "$f" ] || continue
-    n=$((n + 1))
-    runtext=$(awk '
-      {
-        line = $0
-        sub(/[ \t]+#.*$/, "", line)
-        if (line ~ /^[ \t]*#/) next
-        if (line ~ /^[ \t]*$/) next
-        if (line ~ /^[ \t]*-?[ \t]*run:/) { print substr(line, index(line, "run:") + 4); next }
-        if (line ~ /^[ \t]*-?[ \t]*[A-Za-z_][A-Za-z0-9_.-]*:/) next
-        print line
-      }
-    ' "$f")
-    if printf '%s\n' "$runtext" | grep -q 'goblin-verify' \
-       && ! printf '%s\n' "$runtext" | grep -q 'goblin-verify[^&|;]*--only'; then
-      printf '%s: runs the verifier, which executes every declared gate\n' "$(basename "$f")"
-      continue
-    fi
-    # The verbatim path: compare on whitespace-normalised text, so a YAML line wrap or a dropped
-    # `2>/dev/null` does not read as "not the declared gate".
-    nrun=$(printf '%s\n' "$runtext" | tr '\n' ' ' | sed 's#2>/dev/null##g' | tr -s ' ')
-    miss=""
-    while IFS= read -r gcmd; do
-      [ -n "$gcmd" ] || continue
-      nc=$(printf '%s' "$gcmd" | sed 's#2>/dev/null##g' | tr -s ' ')
-      printf '%s' "$nrun" | grep -qF -- "$nc" || miss="$miss [$gcmd]"
-    done <<EOF
-$gates
-EOF
-    if [ -n "$miss" ]; then
-      printf '%s: runs no gate the project declares - declared but not run:%s\n' "$(basename "$f")" "$miss"
-      bad=1
-    else
-      printf '%s: runs all %d declared gate(s) verbatim\n' "$(basename "$f")" "$ngates"
-    fi
-  done
-  if [ "$n" -eq 0 ]; then
-    printf 'no workflow file to check - CI runs no gate here\n'
-    return 3
-  fi
-  printf '%d workflow file(s) compared with the %d declared gate(s)\n' "$n" "$ngates"
-  [ "$bad" -eq 0 ]
-}
-
 hash_runtime_data() {
   local p h out=""
   while read -r p; do
@@ -1251,60 +1076,6 @@ check_ds_02() {
   printf '%s · runtime_data %s\n' "$line" "${b:-<none declared>}" > "$ROOT/.gob/last-gate-line"
   printf 'snapshot %s\n' "${b:-<none declared>}"
   return 0
-}
-
-check_au_02() {
-  # The dedup key must be a function of the report's CONTENT only. Recompute it from the
-  # report's own repo+symptom and require the recorded value to equal it: a key derived from a
-  # date, a run id or a counter dedups nothing, and this is the row that says so.
-  local f n=0 bad=0 repo sym key want norm slug
-  for f in "$ROOT"/reports/*/report.yaml; do
-    [ -e "$f" ] || continue
-    n=$((n + 1))
-    slug=$(basename "$(dirname "$f")")
-    repo=$(sed -n 's/^repo:[[:space:]]*//p' "$f" | head -n 1)
-    sym=$(sed -n 's/^symptom:[[:space:]]*//p' "$f" | head -n 1)
-    key=$(sed -n 's/^dedup_key:[[:space:]]*//p' "$f" | head -n 1)
-    norm=$(printf '%s' "$sym" | tr 'A-Z' 'a-z' | tr -s '[:space:]' ' ' | sed 's/^ //; s/ $//')
-    want="bug:${repo}:$(g_sha256_text "$norm" | cut -c1-12)"
-    case "$key" in
-      '') printf '%s: no dedup_key recorded\n' "$slug"; bad=1; continue ;;
-    esac
-    if [ "$key" != "$want" ]; then
-      printf '%s: recorded key %s, recomputed %s\n' "$slug" "$key" "$want"; bad=1
-    fi
-    if printf '%s' "$key" | grep -qE '[0-9]{4}-[0-9]{2}-[0-9]{2}'; then
-      printf '%s: the key carries a date: %s\n' "$slug" "$key"; bad=1
-    fi
-  done
-  [ "$n" -gt 0 ] || { printf 'no reports/*/report.yaml - nothing to dedup\n'; return 3; }
-  printf '%d report(s): the key is content-only\n' "$n"
-  [ "$bad" -eq 0 ]
-}
-
-check_au_03() {
-  # A reporter's write surface is reports/** plus cards. Two falsifiable clauses: the tree is
-  # clean, and - when HEAD is a reporter commit - no path under the declared harness dir is in
-  # it. The harness clause only applies to a commit that touches reports/, so a normal round's
-  # commit is not mistaken for a reporter's.
-  local dirty bad=0 touched=""
-  [ -d "$ROOT/reports" ] || { printf 'no reports/ - no reporter run in this repo to audit\n'; return 3; }
-  dirty=$(cd "$ROOT" && git status --porcelain 2>/dev/null | wc -l | tr -d '[:space:]')
-  printf '%s dirty entr(y|ies), max_dirty %s\n' "$dirty" "$MAX_DIRTY"
-  if ( cd "$ROOT" && git rev-parse --verify --quiet HEAD~1 >/dev/null 2>&1 ); then
-    if ( cd "$ROOT" && git diff --name-only HEAD~1..HEAD 2>/dev/null | grep -q '^reports/' ); then
-      touched=$( cd "$ROOT" && git diff --name-only HEAD~1..HEAD 2>/dev/null \
-        | grep "^${GOBLIN_HARNESS_REL}/" || true )
-    else
-      printf 'HEAD is not a reporter commit - the harness clause does not apply\n'
-    fi
-  fi
-  if [ -n "$touched" ]; then
-    printf 'the reporter commit touched the harness: %s\n' "$(printf '%s' "$touched" | tr '\n' ' ')"
-    bad=1
-  fi
-  [ "$dirty" -le "$MAX_DIRTY" ] || { printf 'the reporter left the tree dirty\n'; bad=1; }
-  [ "$bad" -eq 0 ]
 }
 
 check_sc_02() {
@@ -1450,160 +1221,12 @@ check_in_03() {
   return 1
 }
 
-check_sc_07() {
-  # Offline by construction: the record is written by .gob/bin/goblin-audit, run ONCE,
-  # deliberately. A verify-time network call would break the offline dependency contract
-  # (docs/RISKS.md K4). The record and the waiver table are repo-local by design (W1 §2.5);
-  # only the SKIP remedy names the runner, and global mode names the CLI verb - the record
-  # is the repo's, the tool that produced it is wherever the engine resolves (chain §2.3).
-  [ -n "$SEC_AUDIT_CMD" ] || { printf 'this class declares no audit command (security.audit_cmd is empty)\n'; return 3; }
-  local rec="$ROOT/.gob/audit.tsv" wfile="$ROOT/.gob/audit-waiver.tsv"
-  if [ ! -f "$rec" ]; then
-    if [ "$ENGINE_MODE" = "global" ]; then
-      printf 'no audit record yet. Run `gob audit` once, deliberately, then commit\n.gob/audit.tsv: SC-07 reads the record and never the network\n'
-    else
-      printf 'no audit record yet. Run .gob/bin/goblin-audit once, deliberately, then commit\n.gob/audit.tsv: SC-07 reads the record and never the network\n'
-    fi
-    return 3
-  fi
-  local d age lines=0 waivers=0 pkg sev id bad=0 wl wd
-  d=$(sed -n 's/^measured[[:space:]]*//p' "$rec" | head -n 1)
-  if [ -z "$d" ]; then printf 'the audit record carries no `measured` date\n'; return 1; fi
-  age=$(age_days "$d") || { printf 'the recorded date does not parse on this host: %s\n' "$d"; return 1; }
-  if [ "$age" -gt "$SEC_AUDIT_MAX_AGE" ]; then
-    printf 'the audit record is %s days old (max %s): run goblin-audit again\n' "$age" "$SEC_AUDIT_MAX_AGE"
-    bad=1
-  fi
-  while IFS=$'\t' read -r pkg sev id rest; do
-    [ -n "$pkg" ] || continue
-    case "$pkg" in \#*) continue ;; esac
-    case "$sev" in high|critical) : ;; *) continue ;; esac
-    lines=$((lines + 1))
-    wl=""
-    if [ -f "$wfile" ]; then
-      wl=$(awk -F'\t' -v p="$pkg" -v i="$id" '$1==p && ($3==i || $3=="*") { print $4; exit }' "$wfile")
-    fi
-    if [ -z "$wl" ]; then
-      printf 'unwaived %s advisory: %s %s\n' "$sev" "$pkg" "$id"; bad=1; continue
-    fi
-    waivers=$((waivers + 1))
-    wd=$(age_days "$wl") || { printf 'the waiver for %s carries an unparseable date: %s\n' "$pkg" "$wl"; bad=1; continue; }
-    [ "$wd" -le "$SEC_WAIVER_MAX_AGE" ] \
-      || { printf 'the waiver for %s is %s days old (max %s): re-decide it\n' "$pkg" "$wd" "$SEC_WAIVER_MAX_AGE"; bad=1; }
-  done < "$rec"
-  printf 'audit measured %s (%s days old): %s high|critical line(s), %s matched waiver(s), %s unwaived\n' \
-    "$d" "$age" "$lines" "$waivers" "$((lines - waivers))"
-  [ "$bad" -eq 0 ]
-}
-
-check_sc_08() {
-  # An install hook is arbitrary code that runs on every `npm ci`. Only npm's lockfile records
-  # it (`hasInstallScript`); pnpm/yarn do not, so the row SKIPs with that reason rather than
-  # passing vacuously.
-  local lock="$ROOT/package-lock.json"
-  if [ ! -f "$lock" ]; then
-    if [ -f "$ROOT/pnpm-lock.yaml" ] || [ -f "$ROOT/yarn.lock" ]; then
-      printf 'a pnpm/yarn lockfile carries no hasInstallScript field - nothing to enumerate\n'; return 3
-    fi
-    printf 'no package-lock.json - there is no install-hook surface to enumerate\n'; return 3
-  fi
-  local pkgs n=0 ok=0 bad=0 p
-  # Z2-2: this reader is line-anchored, so a MINIFIED (one-line) lockfile - valid JSON, and what a
-  # tool that writes without pretty-printing leaves behind - matched NOTHING and the row printed
-  # `0 install hook(s), 0 allowlisted` as a PASS, exit 0. That is a vacuous PASS: the exact defect
-  # family (D6/PR-03) this harness exists to prevent, and the one shape the pnpm/yarn branch above
-  # already reports honestly. The text is normalised into the pretty shape first - break after
-  # every `{`, `}` and `,` - which is a TEXT transform, not a JSON parse: no npm, no jq, no parser
-  # (docs/CONTRACTS.md). The anchor accepts `": {` (what npm writes) and `":{` (minified), and the
-  # per-line state machine still attributes `hasInstallScript` to the key line it followed.
-  pkgs=$(awk '
-    {
-      gsub(/\{/, "{\n"); gsub(/\}/, "}\n"); gsub(/,/, ",\n")
-      n = split($0, L, "\n")
-      for (i = 1; i <= n; i++) {
-        s = L[i]
-        if (s ~ /^[[:space:]]*"node_modules\/[^"]+":[[:space:]]*\{/) {
-          k = s; sub(/^[[:space:]]*"/, "", k); sub(/":[[:space:]]*\{.*/, "", k); sub(/^node_modules\//, "", k)
-        }
-        if (s ~ /"hasInstallScript"[[:space:]]*:[[:space:]]*true/ && k != "") print k
-      }
-    }
-  ' "$lock" | sort -u)
-  for p in $pkgs; do
-    n=$((n + 1))
-    if [ -f "$ROOT/.gob/install-hooks.allowlist" ] \
-       && grep -qxF "$p" "$ROOT/.gob/install-hooks.allowlist"; then
-      ok=$((ok + 1))
-    else
-      printf 'an install-time script is not on the allowlist: %s\n' "$p"; bad=1
-    fi
-  done
-  printf '%s install hook(s), %s allowlisted\n' "$n" "$ok"
-  [ "$bad" -eq 0 ]
-}
-
 # ---- W1 §2.5, the SK/automation split ----------------------------------------
-# In global mode the procedure tier (skills, the automation producers) is served from the
+# In global mode the procedure tier (skills) is served from the
 # engine, not emitted in the repo - emission is W4's. Hashing a global copy from a repo's
 # verify would make one machine's skill set answer for every repo, so the per-repo rows
 # SKIP with that reason instead of FAILing on the absent copies. SK-03 runs unchanged:
 # it reads the manifest, which resolves via the chain either way.
-
-# au01_producer_count — the producers an AU-01 run can see, engine-first in global mode.
-# In global mode the first glob resolves under the engine dir (chain §2.3); the repo-local
-# globs stay. In vendored mode this is exactly today's three globs.
-au01_globs() {
-  if [ "$ENGINE_MODE" = "global" ]; then
-    printf '%s\n' "$GOBLIN_ENGINE/automations/*.sh" "$ROOT/automations/*.sh" "$ROOT/automations/*/*.sh"
-  else
-    printf '%s\n' "$ROOT/.gob/automations/*.sh" "$ROOT/automations/*.sh" "$ROOT/automations/*/*.sh"
-  fi
-}
-
-check_au_01() {
-  # One control loop over the producer globs. The new clause (W1 §2.5, Q2's narrow form):
-  # a repo that declares NO automations and has no producer anywhere SKIPs with the reason
-  # - the measured M9 FAIL was a born-RED artifact of the glob, and a repo that never
-  # adopted automations must not be failed for it. A repo that DECLARES automations (its
-  # own, repo-local) but has no producer still FAILs: the SKIP is only for repos that
-  # declare none.
-  local f n=0 own=0 glob
-  # The repo's OWN producers: anything under a root automations/ directory (the engine's
-  # payload lives under .gob/automations/ in vendored mode, engine_dir in global mode;
-  # neither is a declaration by this repo).
-  for f in "$ROOT"/automations/*.sh "$ROOT"/automations/*/*.sh; do
-    [ -e "$f" ] || continue
-    own=$((own + 1))
-  done
-  while IFS= read -r glob; do
-    for f in $glob; do
-      [ -e "$f" ] || continue
-      n=$((n + 1))
-      if grep -nE "^[[:space:]]*(curl|wget|gh[[:space:]]|npm[[:space:]]|npx[[:space:]])" "$f" >/dev/null 2>&1; then
-        printf 'a network or forge verb opens a line of the producer:\n'
-        grep -nE "^[[:space:]]*(curl|wget|gh[[:space:]]|npm[[:space:]]|npx[[:space:]])" "$f"
-        return 1
-      fi
-    done
-  done < <(au01_globs)
-  # The declaration clause: a root automations/ directory that holds NO .sh producer is
-  # a declaration whose producer is gone (the files were deleted, not never written).
-  local declared=0
-  for f in "$ROOT"/automations/* "$ROOT"/automations/*/; do
-    [ -e "$f" ] || continue
-    declared=1
-  done
-  if [ "$declared" -eq 1 ] && [ "$own" -eq 0 ]; then
-    printf 'automations are declared but no producer exists - the producer is gone\n'
-    return 1
-  fi
-  if [ "$n" -eq 0 ]; then
-    printf 'no automation producer found (repo or engine)\n'
-    return 3
-  fi
-  printf '%d automation producer(s) scanned, none opens with a network or forge verb\n' "$n"
-  return 0
-}
 
 check_bn_00() {
   # The coherence row: the ban table and the matrix must agree in BOTH directions, every ban
@@ -1645,7 +1268,7 @@ check_bn_run() {
   # closed (the engine's own exit 2 = the table is missing/empty, which is not a pass).
   # W1 §2.5: the engine is <resolved engine>/bin/goblin-bans (chain §2.3). The hard-FAIL
   # stays for the vendored mode; in global mode the engine's own existence was already
-  # checked at resolution (§1.2 item 4), so an absent ban engine is exit-2-class, but it
+  # checked at resolution (§1.2 item 4), so an absent ban engine is a config error, but it
   # is still reported FAIL-closed here rather than silently skipped - the ban lane must
   # never read clean because a binary went missing.
   local id="$1" engine out rc detail
@@ -1684,15 +1307,8 @@ check_pf_01() {
   # to ignore it.
   local rname bad=0
   rname=$(g_agents_read "$CONFIG" ratchet.name)
-  # The electron opt-in's done-definition: an Electron repo declares its host gate (the FPS /
-  # main_thread_busy_pct number a hermetic rule cannot measure). `electron: true` with no host
-  # gate is a repo missing half its definition — FAIL, before the baseline skip below can mask it.
-  if [ "$ELECTRON" = "true" ] && [ -z "$PERF_HOST_GATE" ]; then
-    printf 'electron: true requires a declared perf.host_gate — declare the host-gate probe (the number no hermetic rule can measure) or drop electron: true\n'
-    return 1
-  fi
   [ -n "$PERF_METRIC" ] || {
-    printf 'this class declares no perf metric (perf.metric is empty). The ratchet still carries\n%s; declare metric/cmd here the day you pick one\n' "${rname:-nothing}"
+    printf 'no perf metric is declared (perf.metric is empty). The ratchet still carries\n%s; declare metric/cmd here the day you pick one\n' "${rname:-nothing}"
     return 3
   }
   [ -n "$PERF_BASELINE_COMMIT" ] || {
@@ -1751,7 +1367,7 @@ sk_proc_skip() {
 # without it, a global repo with no skills passes the loop vacuously — a green that proves
 # nothing, exactly the shape §2.5 exists to kill).
 sk01_cell() {
-  n=0; for f in .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); head -n 1 "$f" | grep -qx -- '---' || exit 1; awk 'NR==1{next} /^---/{exit} /^name:/{a=1} /^description:/{b=1} END{exit !(a&&b)}' "$f" || exit 1; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
+  n=0; for f in .gob/skills/*/SKILL.md .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); head -n 1 "$f" | grep -qx -- '---' || exit 1; awk 'NR==1{next} /^---/{exit} /^name:/{a=1} /^description:/{b=1} END{exit !(a&&b)}' "$f" || exit 1; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
 }
 
 check_sk_01() {
@@ -1762,7 +1378,7 @@ check_sk_01() {
 # sk04_cell — SK-04's original check cell. Kept verbatim so the row's declared text and
 # its executed behaviour stay the same thing; the builtin only adds the mode clause.
 sk04_cell() {
-  n=0; for f in .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); grep -q "^## What this cannot see" "$f" || { echo "missing cannot-see section: $f"; exit 1; }; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
+  n=0; for f in .gob/skills/*/SKILL.md .hermes/skills/*/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); grep -q "^## What this cannot see" "$f" || { echo "missing cannot-see section: $f"; exit 1; }; done; [ "$n" -gt 0 ] || { echo "no installed skill found"; exit 1; }; exit 0
 }
 
 check_sk_04() {
@@ -1770,22 +1386,11 @@ check_sk_04() {
   ( cd "$ROOT" && sk04_cell )
 }
 
-# au04_cell — AU-04's original check cell (the installed automation skills carry a
-# `## Write surface` section); the builtin only adds the mode clause.
-au04_cell() {
-  n=0; for f in .hermes/skills/goblin-bugreporter/SKILL.md .hermes/skills/goblin-drift-audit/SKILL.md; do [ -e "$f" ] || continue; n=$((n+1)); grep -q "^## Write surface" "$f" || { echo "missing write surface: $f"; exit 1; }; done; [ "$n" -gt 0 ] || { echo "no automation skill found"; exit 1; }; exit 0
-}
-
-check_au_04() {
-  sk_proc_skip && return 3
-  ( cd "$ROOT" && au04_cell )
-}
-
 check_sk_02() {
   sk_proc_skip && return 3
   local p h cur n=0 bad=0
   while IFS=$'\t' read -r p h; do
-    case "$p" in .hermes/skills/*) ;; *) continue ;; esac
+    case "$p" in .gob/skills/*|.hermes/skills/*) ;; *) continue ;; esac
     n=$((n + 1))
     cur=$(g_sha256_file "$ROOT/$p")
     [ "$cur" = "$h" ] || { printf 'skill drift: %s\n' "$p"; bad=1; }
@@ -1804,11 +1409,11 @@ check_sk_03() {
     ''|*[!0-9]*) printf 'advisory_ceiling is not a number: %s\n' "${ADV_CEILING:-<empty>}"; return 1 ;;
   esac
   # Count what the run counts: a row is advisory if its check column says so OR its enforced_by
-  # does (MD-02 is advisory-labelled but its check column holds a builtin marker). Counting only
+  # does (an advisory-labelled row can carry a builtin marker in its check column). Counting only
   # the literal column printed 7 while the summary printed 8 (D13).
-  k=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "$MANIFEST")
+  k=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "${RUN_MANIFEST:-$MANIFEST}")
   # The REMAINING BUDGET is reported, not implied: the ceiling is the one scarce resource a rule
-  # author spends, and two cards (G1's FM-03, G2's JG-03) each wanted the last slot. A count with
+  # author spends. A count with
   # no arithmetic leaves the next author to work it out (G8-5).
   free=$((ADV_CEILING - k))
   plural=""; [ "$free" -eq 1 ] || plural="s"
@@ -1822,113 +1427,11 @@ check_sk_03() {
   [ "$k" -le "$ADV_CEILING" ]
 }
 
-check_pt_02() {
-  local cur
-  cur=$(cd "$ROOT" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
-  printf 'declared %s, actual %s\n' "$BRANCH" "$cur"
-  if [ "$cur" != "$BRANCH" ]; then
-    printf 'fix: set branch: %s in %s, or check out %s\n' "$cur" "$CONFIG" "$BRANCH"
-    return 1
-  fi
-  return 0
-}
-
-class_part_artifact() {
-  # prints 0 (present) or 1 (absent) for the part's artifact
-  case "$1" in
-    handoff)      [ -f "$ROOT/HANDOFF.md" ] ;;
-    spec)         ls "$ROOT"/*-SPEC.md >/dev/null 2>&1 ;;
-    gate)         [ "$(g_agents_gates "$CONFIG" | grep -c . || true)" -ge 1 ] ;;
-    replay)       [ -n "$(g_agents_read "$CONFIG" replay.env)" ] && [ -n "$(g_agents_read "$CONFIG" replay.cmd)" ] ;;
-    ratchet)      [ -n "$(g_agents_read "$CONFIG" ratchet.name)" ] ;;
-    pr-gate)      [ -d "$ROOT/reviews" ] ;;
-    review-panel) [ -d "$ROOT/reviews" ] ;;
-    # The W4a re-point (W4A-SPEC §5.3): the artifact test accepts the goblin-mode skill
-    # at ANY path in the W4a emitted set, or a record in the emissions ledger. The old
-    # probe hardcoded the Hermes project path and FAILed the first emitted-only repo
-    # (declaration + emit, no goblin-install). Rule text, class table and enforced_by
-    # are untouched - this is the W1 §2.5 re-point precedent.
-    playbooks)
-      # The first platform's dir name is ASSEMBLED at run time from fragments (the MD_SLUG
-      # precedent in tests/run-tests.sh): the tool's own name, literal or inside a variable's
-      # name, would trip MD-01's pattern in every vendored copy of this file. W4b added the
-      # four remaining platforms' emitted roots; the last one's dir name is assembled too.
-      # The global-scope probes are gated on GOBLIN_GLOBAL=1: a global path under the real
-      # $HOME is not evidence about THIS repo, and letting it count made the T6 RED control
-      # pass vacuously on any machine whose operator emits globally (measured 2026-10-01:
-      # new_home() isolates GOBLIN_EMISSIONS but not HOME, so the fallbacks reached the
-      # operator's real ~/.hermes). GOBLIN_GLOBAL=1 is set by an operator who wants the
-      # global tier to count; tests that need isolation leave it unset.
-      local _cl_1 _cl_2 _cl_3 _g1 _g2
-      _cl_1="$(printf '%s' '.cl')"; _cl_2="$(printf '%s' 'a')"; _cl_3="$(printf '%s' 'ude')"
-      _g1="$(printf '%s' '.gem')"; _g2="$(printf '%s' 'ini')"
-      [ -f "$ROOT/.hermes/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/$_cl_1$_cl_2$_cl_3/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/.github/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/.cursor/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/.opencode/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/.agents/skills/goblin-mode/SKILL.md" ] && return 0
-      [ -f "$ROOT/$_g1$_g2/skills/goblin-mode/SKILL.md" ] && return 0
-      if [ "${GOBLIN_GLOBAL:-0}" = "1" ]; then
-        [ -f "${HOME:-$ROOT}/.copilot/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/$_cl_1$_cl_2$_cl_3/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/.cursor/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/.opencode/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/.agents/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/.hermes/skills/goblin-mode/SKILL.md" ] && return 0
-        [ -f "${HOME:-$ROOT}/$_g1$_g2/skills/goblin-mode/SKILL.md" ] && return 0
-      fi
-      [ -f "${GOBLIN_EMISSIONS:-${HOME:-}/.goblin-stack/emissions.tsv}" ] \
-        && awk -F'\t' -v r="$ROOT" 'NR>1 && index($3, r) == 1 { found=1 } END { exit !found }' \
-           "${GOBLIN_EMISSIONS:-${HOME:-}/.goblin-stack/emissions.tsv}" && return 0
-      return 1 ;;
-    tokens)       [ -f "$ROOT/.gob/tokens.yaml" ] ;;
-    # ci-gate: the part is GONE from the product (v2). Every class carries need="-" in
-    # classes.tsv, and the artifact can never be written again — so the probe is a
-    # constant ABSENT and the CL-01 "-" branch (forbids, artifact absent) always passes.
-    ci-gate)      return 1 ;;
-    # The CI lane's artifact is the workflow goblin-stack WRITES, not the directory: a repo is
-    # allowed to have its own workflows, and `-` on this part means "goblin-stack must not have
-    # placed one here", not "this repo may not have CI" (G6 A.6).
-    *)            return 0 ;;
-  esac
-}
-
-check_cl_01() {
-  local part need present bad=0
-  while read -r part; do
-    [ -n "$part" ] || continue
-    need=$(g_class_need "$CLASSES" "$CLASS" "$part")
-    class_part_artifact "$part"; present=$?
-    # A class-forbidden part is forbidden whether or not the installer pre-disabled it: the
-    # opt-out branch used to mask the '-' branch for every part the class turns off, so only
-    # review-panel was ever enforced (D10).
-    if [ "$need" = "-" ]; then
-      if [ "$present" -eq 0 ]; then printf 'class %s forbids part %s, artifact present\n' "$CLASS" "$part"; bad=1; fi
-      continue
-    fi
-    if g_agents_part_disabled "$CONFIG" "$part"; then
-      printf 'part %s: opt-out\n' "$part"
-      continue
-    fi
-    case "$need" in
-      R)
-        if [ "$ARCHIVE" = "true" ]; then
-          printf 'part %s: waived (archive: true)\n' "$part"
-        elif [ "$present" -ne 0 ]; then
-          printf 'class %s requires part %s, artifact absent\n' "$CLASS" "$part"; bad=1
-        fi ;;
-      O) printf 'part %s: optional, %s\n' "$part" "$([ "$present" -eq 0 ] && echo present || echo absent)" ;;
-    esac
-  done < <(awk -F'\t' 'NR>1 {print $2}' "$CLASSES" | sort -u)
-  [ "$bad" -eq 0 ]
-}
-
 check_cl_02() {
   # The archive flag is a switch with a contract, so it must be checkable (D6 - the old body
   # printed a sentence and returned 0 in both branches, so the row could never be RED).
   # Two falsifiable clauses: the value must be a boolean, and it must agree with what the
-  # install recorded - otherwise flipping `archive:` by hand silently waives the class.
+  # install recorded - otherwise flipping `archive:` by hand silently waives the checks.
   case "$ARCHIVE" in
     true|false) ;;
     *) printf 'archive: must be true or false, got "%s"\n' "${ARCHIVE:-<empty>}"; return 1 ;;
@@ -1943,7 +1446,7 @@ check_cl_02() {
   if [ "$ARCHIVE" = "true" ]; then
     printf 'archive: true (matches the install record) - HP-*/GT-*/SP-* skipped, no HANDOFF or gates required\n'
   else
-    printf 'archive: false - the full class requirement applies\n'
+    printf 'archive: false - the full requirement applies\n'
   fi
   return 0
 }
@@ -2016,7 +1519,7 @@ fm_feature_files() {
 
 check_fm_01() {
   [ -n "$FEATURE_MAP" ] || {
-    printf 'feature_map: is empty - no map is declared, so there is nothing to index\n'
+    printf 'feature_map: is empty - this state is UNREACHABLE through `gob init --write`, which always declares a live map; the repo was installed by the low-level goblin-install, or hand-edited. There is nothing to index.\n'
     return 3
   }
   local readme; readme=$(fm_readme)
@@ -2057,7 +1560,7 @@ check_fm_01() {
 
 check_fm_02() {
   [ -n "$FEATURE_MAP" ] || {
-    printf 'feature_map: is empty - no map is declared, so there are no entry paths to resolve\n'
+    printf 'feature_map: is empty - this state is UNREACHABLE through `gob init --write`, which always declares a live map; the repo was installed by the low-level goblin-install, or hand-edited. There are no entry paths to resolve.\n'
     return 3
   }
   local readme; readme=$(fm_readme)
@@ -2133,321 +1636,6 @@ check_va_01() {
     return 1
   fi
   printf 'verify_doctor: "%s" -> exit 0\n' "$VERIFY_DOCTOR"
-  return 0
-}
-
-# ---- the judge and the loop (G2): JG-01..JG-03, LP-01..LP-05 --------------------------------
-# A loop record is the committed artifact of ONE unattended run:
-#
-#   .gob/loop/predicate        one shell command - the loop's own exit condition
-#   .gob/loop/predicate.sha256 its digest, recorded at loop start (the pin); after a close, the
-#                                 chain follows on `previous: <digest>` lines (W5-7)
-#   .gob/loop/first-run        "exit=<n> ts=<ISO8601>" - run BEFORE iteration 1
-#   .gob/loop/budget           the turn budget the loop declared
-#   .gob/loop/decisions.tsv    one row per iteration: ts phase decision why evidence result
-#   .gob/loop/stuck.md         the write-up when the loop ended without its predicate green
-#   .gob/loop/closed-<date>/   a relaxed predicate AND the pin it was closed under, archived;
-#                                 the live pin names its digest, so the close is auditable
-#
-# Nothing here re-runs the predicate and nothing here writes: the record is the evidence, and
-# what that costs is stated in docs/LOOP.md and docs/LIMITS.md.
-
-loop_present() { [ -d "$LOOP_DIR" ]; }
-
-# The one reason every LP row skips: no loop has run here, so there is nothing to audit.
-loop_no_record() { printf 'no loop has run in this repo\n'; return 3; }
-
-# The verdict rows, in order: "<rownum><TAB><decision><TAB><evidence><TAB><result>".
-loop_decision_rows() {
-  awk -F'\t' 'NR > 1 && NF >= 6 { print NR "\t" $3 "\t" $5 "\t" $6 }' "$LOOP_DIR/decisions.tsv" 2>/dev/null
-}
-
-# A row with fewer columns than the header is a malformed record, and a malformed record is a
-# FAIL: a row the reader silently skipped is a row nothing checked.
-loop_malformed_rows() {
-  awk -F'\t' 'NR > 1 && NF > 0 && NF < 6 { print NR }' "$LOOP_DIR/decisions.tsv" 2>/dev/null
-}
-
-# Does ONE evidence token resolve? The typed handles are sha:<hex> (a commit `git rev-list
-# --all` knows), file:<path> (a path under the root) and sha256:<hex> (the digest of a file
-# under .gob/loop/); a bare token resolves when it names an existing path. A `cmd:` token
-# resolves NOTHING on purpose: the command ran, its output is not in the record, and a verdict
-# that rests on it is exactly the self-report JG-01 exists to refuse.
-loop_token_resolves() {
-  local t="$1" h p
-  case "$t" in
-    *..*) return 1 ;;
-  esac
-  case "$t" in
-    sha:*)
-      h=${t#sha:}
-      case "$h" in ''|*[!0-9a-fA-F]*) return 1 ;; esac
-      [ "${#h}" -ge 7 ] || return 1
-      # NOT `git rev-list --all | grep -qi` : grep -q exits on the first match, git dies of
-      # SIGPIPE (141), and with `set -o pipefail` the pipeline reports FAILURE for a commit that
-      # IS in the repo. Measured: a seeded record's own HEAD resolved as false, rc 141. grep -c
-      # reads to the end of the stream, so the count is what is compared.
-      case "$( cd "$ROOT" && git rev-list --all 2>/dev/null | grep -ci "^$h" )" in
-        ''|0) return 1 ;;
-      esac
-      return 0 ;;
-    sha256:*)
-      h=${t#sha256:}
-      case "$h" in ''|*[!0-9a-fA-F]*) return 1 ;; esac
-      [ "${#h}" -eq 64 ] || return 1
-      for p in "$LOOP_DIR"/* "$LOOP_DIR"/closed-*/*; do
-        [ -f "$p" ] || continue
-        [ "$(g_sha256_file "$p")" = "$h" ] && return 0
-      done
-      return 1 ;;
-    file:*)
-      p=${t#file:}
-      [ -n "$p" ] && [ -e "$ROOT/$p" ] && return 0
-      return 1 ;;
-    cmd:*|verdict:*|predicate:*|ts:*)
-      return 1 ;;
-    *)
-      [ -n "$t" ] && [ -e "$ROOT/$t" ] && return 0
-      return 1 ;;
-  esac
-}
-
-check_jg_01() {
-  local f="$LOOP_DIR/decisions.tsv" n=0 bad=0 rn dec ev res tok hit mal
-  [ -f "$f" ] || { printf 'no loop record in this repo - no judge verdict to check\n'; return 3; }
-  mal=$(loop_malformed_rows | head -n 3 | paste -sd' ' -)
-  if [ -n "$mal" ]; then
-    printf 'decisions.tsv row(s) %s carry fewer columns than the header - a row nothing reads is a row nothing checks\n' "$mal"
-    bad=1
-  fi
-  while IFS=$'\t' read -r rn dec ev res; do
-    [ -n "$rn" ] || continue
-    case "$dec" in verdict:*) ;; *) continue ;; esac
-    n=$((n + 1))
-    hit=0
-    for tok in $(printf '%s' "$ev" | tr ',' ' '); do
-      if loop_token_resolves "$tok"; then hit=1; break; fi
-    done
-    if [ "$hit" -eq 0 ]; then
-      printf 'row %s: %s cites no handle that resolves: "%s"\n' "$rn" "$dec" "${ev:-<empty>}"
-      printf '  a handle is sha:<hex> (a commit in this repo), file:<path>, sha256:<hex> (a file under .gob/loop/), or an existing path\n'
-      bad=1
-    fi
-  done < <(loop_decision_rows)
-  [ "$bad" -eq 0 ] || return 1
-  printf '%d judge verdict row(s), each citing a handle the repo resolves\n' "$n"
-  return 0
-}
-
-# The profiles a role resolves to (one per lane), or nothing when the role has no lane.
-role_lane_profiles() {
-  resolve_role_models "$1" | awk -F'\t' 'NF >= 2 && $2 != "" { print $2 }' | sort -u
-}
-
-# Non-zero when ANY lane of the role has no provider/model. BOTH sentinels count as unresolved:
-# the installed path prints `?` (resolve_role_models, `${prov:-?}`) and the checkout path prints
-# `unknown` - a check that greps for one of them passes on the other.
-role_unresolved() {
-  local line p prov model
-  while IFS=$'\t' read -r line p prov model _; do
-    [ -n "$p" ] || continue
-    case "$prov" in '?'|unknown|'') return 0 ;; esac
-    case "$model" in '?'|unknown|'') return 0 ;; esac
-  done < <(resolve_role_models "$1")
-  return 1
-}
-
-check_jg_02() {
-  local judge_profiles code_profiles shared judge_unres code_unres
-  if [ ! -f "$MODELS_FILE" ]; then
-    printf 'no model mapping configured (%s absent) - advisory\n' "$MODELS_FILE"
-    printf 'remedy: add a `judge:` entry beside the code lane in the file declared as models_file: in %s\n' "$CONFIG"
-    return 2
-  fi
-  judge_profiles=$(role_lane_profiles judge)
-  code_profiles=$(role_lane_profiles code)
-  if [ -z "$judge_profiles" ] || [ -z "$code_profiles" ]; then
-    printf 'roles.yaml did not resolve both lanes (judge: %s, code: %s) - advisory\n' \
-      "${judge_profiles:-none}" "${code_profiles:-none}"
-    printf 'remedy: role-judge needs a profiles: list and a profile for it in the mapping file\n'
-    return 2
-  fi
-  role_unresolved judge; judge_unres=$?
-  role_unresolved code; code_unres=$?
-  if [ "$judge_unres" -eq 0 ] || [ "$code_unres" -eq 0 ]; then
-    printf 'unresolved lane - advisory (judge: %s, code: %s)\n' \
-      "$([ "$judge_unres" -eq 0 ] && printf 'no provider/model' || printf 'ok')" \
-      "$([ "$code_unres" -eq 0 ] && printf 'no provider/model' || printf 'ok')"
-    printf 'remedy: add the missing profile to the file declared as models_file: in %s - goblin-stack reads that file and never writes it\n' "$CONFIG"
-    return 2
-  fi
-  shared=$(printf '%s\n' "$judge_profiles" | grep -Fxf <(printf '%s\n' "$code_profiles") | head -n 1)
-  if [ -n "$shared" ]; then
-    printf 'the judge lane and the author (code) lane share the profile "%s" - the judge is the author\n' "$shared"
-    return 1
-  fi
-  printf 'judge lane [%s] and code lane [%s] are disjoint\n' \
-    "$(printf '%s' "$judge_profiles" | paste -sd, -)" "$(printf '%s' "$code_profiles" | paste -sd, -)"
-  return 0
-}
-
-check_lp_01() {
-  if ! loop_present; then loop_no_record; return 3; fi
-  local p="$LOOP_DIR/predicate" f="$LOOP_DIR/first-run" n fr fr_ts row1_ts a b
-  [ -f "$p" ] || { printf 'no .gob/loop/predicate - the loop declared no exit condition\n'; return 1; }
-  n=$(grep -cvE '^[[:space:]]*(#|$)' "$p")
-  if [ "$n" -ne 1 ]; then
-    printf 'the predicate must be exactly ONE command; found %s non-blank non-comment line(s)\n' "$n"
-    return 1
-  fi
-  [ -f "$f" ] || { printf 'no .gob/loop/first-run - the predicate was never run before iteration 1\n'; return 1; }
-  fr=$(head -n 1 "$f")
-  case "$fr" in
-    "exit="[0-9]*" ts="*) ;;
-    *) printf 'first-run must read "exit=<n> ts=<ISO8601>", got "%s"\n' "$fr"; return 1 ;;
-  esac
-  fr_ts=$(printf '%s' "$fr" | sed -n 's/.* ts=//p')
-  case "$fr_ts" in
-    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]*) ;;
-    *) printf 'first-run ts is not an ISO8601 timestamp: "%s"\n' "$fr_ts"; return 1 ;;
-  esac
-  row1_ts=$(awk -F'\t' 'NR > 1 && NF >= 6 { print $1; exit }' "$LOOP_DIR/decisions.tsv" 2>/dev/null)
-  if [ -n "$row1_ts" ]; then
-    a=$fr_ts; b=$row1_ts
-    if [ "$a" \> "$b" ]; then
-      printf 'the recorded first run (%s) is AFTER the first log row (%s) - it did not run before iteration 1\n' "$fr_ts" "$row1_ts"
-      return 1
-    fi
-  fi
-  printf 'one predicate command; first run (%s) is at or before the first log row\n' "$fr"
-  return 0
-}
-
-check_lp_02() {
-  if ! loop_present; then loop_no_record; return 3; fi
-  local p="$LOOP_DIR/predicate" pin="$LOOP_DIR/predicate.sha256" want have bad=0
-  [ -f "$p" ] || { printf 'no .gob/loop/predicate to pin\n'; return 1; }
-  [ -f "$pin" ] || { printf 'no .gob/loop/predicate.sha256 - the predicate was never pinned at loop start\n'; return 1; }
-  want=$(head -n 1 "$pin" | tr -d '[:space:]')
-  have=$(g_sha256_file "$p")
-  if [ "$want" != "$have" ]; then
-    printf 'the predicate changed after the loop was pinned\n  pinned %s\n  now    %s\n' "$want" "$have"
-    printf 'remedy: close this loop - commit the green state, archive the predicate AND its pin under .gob/loop/closed-<date>/, then open a new loop and re-record the pin with a `previous: <archived digest>` line. Never automatic.\n'
-    return 1
-  fi
-  # W5-7: the close-and-reopen path. The pin covers the predicate file on disk, so a loop could
-  # archive its old bar, write a weaker one, re-pin, and pass LP-02 and LP-05 with nothing in the
-  # record - a relaxed predicate was indistinguishable from a legitimate re-scope. The chain below
-  # cannot judge whether a predicate is WEAKER (nothing in bash can, docs/LIMITS.md #39); what it
-  # can do is make the supersession RECORDED: the archive must be intact (its own pin agrees with
-  # its own predicate) and the current pin must name the archived digest on a `previous:` line. So
-  # a silent relaxation is caught, and a real re-scope costs one line.
-  local d arcdig adig
-  for d in "$LOOP_DIR"/closed-*; do
-    [ -d "$d" ] || continue
-    if [ ! -f "$d/predicate" ] || [ ! -f "$d/predicate.sha256" ]; then
-      printf '%s: a closed loop must archive its predicate AND its pin - an archive that records nothing is not a close\n' "$(basename "$d")"
-      bad=1; continue
-    fi
-    arcdig=$(head -n 1 "$d/predicate.sha256" | tr -d '[:space:]')
-    adig=$(g_sha256_file "$d/predicate")
-    if [ "$arcdig" != "$adig" ]; then
-      printf '%s: the archived pin does not match the archived predicate\n  pinned %s\n  now    %s\n' "$(basename "$d")" "$arcdig" "$adig"
-      bad=1; continue
-    fi
-    if ! awk -v want="$adig" '
-          NR > 1 { line = $0; sub(/^previous:[[:space:]]*/, "", line); sub(/[[:space:]]+$/, "", line); if (line == want) found = 1 }
-          END { exit !found }
-        ' "$pin"; then
-      printf '%s: the current pin does not name the superseded predicate\n  archived %s\n  add a `previous: %s` line to %s - a close-and-reopen that records nothing is a silent relaxation\n' \
-        "$(basename "$d")" "$adig" "$adig" "$pin"
-      bad=1
-    fi
-  done
-  [ "$bad" -eq 0 ] || return 1
-  printf 'predicate pin ok (%s)%s\n' "$have" \
-    "$([ -n "$(ls -d "$LOOP_DIR"/closed-* 2>/dev/null)" ] && printf ', every archived predicate named by a previous: line' || printf '')"
-  return 0
-}
-
-check_lp_03() {
-  if ! loop_present; then loop_no_record; return 3; fi
-  local f="$LOOP_DIR/budget" b ceil n bad=0
-  [ -f "$f" ] || { printf 'no .gob/loop/budget - the loop declared no turn budget\n'; return 1; }
-  b=$(head -n 1 "$f" | tr -d '[:space:]')
-  case "$b" in
-    ''|*[!0-9]*) printf 'budget must be a positive integer, got "%s"\n' "$b"; return 1 ;;
-  esac
-  [ "$b" -gt 0 ] || { printf 'budget must be a positive integer, got "%s"\n' "$b"; return 1; }
-  ceil=$LOOP_MAX_TURNS_CEILING
-  case "$ceil" in ''|*[!0-9]*) ceil=20 ;; esac
-  if [ "$b" -gt "$ceil" ]; then
-    printf 'budget %s exceeds loop_max_turns_ceiling %s in the config\n' "$b" "$ceil"
-    bad=1
-  fi
-  if [ ! -f "$LOOP_DIR/decisions.tsv" ]; then
-    printf 'no decisions.tsv - the loop declared a budget and kept no record\n'
-    return 1
-  fi
-  n=$(awk -F'\t' 'NR > 1 && NF >= 6 && $3 ~ /^verdict:/ { c++ } END { print c+0 }' "$LOOP_DIR/decisions.tsv")
-  if [ "$n" -gt "$b" ]; then
-    printf 'the record holds %s verdict row(s) against a declared budget of %s\n' "$n" "$b"
-    bad=1
-  fi
-  [ "$bad" -eq 0 ] || return 1
-  printf 'budget %s (ceiling %s), %s verdict row(s) recorded\n' "$b" "$ceil" "$n"
-  return 0
-}
-
-check_lp_04() {
-  if ! loop_present; then loop_no_record; return 3; fi
-  [ -f "$LOOP_DIR/decisions.tsv" ] || { printf 'no decisions.tsv to read\n'; return 1; }
-  local prev_ev="" streak=0 nums="" rn dec ev res
-  while IFS=$'\t' read -r rn dec ev res; do
-    [ -n "$rn" ] || continue
-    case "$dec" in verdict:*) ;; *) continue ;; esac
-    if [ -n "$ev" ] && [ "$ev" = "$prev_ev" ] && [ "$res" != "predicate:green" ]; then
-      streak=$((streak + 1))
-      nums="$nums $rn"
-    else
-      streak=1
-      nums=" $rn"
-    fi
-    prev_ev="$ev"
-    if [ "$streak" -ge 3 ]; then
-      printf 'no progress: rows%s share the evidence pointer "%s" and none reached predicate:green\n' "$nums" "$ev"
-      printf '  a loop making no progress stops and writes up why; it does not spend its budget thrashing\n'
-      return 1
-    fi
-  done < <(loop_decision_rows)
-  printf 'no three consecutive verdict rows share an evidence pointer without reaching predicate:green\n'
-  return 0
-}
-
-check_lp_05() {
-  if ! loop_present; then loop_no_record; return 3; fi
-  [ -f "$LOOP_DIR/decisions.tsv" ] || { printf 'no decisions.tsv to read\n'; return 1; }
-  local last rn res s n
-  last=$(awk -F'\t' 'NR > 1 && NF >= 6 && $3 ~ /^verdict:/ { rn = NR; res = $6 } END { if (rn) print rn "\t" res }' "$LOOP_DIR/decisions.tsv")
-  if [ -z "$last" ]; then
-    printf 'the record holds no verdict row - there is no closing state to audit\n'
-    return 3
-  fi
-  rn=${last%%$'\t'*}
-  res=${last#*$'\t'}
-  if [ "$res" = "predicate:green" ]; then
-    printf 'the last verdict row (row %s) reached predicate:green - no write-up required\n' "$rn"
-    return 0
-  fi
-  s="$LOOP_DIR/stuck.md"
-  [ -f "$s" ] || { printf 'the loop ended at "%s" (row %s) and left no .gob/loop/stuck.md\n' "${res:-<empty>}" "$rn"; return 1; }
-  n=$(grep -c '[^[:space:]]' "$s")
-  if [ "$n" -lt 3 ]; then
-    printf 'stuck.md holds %s non-blank line(s); a write-up needs at least 3\n' "$n"
-    return 1
-  fi
-  grep -q 'predicate' "$s" || { printf 'stuck.md does not name the predicate it failed to satisfy\n'; return 1; }
-  printf 'the loop ended at "%s" (row %s) and stuck.md names the predicate in %s line(s)\n' "$res" "$rn" "$n"
   return 0
 }
 
@@ -2645,7 +1833,7 @@ check_rc_03() {
       scripts/*|notes/*|manifests/*) continue ;;
       # The harness's own directories and the .gitignore block it appends are the install, not the
       # lab's content - the same exclusion FM-02 makes for the same reason (W5-4). That set is the
-      # one the class-A install contract creates: .gob/, .hermes/, the .gitignore block, the
+      # one the install contract creates: .gob/, .hermes/, the .gitignore block, the
       # declared harness_dir (checks/ by default), reviews/, and the CI scaffold .github/. A payload
       # hidden in any of them is still caught by clause 2 (the sha256 sweep below).
       .gob/*|.hermes/*|.gitignore|.github/*|reviews/*) continue ;;
@@ -2732,23 +1920,11 @@ rc_hdr_field() {
 }
 
 # ---- the day-one framing (review 1, scope 3) ----------------------------------
-# Two shapes are undeserved reds for a person who just cloned a repo. They are DETECTED and
-# framed — the verdict's exit semantics, the counts and every row's payload are untouched:
-#   (a) owner_email in AGENTS.md is not the current git identity -> the CM-01 red names
-#       whose email the repo actually expects (the remedy column says where to point it);
-#   (b) the repo looks freshly cloned (.gob committed, but fewer than 3 commits) -> one
-#       banner line after the verdict. Commit count only: an mtime comparison against the
-#       reflog fired after every ordinary GT-02 write, so the banner lingered on aged repos
-#       (the verify itself refreshes last-gate-line forever); a repo under 3 commits is the
-#       only unambiguous fresh-clone shape.
-owner_mismatch() {
-  [ -f "$CONFIG" ] || return 1
-  local declared cur
-  declared=$(g_agents_read "$CONFIG" owner_email | tr -d '"')
-  cur=$(cd "$ROOT" && git config user.email 2>/dev/null)
-  [ -n "$declared" ] && [ -n "$cur" ] && [ "$declared" != "$cur" ]
-}
-
+# One shape is an undeserved red for a person who just cloned a repo: the repo looks freshly
+# cloned (.gob committed, but fewer than 3 commits) -> one banner line after the verdict.
+# Commit count only: an mtime comparison against the reflog fired after every ordinary GT-02
+# write, so the banner lingered on aged repos (the verify itself refreshes last-gate-line
+# forever); a repo under 3 commits is the only unambiguous fresh-clone shape.
 fresh_clone() {
   [ -f "$INSTALLED" ] || return 1
   [ -d "$ROOT/.git" ] || return 1
@@ -2759,6 +1935,82 @@ fresh_clone() {
 }
 
 # ================================================================ runner ======
+
+# ---- the repo-local override (batch 3) ---------------------------------------
+# Read .gob/manifest/enforcement.local.tsv, validate it (THE HONESTY GATE), and merge its rows
+# into the run. Placed here, after every builtin is defined, so a `goblin-verify --only <ID>`
+# marker cell can be checked against the builtins that actually exist.
+is_local_id() { case " $LOCAL_IDS " in *" $1 "*) return 0 ;; esac; return 1; }
+
+# LOCAL_NO_VERDICT — set at run time when a LOCAL row's check COULD NOT EXECUTE (exit 126/127/137:
+# not found / not executable / killed by a signal). Such a check "exited without producing a
+# verdict": it is REFUSED at the end of the run, never read as a pass.
+LOCAL_NO_VERDICT=""
+setup_local_override() {
+  [ -n "$LOCAL_FILE" ] || return 0
+  local tmp _n=0 _id _scope _rule _eby _art _check _why _nf _hit _fn _line
+  tmp=$(mktemp) || { g_err "mktemp failed"; exit 2; }
+  cp "$MANIFEST" "$tmp"
+  while IFS= read -r _line || [ -n "$_line" ]; do
+    _line=${_line%$'\r'}
+    case "$_line" in ''|'#'*) continue ;; esac
+    _nf=$(printf '%s' "$_line" | awk -F'\t' '{print NF}')
+    _id=${_line%%$'\t'*}
+    if [ "$_nf" -lt 7 ]; then
+      g_err "local override: '$_id' names a row id with no check."
+      g_err "  a local row must carry the full 7-cell line; get it with: gob verify --library"
+      g_err "  (an LX-* rule must supply its own check cell - a rule nothing verifies is refused)."
+      exit 3
+    fi
+    IFS=$'\t' read -r _id _scope _rule _eby _art _check _why <<< "$_line"
+    # the id must name a check the engine can run: a matrix row, a library row, or an LX-* rule.
+    _hit=0
+    awk -F'\t' -v x="$_id" 'NR>1 && $1==x {f=1} END{exit !f}' "$MANIFEST" && _hit=1
+    if [ "$_hit" -eq 0 ] && [ -n "$LIBRARY_FILE" ]; then
+      awk -F'\t' -v x="$_id" 'NR>1 && $1==x {f=1} END{exit !f}' "$LIBRARY_FILE" && _hit=1
+    fi
+    case "$_id" in LX-*) _hit=1 ;; esac
+    if [ "$_hit" -eq 0 ]; then
+      g_err "local override: '$_id' names no row the engine ships - it is in neither"
+      g_err "  .gob/manifest/enforcement.tsv nor .gob/manifest/library.tsv."
+      g_err "  a local row may only turn on a shipped row (see: gob verify --library) or declare"
+      g_err "  an LX-* rule with its own check cell."
+      exit 3
+    fi
+    # a builtin-marker check must have a builtin, or it can never produce a verdict.
+    case "$_check" in
+      "goblin-verify --only "*)
+        _fn="check_$(printf '%s' "$_id" | tr 'A-Z' 'a-z' | tr '-' '_')"
+        if ! declare -F "$_fn" >/dev/null 2>&1; then
+          g_err "local override: '$_id' names a check the engine has no builtin for ($_fn)."
+          g_err "  a local row cannot certify a rule nothing verifies."
+          exit 3
+        fi ;;
+      "")
+        case "$_eby" in
+          advisory) ;;
+          *) g_err "local override: '$_id' carries no check and is not advisory - nothing verifies it."
+             exit 3 ;;
+        esac ;;
+    esac
+    # a row the matrix already runs by default is a no-op here (never a duplicate).
+    if awk -F'\t' -v x="$_id" 'NR>1 && $1==x {f=1} END{exit !f}' "$MANIFEST"; then
+      g_info "local override: '$_id' is already on by default - ignored."
+      continue
+    fi
+    printf '%s\n' "$_line" >> "$tmp"
+    LOCAL_IDS="$LOCAL_IDS $_id"
+    _n=$((_n + 1))
+  done < "$LOCAL_FILE"
+  if [ "$_n" -gt 0 ]; then
+    RUN_MANIFEST="$tmp"
+    _GOB_MANIFEST="$tmp"
+    export _GOB_MANIFEST
+  else
+    rm -f "$tmp"
+  fi
+}
+setup_local_override
 
 PASS=0; FAIL=0; ADV=0; SKIP=0; BAD=0
 JSON_ROWS=""
@@ -2795,21 +2047,6 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
   only_selected "$id" || continue
 
   part=$(row_part "$id")
-  # W6 neutral-first: in global engine mode AU-01's subject is the PRODUCER glob, which
-  # global mode reads from the engine dir — the row must run there even when the repo's
-  # skills opt-out (playbooks) is set, or the W1 control below it is skip-masked. This
-  # clause precedes the opt-out branch on purpose. SK-01/SK-02/SK-04 and AU-02..AU-04 keep
-  # their opt-out semantics.
-  if [ "$id" = "AU-01" ] && [ "$ENGINE_MODE" = "global" ]; then
-    out=$(check_au_01 2>&1); rc=$?
-    case "$rc" in
-      0) PASS=$((PASS + 1)); emit "$id" PASS "$out" ;;
-      1) FAIL=$((FAIL + 1)); emit "$id" FAIL "$out" ;;
-      2) ADV=$((ADV + 1));  emit "$id" ADV "$out" ;;
-      3) SKIP=$((SKIP + 1)); emit "$id" SKIP "$out" ;;
-    esac
-    continue
-  fi
   if [ -n "$part" ] && g_agents_part_disabled "$CONFIG" "$part"; then
     SKIP=$((SKIP + 1)); emit "$id" SKIP "$rule (opt-out: $part)"; continue
   fi
@@ -2834,6 +2071,15 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
       ;;
     *)
       detail=$( cd "$ROOT" && bash -c "$check" 2>&1 ); rc=$?
+      # A LOCAL row whose check could not execute (126 not executable / 127 not found /
+      # 137 killed by a signal) exited WITHOUT producing a verdict: record it for the refusal
+      # at the end of the run, rather than folding it into a FAIL a reader could mistake for a
+      # verdict. A matrix row keeps the old fold (its checks are shipped and known).
+      if is_local_id "$id"; then
+        case "$rc" in
+          126|127|137) LOCAL_NO_VERDICT="$LOCAL_NO_VERDICT $id(exit $rc)" ;;
+        esac
+      fi
       # A shell check has no advisory state: anything non-zero is a FAIL. Only builtins
       # (the 'goblin-verify --only <ID>' marker rows) may return 2 = advisory or 3 = skip.
       if [ "$rc" -eq 0 ]; then
@@ -2859,44 +2105,65 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
     3) SKIP=$((SKIP + 1)); emit "$id" SKIP "$detail" ;;
     *) FAIL=$((FAIL + 1)); emit "$id" FAIL "$detail (exit $rc)" ;;
   esac
-done < "$MANIFEST"
+done < "$RUN_MANIFEST"
+
+# ---- the honesty gate, run-time half: a local check that produced no verdict ----------------
+# A local row's check that could not execute (exit 126/127/137) never produced a verdict, so it
+# is REFUSED - exit 3, with the ids named - rather than reported as the FAIL the fold above made
+# of it. Nothing about such a row is green.
+if [ -n "$LOCAL_NO_VERDICT" ]; then
+  g_err "local override: a check could not execute, so it produced NO verdict:$LOCAL_NO_VERDICT"
+  g_err "  a local row's check must be runnable - a command that is not found (127), not"
+  g_err "  executable (126), or killed by a signal (137) cannot verify the rule it names."
+  g_err "  fix the check cell, or remove the row from .gob/manifest/enforcement.local.tsv."
+  exit 3
+fi
 
 if [ "$JSON" -eq 1 ]; then
-  printf '{"root":"%s","class":"%s","passed":%d,"failed":%d,"advisory":%d,"skipped":%d,"rows":[%s]}\n' \
-    "$(json_escape "$ROOT")" "$(json_escape "$CLASS")" "$PASS" "$FAIL" "$ADV" "$SKIP" "${JSON_ROWS%,}"
+  _lib_n=0
+  [ -n "$LIBRARY_FILE" ] && _lib_n=$(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$LIBRARY_FILE")
+  printf '{"root":"%s","passed":%d,"failed":%d,"advisory":%d,"skipped":%d,"library":%d,"rows":[%s]}\n' \
+    "$(json_escape "$ROOT")" "$PASS" "$FAIL" "$ADV" "$SKIP" "$_lib_n" "${JSON_ROWS%,}"
 else
   printf '      %d passed, %d failed, %d advisory, %d skipped\n' "$PASS" "$FAIL" "$ADV" "$SKIP"
-  # Day-one framing, part (a) (review 1, scope 3): the owner mismatch names whose email the
-  # repo expects, under the verdict, before the row detail. One line, no exit semantics.
-  if [ "$FAIL" -gt 0 ] && owner_mismatch; then
-    _owner_declared=$(g_agents_read "$CONFIG" owner_email | tr -d '"')
-    printf '      note: this repo records a different owner (you are probably new here) — commit with --author or update owner_email: %s\n' "$_owner_declared"
-    unset _owner_declared
-  fi
-  # Day-one framing, part (b): a fresh clone is not your debt. One banner line, after the
+  # Day-one framing: a fresh clone is not your debt. One banner line, after the
   # verdict; counts and exit codes untouched.
   if [ "$FAIL" -gt 0 ] && fresh_clone; then
     printf '      fresh clone detected: some of these fails are not yours — see docs/GUIDE.md §9 (day one for a new teammate)\n'
   fi
-  # Z1-7: the advisory number above counts TWO different things - the rows the matrix LABELS
-  # advisory, and a row that is not advisory-labelled but whose lane cannot be resolved here
-  # (JG-02's unresolved judge lane returns 2 = ADV by design). SK-03 counts the first, the ADV
-  # lines on screen are both, so a reader comparing `advisory 10 of ceiling 10` with 11 ADV lines
-  # saw a mismatch that only the row's why-cell explained. Print the arithmetic.
-  adv_labelled=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "$MANIFEST")
+  # Z1-7: the advisory number above counts the rows the matrix LABELS advisory; a row that is
+  # not advisory-labelled can also report ADV by design when its lane cannot be resolved here.
+  # SK-03 counts the labelled rows, the ADV lines on screen are both, so a reader comparing
+  # `advisory N of ceiling C` with more ADV lines sees the arithmetic. Print it.
+  adv_labelled=$(awk -F'\t' 'NR>1 && ($4=="advisory" || $6=="advisory") {n++} END{print n+0}' "${RUN_MANIFEST:-$MANIFEST}")
   if [ "$ADV" -ne "$adv_labelled" ]; then
     printf '      of those %d advisory: the matrix labels %d row(s) advisory; the difference is the non-advisory row(s) reporting ADV by design (an unresolved lane) and any labelled row skipped by an opt-out\n' \
       "$ADV" "$adv_labelled"
+  else
+    printf '      of those %d advisory: the matrix labels %d row(s) advisory\n' \
+      "$ADV" "$adv_labelled"
+  fi
+  # The library census (batch 2b-ii). A green default run must never read as the whole story:
+  # the rows this run did NOT check are counted here, with the surface that lists them. The
+  # count is read from library.tsv, so it tracks the shipped row set rather than a typed number.
+  if [ -n "$LIBRARY_FILE" ]; then
+    _lib_n=$(awk -F'\t' 'NR>1 && $1!="" {n++} END{print n+0}' "$LIBRARY_FILE")
+    printf '      library: %d off-by-default row(s) held but NOT run - discover them with `gob verify --library`\n' \
+      "$_lib_n"
+  fi
+  # The local-override census (batch 3): a row turned ON through .gob/manifest/enforcement.local.tsv
+  # is named here, so a reader can tell the locally-enabled rows apart from the default set.
+  if [ -n "$LOCAL_IDS" ]; then
+    printf '      enabled-locally: %d row(s) added by .gob/manifest/enforcement.local.tsv:%s\n' \
+      "$(printf '%s' "$LOCAL_IDS" | wc -w | tr -d ' ')" "$LOCAL_IDS"
   fi
   # The collapsed listing keeps one line per row (a SKIP's reason is the row's whole
   # point and scripts read them by id); the width discipline lives in the lib's printers.
   if [ "$VERBOSE" -eq 1 ]; then
     cat <<'SEE'
       cannot see: whether a check in the harness dir tests the right path rather than
-      merely passing; whether the forge is bound by the workflow CL-01 found; whether a human
-      read the diff;
-      whether the model mapping names a family that actually differs (MD-02 reports it
-      and cannot change it); and whether .gob/installed.json — the record every drift
+      merely passing; whether the forge is bound by the workflow the repo declares found; whether a human
+      read the diff; and whether .gob/installed.json — the record every drift
       check trusts — was itself rewritten. It is not signed, so one edit to it (with the
       matching edit to the file it protects) defeats IN-02, SK-02 and HS-01 at once
       (docs/LIMITS.md #18). The ban lane carries the same blind spot and two of its own:
@@ -2905,17 +2172,7 @@ else
       `Record<string, any>` is missed and a `: any` inside a string is reported
       (docs/LIMITS.md #27); and no check here can reach a ban IN CONTEXT — the row proves
       the forbidden path fails mechanically, never that the ban reached the agent that
-      wrote the line. The judge/loop lane adds its own: every JG-/LP- row reads a RECORD, so
-      it proves a handle, a pin, a budget and a pointer exist — never that the loop made
-      progress (a changed pointer is a proxy, docs/LIMITS.md #33), never which lane returned
-      a verdict, and never that the predicate was the right one or was really run. The CI lane
-      adds its own: PG-05 and PG-06 read a workflow's TEXT, so PG-05 sees a job whose gate step is
-      conditional and cannot see branch protection, the required-check list, or a forge that never
-      ran the job at all, and PG-06 proves a declared gate is INVOKED in a file under
-      .github/workflows/ — never that the forge marks that job required, never that it is the job
-      the forge waits on, and never that the workflow can fail (that is PG-05). A required check
-      that reports Success after skipping its gate is a green light for a commit whose gate never
-      ran (docs/CI.md). The reference-corpus lane adds its own: RC-01 matches EXACT sha256 only,
+      wrote the line. The reference-corpus lane adds its own: RC-01 matches EXACT sha256 only,
       so a resized, recoloured or re-encoded reference asset, or copied text inside a shipped
       string, passes it unseen; RC-02 proves the manifest is well-shaped, never that its entries
       are the right hashes (as strong as tamper hashing, and installed.json is unsigned); RC-03
@@ -2929,8 +2186,8 @@ SEE
     cat <<'SEE'
       cannot see: whether a check tests the right path rather than merely passing; whether a
       human read the diff; whether the unsigned install record (.gob/installed.json — it is
-      not signed) was rewritten; and the per-lane blind spots of the ban, judge/loop, CI and
-      reference lanes. Full statement: `goblin-verify --verbose`, docs/LIMITS.md #18 #27 #28 #33 #43.
+      not signed) was rewritten; and the per-lane blind spots of the ban and
+      reference lanes. Full statement: `goblin-verify --verbose`, docs/LIMITS.md #18 #27 #28 #43.
 SEE
   fi
   # ---- the sign-off (locked v2 decision) ----------------------------------------
@@ -2972,9 +2229,8 @@ SEE
   if [ "$ENGINE_MODE" = "global" ]; then
     _shadow_n=0
     for _f in "$ROOT"/.gob/bin/goblin-verify "$ROOT"/.gob/bin/goblin-lib.sh \
-              "$ROOT"/.gob/bin/goblin-audit "$ROOT"/.gob/bin/goblin-bans \
-              "$ROOT"/.gob/manifest/* "$ROOT"/.gob/bans/* \
-              "$ROOT"/.gob/automations/* "$ROOT"/.gob/roles.yaml; do
+              "$ROOT"/.gob/bin/goblin-bans \
+              "$ROOT"/.gob/manifest/* "$ROOT"/.gob/bans/*; do
       [ -e "$_f" ] || continue
       _shadow_n=$((_shadow_n + 1))
     done

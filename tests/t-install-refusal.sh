@@ -2,7 +2,7 @@
 # t-install-refusal.sh — the installer's documented refusal contract.
 #
 #   D1  a file goblin-stack did not create is never overwritten (it used to be clobbered
-#       silently, against docs/CONTRACTS.md and the installer's own header)
+#       silently, against docs/GUIDE.md and the installer's own header)
 #   D2  a refusal exits 1 with the path (it used to print the refusal and exit 0, so a wrapper
 #       could not detect it)
 #   D11 --force is the documented override, and it takes over a file that existed before the
@@ -17,7 +17,6 @@ fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
 printf 'the referenced standard\n' > "$WORK/standard.md"
 
 mkdir -p "$WORK/target" && cd "$WORK/target"
@@ -29,15 +28,15 @@ git add -A && git commit -q -m "chore: seed"
 
 # The three files a real project is most likely to own already: its own harness in the same
 # directory goblin-stack scaffolds into, a skill with the same name, and a HANDOFF.
-mkdir -p checks .hermes/skills/goblin-mode
+mkdir -p checks .hermes/skills/goblin-handoff
 printf '// MY OWN HARNESS - do not touch\n' > checks/assert.mjs
-printf -- '--- my own skill, before ---\n' > .hermes/skills/goblin-mode/SKILL.md
+printf -- '--- my own skill, before ---\n' > .hermes/skills/goblin-handoff/SKILL.md
 printf '# my own handoff\n' > HANDOFF.md
 OWN_ASSERT=$(sha256sum checks/assert.mjs | awk '{print $1}')
-OWN_SKILL=$(sha256sum .hermes/skills/goblin-mode/SKILL.md | awk '{print $1}')
+OWN_SKILL=$(sha256sum .hermes/skills/goblin-handoff/SKILL.md | awk '{print $1}')
 OWN_HANDOFF=$(sha256sum HANDOFF.md | awk '{print $1}')
 
-INSTALL="bash $SRC/bin/goblin-install --target $WORK/target --class A --models $WORK/models.yaml --practice $WORK/standard.md"
+INSTALL="bash $SRC/bin/goblin-install --target $WORK/target --practice $WORK/standard.md"
 
 # ---- D1 + D2: the refusal ----------------------------------------------------
 OUT1=$($INSTALL 2>&1); RC1=$?
@@ -48,7 +47,7 @@ check "the refusal names the paths" "$?"
 check "the project's own checks/assert.mjs survives (D1)" \
   "$([ "$(sha256sum checks/assert.mjs | awk '{print $1}')" = "$OWN_ASSERT" ] && echo 0 || echo 1)"
 check "the project's own .hermes skill survives (D1)" \
-  "$([ "$(sha256sum .hermes/skills/goblin-mode/SKILL.md | awk '{print $1}')" = "$OWN_SKILL" ] && echo 0 || echo 1)"
+  "$([ "$(sha256sum .hermes/skills/goblin-handoff/SKILL.md | awk '{print $1}')" = "$OWN_SKILL" ] && echo 0 || echo 1)"
 check "the project's own HANDOFF.md survives (D1)" \
   "$([ "$(sha256sum HANDOFF.md | awk '{print $1}')" = "$OWN_HANDOFF" ] && echo 0 || echo 1)"
 check "the installer still landed its own verifier" "$([ -x .gob/bin/goblin-verify ] && echo 0 || echo 1)"
@@ -85,13 +84,13 @@ check "and it exits 0" "$([ "$RC3" -eq 0 ] && echo 0 || echo 1)"
 # --practice on the command line - stays silent, because there is no flag to answer for; that is
 # why the control has to NAME the path. --force is used so the install is not the same-version
 # no-op above and actually reaches the practice pin.
-OUT4=$(bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --models "$WORK/models.yaml" \
+OUT4=$(bash "$SRC/bin/goblin-install" --target "$WORK/target" \
         --practice "$WORK/absent-standard.md" --force 2>&1); RC4=$?
 printf '%s' "$OUT4" | grep -q -e '--practice .*absent-standard.md does not exist'
 check "W5-3: an explicit --practice that does not resolve is reported" "$?"
 printf '%s' "$OUT4" | grep -q -e 'practice: and practice_sha256: stay empty'
 check "  and the report says what the operator is left with" "$?"
-OUT5=$(bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A --models "$WORK/models.yaml" \
+OUT5=$(bash "$SRC/bin/goblin-install" --target "$WORK/target" \
         --force 2>&1); RC5=$?
 printf '%s' "$OUT5" | grep -q -e 'does not exist' && SILENT=1 || SILENT=0
 check "  no --practice on the command line stays silent, and still exits 0" \

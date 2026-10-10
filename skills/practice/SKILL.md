@@ -1,12 +1,12 @@
 ---
 name: practice
-description: The composition hook: read the referenced standard at the path pinned in .goblin/goblin.yaml.
+description: The composition hook: read the referenced standard at the path pinned in the AGENTS.md gob block.
 ---
 
 # practice
 
 goblin-stack owns the **mechanism**: which rule is enforced by what, how it is installed, how
-it is verified, which class a project is, which flow applies, which role runs it.
+it is verified, which flow applies, which role runs it.
 
 The **house style** — the HANDOFF shape and the stale-sentence rule, the SPEC lifecycle, the
 harness house style and the pinned-commit REPLAY, the gate vocabulary, commit discipline, the
@@ -15,13 +15,13 @@ standard this repo references. goblin-stack carries **no copy of it**.
 
 ## Mandate
 
-1. Read `.goblin/goblin.yaml` and take `practice:`.
+1. Read the `AGENTS.md` gob block and take `practice:`.
 2. If that path exists, **read the standard before starting work** in this repo. Its hash is
    pinned in `practice_sha256:`; `goblin-verify` re-checks it, so a silently edited standard
    is visible rather than assumed. If the standard has been edited **deliberately**, re-record
    the pin deliberately: `goblin-install --target <repo> --re-pin` rewrites that one line and
    prints the old and new hash. Nothing re-pins on its own — not `goblin-verify`, not
-   `--upgrade` (`docs/CONTRACTS.md`).
+   `--upgrade` (`docs/GUIDE.md`).
 3. If the path is absent or unset, **say so** and continue with the goblin-stack rules alone.
    Absent is not an error: goblin-stack is portable, and another machine has no such file.
 

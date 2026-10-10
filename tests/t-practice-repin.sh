@@ -12,7 +12,7 @@
 # actual parent — with this file copied in): 47 assertions, 23 pass and 24 fail, exit 1. Those 24
 # are the controls:
 #   * 4 name-the-remedy assertions: the `practice EDITED` detail, the installed verifier, the
-#     installed `practice` skill and docs/CONTRACTS.md all say nothing about `--re-pin` there;
+#     installed `practice` skill and docs/GUIDE.md all say nothing about `--re-pin` there;
 #   * 14 from the "the documented path clears it" block: `--re-pin` is an unknown option there
 #     (exit 2), so nothing is rewritten, nothing prints either hash, and IN-02 stays RED;
 #   * the 2 refusal *messages* ("nothing to re-pin", "no practice: recorded");
@@ -60,7 +60,6 @@ note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 sha() { sha256sum "$1" | awk '{print $1}'; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
 printf '# a fixture standard\nthe house style lives here\n' > "$WORK/standard.md"
 
 mkdir -p "$TARGET" && cd "$TARGET"
@@ -73,7 +72,7 @@ git add -A && git commit -q -m "chore: seed"
 # W6 neutral-first: the default install is skills=no, and this control previously read the
 # installed copy of the practice skill under .hermes/skills/. The control now reads the SOURCE
 # copy (skills/*/SKILL.md is the installer's write set — the same file, pre-copy).
-bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --models "$WORK/models.yaml" \
+bash "$SRC/bin/goblin-install" --target "$TARGET" \
   --practice "$WORK/standard.md" >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
 
@@ -104,8 +103,8 @@ grep -q -- '--re-pin' .gob/bin/goblin-verify
 check "  and the installed verifier names it (CONTROL)" "$?"
 grep -q -- '--re-pin' "$SRC/skills/practice/SKILL.md"
 check "  and the practice skill names it (CONTROL; the source copy — a default install ships no skills)" "$?"
-grep -q -- '--re-pin' "$SRC/docs/CONTRACTS.md"
-check "  and docs/CONTRACTS.md documents it (CONTROL)" "$?"
+grep -q -- '--re-pin' "$SRC/docs/GUIDE.md"
+check "  and docs/GUIDE.md documents it (CONTROL)" "$?"
 
 # ---- the documented path clears it ------------------------------------------
 out=$(bash "$SRC/bin/goblin-install" --target "$TARGET" --re-pin 2>&1); rc=$?
@@ -205,7 +204,7 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 printf '# nostandard\n' > README.md
 git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$WORK/nostandard" --class A --models "$WORK/models.yaml" \
+bash "$SRC/bin/goblin-install" --target "$WORK/nostandard" \
   --practice "$WORK/absent.md" >/dev/null 2>&1
 out=$(bash "$SRC/bin/goblin-install" --target "$WORK/nostandard" --re-pin 2>&1); rc=$?
 check "no practice: configured -> exit 2 (GUARD on the code)" "$([ "$rc" -eq 2 ] && echo 0 || echo 1)"
@@ -227,7 +226,7 @@ check "  and the target was not uninstalled (CONTROL)" "$?"
 # ---- a plain --upgrade must never re-pin by itself ---------------------------
 cd "$TARGET"
 PIN_STALE=$(g_agents_read "$TARGET/AGENTS.md" practice_sha256)
-bash "$SRC/bin/goblin-install" --target "$TARGET" --class A --upgrade --models "$WORK/models.yaml" \
+bash "$SRC/bin/goblin-install" --target "$TARGET" --upgrade \
   --practice "$WORK/standard.md" >/dev/null 2>&1
 [ "$(g_agents_read "$TARGET/AGENTS.md" practice_sha256)" = "$PIN_STALE" ]
 check "--upgrade does not re-pin the standard by itself (GUARD)" "$?"

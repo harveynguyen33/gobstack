@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # t-render-tokens.sh — Z1-3's control: a RENDERED install carries no unsubstituted template token.
 #
-# The defect this exists for. `templates/goblin.yaml.tmpl` held a `{{GATE2}}` line that no
-# `render` call replaced, so every one of the classes' installed `.gob/goblin.yaml`
+# The defect this exists for. `templates/AGENTS.md.tmpl` held a `{{GATE2}}` line that no
+# `render` call replaced, so every one of the classes' installed `AGENTS.md` config
 # carried a raw template token - visible to the operator in their own config, two waves after it
 # was first reported (W5-8). `grep -rl '{{GATE2}}' tests docs manifest bin` was 0 files, which is
 # exactly why nothing caught it: no test, no document, and no row read the rendered output.
@@ -31,53 +31,36 @@ fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
 printf 'the referenced standard\n' > "$WORK/standard.md"
 
-# W6: five domain-named classes, plus the electron opt-in overlay over software (the merged
-# desktop class) - the overlay is a second preset path, so it is its own rendered surface.
-CLASSES="software service game research fleet"
-for c in $CLASSES; do
-  t="$WORK/class-$c"
-  mkdir -p "$t" && cd "$t"
-  git init -q -b main
-  git config user.name "Test Runner"
-  git config user.email "runner@example.com"
-  printf '# target\n' > README.md
-  git add -A && git commit -q -m "chore: seed"
-  bash "$SRC/bin/goblin-install" --target "$t" --class "$c" \
-    --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
-  check "class $c renders an install" "$?"
-  # The positive control: the scan below is over a tree that HAS the rendered gate block. Without
-  # this, an install that wrote nothing (or a scan that read nothing) would pass the token check
-  # vacuously - the shape this suite exists to refuse. v2: the gates live in the AGENTS.md
-  # frontmatter block (flat gate_<name>_cmd: keys), there is no .gob/goblin.yaml.
-  [ -s "$t/AGENTS.md" ] && grep -q '^gate_.*_cmd: ' "$t/AGENTS.md"
-  check "  and class $c's config carries a rendered gate block (so the scan reads a real file)" "$?"
-done
-t="$WORK/class-software-electron"
+# A rendered install carries no unsubstituted {{...}} token. There is one install now - the class
+# matrix and the electron overlay are gone - so the surface is the single rendered block.
+t="$WORK/install"
 mkdir -p "$t" && cd "$t"
 git init -q -b main
 git config user.name "Test Runner"
 git config user.email "runner@example.com"
 printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
-bash "$SRC/bin/goblin-install" --target "$t" --class software --electron \
-  --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
-check "the electron opt-in renders an install" "$?"
-[ -s "$t/AGENTS.md" ] && grep -q '^gate_.*_cmd: ' "$t/AGENTS.md" \
-  && grep -q '^electron: true$' "$t/AGENTS.md"
+bash "$SRC/bin/goblin-install" --target "$t" \
+  --practice "$WORK/standard.md" >/dev/null 2>&1
+check "the install renders" "$?"
+# The positive control: the scan below is over a tree that HAS the rendered gate block. Without
+# this, an install that wrote nothing (or a scan that read nothing) would pass the token check
+# vacuously - the shape this suite exists to refuse. v2: the gates live in the AGENTS.md
+# frontmatter block (flat gate_<name>_cmd: keys), there is no separate config file.
+[ -s "$t/AGENTS.md" ] && grep -q '^gate_.*_cmd: ' "$t/AGENTS.md"
 check "  and its config carries a rendered gate block (so the scan reads a real file)" "$?"
 
 # The control. `{{` alone is not a token (a shell brace needs no partner), so the pattern is the
 # token SHAPE; `.git/` is excluded because packed objects hold whatever was ever committed.
 cd "$WORK"
-LEAKS=$(grep -rnE '\{\{[A-Za-z0-9_]+\}\}' $WORK/class-* 2>/dev/null | grep -v '/\.git/')
+LEAKS=$(grep -rnE '\{\{[A-Za-z0-9_]+\}\}' $WORK/install 2>/dev/null | grep -v '/\.git/')
 if [ -z "$LEAKS" ]; then
-  check "a rendered install of all five classes (and the electron opt-in) carries no unsubstituted {{...}} token" 0
+  check "a rendered install carries no unsubstituted {{...}} token" 0
 else
   printf '%s\n' "$LEAKS" | sed 's/^/        /'
-  check "a rendered install of all five classes (and the electron opt-in) carries no unsubstituted {{...}} token" 1
+  check "a rendered install carries no unsubstituted {{...}} token" 1
 fi
 
 if [ "$fail" -eq 0 ]; then note "t-render-tokens: PASS"; else note "t-render-tokens: FAIL"; fi

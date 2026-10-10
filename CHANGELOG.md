@@ -3,6 +3,29 @@
 One line per released version. `goblin-install --upgrade` prints the delta between the
 version recorded in a target's `.goblin/installed.json` and the source `VERSION`.
 
+## Unreleased (v3 core: a default row set + a library)
+
+- **The default verifier is the ~19-row core; the rest lives in a library.** `verify` now runs a
+  row set that is right for every repo — `IN-01..04`, `HP-01/02/03/05`, `GT-01/02/03`,
+  `FM-01/02`, `SC-01`, `SK-01..04`, `BN-00`, plus the 8 `applies_when`-gated bans. The other 32
+  target rows moved to `manifest/library.tsv` (off by default, available-but-off); nothing was
+  deleted or commented out. `gob verify --library` lists each off row with its id, a one-line
+  purpose and the enable hint — the discovery surface for the extend mechanism. The default run
+  never executes a library row and its summary counts them, so a green run is never the whole
+  story. No moved check lost its control: `t-verify-red.sh` enables a library row before running
+  its negative control.
+- **A repo turns a library row on through a repo-local override.** `.gob/manifest/enforcement.local.tsv`
+  (versioned with the repo) is merged into the run alongside the matrix: a row pasted there behaves
+  exactly like a built-in row — PASS, FAIL with its `remedy:` line, or reported not-applicable — and
+  the summary names it `enabled-locally`. The file is optional (absent = the default set, no noise).
+  `gob verify --library` prints each off-by-default row's exact paste-ready line, not just its id.
+  **The honesty gate:** a local row that names no check the engine can run is refused (exit 3, with a
+  named remedy), never silently green — an id in neither the matrix nor the library, a
+  `goblin-verify --only <ID>` marker whose builtin does not exist, a check that cannot execute, or a
+  bare id with no check cell. `tests/t-extend.sh` proves the loop end to end through the real file:
+  a library row off, then on and green, then red under its violation with its remedy, then refused
+  when miswritten, then off again.
+
 ## Unreleased (feat/extras-catalogue)
 
 - **`gob extras`: the curated catalogue (the surface is seven verbs).** The catalogue
@@ -18,6 +41,22 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   fixed schema (`source_url`/`license`/`rationale`/`suggested_kind`), inert until the curator
   promotes them into catalogue.tsv by PR or edit. `--write` honours only the proposal's TICKED
   rows, through `gob extras install` itself — one allowlist, one code path.
+
+## 0.6.0-alpha.4
+
+The v2 QA-fixes wave. Ten issues found against the v2 surface, all resolved: the extras
+payload-aware pre-tick and a pre-flight validation so a partial install cannot happen; the
+GUIDE's own `Version:` stamp caught up with the tree; v2 command names in every user-facing
+string; neutral machine-defaults; `map --write` accepting the brief's own state and the
+README-as-feature stem fix; the MCP `gob_verify` tool honouring its target and echoing the
+verified path; and a gawk-5.2 fatal in the remedy word-fold.
+
+## 0.6.0-alpha.3
+
+The license gate for the curated extras catalogue. Every `catalogue.tsv` row carries a
+`license_status` (`verified` / `pending` / `proprietary-confirmed-ok`) and install REFUSES any
+row whose status is not `verified` - a data-driven gate that flips with a column edit, not a
+code change. Two rows (vercel / anthropics) are held LICENSE-PENDING by decision.
 
 ## 0.6.0-alpha.2
 

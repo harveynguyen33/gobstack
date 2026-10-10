@@ -10,7 +10,7 @@
 #
 # It reads TEXT, with no AST and no comments blanked: a `: any` inside a string or a
 # comment is reported. That limit is stated, not hidden - the AST-grade form needs a
-# parser the no-npm contract (docs/CONTRACTS.md) does not allow (docs/LIMITS.md #27).
+# parser the no-npm contract (docs/GUIDE.md) does not allow (docs/LIMITS.md #27).
 #
 # NARROW, EXPLICIT EXCEPTIONS (Dune rule 5). The engine exports two variables, and the hits are
 # filtered BEFORE the exit code is chosen - a filter applied to stdout after the fact cannot

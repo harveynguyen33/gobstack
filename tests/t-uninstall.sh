@@ -3,11 +3,11 @@
 #
 # F2-7: the rmdir pass ran BEFORE `rm -f "$INSTALLED"`, so `.gob/` was never empty when it was
 # tested, and the list never tried `.hermes/skills/goblin-*`. Measured pre-fix (b100b44): 15
-# unnamed empty directories survived (.goblin, .hermes, .hermes/skills and 13 skill dirs) and the
+# unnamed empty directories survived (.gob, .hermes, .hermes/skills and 13 skill dirs) and the
 # summary named none of them.
 #
 # F2-8: the same fixture pins what the installer does NOT install. `.gob/bin` holds exactly the
-# two shipped scripts, which is why `docs/ROLES.md` calls `bin/goblin-model` checkout-only.
+# three shipped scripts (goblin-verify, goblin-lib.sh, goblin-bans).
 #
 # Run by tests/run-tests.sh.
 set -uo pipefail
@@ -18,7 +18,6 @@ fail=0
 note() { printf '      %s\n' "$*"; }
 check() { if [ "$2" -eq 0 ]; then note "ok   $1"; else note "FAIL $1"; fail=1; fi; }
 
-printf 'profiles:\n  coder:\n    model: model-code\n    provider: prov-code\n    effort: low\n' > "$WORK/models.yaml"
 printf 'the referenced standard\n' > "$WORK/standard.md"
 
 mkdir -p "$WORK/target" && cd "$WORK/target"
@@ -28,13 +27,11 @@ git config user.email "runner@example.com"
 printf '# target\n' > README.md
 git add -A && git commit -q -m "chore: seed"
 
-bash "$SRC/bin/goblin-install" --target "$WORK/target" --class A \
-  --models "$WORK/models.yaml" --practice "$WORK/standard.md" >/dev/null 2>&1
+bash "$SRC/bin/goblin-install" --target "$WORK/target" \
+  --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install exits 0" "$?"
-check "the installer's .gob/bin holds exactly the four shipped scripts" \
-  "$([ "$(ls .gob/bin | sort | tr '\n' ' ')" = "goblin-audit goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
-check "  so bin/goblin-model is checkout-only, as docs/ROLES.md says" \
-  "$([ ! -e .gob/bin/goblin-model ] && echo 0 || echo 1)"
+check "the installer's .gob/bin holds exactly the three shipped scripts" \
+  "$([ "$(ls .gob/bin | sort | tr '\n' ' ')" = "goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
 # v2: the CI lane is GONE from the product (no .github/workflows payload is ever written),
 # so the v1 placement probe has nothing to place. The uninstall's own contract is now pinned
 # by the two-survivors assertions below (the edited waiver + the project docs); a workflow
@@ -48,7 +45,7 @@ DIRS_BEFORE=$(find . -path ./.git -prune -o -type d -print | wc -l | tr -d ' ')
 
 # A decision record the project has EDITED is the project's, not the harness's: the uninstall
 # must keep it and name it. An untouched template is removed with the rest (both are asserted).
-printf 'lodash\thigh\t*\t2026-01-01\ta decision somebody took, not a template\n' >> .gob/audit-waiver.tsv
+printf 'lodash\thigh\t*\t2026-01-01\ta decision somebody took, not a template\n' >> .gob/boundary-waivers
 
 # ---- the uninstall -----------------------------------------------------------
 OUT=$(bash "$SRC/bin/goblin-install" --target "$WORK/target" --uninstall 2>&1); RC=$?
@@ -58,8 +55,8 @@ printf '%s' "$OUT" | grep -qE '^removed [1-9][0-9]* file\(s\) and [1-9][0-9]* em
 check "  the summary counts the files and the emptied directories it removed" "$?"
 
 check ".gob/ holds nothing but the decision record the project edited" \
-  "$([ "$(find .gob -type f | sort | tr '\n' ' ')" = ".gob/audit-waiver.tsv " ] && echo 0 || echo 1)"
-printf '%s' "$OUT" | grep -q 'kept .gob/audit-waiver.tsv (you edited it'
+  "$([ "$(find .gob -type f | sort | tr '\n' ' ')" = ".gob/boundary-waivers " ] && echo 0 || echo 1)"
+printf '%s' "$OUT" | grep -q 'kept .gob/boundary-waivers (you edited it'
 check "  and the summary names it rather than deleting it in silence" "$?"
 check ".hermes/ is gone (every installed skill dir was emptied and removed)" \
   "$([ ! -d .hermes ] && echo 0 || echo 1)"
@@ -75,8 +72,14 @@ check "no empty directory is left behind (pre-fix: 15)" \
 check "the verifier's own record is gone" "$([ ! -f .gob/installed.json ] && echo 0 || echo 1)"
 check "the project's HANDOFF.md survives" "$([ -f HANDOFF.md ] && echo 0 || echo 1)"
 check "the project's AGENTS.md survives" "$([ -f AGENTS.md ] && echo 0 || echo 1)"
-check "the project's ROUND-000-SPEC.md survives" "$([ -f ROUND-000-SPEC.md ] && echo 0 || echo 1)"
-check "reviews/ survives with its .gitkeep" "$([ -f reviews/.gitkeep ] && echo 0 || echo 1)"
+# FIX 3: a default install ships neither a *-SPEC.md nor reviews/ — the SP-*/PG-* rows that
+# police them are LIBRARY rows (off by default), so nothing a default install writes is
+# unverified. Asserted here (and post-uninstall, trivially) so a regression that re-scaffolds an
+# unchecked artefact is caught.
+check "the default install wrote NO *-SPEC.md (nothing ships unverified)" \
+  "$([ -z "$(ls ./*-SPEC.md 2>/dev/null)" ] && echo 0 || echo 1)"
+check "the default install wrote NO reviews/ (nothing ships unverified)" \
+  "$([ ! -d reviews ] && echo 0 || echo 1)"
 check "the .gitignore block is left, with the uninstalled marker" \
   "$(grep -q 'goblin-stack uninstalled' .gitignore && echo 0 || echo 1)"
 

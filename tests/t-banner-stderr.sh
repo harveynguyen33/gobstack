@@ -28,8 +28,8 @@ PROBE="$WORK/probe"; mkdir -p "$PROBE"
 trap 'rm -rf "$WORK"' EXIT
 
 # a fresh class-A install, committed (CM-03 max_dirty 0 fails an uncommitted install)
-HOME="$HOMEDIR" node "$SRC/bin/goblin.js" install --target "$PROBE" --class A >/dev/null 2>&1 || \
-  HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target "$PROBE" --class A >/dev/null 2>&1
+HOME="$HOMEDIR" node "$SRC/bin/goblin.js" install --target "$PROBE" >/dev/null 2>&1 || \
+  HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target "$PROBE" >/dev/null 2>&1
 ( cd "$PROBE" && git init -q && git add -A && git commit -qm "install" ) >/dev/null 2>&1
 
 OUT="$WORK/stdout.txt"; ERR="$WORK/stderr.txt"
@@ -58,9 +58,16 @@ else
   note "ok   stdout names no cli_sha256"
 fi
 NONV=$(grep -cvE '^(PASS|FAIL|ADV|SKIP| |$)' "$OUT" || true)
-[ "$NONV" -eq 0 ] && note "  (unindented non-verdict lines: $NONV)"
-check "no engine banner on stdout is the only unindented non-verdict line class (asserted via cli_sha256 above)" \
-  "$([ "$NONV" -ge 0 ] && echo 0 || echo 1)"
+note "  (unindented non-verdict stdout lines: $NONV; the cli_sha256 absence is asserted above)"
+# S2b: the banner is ONE line carrying three fields, and it is emitted EXACTLY once, on stderr
+# only. The assertion this replaces read `$([ "$NONV" -ge 0 ] && echo 0 || echo 1)` - NONV is a
+# `grep -c` count and a count is never negative, so it could never fail. This one can: a second
+# emit, or a copy on stdout, is the defect (measured RED by flipping the banner's `>&2` to `&1` -
+# stdout then carries the banner and this FAILs; restored after the measurement).
+ERR_BANNER=$(grep -c 'engine: mode=' "$ERR" || true)
+OUT_BANNER=$(grep -c 'engine: mode=' "$OUT" || true)
+check "the engine banner is emitted exactly once, on stderr only (stderr $ERR_BANNER, stdout $OUT_BANNER)" \
+  "$([ "$ERR_BANNER" -eq 1 ] && [ "$OUT_BANNER" -eq 0 ] && echo 0 || echo 1)"
 grep -qE '[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped' "$OUT"
 check "the run summary still lands on stdout (the parse contract of #49's consumers)" "$?"
 

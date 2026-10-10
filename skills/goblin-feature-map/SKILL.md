@@ -15,7 +15,7 @@ behave *as described*; it proves nothing about whether the app is correct.
 
 ## Where it lives, and who declares it
 
-The map's location is **declared, never inferred**: `.goblin/goblin.yaml` holds
+The map's location is **declared, never inferred**: the `AGENTS.md` gob block holds
 
 ```
 feature_map: <path to the map README, relative to the repo>   # empty -> FM-01/FM-02 SKIP

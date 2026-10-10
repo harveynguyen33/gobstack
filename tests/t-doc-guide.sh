@@ -19,8 +19,8 @@
 #   D5  §1's network claim must be scoped the way every other copy of it is (GUARDRAILS: "No
 #       network at verify time"; README/CONTRACTS: under "Dependencies").
 #   §3/§9  the guide's own reproducible numbers, re-measured here on a fresh class-A install: the
-#       `created 23` line, the day-one line (`36 passed, 1 failed, 11 advisory, 34 skipped`) and the
-#       green-path line (`37 passed, 0 failed, 11 advisory, 34 skipped`) — the v2 shapes (the CI
+#       `created 23` line, the day-one line (`34 passed, 1 failed, 6 advisory, 21 skipped`) and the
+#       green-path line (`35 passed, 0 failed, 6 advisory, 21 skipped`) — the v2 shapes (the CI
 #       payload is gone, so PG-06 SKIPs where it passed vacuously: pass 38 -> 37, skip 33 -> 34;
 #       before that skills opt-in moved the pass count 43 -> 38 and the skip count 28 -> 33). A
 #       number no run prints is the defect this half exists to catch.
@@ -86,7 +86,7 @@ git config user.name "Test Runner"
 git config user.email "runner@example.com"
 
 # The reader's $HOME must not matter to any number below (the control runs with a throwaway one).
-INSTALL=$(HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . --class A 2>&1)
+INSTALL=$(HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . 2>&1)
 check "the guide's install command exits 0" "$?"
 printf '%s\n' "$INSTALL" | head -1 | grep -qE '^created [0-9]+ · updated 0 · unchanged 0 · skipped 0$'
 check "  and prints the created/updated/unchanged/skipped line" "$?"
@@ -135,25 +135,31 @@ if [ "${n:-0}" -ge 1 ]; then
 fi
 
 # ---- D4: the file count, and the gloss the guide puts on it ------------------------------------
-# The WALKED path in the guide is `gob init` (review-UX pass), whose ci screen defaults to an
-# explicit no: `created 24`, no .github workflow, 25 files on disk. The plain installer this
-# wizard drives prints `created 25` and writes 26 (the gloss in §3 quotes both sides of the
-# one-file delta and says which file the counter omits). Both counts are asserted against real
-# runs: the installer's here, the wizard's in t-doc-guide-init.sh.
+# The WALKED path in the guide is `gob init` (review-UX pass), which ships no .github workflow.
+# GAP-2 vendored the core procedure tier under .gob/skills/ (the 20-file neutral harness -> 25
+# files, created 24). FIX 3 dropped the two artefacts nothing verifies by default:
+# ROUND-000-SPEC.md and reviews/.gitkeep (the SP-*/PG-* rows police them and are LIBRARY rows, off
+# by default) -> 25 files / created 24. v3 enhance-layer cut the payload to the 5 core skills and
+# dropped manifest/playbooks.tsv and added the categories inventory, so the write set is
+# 23 files / created 22. The gloss in §3
+# quotes both sides of the one-file delta and says which file the counter omits.
 ONDISK=$(find . -path ./.git -prune -o -type f -print | wc -l)
-# v2 neutral-first: the DEFAULT install is skills=no and ships no CI, so the write set is the
-# neutral harness (24 files: 15 tracked + .gob/installed.json + 7 owned + .gitignore).
-[ "$ONDISK" = "24" ]
-check "a default class-A install writes 24 files, no skills (measured here: $ONDISK; created $CREATED)" "$?"
+# v2 neutral-first + GAP-2 + FIX 3 + v3 enhance-layer: the DEFAULT install is skills=no for the
+# Hermes tier, always vendors the core procedure tier, no longer scaffolds the unchecked
+# SPEC/reviews artefacts, and the payload is the 5 core skills — so the write set is the neutral
+# harness + .gob/skills/ (23 files: the tracked 22 + .gob/installed.json and the owned files it
+# does not count).
+[ "$ONDISK" = "23" ]
+check "a default install writes 23 files (created 22 tracked + installed.json, 5-skill payload + categories inventory) (measured here: $ONDISK; created $CREATED)" "$?"
 check "  and the guide quotes the plain installer's own count (created $CREATED)" \
-  "$(printf '%s' "$CREATED" | grep -qE '^23$' && echo 0 || echo 1)"
-grep -qF "created 23 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
-check "  and the guide's walked-path transcript is the installer's created-23 line" "$?"
+  "$(printf '%s' "$CREATED" | grep -qE '^22$' && echo 0 || echo 1)"
+grep -qF "created 22 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
+check "  and the guide's walked-path transcript is the installer's created-22 line" "$?"
 ! grep -q 'means it wrote 50 files' "$GUIDE"
 check "  and the false gloss ('created 50 means it wrote 50 files') is gone (D4)" "$?"
-GLOSS_LINE=$(grep -n "created 23" "$GUIDE" | head -1 | cut -d: -f1)
+GLOSS_LINE=$(grep -n "created 22" "$GUIDE" | head -1 | cut -d: -f1)
 if [ -n "$GLOSS_LINE" ] && sed -n "${GLOSS_LINE},$((GLOSS_LINE + 12))p" "$GUIDE" | grep -q 'installed\.json'; then
-  note "ok   the gloss names the file the counter does not count (.goblin/installed.json)"
+  note "ok   the gloss names the file the counter does not count (.gob/installed.json)"
 else
   note "FAIL the gloss on 'created $CREATED' does not say which file the installer omits from the count"
   fail=1
@@ -162,7 +168,7 @@ fi
 # ---- AB3: the guide's own file-count claim must equal the map a real install writes -------------
 # §8's rule tells the reader which row to break, and until AB3 it said `IN-02` "hashes every file the
 # installer wrote" - measured false: the installer writes 51 files into an empty repo and the row's
-# `files` map is 40, so the ten it does not hash (including `.goblin/goblin.yaml`, the file §5 step 3
+# `files` map is 40, so the ten it does not hash (including the `AGENTS.md` gob block, the file §5 step 3
 # has the reader edit) drift nothing and the exercise "confirms" a check that never moved. The count
 # the sentence quotes is compared with the map THIS install wrote, and the universal is compared with
 # absence. Both are RED at 58a6fe6, where the sentence carries no count at all.
@@ -233,14 +239,14 @@ check "  and the same paragraph now scopes it to verify time" "$?"
 # shapes against the guide); the plain installer path is re-measured here. The tight set control
 # below accepts BOTH paths' shapes — every line the guide quotes must be one EITHER run printed.
 DAYONE=$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$DAYONE" | grep -qE '^36 passed, 1 failed, 11 advisory, 34 skipped$'
+printf '%s\n' "$DAYONE" | grep -qE '^16 passed, 1 failed, 0 advisory, 10 skipped$'
 check "the day-one run prints the shape the guide documents ($DAYONE)" "$?"
 
 HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped$' | sed 's/^ *//')
-printf '%s\n' "$GREEN" | grep -qE '^37 passed, 0 failed, 11 advisory, 34 skipped$'
+printf '%s\n' "$GREEN" | grep -qE '^17 passed, 0 failed, 0 advisory, 10 skipped$'
 check "naming a real commit makes it green ($GREEN)" "$?"
 
 # EVERY summary-shaped line in the guide must be one a real run printed — on this path or the
@@ -262,9 +268,7 @@ SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0
 # measurement — the plain installer this file walks never prints it. The guide teaches the wizard
 # path in §8's table, so the set this SUBSET accepts is both paths' union.
 WIZ_SHAPES=$(printf '%s\n' \
-  "35 passed, 2 failed, 11 advisory, 34 skipped" \
-  "36 passed, 1 failed, 11 advisory, 34 skipped" \
-  "37 passed, 0 failed, 11 advisory, 34 skipped")
+  "22 passed, 0 failed, 0 advisory, 5 skipped")
 MEASURED=$(printf '%s\n%s\n%s\n' "$DAYONE" "$GREEN" "$WIZ_SHAPES" | sort -u)
 SUBSET=0
 while IFS= read -r s; do
@@ -277,14 +281,14 @@ check "every summary line the guide quotes is one a run printed ($(printf '%s' "
 
 # ---- the exercise must not destroy the reader's own uncommitted work ---------------------------
 # The block is path-limited on purpose, and the guide says so in its own parenthetical ("your own
-# edits stay put"). §5 step 3 leaves an uncommitted `.goblin/goblin.yaml` edit in a real reading, so
+# edits stay put"). §5 step 3 leaves an uncommitted the `AGENTS.md` gob block edit in a real reading, so
 # an unqualified `git stash` + `git stash drop` would silently delete the reader's config. Measured
 # here rather than claimed.
 mkdir -p "$WORK/reader" && cd "$WORK/reader"
 git init -q -b main
 git config user.name "Test Runner"
 git config user.email "runner@example.com"
-HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . --class A >/dev/null 2>&1
+HOME="$HOMEDIR" bash "$SRC/bin/goblin-install" --target . >/dev/null 2>&1
 git add -A && git commit -q -m "chore: install gobstack"
 printf '  # the reader-own edit §5 step 3 leaves behind\n' >> AGENTS.md
 # The guard is not decoration: with no block extracted there is nothing to run, the edit survives

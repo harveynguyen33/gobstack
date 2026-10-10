@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-tests.sh — every source-scope rule (PR-01..PR-05) plus the test scripts.
+# run-tests.sh — every source-scope rule (PR-01..PR-04) plus the test scripts.
 # Exits non-zero on any failure and prints one line per test.
 #
 #   bash tests/run-tests.sh
@@ -8,11 +8,6 @@
 # PR-02  a second install is a no-op                     -> t-install-idempotent.sh
 # PR-03  every target-scope check goes RED under its own violation -> t-verify-red.sh
 # PR-04  the repo is portable: no personal path in a reusable rule -> the PT-01 body below
-# PR-05  the automation producer is silent when there is nothing to report -> t-automation-silent.sh
-#
-# (This line listed PR-01..PR-04 until Z1-8 while the matrix carried five source rows and the
-# suite below did run t-automation-silent.sh - off by one in the conservative direction, in the
-# file that pins counts. The fifth row is PR-05, enforcement.tsv:84.)
 #
 # The installer's own contract (a refusal exits 1, a file it did not create is never
 # overwritten) is t-install-refusal.sh. The verifier's refusal to read an enclosing repo
@@ -33,9 +28,8 @@ line() { printf '%-34s %s\n' "$1" "$2"; }
 
 # ---- syntax ------------------------------------------------------------------
 SYNTAX_OK=0
-for f in bin/goblin-install bin/goblin-verify bin/goblin-model bin/goblin-lib.sh \
-         bin/goblin-emit bin/goblin-doctor bin/goblin-init bin/goblin-extras \
-         adapters/*/detect.sh adapters/*/verify.sh \
+for f in bin/goblin-install bin/goblin-verify bin/goblin-lib.sh \
+         bin/goblin-init \
          tests/run-tests.sh tests/t-*.sh templates/checks/gate.sh.tmpl; do
   bash -n "$f" 2>/dev/null || { SYNTAX_OK=1; printf 'syntax error: %s\n' "$f"; }
 done
@@ -46,55 +40,17 @@ if out=$(bash bin/goblin-lib.sh --self-test 2>&1); then line "goblin-lib --self-
 
 # ---- PR-04 / PT-01 over the SOURCE tree -------------------------------------
 # PT-01's own directory list is the set an INSTALL writes (skills manifest bin templates presets
-# .goblin .hermes). This body is the same rule over the SOURCE tree, which also owns tests/ — the
+# .gob .hermes). This body is the same rule over the SOURCE tree, which also owns tests/ — the
 # directory the negative control lives in, and where a tenant string sat until F2-5 (1 repo-wide
 # hit at f23b371, 0 at b100b44, and PT-01 could not see it). tests/ is deliberately NOT added to
 # PT-01 itself: a target's own tests are its code, and a project may legitimately name its own
 # paths there.
-# extras-catalogue/ rides this scan SINCE W-extras with ONE deliberate exception: the catalogue's
-# `reviewed_by` column is governance metadata — every data row carries the literal curator token
-# (the whole point of the column), so the file is scanned with that one cell dropped, never with
-# the rule skipped. A tenant string anywhere else in the directory (payload prose, a new column,
-# the research notes) still fails here.
-PT=$(for d in skills manifest bin templates presets automations tests; do
+PT=$(for d in skills manifest bin templates presets tests; do
        [ -d "$d" ] || continue
        grep -rniE '(h[a]rvey|tech-g[o]blin|/h[o]me/[a-z]+|g[o]blin-ui|op[e]n-door|sup[r]eme|bb[t]ech|c[l]v)' "$d"
-     done
-     [ -f extras-catalogue/catalogue.tsv ] && \
-       awk -F'\t' 'NR>1 { $16="" ; print }' extras-catalogue/catalogue.tsv \
-       | grep -niE '(h[a]rvey|tech-g[o]blin|/h[o]me/[a-z]+|g[o]blin-ui|op[e]n-door|sup[r]eme|bb[t]ech|c[l]v)' \
-       | sed 's/^/extras-catalogue\/catalogue.tsv:/'
-     [ ! -d extras-catalogue/payload ] || \
-       grep -rniE '(h[a]rvey|tech-g[o]blin|/h[o]me/[a-z]+|g[o]blin-ui|op[e]n-door|sup[r]eme|bb[t]ech|c[l]v)' extras-catalogue/payload \
-       | sed 's/^/extras-catalogue\/payload\//')
+     done)
 if [ -z "$PT" ]; then line "PR-04 portability (PT-01 body)" "ok (0 hits)"; else
   printf '%s\n' "$PT" | sed 's/^/    /'; line "PR-04 portability (PT-01 body)" "FAIL"; FAIL=1
-fi
-
-# ---- MD-01 over the source tree ----------------------------------------------
-# extras-catalogue/ rides this scan too: the catalogue's `source_repo`, `matches` and
-# `name` cells name real projects and stacks, and one of them is enough to trip a
-# model-name pattern the day a project is called like a model. The scan is the SAME
-# body over the new directory (no cell dropped — unlike PR-04's reviewed_by governance
-# column, nothing in a catalogue row legitimately needs a model name).
-MD=$(for d in skills manifest bin templates presets automations extras-catalogue/catalogue.tsv extras-catalogue/payload; do
-       [ -e "$d" ] || continue
-       grep -rniE '(d[e]epseek|cl[a]ude|g[p]t-[0-9]|gr[o]k|g[e]mini|g[l]m-[0-9]|k[i]mi)[a-z0-9.:_-]*' "$d"
-     done)
-if [ -z "$MD" ]; then line "MD-01 no hardcoded model name" "ok (0 hits)"; else
-  printf '%s\n' "$MD" | sed 's/^/    /'; line "MD-01 no hardcoded model name" "FAIL"; FAIL=1
-fi
-
-# ---- MD-01 positive control: the pattern must still catch a real model name --
-# The slug is ASSEMBLED at run time, never written literally: a literal model name in this file
-# was one of the two repo-wide MD-01 hits G8-10 measured (the other is the control in
-# tests/t-verify-red.sh). Same fix F2-5 gave the tenant string - the control must not be the leak
-# its own rule exists to catch.
-MD_SLUG="$(printf '%s%s' 'deep' 'seek-v9-turbo')"
-if printf 'model: %s\n' "$MD_SLUG" | grep -qE '(d[e]epseek|cl[a]ude|g[p]t-[0-9]|gr[o]k|g[e]mini|g[l]m-[0-9]|k[i]mi)[a-z0-9.:_-]*'; then
-  line "MD-01 positive control" "ok (a real model name is caught)"
-else
-  line "MD-01 positive control" "FAIL (the pattern no longer catches anything)"; FAIL=1
 fi
 
 # ---- the manifest's own integrity -------------------------------------------
@@ -108,10 +64,10 @@ else
 fi
 
 # ---- the test scripts --------------------------------------------------------
-for t in t-install-idempotent t-install-off-switch t-install-refusal t-verify-green t-verify-red \
-         t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin t-automation-silent \
-         t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-doc-replay t-version-sync \
-         t-init t-banner-stderr t-shim t-map t-mcp t-extras; do
+for t in t-install-idempotent t-install-off-switch t-skills-library t-install-refusal t-verify-green t-verify-red \
+         t-extend t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin \
+         t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-version-sync \
+         t-init t-banner-stderr t-shim t-mcp t-hooks; do
   out=$(bash "tests/$t.sh" 2>&1); rc=$?
   if [ "$rc" -eq 0 ]; then line "$t" "ok"
   else line "$t" "FAIL"; printf '%s\n' "$out" | sed 's/^/    /'; FAIL=1; fi
@@ -126,6 +82,9 @@ done
 #   t-audit.sh, t-emit.sh, t-doctor.sh — audit/emit/doctor are UNWIRED in v2 (the shim
 #     refuses the verbs); the suites tested commands no reader can reach. They return with
 #     the commands in session 3, re-measured, or not at all.
+#   t-map.sh — folded into t-init.sh: the feature map is no longer a standalone verb
+#     (`gob map` is gone); `gob init --write` validates the map embedded in the proposal
+#     in the same pass as the config block.
 
 echo
 if [ "$FAIL" -eq 0 ]; then echo "run-tests: PASS"; else echo "run-tests: FAIL"; fi

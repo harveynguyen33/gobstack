@@ -25,7 +25,7 @@
 //   gob_map_status   features/ + the feature_map: key, read-only: what exists, the
 //                    verified: dates, whether each entry path still resolves (FM-01
 //                    index hygiene + the FM-02 resolution half)
-//   gob_init_status  does this repo carry a gob block, which class/gates, engine version
+//   gob_init_status  does this repo carry a gob block, its gates, engine version
 //
 // Simplifications vs the full MCP spec, stated rather than hidden: no resources/,
 // no prompts/, no pagination, no progress notifications, no completion/, no logging
@@ -39,12 +39,11 @@ const path = require("node:path");
 
 const VERSION = fs.readFileSync(path.join(__dirname, "..", "VERSION"), "utf8").trim();
 
-// The generated registration bytes (bin/goblin-install writes the same line into
-// .mcp.json for `init --with-mcp-config` — one source of truth for the shape, typed
+// The generated registration bytes (bin/goblin-init writes the same line into
+// .mcp.json as part of `init --write` — one source of truth for the shape, typed
 // once per file because bin/ may not import across files).
-// MD-01: the agent CLI's family name is ASSEMBLED at run time — a literal family name
-// in bin/ source is the exact string MD-01 exists to catch; the printed line still
-// reads the way the docs quote it.
+// The agent CLI's family name is ASSEMBLED at run time, so no source in bin/ spells the
+// tool's own name literally; the printed line still reads the way the docs quote it.
 const AGENT_CLI = "cl" + "aude";
 const MCP_CONFIG_BYTES = '{"mcpServers":{"gob":{"command":"npx","args":["-y","@techgoblin/gobstack","mcp"]}}}';
 
@@ -285,7 +284,7 @@ function toolGobMapStatus() {
   if (!fm) {
     return text(
       "feature_map: is empty — no map is declared, so there is nothing to index. " +
-      "Generate a starter with: gob map --heuristic"
+      "The map is mandatory: author it with `gob init` (the brief carries the feature-map schema)"
     );
   }
   const readme = path.resolve(root, fm);
@@ -341,10 +340,6 @@ function toolGobInitStatus() {
     );
   }
   const lines = ["gob block: present in AGENTS.md"];
-  const cls = blockValue(block, "class");
-  lines.push("class: " + (cls || "<unset>"));
-  const branch = blockValue(block, "branch");
-  lines.push("branch: " + (branch || "<unset>"));
   const gates = blockGates(block);
   if (gates.length) {
     for (const g of gates) lines.push("gate_" + g.name + "_cmd: " + g.cmd);
@@ -366,7 +361,7 @@ function toolGobInitStatus() {
   lines.push("engine version: " + (engine || "<no vendored engine found>") + (engineSrc ? " (" + engineSrc + ")" : ""));
   const vendored = fs.existsSync(path.join(root, ".gob", "bin", "goblin-verify"));
   lines.push("vendored verify: " + (vendored ? ".gob/bin/goblin-verify" : "ABSENT (a global/declaration-mode repo — run gob verify through the engine chain)"));
-  lines.push("mcp registration: " + (fs.existsSync(path.join(root, ".mcp.json")) ? ".mcp.json present" : "no .mcp.json (gob init --with-mcp-config writes one)"));
+  lines.push("mcp registration: " + (fs.existsSync(path.join(root, ".mcp.json")) ? ".mcp.json present" : "no .mcp.json (gob init --write writes one)"));
   return text(lines.join("\n"));
 }
 
@@ -398,7 +393,7 @@ const TOOLS = [
   {
     name: "gob_init_status",
     description:
-      "Report whether this repo is under the gobstack harness: the AGENTS.md gob block, its class and gates, " +
+      "Report whether this repo is under the gobstack harness: the AGENTS.md gob block, its gates, " +
       "and the engine version. Call this first when unsure whether the discipline gate applies here.",
     inputSchema: { type: "object", properties: {} },
   },
@@ -484,7 +479,7 @@ function usage() {
       "  verifier (.gob/bin/goblin-verify --json)",
       "",
       "register it: " + AGENT_CLI + " mcp add gob -- npx -y @techgoblin/gobstack mcp",
-      "or per-repo:  gob init --with-mcp-config   (writes .mcp.json; " + AGENT_CLI + " Code and Cursor",
+      "or per-repo:  gob init --write installs a repo-root .mcp.json (" + AGENT_CLI + " Code and Cursor",
       "              auto-detect it)",
       "",
     ].join("\n")

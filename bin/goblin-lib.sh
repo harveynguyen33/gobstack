@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # goblin-lib.sh — shared helpers for goblin-stack.
 #
-# Sourced by bin/goblin-install, bin/goblin-verify and bin/goblin-model.
+# Sourced by bin/goblin-install and bin/goblin-verify.
 # Dependencies: bash 4+, git, awk, sed, grep, sha256sum (or shasum).
 # No npm, no jq, no yq, no network.
 #
@@ -62,7 +62,7 @@ g_pass() {
 }
 # FAIL keeps its row line whole in every mode, and the matrix's remedy column rides under it.
 # The remedy is the TSV's own cell (IN-01/IN-02/GT-03/CM-01 carry prose there; the pre-remedy
-# rows carry `—`, which prints nothing) — the JG-02 judge-lane `remedy:` line, brought to every
+# rows carry `—`, which prints nothing) — a `remedy:` line, brought to every
 # row that names one, so the fix a failure needs is printed where the failure is read. A missing
 # column (a manifest written before the column existed) is no remedy, not an error: empty is the
 # same as `—`.
@@ -270,16 +270,15 @@ g_part_disabled() {
   g_yaml_disabled "$1" | grep -qx "$2"
 }
 
-# ------------------------------------------------------------- class data ----
 # ------------------------------------------------------------- agents.md -----
 # v2 config engine: the project config lives in AGENTS.md FRONTMATTER, delimited by
-# fixed markers. There is no goblin.yaml. One file is the single source of truth:
+# fixed markers. There is no separate config file. One file is the single source of truth:
 #
 #   <!-- gob:begin (gobstack config) -->
-#   class: software
-#   branch: main
+#   harness_dir: checks
+#   source_root: src
 #   ratchet.ceiling: 160          # one nested level = a dotted key
-#   bans: [BN-01, BN-02]          # a list is a one-line JSON-ish array
+#   bans_disabled: [BN-02]        # a list is a one-line JSON-ish array (the ban OFF-switch)
 #   gate_commit_cmd: git rev-parse --verify --quiet HEAD
 #   <!-- gob:end -->
 #
@@ -433,41 +432,6 @@ g_agents_write() {
   rm -f "$tmp" "$tmp.out"; return 1
 }
 
-# g_class_canon <spelling> -> the canonical class NAME
-#   software | service | game | research | fleet
-# The taxonomy is five domain-named classes. The letters A-E and the older taught domain names
-# (app, agent, desktop) stay as READ-TIME aliases so every existing installed.json / goblin.yaml
-# - which record a letter or an old name - keeps verifying with no rewrite. `desktop` / `F` / `f`
-# resolve to `software`: F was merged into A (their classes.tsv need columns are identical), and
-# what made a desktop shell different is the `electron:` opt-in + ban list, config keys the repo
-# already carries. Unknown spelling -> empty output; the caller refuses with the enum.
-g_class_canon() {
-  case "$1" in
-    software|A|a|app)    printf 'software' ;;
-    service|B|b)         printf 'service' ;;
-    game|C|c)            printf 'game' ;;
-    research|D|d)        printf 'research' ;;
-    fleet|E|e|agent)     printf 'fleet' ;;
-    desktop|F|f)         printf 'software' ;;
-    *) return 1 ;;
-  esac
-}
-
-# g_class_is_electron_alias <spelling> -> 0 when the spelling is the merged desktop/F spelling.
-# `--class desktop` (or F/f) must mean the OLD desktop install, not a silently weaker software
-# one: the installer auto-sets electron: true so the alias behaves as F did.
-g_class_is_electron_alias() {
-  case "$1" in desktop|F|f) return 0 ;; *) return 1 ;; esac
-}
-
-# g_class_need <classes.tsv> <class> <part> -> R | O | -
-g_class_need() {
-  awk -F'\t' -v c="$2" -v p="$3" '
-    NR > 1 && $1 == c && $2 == p { print $3; found = 1; exit }
-    END { if (!found) print "-" }
-  ' "$1"
-}
-
 # ---------------------------------------------------------------- json -------
 # installed.json is emitted by goblin-install in a fixed, line-oriented shape so it can
 # be read without a JSON library. g_json_object <installed.json> <object-name> -> "key<TAB>value".
@@ -545,8 +509,8 @@ g_self_test() {
   local tmp rc=0
   tmp=$(mktemp -d 2>/dev/null || mktemp -d -t goblin) || { g_err "mktemp failed"; return 2; }
   cat > "$tmp/g.yaml" <<'YAML'
-class: B
-branch: master
+flavour: B
+revision: master
 archive: false
 disabled: [spec, tokens]
 gates:
@@ -556,13 +520,13 @@ ratchet:
   name: hex
   ceiling: 160
 runtime_data:
-  - .goblin/state.json
+  - .gob/state.json
 YAML
 
   local got
-  got=$(g_yaml_scalar "$tmp/g.yaml" class)
+  got=$(g_yaml_scalar "$tmp/g.yaml" flavour)
   [ "$got" = "B" ] || { g_err "scalar: expected B, got '$got'"; rc=1; }
-  got=$(g_yaml_scalar "$tmp/g.yaml" branch)
+  got=$(g_yaml_scalar "$tmp/g.yaml" revision)
   [ "$got" = "master" ] || { g_err "scalar: expected master, got '$got'"; rc=1; }
   got=$(g_yaml_scalar "$tmp/g.yaml" nosuchkey)
   [ -z "$got" ] || { g_err "scalar: absent key should be empty, got '$got'"; rc=1; }
@@ -586,7 +550,7 @@ YAML
   got=$(g_yaml_gate_names "$tmp/g2.yaml" | tr '\n' ',')
   [ "$got" = "typecheck,reindented," ] || { g_err "gate-names: got '$got'"; rc=1; }
   got=$(g_yaml_list "$tmp/g.yaml" runtime_data | tr '\n' ',')
-  [ "$got" = ".goblin/state.json," ] || { g_err "list: got '$got'"; rc=1; }
+  [ "$got" = ".gob/state.json," ] || { g_err "list: got '$got'"; rc=1; }
   got=$(g_yaml_disabled "$tmp/g.yaml" | tr '\n' ',')
   [ "$got" = "spec,tokens," ] || { g_err "disabled: got '$got'"; rc=1; }
 
@@ -597,10 +561,9 @@ YAML
 House rules the agent reads. The block below is machine-read.
 
 <!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->
-class: software
-branch: main
+flavour: software
+revision: main
 archive: false
-owner_email: team@example.com
 disabled: [spec, tokens]
 ratchet.name: hex
 ratchet.ceiling: 160
@@ -608,11 +571,11 @@ gate_typecheck_cmd: npx tsc --noEmit
 gate_commit_cmd: git rev-parse --verify --quiet HEAD
 <!-- gob:end -->
 
-Body prose continues here. A line like `class: decoy` outside the block must stay
+Body prose continues here. A line like `flavour: decoy` outside the block must stay
 invisible to the parser.
 EOF
-  printf 'class: decoy\n' >> "$tmp/AGENTS.md"
-  got=$(g_agents_read "$tmp/AGENTS.md" class)
+  printf 'flavour: decoy\n' >> "$tmp/AGENTS.md"
+  got=$(g_agents_read "$tmp/AGENTS.md" flavour)
   [ "$got" = "software" ] || { g_err "agents scalar: expected software, got '$got'"; rc=1; }
   got=$(g_agents_read "$tmp/AGENTS.md" nosuchkey)
   [ -z "$got" ] || { g_err "agents scalar: absent key should be empty, got '$got'"; rc=1; }
@@ -629,35 +592,35 @@ commit:git rev-parse --verify --quiet HEAD" ] \
   got=$(g_agents_list "$tmp/AGENTS.md" disabled | tr '\n' ',')
   [ "$got" = "spec,tokens," ] || { g_err "agents list: got '$got'"; rc=1; }
   got=$(g_agents_keys "$tmp/AGENTS.md" | head -n 1)
-  [ "$got" = "class" ] || { g_err "agents keys: got '$got'"; rc=1; }
+  [ "$got" = "flavour" ] || { g_err "agents keys: got '$got'"; rc=1; }
   # g_agents_write: stdin IS the whole new block (key<TAB>value lines); it rewrites
   # ONLY the block and preserves the body. Idempotent on a second identical write.
   {
-    printf '%s\tsoftware\n' class
-    printf '%s\tmain\n' branch
+    printf '%s\tsoftware\n' flavour
+    printf '%s\tmain\n' revision
     printf '%s\t42\n' max_dirty
   } | g_agents_write "$tmp/AGENTS.md" >/dev/null
   grep -q '^max_dirty: 42$' "$tmp/AGENTS.md" || { g_err "agents write: the new key is absent"; rc=1; }
   grep -qF 'Body prose continues here' "$tmp/AGENTS.md" \
     || { g_err "agents write: the body was not preserved"; rc=1; }
-  grep -qF 'class: decoy' "$tmp/AGENTS.md" \
+  grep -qF 'flavour: decoy' "$tmp/AGENTS.md" \
     || { g_err "agents write: the body below the block was not preserved"; rc=1; }
-  W1=$(g_agents_read "$tmp/AGENTS.md" class)
+  W1=$(g_agents_read "$tmp/AGENTS.md" flavour)
   [ "$W1" = "software" ] || { g_err "agents write: the block was destroyed ($W1)"; rc=1; }
   {
-    printf '%s\tsoftware\n' class
-    printf '%s\tmain\n' branch
+    printf '%s\tsoftware\n' flavour
+    printf '%s\tmain\n' revision
     printf '%s\t42\n' max_dirty
   } | g_agents_write "$tmp/AGENTS.md" > "$tmp/w2"
   grep -q unchanged "$tmp/w2" || { g_err "agents write: the second identical write is not a no-op"; rc=1; }
   # A fresh file: the block is created, and a body-less write stays parseable.
-  printf '%s\ttrue\n' "electron" | g_agents_write "$tmp/fresh.md" >/dev/null
-  [ "$(g_agents_read "$tmp/fresh.md" electron)" = "true" ] \
+  printf '%s\ttrue\n' "toggle" | g_agents_write "$tmp/fresh.md" >/dev/null
+  [ "$(g_agents_read "$tmp/fresh.md" toggle)" = "true" ] \
     || { g_err "agents write: a fresh file was not created parseable"; rc=1; }
   # A body-only file: the block is inserted before the first line.
   printf 'the body\n' > "$tmp/bodyonly.md"
-  printf '%s\tmain\n' "branch" | g_agents_write "$tmp/bodyonly.md" >/dev/null
-  [ "$(g_agents_read "$tmp/bodyonly.md" branch)" = "main" ] \
+  printf '%s\tmain\n' "revision" | g_agents_write "$tmp/bodyonly.md" >/dev/null
+  [ "$(g_agents_read "$tmp/bodyonly.md" revision)" = "main" ] \
     && grep -qx 'the body' "$tmp/bodyonly.md" \
     || { g_err "agents write: insertion into a body-only file failed"; rc=1; }
 
@@ -668,6 +631,40 @@ commit:git rev-parse --verify --quiet HEAD" ] \
     printf 'SELF-TEST FAILED\n' >&2
   fi
   return "$rc"
+}
+
+# g_next_block <target> <skills yes|no> [<declared-gate label>]
+# THE one ordered next-steps list a completed install prints. `gob init --write` runs the engine
+# (goblin-install), which calls this; init then calls it again for its own tail — so a user sees
+# ONE list, never the two the front-door engine and the installer each used to print. Every line
+# is true of the artefact the user now has:
+#   * the install is uncommitted (the record is written last and git is the user's to run);
+#   * verify re-runs the gate the config declares (GT-02);
+#   * when a gate LABEL is given the gate is the one the user declared and `gob init --write`
+#     MEASURED before writing it, so no edit is owed — the advice is only "edit the default gate"
+#     on a bare `goblin-install`, whose shipped gate is a generic default;
+#   * the seven-skill CORE tier ships under .gob/skills/ on EVERY install, so the agent-skill
+#     switch is about the .hermes/ project tier, not about whether any skill is present.
+g_next_block() {
+  local target="$1" skills="$2" gate="${3:-}" gline
+  if [ -n "$gate" ]; then
+    gline="the gate is the one you declared and gob init measured ($gate); edit AGENTS.md's gate_ keys when it changes"
+  else
+    gline="edit AGENTS.md: replace the default gate with your real commands"
+  fi
+  printf 'next:\n'
+  printf '  1. cd %s && git add -A && git commit   # the install is uncommitted by design\n' "$target"
+  printf '  2. .gob/bin/goblin-verify   # re-runs the gate the config declares; green on a fresh repo\n'
+  printf '  3. %s\n' "$gline"
+  if [ "$skills" = "yes" ]; then
+    printf '  4. hermes skills trust %s   # one-time, so the .hermes/ project tier loads\n' "$target"
+  elif [ "$skills" = "no" ]; then
+    printf '  4. the core goblin tier ships under .gob/skills/ by default; the .hermes/ project tier is opt-in: re-run with --skills yes\n'
+  elif [ "$skills" = "all" ]; then
+    printf '  4. all skills vendored under .gob/skills/; the .hermes/ project tier is opt-in: re-run with --skills yes\n'
+  else
+    printf '  4. vendored under .gob/skills/: %s; the .hermes/ project tier is opt-in: re-run with --skills yes\n' "$skills"
+  fi
 }
 
 # Allow `bash bin/goblin-lib.sh --self-test` and `source bin/goblin-lib.sh`.
