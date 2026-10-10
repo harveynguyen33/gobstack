@@ -39,6 +39,10 @@ jobs:
           # Dedicated least-privilege bot token (issue-comment write) for --post;
           # never expose the default automation token under pull_request_target.
           FORGEJO_TOKEN: ${{ secrets.AI_REVIEW_BOT_TOKEN }}
+          # Injection-proofing: context values pass through env, never interpolated
+          # directly into the run script.
+          GOB_REPO: ${{ github.repository }}
+          GOB_PR: ${{ github.event.number }}
           AI_PROVIDER: openai
           # GLM 4.6 is the only coding-plan model that honors OpenAI tool
           # calling (required for ai-code-review's structured output).
