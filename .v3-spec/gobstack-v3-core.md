@@ -1,6 +1,13 @@
 # gobstack v3 — a minimal, purely agent-driven core
 
 Status: SPEC. No code. v3 keeps exactly six elements; anything else must name the element
+
+> **SUPERSEDED since writing (see git log):**
+> - MCP registration is opt-in — `--with-mcp-config` was removed in f6863c4;
+>   `init --write` now emits the agent hooks payload instead of registering MCP by default.
+> - npm is frozen and is NOT the install path (088572a): install is clone + init.
+> Paragraphs below describing npx transport or default MCP registration are
+> point-in-time history, not current behavior.
 it displaces. One test decides every call below: **does this help the agent stop
 re-improvising, or is it surface the repo does not need yet?**
 

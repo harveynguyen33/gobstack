@@ -35,7 +35,7 @@ format:
 | `goblin-feature-map`, `practice` | **COMPLEMENT (unique)** | The feature map feeds FM-01/FM-02; `practice` is the composition hook (reads any external standard pinned by path in the gob block). Both exist only because the gate exists. Keep. |
 | `goblin-bootstrap` (P8) | **MORPH** | Becomes the "adopt the layer + wire your packs" skill (see §3/§4). |
 
-Net: **7 of 17 goblin-* skills duplicate commodity skills the owner should not be
+Net: **13 of 17 goblin-* skills duplicate or are dormant commodity skills the owner should not be
 maintaining; 4 are gate-coupled and survive because the owner's enforcement floor
 depends on them.**
 
@@ -115,7 +115,7 @@ commodity the owner should get from elsewhere instead of maintaining.
 | `manifest/playbooks.tsv` + playbook rails | **CUT** | The playbooks it indexes are being cut; a rail for a cut list is a permanent SKIP with extra steps. |
 | `manifest/glossary.tsv` | **MORPH → docs/RECORD-NOTES.md** | Wave-code legend already lives there; one home, not two. |
 
-Count check: 5 skills kept + 12 cut + 1 morphed = 18 measured dirs ✓. Verbs stay 4 ✓ (the
+Count check: 5 skills kept + 13 cut + 1 morphed = 18 measured dirs ✓ (13 = 6 loop/mode skills + 7 process playbooks; bootstrap counted once as KEEP with morphed content). Verbs stay 4 ✓ (the
 "nothing added without naming a removal" rule holds: hooks emission is inside init's existing
 write-set; the category inventory is shipped data inside the existing vendored engine tree,
 replacing the deleted extras-catalogue's *role*, not its code; the npm surface is removed).
@@ -262,7 +262,7 @@ decisions.
 |---|---|
 | `categories.tsv` inventory + init-brief adjudication section + decision record | `extras-catalogue/` + `manifest/playbooks.tsv` (deletion stands as planned — the inventory replaces the catalogue's **role** as listed inventory, not its code: it ships list-only data with no matches/conflicts columns and no pre-built payloads, and adds zero gobstack code paths) |
 | hooks-snippet emission in `init --write` | MCP registration stops being default (opt-in flag) |
-| 5-skill payload | 12 cut skills + the rails that indexed them |
+| 5-skill payload | 13 cut skills + the rails that indexed them |
 | `npx github:…` install path | npm publish cadence, dist-tag hygiene, OTP chores (package frozen) |
 
 The ledger balance on the inventory row: the old catalogue was 41 inert rows + 1 pre-built
@@ -275,7 +275,7 @@ replaces are deleted in the same phase.
 
 ## 5. Phased migration plan — small steps, each shippable, suite green at every commit
 
-**Phase 1 — cut the commodity skills (1 commit wave, ~3 batches).** Delete the 12 cut skill
+**Phase 1 — cut the commodity skills (1 commit wave, ~3 batches).** Delete the 13 cut skill
 dirs from the shipped payload (move to an `attic/` branch, not history-rewritten). Re-measure
 payload counts, sync the pins (the checklist in the layer skill's pin-sync section applies:
 `t-install-off-switch`, `t-doc-*`), delete `manifest/playbooks.tsv` and its reader. Shipped
