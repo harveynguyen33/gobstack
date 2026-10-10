@@ -130,6 +130,12 @@ skills whose rows (`SK-01`/`SK-02`/`SK-04`) ride every install — under `.gob/s
 repo runs those rows instead of skipping them. The wider **Hermes project tier** is the opt-in:
 `--skills yes` (or `init --write` with skills on) copies the full skill set under `.hermes/skills/`.
 
+The repo ships eighteen skills. The other eleven are the **skill library** — off by default,
+chosen per repo with `--skills all` (every skill) or `--skills <name>[,<name>...]` (exactly those;
+an unknown name is refused). `gob init --list-skills` prints every skill, its tier and its
+one-line purpose, so the set is discoverable without opening the repo. This is the same shape the
+rule library uses: a default set on, the rest held back and selectable.
+
 ## What it is not
 
 Not a rules document (every rule carries a runnable check or is explicitly counted as

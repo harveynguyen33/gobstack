@@ -591,9 +591,15 @@ same way the fleet's own tool reads it. Everything else is line-oriented shell.
                           silently dropped)
     --parts <list>        comma list to install (default = the whole default part set)
     --archive             mark the project archive: verify requires no HANDOFF and no gates
-    --skills yes|no       install agent skills under .hermes/skills (default no — the harness is
-                          neutral). On a repo whose record already has skills installed, an OMITTED
-                          flag keeps them; an explicit --skills no removes them.
+    --skills <spec>       which skills to vendor into .gob/skills/ (default: the seven core
+                          skills). <spec> is `yes`/`no` for the core tier, `all` for every skill
+                          in the repo's skills/, or a comma-separated name list
+                          (`goblin-eval,goblin-tdd-repro`). An unknown name is refused with the
+                          available set named. `yes` additionally installs the full set under
+                          .hermes/skills (the Hermes project tier). On a repo whose record already
+                          has a chosen set, an OMITTED flag keeps it; an explicit `--skills no`
+                          drops back to the core tier and removes the files it no longer covers.
+    --list-skills         print the skill library (name, tier, one-line purpose) and exit
     --dry-run             print the plan; write nothing
     --no-verify           skip the health check (goblin-verify) at the end; the wizard
                           still installs, and prints the skip notice
@@ -756,6 +762,16 @@ verifier is reporting FAILs.
   recorded skill files; `--uninstall` removes everything recorded, as always.
   `tests/t-install-off-switch.sh` walks that migration: install `--skills yes`, upgrade flag-less,
   the skills survive byte-identical; uninstall, and they are all gone.
+- **Skills, the library (the same shape as the rule library).** The repo's `skills/` holds
+  eighteen skills; the seven core ones are what a default install vendors. The other eleven are
+  the **skill library** — off by default, selected per repo with `--skills all` (every skill) or
+  `--skills <name>[,<name>...]` (exactly those; an unknown name is refused with the available set
+  named, and nothing partial is written). `--list-skills` (and the `gob init` brief's SKILL
+  LIBRARY section) prints every skill's name, tier and one-line purpose, so the set is
+  discoverable without opening the repo. `installed.json` records exactly the vendored set, so
+  `SK-02` hashes 7 files on a default install and 18 after `--skills all` — no more, no fewer;
+  dropping a skill (e.g. `all` → `no`) removes its file from the tree and the record.
+  `tests/t-skills-library.sh` walks all of it.
 - **Whole harness:** `--uninstall` deletes the `files` list plus the `AGENTS.md` gob block, removes
   every directory that leaves empty (deepest first, after `installed.json` itself is gone — the
   order that used to leave `.gob/` and the sixteen `.hermes/skills/*` directories behind),
@@ -822,7 +838,9 @@ Each step is independently useful and the later ones build on the earlier:
 `AGENTS.md`, and — only when the parts are on (`--parts spec,reviews`) — `ROUND-000-SPEC.md`,
 `reviews/`, and the harness scaffold in `checks/`. A default install ships the seven-skill core
 procedure tier under `.gob/skills/`; **agent skills are opt-in** — the `.hermes/` project tier
-arrives only with `--skills yes` (W6 neutral-first).
+arrives only with `--skills yes` (W6 neutral-first). The repo's other eleven skills are the
+**skill library**: add them to `.gob/skills/` with `--skills all` or a comma-separated name list
+(`gob init --list-skills` prints every skill and its one-line purpose).
 
 Then, in order:
 
