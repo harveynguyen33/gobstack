@@ -19,7 +19,9 @@ concurrency:
 
 jobs:
   review:
-    runs-on: ubuntu-latest
+    # ai-review label: only the pve2-runner LXC advertises it, so the job can
+    # only land where the runner-local ai-code-review:glm image exists.
+    runs-on: ai-review
     timeout-minutes: 25
     # Reviews must never block merging on tool flakiness.
     continue-on-error: true
@@ -34,6 +36,9 @@ jobs:
     steps:
       - name: AI code review
         env:
+          # Dedicated least-privilege bot token (issue-comment write) for --post;
+          # never expose the default automation token under pull_request_target.
+          FORGEJO_TOKEN: ${{ secrets.AI_REVIEW_BOT_TOKEN }}
           AI_PROVIDER: openai
           # GLM 4.6 is the only coding-plan model that honors OpenAI tool
           # calling (required for ai-code-review's structured output).
@@ -46,10 +51,9 @@ jobs:
           # (gpt-5-nano) that z.ai rejects with "Unknown Model" (code 1211).
           ENABLE_PROJECT_CONTEXT: "false"
           INCLUDE_MR_SUMMARY: "false"
-          SYNTHESIS_MODEL: glm-4.5-air
           OPENAI_BASE_URL: ${{ secrets.GLM_BASE_URL }}
           AI_API_KEY: ${{ secrets.GLM_API_KEY }}
-          LANGUAGE_HINT: typescript
+          LANGUAGE_HINT: shell
         run: |
           ai-code-review --platform forgejo \
             --project-id "${{ github.repository }}" \
