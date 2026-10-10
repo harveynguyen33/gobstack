@@ -140,23 +140,24 @@ fi
 # files, created 24). FIX 3 dropped the two artefacts nothing verifies by default:
 # ROUND-000-SPEC.md and reviews/.gitkeep (the SP-*/PG-* rows police them and are LIBRARY rows, off
 # by default) -> 25 files / created 24. v3 enhance-layer cut the payload to the 5 core skills and
-# dropped manifest/playbooks.tsv, so the write set is 22 files / created 21. The gloss in §3
+# dropped manifest/playbooks.tsv and added the categories inventory, so the write set is
+# 23 files / created 22. The gloss in §3
 # quotes both sides of the one-file delta and says which file the counter omits.
 ONDISK=$(find . -path ./.git -prune -o -type f -print | wc -l)
 # v2 neutral-first + GAP-2 + FIX 3 + v3 enhance-layer: the DEFAULT install is skills=no for the
 # Hermes tier, always vendors the core procedure tier, no longer scaffolds the unchecked
 # SPEC/reviews artefacts, and the payload is the 5 core skills — so the write set is the neutral
-# harness + .gob/skills/ (22 files: the tracked 21 + .gob/installed.json and the owned files it
+# harness + .gob/skills/ (23 files: the tracked 22 + .gob/installed.json and the owned files it
 # does not count).
-[ "$ONDISK" = "22" ]
-check "a default install writes 22 files (created 21 tracked + installed.json, 5-skill payload) (measured here: $ONDISK; created $CREATED)" "$?"
+[ "$ONDISK" = "23" ]
+check "a default install writes 23 files (created 22 tracked + installed.json, 5-skill payload + categories inventory) (measured here: $ONDISK; created $CREATED)" "$?"
 check "  and the guide quotes the plain installer's own count (created $CREATED)" \
-  "$(printf '%s' "$CREATED" | grep -qE '^21$' && echo 0 || echo 1)"
-grep -qF "created 21 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
-check "  and the guide's walked-path transcript is the installer's created-21 line" "$?"
+  "$(printf '%s' "$CREATED" | grep -qE '^22$' && echo 0 || echo 1)"
+grep -qF "created 22 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
+check "  and the guide's walked-path transcript is the installer's created-22 line" "$?"
 ! grep -q 'means it wrote 50 files' "$GUIDE"
 check "  and the false gloss ('created 50 means it wrote 50 files') is gone (D4)" "$?"
-GLOSS_LINE=$(grep -n "created 21" "$GUIDE" | head -1 | cut -d: -f1)
+GLOSS_LINE=$(grep -n "created 22" "$GUIDE" | head -1 | cut -d: -f1)
 if [ -n "$GLOSS_LINE" ] && sed -n "${GLOSS_LINE},$((GLOSS_LINE + 12))p" "$GUIDE" | grep -q 'installed\.json'; then
   note "ok   the gloss names the file the counter does not count (.gob/installed.json)"
 else

@@ -720,6 +720,10 @@ put ".gob/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
 # or not at all with the manifest it is the complement of.
 put ".gob/manifest/library.tsv" "$SRC/manifest/library.tsv"
 put ".gob/manifest/glossary.tsv" "$SRC/manifest/glossary.tsv"
+# The external-categories inventory (v3 §4.1): data-only, vendored and hash-pinned like
+# every other manifest file. No gobstack code reads it — the reader is the agent following
+# the init brief; the pin just makes the target's copy tamper-evident.
+put ".gob/engine/categories.tsv" "$SRC/manifest/categories.tsv"
 # The ban list (G5): the table, the engine, and the two probes. A ban with no mechanism is a
 # wish, so the table and the engine install together or not at all.
 put ".gob/manifest/bans.tsv" "$SRC/manifest/bans.tsv"

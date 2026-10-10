@@ -202,6 +202,37 @@ Notes:
      --write line. Without it the install writes no registration; it DOES write the
      agent hooks (.claude/hooks.json / .cursor/hooks.json) into existing vendor dirs.
 
+== EXTERNAL CATEGORIES (adjudication — do this before writing the proposal) =====
+
+The install vendored (or, at brief time, ships at manifest/categories.tsv) an inventory of
+external composition categories at .gob/engine/categories.tsv (source: manifest/categories.tsv
+in the gobstack repo of origin). It is DATA — gobstack's code never reads it; you are the
+reader and the adjudicator, because you can see this repo and its code cannot.
+
+For EACH row in that file, in order:
+
+1. EVALUATE the row's fits_when predicate against THIS repository (its actual work, its
+   actual shape — not what a repo like it might want). A row you cannot evaluate, say so
+   in the decision record with that reason.
+2. PROPOSE every row that FITS to the user before installing anything: name, source URL,
+   license, and what it would concretely add here. A fit is a proposal, never an install.
+3. INSTALL only on the user's explicit approval, through the SK-checked lane: fetch the
+   pack, drop it in .gob/skills/<name>/ (SK-01/02/04 hash and police it like any shipped
+   skill), and record the row in .gob/manifest/compose-decisions.tsv with added_by = the
+   source URL and why = the license + the fit reason. Nothing lands without a license line.
+4. RECORD EVERY evaluated row — installed or declined — in .gob/manifest/compose-decisions.tsv
+   (create it if absent; header: date<TAB>category<TAB>decision<TAB>reason; one row per
+   category, tab-separated):
+   - installed rows: decision=installed, reason names the license and the concrete fit;
+   - declined rows: decision=declined, reason names the CONCRETE property of this repo that
+     fails the predicate ("no user-facing feature surface", "single-session CLI", ...) —
+     "not applicable" is not a reason;
+   - a row left unrecorded is a VIOLATION of this brief: an adjudication that left no
+     trace is indistinguishable from an adjudication that never happened.
+
+The gate only ever runs the repo's own checks; an external pack may AUTHOR rows (LX-*),
+and then the check is the repo's, proof and all.
+
 == PROPOSAL SCHEMA =============================================================
 
 <!-- gob:begin (gobstack config — edit in place; the parser reads only this block) -->

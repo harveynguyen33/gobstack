@@ -355,6 +355,47 @@ check "verify exits 0 after the commit" "$VRC"
 printf '%s' "$VOUT" | grep -qE '[0-9]+ passed, 0 failed'
 check "verify reports 0 failed" "$?"
 
+# ---- B9: the external-categories inventory is vendored, hash-pinned, and adjudicated ----
+# v3 §4.1: the inventory is DATA vendored to .gob/engine/categories.tsv; the agent is the
+# reader. The zero-fit contract: a repo that fits no row must still produce a decisions
+# file with a declined line + a concrete reason per row, and .gob/skills/ stays empty
+# (an unrecorded row is an init-brief violation — the brief says so, this proves the
+# artefact side: the file the adjudicator writes exists, parses, and covers every row).
+new_repo b9
+P9="$WORK/proposal-b9.md"
+proposal "$P9"
+init_env --target "$REPO" --write "$P9" --yes < /dev/null >/dev/null 2>&1
+[ -f "$REPO/.gob/engine/categories.tsv" ]
+check "B9a the inventory is vendored at .gob/engine/categories.tsv" "$?"
+CMP=$(awk -F'\t' 'NR>1 && NF>1 {print $1}' "$SRC/manifest/categories.tsv" | sort)
+VEN=$(awk -F'\t' 'NR>1 && NF>1 {print $1}' "$REPO/.gob/engine/categories.tsv" | sort)
+[ "$CMP" = "$VEN" ] && [ -n "$VEN" ]
+check "B9b the vendored copy carries the same rows as the source manifest" "$?"
+grep -qF '".gob/engine/categories.tsv":' "$REPO/.gob/installed.json"
+check "B9c the vendored copy is hash-pinned in installed.json like every engine file" "$?"
+grep -q 'EXTERNAL CATEGORIES' <(init_env --target "$REPO" < /dev/null)
+check "B9d the brief carries the fixed external-categories adjudication section" "$?"
+NROWS=$(awk -F'\t' '$1 !~ /^#/ && $1!="category" && NF>1 {n++} END{print n+0}' "$REPO/.gob/engine/categories.tsv")
+# The zero-fit adjudication itself is AGENT work (the brief instructs it; code cannot read
+# a repo). What the harness proves here is the CONTRACT the brief imposes: the decisions
+# file format the adjudicator must produce, checked against the inventory's row count.
+printf 'date\tcategory\tdecision\treason\n' > "$REPO/.gob/manifest/compose-decisions.tsv"
+while IFS=$'\t' read -r cat pack source license provides fits; do
+  [ -n "$cat" ] || continue
+  case "$cat" in \#*|category) continue ;; esac
+  printf '2026-10-10\t%s\tdeclined\tthis probe repo is a single-file gate fixture with no feature surface: %s\n' "$cat" "fits_when='${fits}' fails on it"
+done < "$REPO/.gob/engine/categories.tsv" >> "$REPO/.gob/manifest/compose-decisions.tsv"
+DEC=$(awk -F'\t' 'NR>1 && NF>1 {n++} END{print n+0}' "$REPO/.gob/manifest/compose-decisions.tsv")
+[ "$DEC" = "$NROWS" ]
+check "B9e the decisions file covers EVERY inventory row ($DEC of $NROWS)" "$?"
+awk -F'\t' 'NR>1 && ($3!="installed" && $3!="declined") {bad=1} NR>1 && $3=="declined" && length($4)<20 {short=1} END{exit bad||short}' "$REPO/.gob/manifest/compose-decisions.tsv"
+check "B9f every declined row carries a decision in the enum and a concrete (>=20 char) reason" "$?"
+# "stays empty" means: no EXTERNAL pack landed — the 5 core skills are the payload the
+# install itself ships (SK-02 hashes them), and adjudication adds nothing.
+NSK=$(ls "$REPO/.gob/skills" 2>/dev/null | grep -vc '^goblin-\|^practice$')
+[ "$NSK" = "0" ]
+check "B9g a zero-fit adjudication adds NO external pack to .gob/skills/ (only the 5-skill payload)" "$?"
+
 # ---- B8: the source gates (from the deleted t8 pty family, still relevant) ----------
 # The class of bug these guard is visible in the SOURCE; the pty was only where the
 # symptoms showed. Each has a positive control proving the pattern still bites.

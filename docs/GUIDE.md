@@ -127,7 +127,7 @@ then install it:
 
 Expected output (this is a real transcript, trimmed):
 
-    created 21 · updated 0 · unchanged 0 · skipped 0
+    created 22 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is uncommitted by design
@@ -135,7 +135,7 @@ Expected output (this is a real transcript, trimmed):
       3. the gate is the one you declared and gob init measured (test: bash tests/run-tests.sh); edit AGENTS.md's gate_ keys when it changes
       4. the core goblin tier ships under .gob/skills/ by default; the .hermes/ project tier is opt-in: re-run with --skills yes
 
-**`created 21`** is the installer's count of the files it **tracks**. It writes **22**: the 22nd
+**`created 22`** is the installer's count of the files it **tracks**. It writes **23**: the 23rd
 is `.gob/installed.json`, the record it keeps for itself, which it writes but does not count. It
 has written nothing outside this directory — and nothing under `.github/`: **v2 installs no
 CI, ever.** The default install ships **no agent skills** — the harness is neutral.
@@ -327,7 +327,7 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 17 files it
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 18 files it
 tracks — not the ones it `owns` (including `AGENTS.md`, whose gob block §5 has you editing) and not
 `.gob/installed.json`; edit one of the tracked — the exercise below uses `.gob/bans/README.md`.
 
@@ -1212,7 +1212,7 @@ them: it reads the path from config, so moving the standard is a one-line config
     git init -b main
     gob init --heuristic                   # the brief + schema; answer it in a proposal file
     gob init --write .gob-init-proposal.md --yes
-                                           # expect: created 21 (the 5-skill core tier vendors; the Hermes tier is opt-in; FIX 3 drops the unchecked SPEC/reviews)
+                                           # expect: created 22 (the 5-skill core tier + the categories inventory vendor; the Hermes tier is opt-in; FIX 3 drops the unchecked SPEC/reviews)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"
