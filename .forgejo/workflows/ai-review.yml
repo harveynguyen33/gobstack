@@ -53,5 +53,6 @@ jobs:
         run: |
           ai-code-review --platform forgejo \
             --project-id "${{ github.repository }}" \
+            --max-chars 40000 \
             --pr-number "${{ github.event.number }}" \
             --post
