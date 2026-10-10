@@ -20,7 +20,7 @@ concurrency:
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     # Reviews must never block merging on tool flakiness.
     continue-on-error: true
     container:
@@ -40,7 +40,7 @@ jobs:
           # glm-5.x / 4.5-air return prose instead and break the JSON parse.
           AI_MODEL: glm-4.6
           # glm-4.6 spends long reasoning bursts; defaults (90s) time out.
-          LLM_TIMEOUT: 240
+          LLM_TIMEOUT: 480
           LLM_MAX_RETRIES: 2
           # Disable the synthesis pass: it uses a hardcoded "fast" model name
           # (gpt-5-nano) that z.ai rejects with "Unknown Model" (code 1211).
