@@ -5,6 +5,10 @@
 #   gob init --heuristic                      append the heuristic detection (fallback)
 #   gob init --write <proposal> [--yes]       validate the proposal and install it
 #   gob init --target <dir>                   aim at a directory that is not $PWD
+#   gob init --skills <spec>                  which skills to vendor into .gob/skills/:
+#                                             no|yes = the 7 core skills (default), all =
+#                                             every skill, or a comma-separated name list
+#   gob init --list-skills                    print the skill library and exit
 #   gob init --dry-run                        --write without writing anything (and without
 #                                             running the declared gate)
 #
@@ -44,11 +48,13 @@ g_info() { printf '%s\n' "$*"; }
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 # ------------------------------------------------------------------ flags -----
-TARGET="" WRITE="" HEURISTIC=0 DRYRUN=0
+TARGET="" WRITE="" HEURISTIC=0 DRYRUN=0 SKILLS_OPT="no"
 while [ $# -gt 0 ]; do
   case "$1" in
     --target)    TARGET="${2:-}"; shift 2 ;;
     --write)     WRITE="${2:-}"; shift 2 ;;
+    --skills)    SKILLS_OPT="${2:-}"; shift 2 ;;
+    --list-skills) exec bash "$SRC/bin/goblin-install" --list-skills ;;
     --heuristic) HEURISTIC=1; shift ;;
     --dry-run)   DRYRUN=1; shift ;;
     --yes)       shift ;;             # accepted for pipe parity; --write is already explicit
@@ -189,6 +195,30 @@ README index in the `(./<slug>.md)` form. `feature:` must equal the filename ste
 four H2s above are required, in order.)
 ============================================================================== ==
 BRIEF
+  print_skill_library
+}
+
+# print_skill_library — the discovery surface for the skill LIBRARY (the repo's skills/
+# directory), appended to the brief. The 7 CORE skills are vendored into .gob/skills/ by
+# default; the rest are selectable through --skills, exactly as the rule LIBRARY holds rows
+# that are off by default. Prints name, tier and the one-line purpose (the frontmatter
+# `description:`), so a reader knows what exists without opening the repo.
+print_skill_library() {
+  local d name desc tier
+  printf '\n== SKILL LIBRARY =============================================================\n\n'
+  printf 'A default install writes the 7 CORE skills into .gob/skills/. Every other skill is\n'
+  printf 'available on request. Choose the set with --skills:\n\n'
+  printf '    --skills all                             every skill in the repo\n'
+  printf '    --skills goblin-eval,goblin-tdd-repro    exactly those (comma-separated)\n\n'
+  printf 'Available skills:\n'
+  for d in "$SRC"/skills/*/; do
+    [ -f "$d/SKILL.md" ] || continue
+    name=$(basename "$d")
+    desc=$(awk 'NR==1{f=1;next} /^---/{f=0} f&&/^description:/{sub(/^description:[[:space:]]*/,"");print;exit}' "$d/SKILL.md")
+    case " goblin-mode goblin-investigation goblin-bugfix goblin-feature goblin-handoff goblin-verify-author practice " in
+      *" $name "*) tier=core ;; *) tier=optional ;; esac
+    printf '  %-22s %-9s %s\n' "$name" "$tier" "$desc"
+  done | sort
 }
 
 # The heuristic fallback: pre-scanned hints appended to the brief (--heuristic).
@@ -355,7 +385,7 @@ if [ -n "$GATE_LINE" ]; then g_info "  first output line: $GATE_LINE"; fi
 # One engine call writes the vendored payload (.gob/), AGENTS.md body + gob block and
 # HANDOFF.md. Its refusal contract applies verbatim: an existing HANDOFF.md is never
 # overwritten; an edited AGENTS.md body is kept (put_once) and only the block is rewritten.
-INSTALL_ARGS=(--target "$TARGET" --skills no --yes)
+INSTALL_ARGS=(--target "$TARGET" --skills "$SKILLS_OPT" --yes)
 # The first gate is the proposal's own: its name AND command. The name rides along so the
 # HANDOFF template renders the declared name — HP-03 anchors on declared gate names, and a
 # HANDOFF that names a gate the config does not declare is the day-one red (GT-04/HP-03
@@ -431,5 +461,5 @@ printf '  harness: %s/.gob/bin/goblin-verify\n' "$TARGET"
 printf '\n'
 # The ONE ordered next-steps list (the engine deferred its own copy). The gate is the one this
 # command declared and MEASURED above, so the list does not tell the user to replace it.
-g_next_block "$TARGET" no "$GATE_NAME: $GATE_CMD"
+g_next_block "$TARGET" "$SKILLS_OPT" "$GATE_NAME: $GATE_CMD"
 exit 0

@@ -658,8 +658,12 @@ g_next_block() {
   printf '  3. %s\n' "$gline"
   if [ "$skills" = "yes" ]; then
     printf '  4. hermes skills trust %s   # one-time, so the .hermes/ project tier loads\n' "$target"
-  else
+  elif [ "$skills" = "no" ]; then
     printf '  4. the core goblin tier ships under .gob/skills/ by default; the .hermes/ project tier is opt-in: re-run with --skills yes\n'
+  elif [ "$skills" = "all" ]; then
+    printf '  4. all skills vendored under .gob/skills/; the .hermes/ project tier is opt-in: re-run with --skills yes\n'
+  else
+    printf '  4. vendored under .gob/skills/: %s; the .hermes/ project tier is opt-in: re-run with --skills yes\n' "$skills"
   fi
 }
 

@@ -8,7 +8,13 @@
 #                         silently dropped)
 #   --parts <list>        comma list to install (default = the whole default part set)
 #   --archive             mark the project archive: verify requires no HANDOFF and no gates
-#   --skills yes|no       install agent skills under .hermes/skills (default no)
+#   --skills <spec>       which skills to vendor into .gob/skills/ (default: the 7 core
+#                         skills). <spec> is `no`/`yes` (the core tier), `all` (every skill
+#                         in the repo's skills/), or a comma-separated list of skill names
+#                         (`goblin-eval,goblin-tdd-repro`) — an unknown name is refused, never
+#                         silently skipped. `yes` additionally installs the full set under
+#                         .hermes/skills/ (the Hermes project tier).
+#   --list-skills         print the skill library (name, tier, one-line purpose) and exit
 #   --dry-run             print the plan; write nothing
 #   --upgrade             re-install at the current version; report created/updated/unchanged/skipped
 #   --opt-out <part>      record the part in disabled: so its required checks are skipped
@@ -27,6 +33,26 @@ SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC=$(cd "$SELF_DIR/.." && pwd)
 # shellcheck source=goblin-lib.sh
 . "$SELF_DIR/goblin-lib.sh"
+
+# The skill LIBRARY: the repo's skills/ directory. The 7 CORE skills are the ones whose rows
+# (SK-01/02/04) ride every install and are vendored by default; every other skill is available
+# on request (`--skills all`, or a name list). This is the same shape the rule LIBRARY uses:
+# a default set on, the rest held back and selectable, discoverable from the CLI (--list-skills).
+CORE_SKILLS="goblin-mode goblin-investigation goblin-bugfix goblin-feature goblin-handoff goblin-verify-author practice"
+# skill_list — name<TAB>one-line-purpose for every skill in $SRC/skills/, sorted. The purpose is
+# the first line of the SKILL.md frontmatter `description:` (the same field SK-01 requires).
+skill_list() {
+  local d name desc
+  for d in "$SRC"/skills/*/; do
+    [ -f "$d/SKILL.md" ] || continue
+    name=$(basename "$d")
+    desc=$(awk 'NR==1{f=1;next} /^---/{f=0} f&&/^description:/{sub(/^description:[[:space:]]*/,"");print;exit}' "$d/SKILL.md")
+    printf '%s\t%s\n' "$name" "$desc"
+  done | sort
+}
+skill_names() { skill_list | cut -f1; }
+# skill_tier <name> — core | optional
+skill_tier() { case " $CORE_SKILLS " in *" $1 "*) printf 'core' ;; *) printf 'optional' ;; esac; }
 
 TARGET=""
 # QA fix (v2-qa issue 4): the old default was $HOME/projects/PROJECT-PRACTICE.md - the
@@ -54,6 +80,7 @@ SKILLS="no"
 # "whatever the record says" (the migration contract below); a NAMED --skills no is an
 # explicit opt-out and is honoured verbatim.
 SKILLS_NAMED=0
+LIST_SKILLS=0
 DRY_RUN=0
 UPGRADE=0
 UNINSTALL=0
@@ -77,6 +104,7 @@ while [ $# -gt 0 ]; do
     --parts)     PARTS="${2:-}"; shift 2 ;;
     --archive)   ARCHIVE="true"; shift ;;
     --skills)    SKILLS="${2:-}"; SKILLS_NAMED=1; shift 2 ;;
+    --list-skills) LIST_SKILLS=1; shift ;;
     --dry-run)   DRY_RUN=1; shift ;;
     --upgrade)   UPGRADE=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
@@ -93,6 +121,19 @@ done
 for dep in git awk sed grep; do
   command -v "$dep" >/dev/null 2>&1 || { g_err "missing dependency: $dep"; exit 2; }
 done
+
+# --list-skills: print the library and exit. This is the discovery surface BEFORE choosing — the
+# same role `gob verify --library` plays for the rule rows. It needs no --target and writes nothing.
+if [ "$LIST_SKILLS" -eq 1 ]; then
+  printf 'the skill library (%s/skills/):\n' "$SRC"
+  printf '  %-22s %-9s %s\n' NAME TIER PURPOSE
+  while IFS=$'\t' read -r n p; do
+    printf '  %-22s %-9s %s\n' "$n" "$(skill_tier "$n")" "$p"
+  done < <(skill_list)
+  printf '\ndefault install: the 7 core skills. choose with --skills all | <name>[,<name>...]\n'
+  exit 0
+fi
+
 [ -n "$TARGET" ] || { g_err "--target is required"; exit 2; }
 TARGET=$(g_expand_tilde "$TARGET")
 [ -d "$TARGET" ] || { g_err "--target is not a directory: $TARGET"; exit 2; }
@@ -279,21 +320,47 @@ if [ "$RE_PIN" -eq 1 ]; then
   exit 0
 fi
 
-case "$SKILLS" in yes|no) ;; *) g_err "--skills must be yes or no"; exit 2 ;; esac
-
 # W6 migration safety: on a --upgrade (or any re-install) of a repo whose record shows skills
 # were installed, an OMITTED --skills flag must READ that state, not silently strip it. The
 # idempotence contract (created/updated/unchanged) holds only if the effective skills choice
 # for a flag-less re-install is `the record's choice`, so previously-installed skills survive
 # every upgrade unchanged. An EXPLICIT --skills no is honoured verbatim (the switch stays
-# real), and --uninstall still removes exactly what the record lists.
+# real), and --uninstall still removes exactly what the record lists. The record's value may be
+# yes, no, all, or a name list — a flag-less re-install reads whichever it was, so a chosen set
+# is stable through every re-install.
 if [ -f "$INSTALLED" ] && [ "$SKILLS_NAMED" -eq 0 ]; then
   PREV_SKILLS=$(g_installed_scalar_options "$INSTALLED" skills)
-  if [ "$PREV_SKILLS" = "yes" ]; then
-    SKILLS="yes"
-    g_info "skills: this repo's install record has agent skills installed - they are kept (remove them with an explicit --skills no, or --uninstall)"
-  fi
+  case "$PREV_SKILLS" in
+    ""|no) ;;
+    *) SKILLS="$PREV_SKILLS"
+       g_info "skills: this repo's install record has agent skills installed - they are kept (remove them with an explicit --skills no, or --uninstall)" ;;
+  esac
 fi
+
+# --skills spec, validated AFTER the migration read so a recorded choice is accepted too:
+#   yes|no  the 7-skill core tier (yes also installs the full set under .hermes/skills/)
+#   all     every skill in the repo's skills/
+#   a,b,c   exactly those names
+# A name that does not exist is REFUSED — with the available set named — never silently skipped.
+# The check runs before anything is planned or written, so a refused selection leaves no partial
+# install (the fail-closed shape the honesty gate uses for rows).
+case "$SKILLS" in
+  yes|no|all) ;;
+  "")
+    g_err "--skills needs a value: yes, no, all, or a comma-separated skill name list (run --list-skills)"; exit 2 ;;
+  *)
+    BAD_NAMES=""
+    for _n in $(printf '%s' "$SKILLS" | tr ',' ' '); do
+      [ -n "$_n" ] || continue
+      [ -d "$SRC/skills/$_n" ] || BAD_NAMES="$BAD_NAMES $_n"
+    done
+    if [ -n "$BAD_NAMES" ]; then
+      g_err "unknown --skills name(s):$BAD_NAMES"
+      g_err "  available: $(skill_names | paste -sd, -)"
+      g_err "  or use --skills all (every skill) / --skills no (the 7 core skills)"
+      exit 2
+    fi ;;
+esac
 
 # The default config block: ONE built-in set of values (the old software preset). There is no
 # class and no preset file: a class only ever selected which bans ran, and the ban table now
@@ -666,46 +733,60 @@ fi
 # only the project can answer (G4 B3).
 [ -f "$SRC/templates/boundary-waivers.tmpl" ] && put_once ".gob/boundary-waivers" "$SRC/templates/boundary-waivers.tmpl"
 
+# the Hermes project tier (opt-in): --skills yes installs the FULL set under .hermes/skills/.
 if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
   for d in "$SRC"/skills/*/; do
-    [ -d "$d" ] || continue
+    [ -f "$d/SKILL.md" ] || continue
     name=$(basename "$d")
     put ".hermes/skills/$name/SKILL.md" "$d/SKILL.md"
   done
 fi
 
-# The CORE procedure tier (GAP-2): the seven skills whose rows (SK-01/02/04) ride every
-# install are vendored under .gob/skills/ UNCONDITIONALLY, so a default install never
-# disables its own rows. The full Hermes tier above stays an explicit --skills yes opt-in
-# under .hermes/skills/; these are the product's own procedures and install with the
-# harness (put: hash-checked, so IN-02/SK-02 see them like any other payload file).
-CORE_SKILLS="goblin-mode goblin-investigation goblin-bugfix goblin-feature goblin-handoff goblin-verify-author practice"
-for name in $CORE_SKILLS; do
+# The vendored procedure tier under .gob/skills/ — the SELECTED set (this mirrors the rule
+# library: a default set on, the rest held back and selectable). Default (yes|no): the 7 core
+# skills whose rows (SK-01/02/04) ride every install, so a default install never disables its
+# own rows. `all`: every skill in the repo. A name list: exactly those (validated above). put:
+# hash-checked, so IN-02/SK-02 see them like any other payload file, and installed.json covers
+# EXACTLY this set — no more, no fewer.
+VENDOR_SKILLS="$CORE_SKILLS"
+case "$SKILLS" in
+  all)    VENDOR_SKILLS=$(skill_names | tr '\n' ' ') ;;
+  yes|no) VENDOR_SKILLS="$CORE_SKILLS" ;;
+  *)      VENDOR_SKILLS=$(printf '%s' "$SKILLS" | tr ',' ' ') ;;
+esac
+for name in $VENDOR_SKILLS; do
   [ -f "$SRC/skills/$name/SKILL.md" ] || continue
   put ".gob/skills/$name/SKILL.md" "$SRC/skills/$name/SKILL.md"
 done
 
-# W6 neutral-first: an EXPLICIT --skills no re-install of a repo that HAS recorded skills
-# removes them — the switch stays real in both directions. The paths come from the previous
-# record, so exactly what was installed is what goes; a skill file the project edited by hand
-# is refused by put's own contract (never clobbered silently), reported in the summary.
-if [ "$SKILLS_NAMED" -eq 1 ] && [ "$SKILLS" = "no" ] && [ -n "$PREV_FILES" ]; then
+# no more, no fewer: remove any RECORDED skill file the new selection no longer covers, so
+# installed.json (and SK-02) covers exactly the vendored set. Both cases read the previous
+# record, so exactly what was installed is what goes:
+#   * .hermes/skills/* goes when the Hermes tier is no longer selected (SKILLS != yes);
+#   * .gob/skills/<name>/* goes when <name> left the vendored set (e.g. all -> no shrinks 18 -> 7).
+# Empty directories left behind are pruned (deepest first).
+if [ -n "$PREV_FILES" ]; then
   while IFS= read -r rel; do
-    case "$rel" in .hermes/skills/*) ;; *) continue ;; esac
+    case "$rel" in
+      .hermes/skills/*) [ "$SKILLS" = "yes" ] && continue ;;
+      .gob/skills/*)
+        sname=${rel#.gob/skills/}; sname=${sname%%/*}
+        case " $VENDOR_SKILLS " in *" $sname "*) continue ;; esac ;;
+      *) continue ;;
+    esac
     dst="$TARGET/$rel"
-    [ -f "$dst" ] || { rm -f "$TARGET/.gob/$(basename "$rel")" 2>/dev/null; continue; }
+    [ -f "$dst" ] || continue
     if [ "$DRY_RUN" -eq 1 ]; then
-      g_info "plan: remove $rel (explicit --skills no)"
+      g_info "plan: remove $rel (no longer selected)"
     else
       rm -f "$dst"
-      g_info "removed $rel (explicit --skills no)"
+      g_info "removed $rel (no longer selected)"
     fi
   done <<EOF
 $PREV_FILES
 EOF
-  # the emptied .hermes/skills/*/<name> and .hermes/ directories go too (deepest first)
   if [ "$DRY_RUN" -eq 0 ]; then
-    find "$TARGET/.hermes" -depth -type d -exec rmdir {} + 2>/dev/null
+    find "$TARGET/.hermes" "$TARGET/.gob/skills" -depth -type d -exec rmdir {} + 2>/dev/null
   fi
 fi
 
