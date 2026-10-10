@@ -8,10 +8,10 @@
 #                         silently dropped)
 #   --parts <list>        comma list to install (default = the whole default part set)
 #   --archive             mark the project archive: verify requires no HANDOFF and no gates
-#   --skills <spec>       which skills to vendor into .gob/skills/ (default: the 7 core
+#   --skills <spec>       which skills to vendor into .gob/skills/ (default: the 5 core
 #                         skills). <spec> is `no`/`yes` (the core tier), `all` (every skill
 #                         in the repo's skills/), or a comma-separated list of skill names
-#                         (`goblin-eval,goblin-tdd-repro`) — an unknown name is refused, never
+#                         (`goblin-handoff,goblin-bootstrap`) — an unknown name is refused, never
 #                         silently skipped. `yes` additionally installs the full set under
 #                         .hermes/skills/ (the Hermes project tier).
 #   --list-skills         print the skill library (name, tier, one-line purpose) and exit
@@ -34,11 +34,13 @@ SRC=$(cd "$SELF_DIR/.." && pwd)
 # shellcheck source=goblin-lib.sh
 . "$SELF_DIR/goblin-lib.sh"
 
-# The skill LIBRARY: the repo's skills/ directory. The 7 CORE skills are the ones whose rows
+# The skill LIBRARY: the repo's skills/ directory. The 5 CORE skills are the ones whose rows
 # (SK-01/02/04) ride every install and are vendored by default; every other skill is available
 # on request (`--skills all`, or a name list). This is the same shape the rule LIBRARY uses:
 # a default set on, the rest held back and selectable, discoverable from the CLI (--list-skills).
-CORE_SKILLS="goblin-mode goblin-investigation goblin-bugfix goblin-feature goblin-handoff goblin-verify-author practice"
+# v3 enhance-layer (proposal §2): the 12+1 commodity/dormant skills were cut to the attic/
+# branch; the payload ships only gate-coupled skills.
+CORE_SKILLS="goblin-handoff goblin-verify-author goblin-feature-map practice goblin-bootstrap"
 # skill_list — name<TAB>one-line-purpose for every skill in $SRC/skills/, sorted. The purpose is
 # the first line of the SKILL.md frontmatter `description:` (the same field SK-01 requires).
 skill_list() {
@@ -130,7 +132,7 @@ if [ "$LIST_SKILLS" -eq 1 ]; then
   while IFS=$'\t' read -r n p; do
     printf '  %-22s %-9s %s\n' "$n" "$(skill_tier "$n")" "$p"
   done < <(skill_list)
-  printf '\ndefault install: the 7 core skills. choose with --skills all | <name>[,<name>...]\n'
+  printf '\ndefault install: the 5 core skills. choose with --skills all | <name>[,<name>...]\n'
   exit 0
 fi
 
@@ -338,7 +340,7 @@ if [ -f "$INSTALLED" ] && [ "$SKILLS_NAMED" -eq 0 ]; then
 fi
 
 # --skills spec, validated AFTER the migration read so a recorded choice is accepted too:
-#   yes|no  the 7-skill core tier (yes also installs the full set under .hermes/skills/)
+#   yes|no  the 5-skill core tier (yes also installs the full set under .hermes/skills/)
 #   all     every skill in the repo's skills/
 #   a,b,c   exactly those names
 # A name that does not exist is REFUSED — with the available set named — never silently skipped.
@@ -357,7 +359,7 @@ case "$SKILLS" in
     if [ -n "$BAD_NAMES" ]; then
       g_err "unknown --skills name(s):$BAD_NAMES"
       g_err "  available: $(skill_names | paste -sd, -)"
-      g_err "  or use --skills all (every skill) / --skills no (the 7 core skills)"
+      g_err "  or use --skills all (every skill) / --skills no (the 5 core skills)"
       exit 2
     fi ;;
 esac
@@ -695,7 +697,6 @@ put ".gob/manifest/enforcement.tsv" "$SRC/manifest/enforcement.tsv"
 # --library` can list them and the summary can count them. Data, not a check: it ships whole
 # or not at all with the manifest it is the complement of.
 put ".gob/manifest/library.tsv" "$SRC/manifest/library.tsv"
-put ".gob/manifest/playbooks.tsv" "$SRC/manifest/playbooks.tsv"
 put ".gob/manifest/glossary.tsv" "$SRC/manifest/glossary.tsv"
 # The ban list (G5): the table, the engine, and the two probes. A ban with no mechanism is a
 # wish, so the table and the engine install together or not at all.
@@ -734,7 +735,7 @@ fi
 [ -f "$SRC/templates/boundary-waivers.tmpl" ] && put_once ".gob/boundary-waivers" "$SRC/templates/boundary-waivers.tmpl"
 
 # the Hermes project tier (opt-in): --skills yes installs the FULL set under .hermes/skills/.
-if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
+if [ "$SKILLS" = "yes" ] && part_wanted skills; then
   for d in "$SRC"/skills/*/; do
     [ -f "$d/SKILL.md" ] || continue
     name=$(basename "$d")
@@ -743,7 +744,7 @@ if [ "$SKILLS" = "yes" ] && part_wanted playbooks; then
 fi
 
 # The vendored procedure tier under .gob/skills/ — the SELECTED set (this mirrors the rule
-# library: a default set on, the rest held back and selectable). Default (yes|no): the 7 core
+# library: a default set on, the rest held back and selectable). Default (yes|no): the 5 core
 # skills whose rows (SK-01/02/04) ride every install, so a default install never disables its
 # own rows. `all`: every skill in the repo. A name list: exactly those (validated above). put:
 # hash-checked, so IN-02/SK-02 see them like any other payload file, and installed.json covers
@@ -763,7 +764,7 @@ done
 # installed.json (and SK-02) covers exactly the vendored set. Both cases read the previous
 # record, so exactly what was installed is what goes:
 #   * .hermes/skills/* goes when the Hermes tier is no longer selected (SKILLS != yes);
-#   * .gob/skills/<name>/* goes when <name> left the vendored set (e.g. all -> no shrinks 18 -> 7).
+#   * .gob/skills/<name>/* goes when <name> left the vendored set (e.g. all -> no shrinks 5 -> 5).
 # Empty directories left behind are pruned (deepest first).
 if [ -n "$PREV_FILES" ]; then
   while IFS= read -r rel; do

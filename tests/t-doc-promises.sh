@@ -98,11 +98,12 @@
 # (b) A SELF-COUNT A DOC STATES ABOUT THE ARTIFACT
 #
 #     Two source tables, three families of claim, all walked from the documents:
-#       * the playbook count. `manifest/playbooks.tsv` is the source (its data rows). Every
-#         `<N> playbook(s)` claim and every `<the artifact> ships <N>` claim must equal it. The
-#         second pattern is anchored on a subject - `this` or `gobstack` - because the same
-#         heading compares against the PREDECESSOR project, and `pstack ships 23` is not a claim
-#         about this artifact and is not measurable here.
+#       * the playbook count. The catalogue manifest is CUT (v3): the check walks for any
+#         remaining `<N> playbook(s)` claim and for every `<the artifact> ships <N>` claim about
+#         the catalogue, and each is measured against the payload the glossary states (the
+#         5 gate-coupled skills). The second pattern is anchored on a subject - `this` or
+#         `gobstack` - because the same heading compares against the PREDECESSOR project, and
+#         `pstack ships 23` is not a claim about this artifact and is not measurable here.
 #       * the matrix's shape. `manifest/enforcement.tsv` is the source: total rows, scope split,
 #         and the per-`enforced_by` counts. The live claim is the sentence that says
 #         `Measured shape of this table:` plus the advisory section that names the count. Everything
@@ -118,11 +119,12 @@
 #
 #     RED case (B2, measured on the un-fixed tree): `docs/GUIDE.md:127` read
 #     `this ships 12 (plus the two automations below)` while the same file's line 1, its own
-#     catalogue P1..P14, `manifest/playbooks.tsv` (14 rows), `README.md:29`,
+#     catalogue P1..P14, the then-live `manifest/playbooks.tsv` (14 rows), `README.md:29`,
 #     `docs/GUIDE.md` and `docs/LIMITS.md:18` ("Fourteen playbooks against twenty-three") all say
 #     14 - left behind by `5e574f2`, the very commit that moved the count. It also caught a site the
 #     wave that found B2 did not list: `manifest/glossary.tsv`'s `playbook` definition said
-#     `gobstack ships 12.`
+#     `gobstack ships 12.` (The manifest itself is cut in v3; the count family walks the docs and
+#     the glossary, which is the definition of the count a reader is handed.)
 #
 # Run by tests/run-tests.sh. Outside the census by construction: the census parses the `expect_*`
 # call sites of `tests/t-verify-red.sh`, and this file adds none.
@@ -329,19 +331,21 @@ fi
 # (b) self-counts. (b0) the playbook count, (b2) the artifact's own subject line - both walked
 # from the documents above - and (b3) the matrix's shape, which lives in prose.
 # ===============================================================================================
-PB_SRC="$SRC/manifest/playbooks.tsv"
 ENF_SRC="$SRC/manifest/enforcement.tsv"
 LIB_SRC="$SRC/manifest/library.tsv"
-PLAYBOOKS=$(awk -F'\t' 'NR>1 && NF>1 {n++} END{print n+0}' "$PB_SRC")
+# v3: manifest/playbooks.tsv is cut. The count the docs must state is the payload the glossary
+# declares (the 5 gate-coupled skills); the walk still catches any stale '<N> playbooks' or
+# 'this ships <N>' claim about the catalogue and measures it against that number.
+PLAYBOOKS=$(awk -F'\t' '$1=="playbook" {print $2}' "$SRC/manifest/glossary.tsv" | grep -oE '[0-9]+' | head -1)
 
 BAD_PB=$(printf '%s\n' "$RECORDS" \
          | awk -F'\t' -v want="$PLAYBOOKS" '$3=="PB" { split($4, a, " "); if (a[1] != want) printf " %s:%s=%s", $1, $2, a[1] }')
 BAD_SHIP=$(printf '%s\n' "$RECORDS" \
          | awk -F'\t' -v want="$PLAYBOOKS" '$3=="SHIP" { split($4, a, " "); if (a[3] != want) printf " %s:%s=%s", $1, $2, a[3] }')
-check "every stated playbook count equals manifest/playbooks.tsv ($PLAYBOOKS data rows)" \
+check "every stated playbook count equals the payload the glossary declares ($PLAYBOOKS skills)" \
   "$([ -z "$BAD_PB" ] && echo 0 || echo 1)"
 [ -z "$BAD_PB" ] || note "  disagrees:$BAD_PB"
-check "every 'this ships N' / 'gobstack ships N' equals the playbook count ($PLAYBOOKS)" \
+check "every 'this ships N' / 'gobstack ships N' equals the declared payload ($PLAYBOOKS)" \
   "$([ -z "$BAD_SHIP" ] && echo 0 || echo 1)"
 [ -z "$BAD_SHIP" ] || note "  disagrees:$BAD_SHIP  (pstack is the predecessor project; its count is not this artifact's and is not read here)"
 

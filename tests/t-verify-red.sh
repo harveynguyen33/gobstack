@@ -61,10 +61,9 @@ cp -a HANDOFF.md "$BK/HANDOFF.md"
 cp -a AGENTS.md "$BK/agents.md"
 cp -a .gob/installed.json "$BK/installed.json"
 cp -a .gob/manifest/enforcement.tsv "$BK/enforcement.tsv"
-cp -a .hermes/skills/goblin-mode/SKILL.md "$BK/SKILL.md"
+cp -a .gob/skills/goblin-handoff/SKILL.md "$BK/SKILL.md"
 cp -a "$WORK/standard.md" "$BK/standard.md"
-cp -a .hermes/skills/goblin-drift-audit/SKILL.md "$BK/drift-audit-SKILL.md"
-cp -a .hermes/skills/goblin-bugreporter/SKILL.md "$BK/bugreporter-SKILL.md"
+cp -a .gob/skills/goblin-verify-author/SKILL.md "$BK/verify-author-SKILL.md"
 cp -a .gob/boundary-waivers "$BK/boundary-waivers"
 cp -a .gob/manifest/bans.tsv "$BK/bans.tsv"
 # v2 DELETION NOTE (wave B): the CI lane is gone product-wide - no .github/workflows is
@@ -93,10 +92,9 @@ restore_all() {
   rm -rf .gob/bin .gob/manifest
   cp -a "$BK/bin" .gob/bin
   cp -a "$BK/manifest" .gob/manifest
-  cp -a "$BK/SKILL.md" .hermes/skills/goblin-mode/SKILL.md
+  cp -a "$BK/SKILL.md" .gob/skills/goblin-handoff/SKILL.md
   cp -a "$BK/standard.md" "$WORK/standard.md"
-  cp -a "$BK/drift-audit-SKILL.md" .hermes/skills/goblin-drift-audit/SKILL.md
-  cp -a "$BK/bugreporter-SKILL.md" .hermes/skills/goblin-bugreporter/SKILL.md
+  cp -a "$BK/verify-author-SKILL.md" .gob/skills/goblin-verify-author/SKILL.md
   cp -a "$BK/gitignore" .gitignore
   rm -f checks/green.mjs checks/red.mjs newfile.txt todo-marker.mjs ROUND-001-SPEC.md stray.txt \
         ROUND-000-SPEC.md .gob/state.json .gob/last-gate-line .gob/.ds-report \
@@ -402,8 +400,8 @@ m_bn_01_probe_env()      { set_bn01_probe; mkdir -p src; printf 'export const a:
 m_bn_01_probe_env_none() { set_bn01_probe; mkdir -p src; printf 'export const a: number = 1;\n' > src/clean.ts; }
 set_bn01_probe() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "test \"$GOBLIN_BANS_ID\" = BN-01 && test \"$GOBLIN_BANS_EXEMPT\" = src"; print }' .gob/manifest/bans.tsv > .gob/manifest/bans.tsv.n && mv .gob/manifest/bans.tsv.n .gob/manifest/bans.tsv; }
 
-m_skill_frontmatter() { sed -i '1d' .hermes/skills/goblin-mode/SKILL.md; }
-m_skill_drift()   { printf '\n<!-- drift -->\n' >> .hermes/skills/goblin-mode/SKILL.md; }
+m_skill_frontmatter() { sed -i '1d' .gob/skills/goblin-handoff/SKILL.md; }
+m_skill_drift()   { printf '\n<!-- drift -->\n' >> .gob/skills/goblin-handoff/SKILL.md; }
 # batch 2b-ii: the default matrix carries NO advisory rows — every advisory row (HP-04, HS-03,
 # CM-02, DOC-01/02, SC-09) moved to the library. So the ceiling can only be exceeded once an
 # advisory row is present in the run. This control enables the advisory library row HP-04 and
@@ -413,13 +411,13 @@ m_adv_ceiling()   { awk -F'\t' -v x="HP-04" 'NR>1 && $1==x {print $1"\t"$2"\t"$3
 # as ADV - so the cap silently stopped capping and the run still exited 0. It is a FAIL now.
 m_adv_ceiling_bad() { sed -i 's/^advisory_ceiling: .*/advisory_ceiling: ten/' AGENTS.md; }
 
-m_sk_04()         { sed -i 's|^## What this cannot see$|## Not seen|' .hermes/skills/goblin-drift-audit/SKILL.md; }
+m_sk_04()         { sed -i 's|^## What this cannot see$|## Not seen|' .gob/skills/goblin-verify-author/SKILL.md; }
 
 # The tenant string is built at run time. A literal here would be the repo's only tenant hit
 # (measured at f23b371: 1 repo-wide, 0 at b100b44) and PT-01, the rule that exists to catch
 # exactly that, does not scan tests/ - so the control was the leak it was meant to catch (F2-5).
 # $HOME expands to the same /home/<user>/projects the rule matches.
-m_tenant_leak()   { printf '\nsee %s/projects for the tenant list\n' "$HOME" >> .hermes/skills/goblin-mode/SKILL.md; }
+m_tenant_leak()   { printf '\nsee %s/projects for the tenant list\n' "$HOME" >> .gob/skills/goblin-handoff/SKILL.md; }
 
 m_archive_flip()  { sed -i 's/^archive: false/archive: true/' AGENTS.md; }
 

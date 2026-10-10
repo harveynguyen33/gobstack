@@ -16,9 +16,13 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 3. **No agent graph and no verdict-ledger daemon.** The board replaces both at a lower
    resolution: `parents` expresses ordering, not data flow, and sibling cards cannot see each
    other.
-4. **Fifteen playbooks against twenty-three.** The cuts in `docs/GUIDE.md` are deliberate and each
-   is argued, but real coverage is lost: performance hillclimbing, pixel parity, trace
-   forensics, stack landing, worktree hygiene.
+4. **Five shipped skills against the old twenty-three-procedure catalogue.** The cuts in
+   `docs/GUIDE.md` are deliberate and each is argued, but real coverage is lost: performance
+   hillclimbing, pixel parity, trace forensics, stack landing, worktree hygiene — and, since the
+   v3 enhance-layer cut, the whole commodity set (investigation, bugfix, feature, refactor,
+   tdd-repro, eval, sweep, overnight, pr-gate, bugreporter, drift-audit, mode-router), which
+   moved to the `attic/` branch. The external-categories adjudication (init brief) is the
+   replacement path for what a repo actually needs.
 5. **No swarm or arena fan-out.** The read-versus-write axis says that is correct for this work
    mix; it is still a capability the other harness has and this does not.
 
@@ -73,9 +77,10 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     curated Skills stayed above it. **goblin-stack installs agent-authored skills**, so the lower
     row of that result is a warning about its own output, not someone else's: a generated skill
     accepted after a skim is a different proposition from a written one. It is why `P6` hands the
-    generated skill to `P12` before any `verified:` date advances (`README.md` K15).
-    **`P12` is still the mechanism to find out, and it has still never been run**: the record format
-    is now specified (`skills/goblin-eval/SKILL.md`) and **no row reads a lane** (#31).
+    generated skill to an eval before any `verified:` date advances (`README.md` K15).
+    **The eval (`P12`) is still the mechanism to find out, and it has still never been run**: the
+    record format was specified in `skills/goblin-eval/SKILL.md` (cut to `attic/` in v3, with the
+    record shape preserved there) and **no row reads a lane** (#31).
     Pin: `https://www.skillsbench.ai/blogs/skillsbench-1-1`, sha256 of the retrieved page
     `d812bb7c2da702cc67556eb5f46b9e93faaca19d3545376544866e940126ef15`, fetched 2026-09-25; the
     eleven-token ban and the grading procedure are argued in
@@ -143,15 +148,17 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
     the source tree, not the repo root, and the third is why the upkeep pass in
     `skills/goblin-feature-map/SKILL.md` requires the date to advance only for a feature someone
     actually drove.
-31. **The P6↔P12 loop is wired as a contract with no runner.** `P6` now hands a generated
-    verification skill to `P12` and `verified:` does not advance until an eval record exists; the
-    record's shape, the eleven-token ban, the cheap-checks-first ladder, the merge rule and the pass
-    condition (every seeded defect detected, the control's number at zero, every correction RED
-    before GREEN) are all specified in `skills/goblin-eval/SKILL.md`. **No row reads a lane, and
-    nothing executes an eval** — measured after W2, `manifest/enforcement.tsv` has no `EV-*` row,
-    and `P12` has still never been run. The runner and the record checks (`EV-01`..`EV-04` in G1's
-    design) are deferred to a follow-up card, deliberately and in the open, rather than half-built:
-    a row that reads a record nobody writes would pass vacuously and look like enforcement.
+31. **The author↔eval loop is wired as a contract with no runner.** The authoring skill hands a
+    generated verification skill to the eval (`P12`) and `verified:` does not advance until an eval
+    record exists; the record's shape, the eleven-token ban, the cheap-checks-first ladder, the
+    merge rule and the pass condition (every seeded defect detected, the control's number at zero,
+    every correction RED before GREEN) were specified in `skills/goblin-eval/SKILL.md` — cut to
+    `attic/` in v3 (no row ever read it: dead weight), the spec preserved on that branch.
+    **No row reads a lane, and nothing executes an eval** — measured after W2,
+    `manifest/enforcement.tsv` has no `EV-*` row, and the eval has still never been run. The runner
+    and the record checks (`EV-01`..`EV-04` in G1's design) are deferred to a follow-up card,
+    deliberately and in the open, rather than half-built: a row that reads a record nobody writes
+    would pass vacuously and look like enforcement.
 32. **Withdrawn (v3).** The judge lane and loop record this item measured were removed in the
     model/role/loop cut; the numbering is kept stable for the cross-references below.
 33. **Withdrawn (v3).** Same cut: `LP-*` and `JG-*` no longer exist.

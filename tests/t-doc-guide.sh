@@ -136,25 +136,27 @@ fi
 
 # ---- D4: the file count, and the gloss the guide puts on it ------------------------------------
 # The WALKED path in the guide is `gob init` (review-UX pass), which ships no .github workflow.
-# GAP-2 vendored the seven-skill core procedure tier under .gob/skills/ (the 20-file neutral
-# harness -> 25 files, created 24). FIX 3 then dropped the two artefacts nothing verifies by
-# default: ROUND-000-SPEC.md and reviews/.gitkeep (the SP-*/PG-* rows police them and are LIBRARY
-# rows, off by default), so the write set SHRANK by two from the 27/-26 shape to 25 files / created
-# 24. The gloss in §3 quotes both sides of the one-file delta and says which file the counter omits.
+# GAP-2 vendored the core procedure tier under .gob/skills/ (the 20-file neutral harness -> 25
+# files, created 24). FIX 3 dropped the two artefacts nothing verifies by default:
+# ROUND-000-SPEC.md and reviews/.gitkeep (the SP-*/PG-* rows police them and are LIBRARY rows, off
+# by default) -> 25 files / created 24. v3 enhance-layer cut the payload to the 5 core skills and
+# dropped manifest/playbooks.tsv, so the write set is 22 files / created 21. The gloss in §3
+# quotes both sides of the one-file delta and says which file the counter omits.
 ONDISK=$(find . -path ./.git -prune -o -type f -print | wc -l)
-# v2 neutral-first + GAP-2 + FIX 3: the DEFAULT install is skills=no for the Hermes tier, always
-# vendors the core procedure tier, and no longer scaffolds the unchecked SPEC/reviews artefacts —
-# so the write set is the neutral harness + .gob/skills/ (25 files: 20 tracked + the 7 core skills
-# - 2 dropped artefacts + .gob/installed.json + the owned files + .gitignore).
-[ "$ONDISK" = "25" ]
-check "a default install writes 25 files (20 harness + 7 core skills - 2 unchecked artefacts) (measured here: $ONDISK; created $CREATED)" "$?"
+# v2 neutral-first + GAP-2 + FIX 3 + v3 enhance-layer: the DEFAULT install is skills=no for the
+# Hermes tier, always vendors the core procedure tier, no longer scaffolds the unchecked
+# SPEC/reviews artefacts, and the payload is the 5 core skills — so the write set is the neutral
+# harness + .gob/skills/ (22 files: the tracked 21 + .gob/installed.json and the owned files it
+# does not count).
+[ "$ONDISK" = "22" ]
+check "a default install writes 22 files (created 21 tracked + installed.json, 5-skill payload) (measured here: $ONDISK; created $CREATED)" "$?"
 check "  and the guide quotes the plain installer's own count (created $CREATED)" \
-  "$(printf '%s' "$CREATED" | grep -qE '^24$' && echo 0 || echo 1)"
-grep -qF "created 24 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
-check "  and the guide's walked-path transcript is the installer's created-24 line" "$?"
+  "$(printf '%s' "$CREATED" | grep -qE '^21$' && echo 0 || echo 1)"
+grep -qF "created 21 · updated 0 · unchanged 0 · skipped 0" "$GUIDE"
+check "  and the guide's walked-path transcript is the installer's created-21 line" "$?"
 ! grep -q 'means it wrote 50 files' "$GUIDE"
 check "  and the false gloss ('created 50 means it wrote 50 files') is gone (D4)" "$?"
-GLOSS_LINE=$(grep -n "created 24" "$GUIDE" | head -1 | cut -d: -f1)
+GLOSS_LINE=$(grep -n "created 21" "$GUIDE" | head -1 | cut -d: -f1)
 if [ -n "$GLOSS_LINE" ] && sed -n "${GLOSS_LINE},$((GLOSS_LINE + 12))p" "$GUIDE" | grep -q 'installed\.json'; then
   note "ok   the gloss names the file the counter does not count (.gob/installed.json)"
 else

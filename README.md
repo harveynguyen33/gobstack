@@ -152,12 +152,12 @@ below is the reference material the guide points into, so the two do not compete
 
 | file | what it decides |
 |---|---|
-| `docs/GUIDE.md` | **read this first**: the first week in order, the installer/verifier interface, the rule matrix, the 15 playbooks, the integration points |
+| `docs/GUIDE.md` | **read this first**: the first week in order, the installer/verifier interface, the rule matrix, the 5-skill payload, the integration points |
 | `README.md` | this file: the thesis and rejected alternatives, the risk register and non-goals, the glossary (all below) |
 | `docs/LIMITS.md` | where this is weaker than its sources, and what is unproven |
 | `docs/RECORD-NOTES.md` | the wave codes the changelog and the matrix parentheticals use, one line each |
 
-`manifest/enforcement.tsv` is the source of truth for rules; `manifest/playbooks.tsv` for the
+`manifest/enforcement.tsv` is the source of truth for rules; the shipped `skills/` payload for the
 flows; `manifest/glossary.tsv` for the vocabulary.
 
 ## Verify
@@ -275,7 +275,7 @@ installer puts the skills in the repo, and `SK-02` hashes what it installed.
 
 #### D3 — the gate is chosen by the change, not by the repo, and every review names its SHA
 
-The stakes ladder S0–S4 becomes the `goblin-pr-gate` playbook. The one-line upgrade that
+The stakes ladder S0–S4 was the `goblin-pr-gate` playbook (cut to `attic/` in v3); its rows PG-01–PG-03 remain in the matrix and the review-note contract lives on in `docs/GUIDE.md`. The one-line upgrade that
 applies at every tier — including a direct push — is that a review note names the SHA it
 reviewed: `reviews/<slug>-<head7>.md` with `head:`, `base:`, `patch-id:`, `stakes:`,
 `checks-run:`. A verdict is a claim about an artifact, not about a moment, and `PG-03`
@@ -406,9 +406,9 @@ sentence). A term a new reader might trip on belongs here, not in a footnote.
 | lane | A family of rules that share a mechanism and a blind spot: the ban lane, the reference-corpus lane. The cannot-see footer reports per lane (the CI lane is cut in v3 and is not named). | UX-review-2026-10-06 |
 | opt-out | A part recorded in disabled: so its required checks report SKIP (opt-out) instead of failing. | R6 sec.6.3 |
 | overnight | P10: an unattended run over a fixed goal, stopped by an escape hatch. | R6 sec.3 |
-| part | One installable unit: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, playbooks, tokens. | R7 sec.5 |
+| part | One installable unit: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, skills, tokens. | R7 sec.5 |
 | patch-id | git patch-id --stable of base..head. A new head voids a verdict; a matching commit message does not restore it. | R1 sec.10 |
-| playbook | A named, ordered procedure with a measurable verification step. gobstack ships 15. | R6 sec.3 |
+| playbook | A named, ordered procedure with a measurable verification step. The catalogue is cut (v3): the payload ships 5 gate-coupled skills. | R6 sec.3 |
 | preimage | The input that produces a known hash. The hash checks here prove non-drift, not preimage resistance - they are tamper-evidence, not signatures (docs/LIMITS.md #18). | UX-review-2026-10-06 |
 | profile | A worker identity in the Hermes fleet (architect, coder, reviewer, ...). Owns memory and skills. | R4 |
 | review-panel | N independent verdict lanes, each its own card with its own resolved model. Only at stakes S3+. | R6 sec.4.3 |

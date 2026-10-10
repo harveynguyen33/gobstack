@@ -127,7 +127,7 @@ then install it:
 
 Expected output (this is a real transcript, trimmed):
 
-    created 24 · updated 0 · unchanged 0 · skipped 0
+    created 21 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is uncommitted by design
@@ -135,7 +135,7 @@ Expected output (this is a real transcript, trimmed):
       3. the gate is the one you declared and gob init measured (test: bash tests/run-tests.sh); edit AGENTS.md's gate_ keys when it changes
       4. the core goblin tier ships under .gob/skills/ by default; the .hermes/ project tier is opt-in: re-run with --skills yes
 
-**`created 24`** is the installer's count of the files it **tracks**. It writes **25**: the 25th
+**`created 21`** is the installer's count of the files it **tracks**. It writes **22**: the 22nd
 is `.gob/installed.json`, the record it keeps for itself, which it writes but does not count. It
 has written nothing outside this directory — and nothing under `.github/`: **v2 installs no
 CI, ever.** The default install ships **no agent skills** — the harness is neutral.
@@ -327,7 +327,7 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 20 files it
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 17 files it
 tracks — not the ones it `owns` (including `AGENTS.md`, whose gob block §5 has you editing) and not
 `.gob/installed.json`; edit one of the tracked — the exercise below uses `.gob/bans/README.md`.
 
@@ -499,27 +499,24 @@ or, committed with the repo so every teammate's agent picks it up: `gob init --w
 a repo-root `.mcp.json` as part of the install (Claude Code and Cursor auto-detect it). It is
 ask-once, and never overwrites a `.mcp.json` you customized.
 
-### The 15 playbooks
+### The 5-skill payload
 
-Named procedures, installed as project-local skills. Each has a measurable verification step.
+v3 enhance-layer (proposal §2): the gate-coupled skills ship; the commodity procedures
+(investigation, bugfix, feature, refactor, tdd-repro, eval, sweep, overnight, pr-gate,
+bugreporter, drift-audit, mode-router) and the dormant re-mobile lab moved to the `attic/`
+branch. What ships is exactly what a verifier row reads:
 
-| | Playbook | Use it when |
+| | Skill | Use it when |
 |---|---|---|
-| P1 | `goblin-investigation` | a read-only question, or "why is this happening" |
-| P2 | `goblin-bugfix` | a reported defect |
-| P3 | `goblin-feature` | new behaviour |
-| P4 | `goblin-refactor` | a behaviour-preserving reshape |
-| P5 | `goblin-tdd-repro` | a defect where a regression test is cheap |
 | P6 | `goblin-verify-author` | a project has no live check lane, or its gates drift |
-| P7 | `goblin-pr-gate` | anything that should be reviewed before landing |
 | P8 | `goblin-bootstrap` | adopting gobstack, or starting a project |
 | P9 | `goblin-handoff` | ending a session, or picking up another's |
-| P10 | `goblin-overnight` | an unattended run over a predicate |
-| P11 | `goblin-sweep` | the same change across many projects |
-| P12 | `goblin-eval` | a skill or prompt changed — did it do anything? |
-| P13 | `goblin-bugreporter` | an event delivered a report |
-| P14 | `goblin-drift-audit` | a recorded claim disagrees with the artifact |
-| P15 | `goblin-re-mobile` | one shipped Android build must be understood as facts for study |
+| — | `goblin-feature-map` | a feature map a verifier row reads (FM-01/02) |
+| — | `practice` | a standard the install pins and IN-02 hashes |
+
+The cut procedures were generic coding-advice prose with no row reading them — the anti-pattern
+this product exists to catch. They are recoverable from `attic/`; the extend mechanism and the
+external-categories adjudication (init brief) add what a repo actually needs.
 
 ### Where the real documentation lives
 
@@ -528,7 +525,7 @@ gobstack ships three documents. This guide is the front door; the README is the 
 | File | Read it for |
 |---|---|
 | `README.md` | the thesis, every rejected alternative, the risk register and non-goals, and the glossary |
-| `docs/GUIDE.md` | this file: the first week in order, the interface, the rule matrix, the playbooks, the integration points |
+| `docs/GUIDE.md` | this file: the first week in order, the interface, the rule matrix, the shipped skills, the integration points |
 | `docs/LIMITS.md` | **what this cannot check** — read this one early: the security and perf lanes, and every recorded limit |
 | `docs/RECORD-NOTES.md` | the wave codes the changelog and the matrix parentheticals use, one line each |
 
@@ -1087,51 +1084,12 @@ these rows are prose. That is stated here rather than implied away.
 
 ---
 
-## 17. The playbooks in full
+## 17. The shipped skills in full
 
-`.gob/manifest/playbooks.tsv` is the machine-readable form; this is the prose. Every playbook has
-the same six fields, and `verification` is always a *measurable* step that also names what it
-cannot see. The router that picks one is the `goblin-mode` skill.
-
-### P1 - `goblin-investigation`
-
-- **When:** a read-only question, or "why is this happening"
-- **Steps:** 1 name the question as a falsifiable claim<br>- 2 read the code paths, cite file:line<br>- 3 if the answer is observable by running something, run it instead of asking<br>- 4 write the answer with its evidence
-- **Verification:** every claim carries a file:line or a command+output; no code changes; a claim you cannot source is marked [unverified]
-- **Profiles:** any
-- **Role:** investigate
-
-### P2 - `goblin-bugfix`
-
-- **When:** a reported defect
-- **Steps:** 1 reproduce it yourself<br>- 2 state the root cause with a measurement, never 'should be'<br>- 3 fix the root, not the symptom<br>- 4 prove absence on the same surface, with a negative control
-- **Verification:** the repro fails before and passes after, on the same command; unit tests show branch behaviour, not bug absence
-- **Profiles:** coder
-- **Role:** code
-
-### P3 - `goblin-feature`
-
-- **When:** new behaviour
-- **Steps:** 1 SPEC first (measured root cause + AC: list)<br>- 2 name the data shape before the code<br>- 3 land it in units that each end checkable<br>- 4 write the SHA it landed at into the review note
-- **Verification:** every AC: item has a checkable assertion; the gate line is measured; the SHA is named
-- **Profiles:** architect -> coder
-- **Role:** judgment -> code
-
-### P4 - `goblin-refactor`
-
-- **When:** a behaviour-preserving reshape
-- **Steps:** 1 pin the contract first (characterization test / snapshot / equivalence harness)<br>- 2 shape only, no behaviour<br>- 3 delete the legacy path in the same change
-- **Verification:** the pin is a real assertion run before and after; a type check and lint are not a pin
-- **Profiles:** coder
-- **Role:** code
-
-### P5 - `goblin-tdd-repro`
-
-- **When:** a defect where a regression test is cheap
-- **Steps:** 1 write the failing test<br>- 2 confirm it fails for the intended reason<br>- 3 smallest production fix<br>- 4 revert the fix -> the test MUST fail -> restore
-- **Verification:** the RED-again step is captured; prefer no new test over a bad test; the skip path is explicit, never silent
-- **Profiles:** coder
-- **Role:** code
+`skills/<name>/SKILL.md` is the form (this is the prose). Every shipped skill names what it
+cannot see, and `verification` stays a *measurable* step wherever one exists. v3 cut the
+playbook catalogue with its manifest: the procedures below are the ones a verifier row reads.
+(The full P1–P15 prose is on the `attic/` branch with the skills it described.)
 
 ### P6 - `goblin-verify-author`
 
@@ -1140,14 +1098,6 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 - **Verification:** a generated skill that was never executed is a draft, not a deliverable; the harness prints PASS/FAIL and exits non-zero on failure; the REPLAY shows RED pre-change; the map's index and four-H2 entry contract hold (`FM-01`), every declared entry path still resolves (`FM-02`), and the declared `verify_doctor:` exits 0 (`VA-01`)
 - **Profiles:** architect
 - **Role:** judgment
-
-### P7 - `goblin-pr-gate`
-
-- **When:** anything that should be reviewed before it lands
-- **Steps:** 1 classify stakes S0-S4<br>- 2 run the gate set at the candidate SHA and record the numbers<br>- 3 write reviews/<slug>-<head7>.md with head/base/patch-id/stakes/checks-run<br>- 4 evaluate the panel rule for S3+<br>- 5 at S3+ the foreman turns N lane verdicts into one decision<br>- 6 re-check the patch-id before landing
-- **Verification:** the patch-id of base..head still matches the recorded one; the review note names a SHA that exists in git rev-list; for S2+ a check ran on that SHA; at S3+ the deciding lane is disjoint from the author's
-- **Profiles:** reviewer (+ architect for S3)
-- **Role:** review-panel
 
 ### P8 - `goblin-bootstrap`
 
@@ -1165,101 +1115,13 @@ cannot see. The router that picks one is the `goblin-mode` skill.
 - **Profiles:** any
 - **Role:** judgment
 
-### P10 - `goblin-overnight`
-
-- **When:** an unattended run over a predicate
-- **Steps:** 1 the exit condition is a checkable predicate written before iteration 1<br>- 2 it never gets relaxed<br>- 3 an escape hatch: a genuine dead end writes up why and stops<br>- 4 the morning audit reads the Attention section first
-- **Verification:** the predicate is a command, and its first run is recorded before iteration 1; the predicate is pinned and never relaxed; the turn budget is set and respected; no three consecutive rows share an evidence pointer without reaching `predicate:green`; a run that ends without its predicate green carries a committed write-up naming it; every landed change has a P7 verdict row; a verdict that says `done` cites a handle the repo resolves
-- **Profiles:** default + coder
-- **Role:** code
-
-### P11 - `goblin-sweep`
-
-- **When:** the same change or question across projects
-- **Steps:** 1 enumerate targets with a shell glob, not a memory<br>- 2 classify each; an archive project is skipped, not processed<br>- 3 one card per project, parents=[sweep]<br>- 4 collect one line per project: what changed / what was refused / what is unfindable
-- **Verification:** the per-project line carries the command it ran; the sweep report states its own coverage (n of m projects, and names the skipped ones)
-- **Profiles:** default
-- **Role:** synthesis
-
-### P12 - `goblin-eval`
-
-- **When:** a skill or prompt changed, and you want to know if it did anything
-- **Steps:** 1 candidate and control run in sanitized directories<br>- 2 no eval/test/judge/rubric token anywhere the candidate sees<br>- 3 grade the chain from the transcript (which files it actually opened), never self-report<br>- 4 the judge runs on a different model family<br>- 5 write the record to `evals/<slug>/` (prompt, rubric, manifest.tsv, transcripts/, verdict.md)<br>- 6 a change must improve the evaluated cases or add new evaluations; a generated verification skill passes only on a measured sensitivity
-- **Verification:** the judge's verdict is reproducible from the transcripts; candidates never learn other candidates exist; the record exists and every lane names a transcript file that exists; a generated verification skill is verified only by a record, with its sensitivity printed beside the control's number
-- **Profiles:** researcher
-- **Role:** synthesis
-
-### P13 - `goblin-bugreporter`
-
-- **When:** an event delivered a report — a bug report file, a chat message turned into one, a webhook
-- **Steps:** 1 validate intake (the six required keys; a missing key is a refusal card with no assignee)<br>- 2 freeze `repo` + `revision` as immutable<br>- 3 reproduce (R1 a failing command, then R2 the REPLAY, then R3 a real-UI drive)<br>- 4 write `reports/<slug>/repro.md` with the `pre`/`post` table<br>- 5 create the fix card only on `reproduced`<br>- 6 complete its own card with the verdict
-- **Verification:** `repro.md` carries a command, a revision that exists in `git rev-list`, and a RED `pre` row; the fix card exists iff the verdict is `reproduced`; `git status --porcelain` is empty after the run
-- **Profiles:** researcher
-- **Role:** investigate
-
-### P14 - `goblin-drift-audit`
-
-- **When:** a recorded claim disagrees with the artifact (drift)
-- **Steps:** 1 enumerate targets by glob, never by memory<br>- 2 compute the drift record per target<br>- 3 print nothing when clean<br>- 4 one card per drifting repo<br>- 5 report `n of m`, naming the skipped targets
-- **Verification:** the summary names each repo and the command it ran; a clean run prints nothing; skipped targets are named; a capped run prints its own line, so "silent because clean" and "silent because capped" are never confused
-- **Profiles:** architect
-- **Role:** judgment
-
-**Why a 13th and 14th playbook, rather than folding these into P1/P9.** Every other playbook is
-entered by a *human or orchestrator request* and delivers a *change*. These two are entered by an
-*event* and deliver a *card*. `P10` covers "an unattended run over a predicate" — a run over a
-*condition*, not a run *started by* a condition. Stretching P1 would lose the intake gate;
-stretching P9 would lose the reproduce-first gate. The producers these cards came from were cut
-in v3 (the `automations/` cron scripts); the two playbooks remain as the card-producing
-procedures.
-
-### P15 - `goblin-re-mobile`
-
-- **When:** one shipped Android build must be understood as facts for study, with a reproducible, hash-manifested corpus
-- **Steps:** 1 S0 preflight: the sandbox exists and is the one the fences describe<br>- 2 S1 acquire, S2 verify provenance against the published hash<br>- 3 S3 triage: the engine verdict, cheapest test first<br>- 4 S4 static decompile, S5 carve the containers, S6 manifest the corpus<br>- 5 S7 dossier: facts and numbers, never expression<br>- 6 S8 is deferred by design; S9 retention/teardown
-- **Verification:** the corpus manifest verifies `sha256sum -c` where the corpus lives; `RC-01`, `RC-02` and `RC-03` return the exits their rows define (an exact hash inside the build output, a weak manifest and a tracked payload each fail the build); every negative control NC-1..NC-6 was shown RED and then restored
-- **Profiles:** coder
-- **Role:** code
-
-**The step list above is the summary, not the procedure**, and the four `RC-` rows are what make
-its verification column measurable rather than aspirational: `RC-01` is the build-time gate over
-the declared `security: build_output:`, `RC-02` is the vacuous-pass guard on the manifest's own
-shape, `RC-03` is the quarantine rule over the lab repo's tracked tree, and `RC-04` is the
-acquisition record. The procedure's non-negotiable fences (an owned build only, one dedicated
-sandbox, the quarantine, nothing extracted entering a repo) are stated with what enforces each.
-
-### The cuts - pstack ships 23, this ships 15
-
-Each cut has a reason, and a cut is recorded rather than deleted silently.
-
-| cut | verdict | reason |
-|---|---|---|
-| `perf-issue` | folded into P2 | Its mechanism is "baseline trace, post-fix trace, diff the artifacts" - a step of a bug fix, not a playbook. No project here has a perf-target loop. |
-| `hillclimb` | cut, deferred | Needs a frozen harness with proven sensitivity plus a loop primitive; the kanban's `goal_mode` already provides re-entry with a budget cap. |
-| `runtime-forensics`, `trace-forensics` | merged into P2 | The transferable step is "capture a real artifact, then inject instrumentation into the running process". The library already ships the runners (`node-inspect-debugger`, `python-debugpy`), so a playbook would restate an existing skill. |
-| `prototype` | merged into P1 step 3 | The valuable half is the classifier: a question whose answer is observable by running something is not the human's to answer. |
-| `visual-parity` | cut | Needs a baseline screenshot harness; no project has a pixel-parity migration target. |
-| `authoring-a-skill` | cut | `hermes-agent-skill-authoring` is live in the global library and is a Hermes-native duplicate. |
-| `autopilot-stack` | cut | Nothing to stack: measured 0 branches and 0 PR merges across the repos this was designed for. |
-| `autopilot-full`, `orchestrate` | merged into P10 + P11 + kanban | The fleet-programme half is the board's job (`parents`, `goal_mode`, `request_review`). The patch-id rule they contain is kept as PG-03. |
-| `multi-phase-plan` | merged into P3 + P8 | The standard already owns the SPEC lifecycle; duplicating it violates the one-owner rule. The machine-checkable half is kept as SP-01/02/03. |
-| `worktree-cleanup` | cut | macOS/Xcode-specific by inspection (`xcrun simctl`, `DerivedData`). |
-| `opening-a-pr` | merged into P7 | It is the terminal step of every other playbook; as its own playbook it would be a step file with one caller. Its PR-body schema becomes P7's review-note schema. |
-
-**Deliberate non-imports:** the `swarm` and `arena` fan-out shapes (the axis is read-vs-write,
-and five parallel lanes cost about five times the tokens), the cloud-agent lane (no per-agent
-computer here), and the Slack automation lane (the *shape* transfers, and P11 plus cron is
-that shape).
-
----
-
 ## 18. Integration points
 
 ### The kanban board
 
 The board is the fleet's fan-out carrier and the only one with a model knob.
 
-- `goblin-overnight` (P10) maps to `goal_mode: true` plus a turn budget. **Corrected 2026-09-25
+- an unattended fleet run maps to `goal_mode: true` plus a turn budget. **Corrected 2026-09-25
   (W3), measured in `hermes_cli/goals.py`:** the truth was weaker than this line claimed. The
   auxiliary judge is called as `judge_goal(goal_text, last_response)` (`:1662`) — two positional
   arguments and nothing else: **no contract, no subgoals, no quality gates** (the function takes all
@@ -1273,25 +1135,21 @@ The board is the fleet's fan-out carrier and the only one with a model knob.
   (`:1689-1696`). The terminal handoff gate is judged on the supplied summary
   text and **allows the handoff when the judge breaks** (`tools/kanban_tools.py:414-424`,
   `:447-477`).
-- `goblin-pr-gate` (P7) maps to the board's review request and change-request verbs. The
-  verdict's `{head_sha, base_sha, patch_id, lanes, verdict}` lives in the card metadata **and**
-  in the committed `reviews/<slug>-<head7>.md`. The card is the routing record; the file is the
-  artifact the verifier can test (`PG-01`/`PG-02`/`PG-03`).
-- `goblin-sweep` (P11) is one card per project, parented to the sweep card.
+- a review maps to the board's review request and change-request verbs. The verdict's
+  `{head_sha, base_sha, patch_id, lanes, verdict}` lives in the card metadata **and** in the
+  committed `reviews/<slug>-<head7>.md`. The card is the routing record; the file is the artifact
+  the verifier can test (`PG-01`/`PG-02`/`PG-03`).
 
 **Rule:** role-pinned fan-out goes through the board, never through a bare subagent spawn.
 
 ### Cron
 
-`goblin-sweep` is the cron-shaped playbook: enumerate by glob, one card per project, one line
-back.
-
 Measured constraint to state plainly: a non-interactive surface inherits the skills **trust**
-decision and resolves the project root from the job's `workdir`. So **a sweep job whose `workdir`
-is not inside a trusted repo loads none of gobstack's skills.** The installer prints the
+decision and resolves the project root from the job's `workdir`. So **a job whose `workdir` is
+not inside a trusted repo loads none of gobstack's skills.** The installer prints the
 `hermes skills trust` step, and `goblin-verify` cannot check it (it is a fleet-runtime property).
 
-The answer to a lost bootstrap is the same as the answer to compaction: the mode skill is
+The answer to a lost bootstrap is the same as the answer to compaction: the bootstrap skill is
 loadable on demand and `AGENTS.md` names it, so recovery is reading one file rather than
 depending on a hook. On this runtime `on_session_start` exists and cannot inject (its
 return is discarded — it is an observer), and `pre_llm_call` can inject into the user
@@ -1354,7 +1212,7 @@ them: it reads the path from config, so moving the standard is a one-line config
     git init -b main
     gob init --heuristic                   # the brief + schema; answer it in a proposal file
     gob init --write .gob-init-proposal.md --yes
-                                           # expect: created 24 (the core tier vendors; the Hermes tier is opt-in; FIX 3 drops the unchecked SPEC/reviews)
+                                           # expect: created 21 (the 5-skill core tier vendors; the Hermes tier is opt-in; FIX 3 drops the unchecked SPEC/reviews)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"

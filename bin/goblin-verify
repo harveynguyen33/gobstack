@@ -473,15 +473,17 @@ row_part() {
     HS-01|HS-03) echo gate ;;
     HS-02) echo replay ;;
     PG-*) echo pr-gate ;;
-    # SK-04 rides the `playbooks` part: its artifact is the shipped skills, and an explicit
-    # --opt-out playbooks disables that part. The CORE tier (.gob/skills/) is vendored on
+    # SK-04 rides the `skills` part: its artifact is the shipped skills, and an explicit
+    # --opt-out skills disables that part. The CORE tier (.gob/skills/) is vendored on
     # every install (GAP-2), so the row runs by default and only an explicit opt-out skips it.
-    SK-04) echo playbooks ;;
+    # (v3: the part was named `playbooks` for the manifest that indexed the cut skills; the
+    # rail follows its list — manifest/playbooks.tsv is gone.)
+    SK-04) echo skills ;;
     # SK-01 rides the same part. The core tier gives it subjects on every install — it no
     # longer has to skip on a default (no .hermes tier) repo.
-    SK-01) echo playbooks ;;
+    SK-01) echo skills ;;
     # SK-02 keys off the same part; it hashes the .gob/skills/ core tier too.
-    SK-02) echo playbooks ;;
+    SK-02) echo skills ;;
     *) echo "" ;;
   esac
 }

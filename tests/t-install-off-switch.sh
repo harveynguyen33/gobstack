@@ -52,11 +52,13 @@ printf '%s' "$A_OUT" | grep -q 'FAIL  HP-01'
 check "the install fails HP-01 when the HANDOFF is gone" "$?"
 check "and the run is not green" "$([ "$A_RC" -eq 1 ] && echo 0 || echo 1)"
 
-# ---- the playbooks part + the core tier (GAP-2) ---------------------------------------------
-# Before GAP-2 a default (--skills no) install recorded `disabled: [playbooks]`, so SK-01/SK-02/
-# SK-04 SKIPPED on every fresh repo — the product disabled its own rows. Now the seven-skill core
+# ---- the skills part + the core tier (GAP-2) ---------------------------------------------
+# Before GAP-2 a default (--skills no) install recorded `disabled: [skills]`, so SK-01/SK-02/
+# SK-04 SKIPPED on every fresh repo — the product disabled its own rows. Now the five-skill core
 # procedure tier is vendored under .gob/skills/ and the part is NOT disabled, so those rows RUN.
-# An explicit --opt-out playbooks is the only thing that turns them off, and it is a real switch.
+# An explicit --opt-out skills is the only thing that turns them off, and it is a real switch.
+# (v3: the part was named `playbooks`, for the manifest that indexed the cut skills — the rail
+# follows its list.)
 mkfix "$WORK/noskills"
 bash "$SRC/bin/goblin-install" --target "$WORK/noskills" --skills no \
   >/dev/null 2>&1
@@ -69,8 +71,8 @@ note "--skills no: verify exit=$NS_RC, $(printf '%s' "$NS_OUT" | grep -E '^ *[0-
 check "a --skills no install verifies green" "$NS_RC"
 printf '%s' "$NS_OUT" | grep -qE '^PASS  SK-01'
 check "  and the core skill rows RUN, not skip (GAP-2)" "$?"
-[ -f .gob/skills/goblin-mode/SKILL.md ]
-check "  because the seven-skill core tier is vendored under .gob/skills/" "$?"
+[ -f .gob/skills/goblin-handoff/SKILL.md ]
+check "  because the five-skill core tier is vendored under .gob/skills/" "$?"
 [ ! -e .hermes ]
 check "  and no Hermes project tier was installed (it is still opt-in)" "$?"
 # V3-3 + GAP-2/3 + FIX 1: the count with the core tier on and bans self-selected. The number is
@@ -82,16 +84,16 @@ check "  and no Hermes project tier was installed (it is still opt-in)" "$?"
 printf '%s' "$NS_OUT" | grep -q '17 passed, 0 failed, 0 advisory, 10 skipped'
 check "  and the numbers are pinned (V3-3 + GAP-2/3 + FIX 1: core tier + predicate bans, 17/0/0/10)" "$?"
 
-# ---- the part switch is still real: an explicit --opt-out playbooks turns the rows off --------
+# ---- the part switch is still real: an explicit --opt-out skills turns the rows off ------------
 mkfix "$WORK/optout"
-bash "$SRC/bin/goblin-install" --target "$WORK/optout" --opt-out playbooks >/dev/null 2>&1
-check "--opt-out playbooks installs" "$?"
-git add -A && git commit -q -m "chore: install (--opt-out playbooks)"
+bash "$SRC/bin/goblin-install" --target "$WORK/optout" --opt-out skills >/dev/null 2>&1
+check "--opt-out skills installs" "$?"
+git add -A && git commit -q -m "chore: install (--opt-out skills)"
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$(git rev-parse --short HEAD)\`/" HANDOFF.md
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 OO_OUT=$(bash .gob/bin/goblin-verify 2>&1); OO_RC=$?
 check "the --opt-out install verifies green" "$OO_RC"
-printf '%s' "$OO_OUT" | grep -q 'SKIP  SK-01  .*opt-out: playbooks'
+printf '%s' "$OO_OUT" | grep -q 'SKIP  SK-01  .*opt-out: skills'
 check "  and the skill rows are opt-out, not absent (the switch is real)" "$?"
 printf '%s' "$OO_OUT" | grep -q 'SKIP  SK-02'
 check "  and SK-02 is opt-out rather than FAIL" "$?"

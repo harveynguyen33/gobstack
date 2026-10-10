@@ -1,8 +1,8 @@
 term	definition	source
-playbook	A named, ordered procedure with a measurable verification step. goblin-stack ships 15.	R6 sec.3
+playbook	A named, ordered procedure with a measurable verification step. The catalogue is cut (v3): the payload ships 5 gate-coupled skills.	R6 sec.3
 skill	A Hermes SKILL.md directory. goblin-stack installs its skills into the target repo at .hermes/skills/ (project tier), never into a profile.	R6 sec.0.1 / sec.7.3
 profile	A worker identity in the Hermes fleet (architect, coder, reviewer, ...). Owns memory and skills.	R4
-part	One installable unit: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, playbooks, tokens.	R7 sec.5
+part	One installable unit: handoff, spec, gate, replay, ratchet, pr-gate, review-panel, skills, tokens.	R7 sec.5
 gate	A declared command that must exit 0. Declared per project, never inferred from the stack.	PP sec.4
 ratchet	A count that must not rise, with a declared ceiling; a rise is allowed only when re-anchored with the arithmetic (old + N new = new).	PP sec.4
 HANDOFF	The session-boundary contract at the repo root: START HERE / State / Gates / Next steps / NOT verified.	PP sec.1
