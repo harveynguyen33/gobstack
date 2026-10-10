@@ -3,8 +3,9 @@
 Status: SPEC. No code. v3 keeps exactly six elements; anything else must name the element
 
 > **SUPERSEDED since writing (see git log):**
-> - MCP registration is opt-in — `--with-mcp-config` was removed in f6863c4;
->   `init --write` now emits the agent hooks payload instead of registering MCP by default.
+> - MCP registration is opt-in as of f6863c4: the default `init --write` no longer
+>   registers MCP and instead emits the agent hooks payload; `--with-mcp-config`
+>   remains available (and is now the only path) for writing .mcp.json.
 > - npm is frozen and is NOT the install path (088572a): install is clone + init.
 > Paragraphs below describing npx transport or default MCP registration are
 > point-in-time history, not current behavior.

@@ -115,7 +115,7 @@ commodity the owner should get from elsewhere instead of maintaining.
 | `manifest/playbooks.tsv` + playbook rails | **CUT** | The playbooks it indexes are being cut; a rail for a cut list is a permanent SKIP with extra steps. |
 | `manifest/glossary.tsv` | **MORPH → docs/RECORD-NOTES.md** | Wave-code legend already lives there; one home, not two. |
 
-Count check: 5 skills kept + 13 cut + 1 morphed = 18 measured dirs ✓ (13 = 6 loop/mode skills + 7 process playbooks; bootstrap counted once as KEEP with morphed content). Verbs stay 4 ✓ (the
+Count check: 5 kept (including bootstrap, whose content morphed) + 13 cut = 18 measured dirs ✓ (13 = 6 loop/mode skills + 7 process playbooks). Verbs stay 4 ✓ (the
 "nothing added without naming a removal" rule holds: hooks emission is inside init's existing
 write-set; the category inventory is shipped data inside the existing vendored engine tree,
 replacing the deleted extras-catalogue's *role*, not its code; the npm surface is removed).
