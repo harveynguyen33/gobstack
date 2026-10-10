@@ -28,12 +28,12 @@ git add -A && git commit -q -m "chore: seed"
 
 # The three files a real project is most likely to own already: its own harness in the same
 # directory goblin-stack scaffolds into, a skill with the same name, and a HANDOFF.
-mkdir -p checks .hermes/skills/goblin-mode
+mkdir -p checks .hermes/skills/goblin-handoff
 printf '// MY OWN HARNESS - do not touch\n' > checks/assert.mjs
-printf -- '--- my own skill, before ---\n' > .hermes/skills/goblin-mode/SKILL.md
+printf -- '--- my own skill, before ---\n' > .hermes/skills/goblin-handoff/SKILL.md
 printf '# my own handoff\n' > HANDOFF.md
 OWN_ASSERT=$(sha256sum checks/assert.mjs | awk '{print $1}')
-OWN_SKILL=$(sha256sum .hermes/skills/goblin-mode/SKILL.md | awk '{print $1}')
+OWN_SKILL=$(sha256sum .hermes/skills/goblin-handoff/SKILL.md | awk '{print $1}')
 OWN_HANDOFF=$(sha256sum HANDOFF.md | awk '{print $1}')
 
 INSTALL="bash $SRC/bin/goblin-install --target $WORK/target --practice $WORK/standard.md"
@@ -47,7 +47,7 @@ check "the refusal names the paths" "$?"
 check "the project's own checks/assert.mjs survives (D1)" \
   "$([ "$(sha256sum checks/assert.mjs | awk '{print $1}')" = "$OWN_ASSERT" ] && echo 0 || echo 1)"
 check "the project's own .hermes skill survives (D1)" \
-  "$([ "$(sha256sum .hermes/skills/goblin-mode/SKILL.md | awk '{print $1}')" = "$OWN_SKILL" ] && echo 0 || echo 1)"
+  "$([ "$(sha256sum .hermes/skills/goblin-handoff/SKILL.md | awk '{print $1}')" = "$OWN_SKILL" ] && echo 0 || echo 1)"
 check "the project's own HANDOFF.md survives (D1)" \
   "$([ "$(sha256sum HANDOFF.md | awk '{print $1}')" = "$OWN_HANDOFF" ] && echo 0 || echo 1)"
 check "the installer still landed its own verifier" "$([ -x .gob/bin/goblin-verify ] && echo 0 || echo 1)"

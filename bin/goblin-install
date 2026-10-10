@@ -107,6 +107,7 @@ while [ $# -gt 0 ]; do
     --archive)   ARCHIVE="true"; shift ;;
     --skills)    SKILLS="${2:-}"; SKILLS_NAMED=1; shift 2 ;;
     --list-skills) LIST_SKILLS=1; shift ;;
+    --print-core-skills) printf '%s\n' "$CORE_SKILLS"; exit 0 ;;
     --dry-run)   DRY_RUN=1; shift ;;
     --upgrade)   UPGRADE=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;

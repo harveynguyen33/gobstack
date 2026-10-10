@@ -296,23 +296,27 @@ BRIEF
 }
 
 # print_skill_library — the discovery surface for the skill LIBRARY (the repo's skills/
-# directory), appended to the brief. The 7 CORE skills are vendored into .gob/skills/ by
+# directory), appended to the brief. The 5 CORE skills are vendored into .gob/skills/ by
 # default; the rest are selectable through --skills, exactly as the rule LIBRARY holds rows
 # that are off by default. Prints name, tier and the one-line purpose (the frontmatter
 # `description:`), so a reader knows what exists without opening the repo.
+# The core set is read from the installer (goblin-install's CORE_SKILLS) rather than
+# restated here — one source of truth, so a tier change cannot fork the two surfaces.
 print_skill_library() {
-  local d name desc tier
+  local d name desc tier core_list
+  core_list=$(bash "$SRC/bin/goblin-install" --print-core-skills 2>/dev/null)
+  [ -n "$core_list" ] || core_list="goblin-handoff goblin-verify-author goblin-feature-map practice goblin-bootstrap"
   printf '\n== SKILL LIBRARY =============================================================\n\n'
-  printf 'A default install writes the 7 CORE skills into .gob/skills/. Every other skill is\n'
+  printf 'A default install writes the 5 CORE skills into .gob/skills/. Every other skill is\n'
   printf 'available on request. Choose the set with --skills:\n\n'
   printf '    --skills all                             every skill in the repo\n'
-  printf '    --skills goblin-eval,goblin-tdd-repro    exactly those (comma-separated)\n\n'
+  printf '    --skills goblin-handoff,goblin-bootstrap  exactly those (comma-separated)\n\n'
   printf 'Available skills:\n'
   for d in "$SRC"/skills/*/; do
     [ -f "$d/SKILL.md" ] || continue
     name=$(basename "$d")
     desc=$(awk 'NR==1{f=1;next} /^---/{f=0} f&&/^description:/{sub(/^description:[[:space:]]*/,"");print;exit}' "$d/SKILL.md")
-    case " goblin-mode goblin-investigation goblin-bugfix goblin-feature goblin-handoff goblin-verify-author practice " in
+    case " $core_list " in
       *" $name "*) tier=core ;; *) tier=optional ;; esac
     printf '  %-22s %-9s %s\n' "$name" "$tier" "$desc"
   done | sort
