@@ -1,0 +1,57 @@
+# Lightweight AI PR review via Red Hat ai-code-review (Forgejo platform mode).
+#
+# Trigger: every PR open + every push to an open PR (synchronize). No label gate.
+# The job container IS the ai-code-review image (runner-local build with two
+# patches, see below); FORGEJO_TOKEN is injected by Forgejo Actions
+# automatically; GLM_API_KEY / GLM_BASE_URL come from repo secrets.
+#
+# This repo is the trusted base; this workflow never checks out PR code, so
+# pull_request_target is safe here AND ensures secrets are available even for
+# fork PRs (plain pull_request hides secrets from fork heads).
+name: ai-review
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ai-review-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Reviews must never block merging on tool flakiness.
+    continue-on-error: true
+    container:
+      # Runner-local build (on pve2-runner LXC, /opt/ai-review-patch) of the
+      # Red Hat image with sitecustomize.py that:
+      #  1) forces langchain structured output to function_calling (z.ai GLM
+      #     rejects OpenAI json_schema response_format),
+      #  2) rewrites the PR diff_url host to the LAN Forgejo API base
+      #     (public hostname is behind Cloudflare Access -> 302 for tokens).
+      image: ai-code-review:glm
+    steps:
+      - name: AI code review
+        env:
+          AI_PROVIDER: openai
+          # GLM 4.6 is the only coding-plan model that honors OpenAI tool
+          # calling (required for ai-code-review's structured output).
+          # glm-5.x / 4.5-air return prose instead and break the JSON parse.
+          AI_MODEL: glm-4.6
+          # glm-4.6 spends long reasoning bursts; defaults (90s) time out.
+          LLM_TIMEOUT: 240
+          LLM_MAX_RETRIES: 2
+          # Disable the synthesis pass: it uses a hardcoded "fast" model name
+          # (gpt-5-nano) that z.ai rejects with "Unknown Model" (code 1211).
+          ENABLE_PROJECT_CONTEXT: "false"
+          INCLUDE_MR_SUMMARY: "false"
+          SYNTHESIS_MODEL: glm-4.5-air
+          OPENAI_BASE_URL: ${{ secrets.GLM_BASE_URL }}
+          AI_API_KEY: ${{ secrets.GLM_API_KEY }}
+          LANGUAGE_HINT: typescript
+        run: |
+          ai-code-review --platform forgejo \
+            --project-id "${{ github.repository }}" \
+            --pr-number "${{ github.event.number }}" \
+            --post
