@@ -1,6 +1,6 @@
 # gobstack
 
-> **Personal layer note (2026-10-10):** this is Harvey's personal agent-enhancement layer — owner of one, zero users. Install = clone this repo + `gob init`; the npm package is FROZEN at 0.6.0-alpha.4 and is not the install path.
+> **Personal layer note (2026-10-10):** this is Harvey's personal agent-enhancement layer — owner of one, zero users. Install = clone this repo + `gob init`; the npm package is FROZEN at 0.6.0-beta.1 and is not the install path.
 
 **gobstack** (npm: [`@techgoblin/gobstack`](https://www.npmjs.com/package/@techgoblin/gobstack))
 installs an **executable rule manifest**, a **vendored verifier**, and an **AGENTS.md-frontmatter

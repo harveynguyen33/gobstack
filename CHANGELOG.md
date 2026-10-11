@@ -42,6 +42,12 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   promotes them into catalogue.tsv by PR or edit. `--write` honours only the proposal's TICKED
   rows, through `gob extras install` itself — one allowlist, one code path.
 
+## 0.6.0-beta.1
+
+The v3 release: the goblin-stack rewrite merged to main (ce203953) — one verify command,
+an enforcement matrix and LIMITS, bash engine, npm shim, skills library, feature map,
+extras catalogue and license gate.
+
 ## 0.6.0-alpha.4
 
 The v2 QA-fixes wave. Ten issues found against the v2 surface, all resolved: the extras
