@@ -107,9 +107,15 @@ jobs:
           # behind Cloudflare Access, e.g. http://192.168.33.210:3000); otherwise the
           # scheme+host of github.server_url.
           API_BASE="${FORGEJO_API_BASE:-$(echo "$GOB_PR_URL" | grep -oE '^[a-z]+://[^/]+')}"
-          BODY=$(curl -sf -H "Authorization: token ${FORGEJO_TOKEN}" \
-            "${API_BASE}/api/v1/repos/${GOB_REPO}/issues/${GOB_PR}/comments" 2>/dev/null \
-            | jq -r '[.[] | select(.body | startswith("## AI Code Review"))] | last | .body' 2>/dev/null || true)
+          # The job container ships curl but NOT jq — parse the comments JSON with
+          # awk (grab the last "body" field; JSON strings carry \n escapes, which is
+          # fine for the verdict greps below).
+          COMMENTS=$(curl -sf -H "Authorization: token ${FORGEJO_TOKEN}" \
+            "${API_BASE}/api/v1/repos/${GOB_REPO}/issues/${GOB_PR}/comments" 2>/dev/null || true)
+          BODY=$(echo "$COMMENTS" | awk 'BEGIN{RS="},{\"id\"}"; n=0}
+            /## AI Code Review/ {
+              if (match($0, /"body":"((\\.|[^"\\])*)"/, m)) { print m[1] }
+            }' | tail -1 | awk '{gsub(/\\n/,"\n"); gsub(/\\"/,"\""); gsub(/\\\\/,"\\"); print}')
           if [ -n "$BODY" ]; then
             # Blocking finding = any Critical/Major file-review bullet...
             if echo "$BODY" | grep -qE '^- \*\*(Major|Critical)\b'; then
