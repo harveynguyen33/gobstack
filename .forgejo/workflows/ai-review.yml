@@ -1,9 +1,20 @@
 # Lightweight AI PR review via Red Hat ai-code-review (Forgejo platform mode).
 #
 # Trigger: every PR open + every push to an open PR (synchronize). No label gate.
-# The job container IS the ai-code-review image (runner-local build with two
-# patches, see below); FORGEJO_TOKEN is injected by Forgejo Actions
-# automatically; GLM_API_KEY / GLM_BASE_URL come from repo secrets.
+# The job container IS the ai-code-review image (runner-local build with
+# provider patches, see the kit README); FORGEJO_TOKEN is injected by Forgejo
+# Actions automatically; LLM_* env comes from repo secrets.
+#
+# PROVIDER CONFIG (model-agnostic):
+#   AI_VENDOR      which sitecustomize patch-set to load inside the image
+#                  (glm | empty for none). Default in this file: glm, the
+#                  only provider measured end-to-end so far.
+#   AI_MODEL       model id passed to the OpenAI-compatible endpoint.
+#   OPENAI_BASE_URL / LLM_API_KEY: endpoint + key. LLM_API_KEY is the
+#                  canonical secret name; GLM_API_KEY is a legacy alias
+#                  (this workflow falls back to it, so existing repos keep
+#                  working without re-creating secrets).
+#   LLM_TIMEOUT    per-attempt LLM timeout in seconds (see README matrix).
 #
 # This repo is the trusted base; this workflow never checks out PR code, so
 # pull_request_target is safe here AND ensures secrets are available even for
@@ -20,18 +31,15 @@ concurrency:
 jobs:
   review:
     # ai-review label: only the pve2-runner LXC advertises it, so the job can
-    # only land where the runner-local ai-code-review:glm image exists.
+    # only land where the runner-local patched image exists.
     runs-on: ai-review
     timeout-minutes: 25
     # Reviews must never block merging on tool flakiness.
     continue-on-error: true
     container:
       # Runner-local build (on pve2-runner LXC, /opt/ai-review-patch) of the
-      # Red Hat image with sitecustomize.py that:
-      #  1) forces langchain structured output to function_calling (z.ai GLM
-      #     rejects OpenAI json_schema response_format),
-      #  2) rewrites the PR diff_url host to the LAN Forgejo API base
-      #     (public hostname is behind Cloudflare Access -> 302 for tokens).
+      # Red Hat image + sitecustomize.py. sitecustomize applies vendor patches
+      # ONLY when AI_VENDOR is set (patches/<vendor>/ in the kit repo).
       image: ai-code-review:glm
     steps:
       - name: AI code review
@@ -43,8 +51,10 @@ jobs:
           # directly into the run script.
           GOB_REPO: ${{ github.repository }}
           GOB_PR: ${{ github.event.number }}
+          # ---- provider selection (see kit README matrix) ----
+          AI_VENDOR: glm
           AI_PROVIDER: openai
-          # GLM 4.6 is the only coding-plan model that honors OpenAI tool
+          # glm-4.6 is the only coding-plan model measured to honor OpenAI tool
           # calling (required for ai-code-review's structured output).
           # glm-5.x / 4.5-air return prose instead and break the JSON parse.
           AI_MODEL: glm-4.6
@@ -56,7 +66,9 @@ jobs:
           ENABLE_PROJECT_CONTEXT: "false"
           INCLUDE_MR_SUMMARY: "false"
           OPENAI_BASE_URL: ${{ secrets.GLM_BASE_URL }}
-          AI_API_KEY: ${{ secrets.GLM_API_KEY }}
+          # Canonical key secret; GLM_API_KEY is the legacy alias for repos
+          # onboarded before the provider-agnostic refactor.
+          AI_API_KEY: ${{ secrets.LLM_API_KEY || secrets.GLM_API_KEY }}
           LANGUAGE_HINT: shell
         run: |
           ai-code-review --platform forgejo \
@@ -64,3 +76,63 @@ jobs:
             --max-chars 40000 \
             --pr-number "$GOB_PR" \
             --post
+
+      - name: Notify on ISSUES verdict (ntfy)
+        # The review comment has no machine-readable verdict; an ISSUES verdict
+        # is a non-empty "Priority Issues:" list OR a Critical/Major file-review
+        # finding (see README "Verdict parsing rule"). Best-effort: never fails
+        # the run, never blocks on ntfy being down.
+        if: always()
+        continue-on-error: true
+        env:
+          # Bot token (read:issue equivalent scope) to fetch the posted comment.
+          FORGEJO_TOKEN: ${{ secrets.AI_REVIEW_BOT_TOKEN }}
+          GOB_REPO: ${{ github.repository }}
+          GOB_PR: ${{ github.event.number }}
+          GOB_PR_URL: ${{ github.server_url }}/${{ github.repository }}/pulls/${{ github.event.number }}
+          NTFY_URL: ${{ secrets.NTFY_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          # Set on CF-Access-fronted instances so the LAN runner can reach the API.
+          # (Name note: FORGEJO_* is a reserved secret prefix on Forgejo — the
+          # custom secret must NOT start with FORGEJO_.)
+          FORGEJO_API_BASE: ${{ secrets.REVIEW_API_BASE }}
+        run: |
+          # Exit quietly if notification plumbing is not configured.
+          [ -n "$NTFY_URL" ] && [ -n "$NTFY_TOPIC" ] || { echo "ntfy not configured; skipping"; exit 0; }
+          VERDICT="UNKNOWN"
+          TOP_ISSUE=""
+          # Re-derive the verdict from the latest AI review comment via the Forgejo API.
+          # API base: FORGEJO_API_BASE (set it on instances whose public hostname sits
+          # behind Cloudflare Access, e.g. http://192.168.33.210:3000); otherwise the
+          # scheme+host of github.server_url.
+          API_BASE="${FORGEJO_API_BASE:-$(echo "$GOB_PR_URL" | grep -oE '^[a-z]+://[^/]+')}"
+          BODY=$(curl -sf -H "Authorization: token ${FORGEJO_TOKEN}" \
+            "${API_BASE}/api/v1/repos/${GOB_REPO}/issues/${GOB_PR}/comments" 2>/dev/null \
+            | jq -r '[.[] | select(.body | startswith("## AI Code Review"))] | last | .body' 2>/dev/null || true)
+          if [ -n "$BODY" ]; then
+            # Blocking finding = any Critical/Major file-review bullet...
+            if echo "$BODY" | grep -qE '^- \*\*(Major|Critical)\b'; then
+              VERDICT="ISSUES"
+            fi
+            # ...or a non-empty Priority Issues list (the list header followed by
+            # at least one "  - item" line before the next section).
+            PRI=$(echo "$BODY" | sed -n '/\*\*Priority Issues:/,/Minor Suggestions\|^### /p' | grep -cE '^[[:space:]]{2,}- ' || true)
+            if [ "${PRI:-0}" -gt 0 ]; then VERDICT="ISSUES"; fi
+            if [ "$VERDICT" != "ISSUES" ]; then VERDICT="PASS"; fi
+            TOP_ISSUE=$(echo "$BODY" | sed -n '/\*\*Priority Issues:/,/Minor Suggestions\|^### /p' | grep -E '^[[:space:]]{2,}- ' | head -1 | sed 's/^[[:space:]]*-[[:space:]]*//')
+          else
+            # No comment found (review failed or still running): stay silent.
+            VERDICT="NO_COMMENT"
+          fi
+          echo "verdict: $VERDICT"
+          [ "$VERDICT" = "ISSUES" ] || exit 0
+          TITLE="AI Review: ISSUES on ${GOB_REPO}#${GOB_PR}"
+          # No "click" field: per homelab convention, tapping opens the ntfy app;
+          # the PR link lives in the body and in the "Open PR" view action.
+          curl -sf -X POST -H "Title: ${TITLE}" \
+            ${NTFY_TOKEN:+-H "Authorization: Bearer ${NTFY_TOKEN}"} \
+            -H "Tags: warning,robot" \
+            -H "Actions: view, Open PR, ${GOB_PR_URL}, clear=true" \
+            -d "${TOP_ISSUE:-Review found issues} — ${GOB_PR_URL}" \
+            "${NTFY_URL}/${NTFY_TOPIC}"
