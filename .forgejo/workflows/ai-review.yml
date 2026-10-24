@@ -51,10 +51,15 @@ jobs:
         env:
           # Scoped token for kit raw fetch; falls back to the bot token.
           KIT_TOKEN: ${{ secrets.FORGEJO_REVIEW_TOKEN || secrets.AI_REVIEW_BOT_TOKEN }}
-          KIT_BASE: http://192.168.33.210:3000
+          # The instance URL is read at run time from GITHUB_SERVER_URL (Forgejo
+          # exports it for every job). It is deliberately NOT hardcoded here: this
+          # workflow file is mirrored to a public repo and the internal address
+          # must not leak. Override with AI_REVIEW_KIT_BASE only if the kit lives
+          # on a different instance than the repo running the workflow.
           KIT_REPO: harvey/ai-review-kit
         run: |
           set -eu
+          : "${KIT_BASE:=${GITHUB_SERVER_URL:?GITHUB_SERVER_URL is not set by this runner}}"
           REF="${AI_REVIEW_KIT_REF}"
           mkdir -p /tmp/ai-review-kit
           fetch() { # fetch <kit-path> <dest>
