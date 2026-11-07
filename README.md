@@ -54,7 +54,7 @@ After installing, in this order:
     cd <target> && git add -A && git commit   # the install is a change like any other
     .gob/bin/goblin-verify                    # or gob verify, anywhere in the target
 
-**A default install verifies green — `19 passed, 0 failed, 0 advisory,
+**A default install verifies green — `20 passed, 0 failed, 0 advisory,
 10 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
 scaffold's `0000000` placeholder is the one expected red.** Ten rows skip: `SK-01`, `SK-02` and
 `SK-04` **run** (the core procedure tier is vendored under `.gob/skills/` on every install);
@@ -174,7 +174,7 @@ run · `3` the manifest is broken. Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-04) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (122 over 61 target rows), each required to go RED and then
+one control per target-scope row (125 over 62 target rows), each required to go RED and then
 restored. **A verifier that only ever prints GREEN is a failure**, so that file is the one that
 matters most.
 

@@ -519,6 +519,15 @@ the Node the gates ran under.
     `Status`, `Pending <x> device test`) are inherited wholesale, so a heading shaped like an
     alias is found by the same loose match. The failure it was adopted from was an item left
     open for a week after the decision to cancel it (CURATION-2026-11-07 §2 C3).
+59. **`HV-01` proves a producer is named, never that the call path uses it.** The input-provenance
+    probe reads assignments to `doc`/`board`/`payload`/`fixture` and requires a bare-package
+    import or a `produced_by: <function> <pinned id>` marker beside them — it cannot tell whether
+    the import is actually called to build the literal (a decorative import clears it), a literal
+    assembled by spread or copied from another file is unseen, a relative import to the product's
+    own source does not clear it (only a package name does), and the trigger is those four names,
+    so a fixture named anything else is invisible. The failure it was adopted from was a harness
+    green on declared node sizes while every shared payload carried none (CURATION-2026-11-07
+    §2 C1).
 
 ---
 

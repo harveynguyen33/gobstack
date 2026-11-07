@@ -55,6 +55,19 @@ git checkout -q -- HANDOFF.md
 out=$(bash .gob/bin/goblin-verify --only HP-06 2>&1); rc=$?
 check "HP-06: the violation removed is GREEN" "$rc"
 
+# ---- HV-01: the input the check uses is the input the user gets -------------------------------
+printf '%s\n' \
+  'const doc = { nodes: [{ id: "a", x: 0, y: 0 }] };' \
+  'assert("has nodes", doc.nodes.length === 1);' > checks/hv01-drill.mjs
+out=$(bash .gob/bin/goblin-verify --only HV-01 2>&1); rc=$?
+[ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q 'checks/hv01-drill.mjs'
+check "HV-01: a hand-written doc literal is RED, naming the file" "$?"
+printf '%s' "$out" | grep -q 'produced_by'
+check "  and the reason" "$?"
+rm -f checks/hv01-drill.mjs
+out=$(bash .gob/bin/goblin-verify --only HV-01 2>&1); rc=$?
+check "HV-01: the violation removed is GREEN" "$rc"
+
 # ---- the rows a new enforcement row must not disturb ------------------------------------------
 out=$(bash .gob/bin/goblin-verify --only IN-03,SK-03 2>&1); rc=$?
 check "IN-03 and SK-03 stay green with the new row(s) in the matrix" "$rc"

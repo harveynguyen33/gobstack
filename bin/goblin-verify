@@ -860,6 +860,49 @@ check_hp_06() {
   return 0
 }
 
+check_hv_01() {
+  # C1: the payload the check uses must be the payload the user gets. Text probe: it proves a
+  # producer is NAMED - a bare-package import, or a produced_by: <function> <pinned id> marker
+  # beside a hand-written doc/board/payload/fixture literal - never that the call path matches
+  # the product wiring. The stronger form needs the product to export a single factory, which is
+  # a design change, not a probe (the why cell and docs/LIMITS.md say so).
+  local d="$GOBLIN_HARNESS_DIR" f rel bad=0 n=0 nk=0
+  if [ -z "$d" ]; then
+    if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
+      printf 'harness_dir %s is declared and scaffold_checks is yes, but the directory is absent\n' \
+        "$GOBLIN_HARNESS_REL"
+      return 1
+    fi
+    printf 'no harness dir (%s absent, scaffold_checks is no) - nothing to build\n' \
+      "$GOBLIN_HARNESS_REL"
+    return 3
+  fi
+  for f in "$d"/*; do
+    [ -f "$f" ] || continue
+    n=$((n + 1))
+    rel="${f#"$ROOT"/}"
+    # a document/board/payload/fixture literal: an object, array or JSON string assigned to a
+    # name built on those four words
+    grep -Eq '(^|[^A-Za-z0-9_])(doc|board|payload|fixture)[A-Za-z0-9_]*[[:space:]]*[:=][[:space:]]*[\[{"]' "$f" || continue
+    # cleared by an import/require of a bare package name (the producer, reachable), ...
+    if grep -Eq "from +[\"'][^./\"]" "$f" \
+       || grep -Eq "require\\([\"'][^./']" "$f" \
+       || grep -Eq "import\\([\"'][^./']" "$f"; then
+      nk=$((nk + 1)); continue
+    fi
+    # ...or by the marker: the producing function plus a pinned id, both required
+    if grep -Eq 'produced_by:[[:space:]]*[^[:space:]]+[[:space:]]+[^[:space:]]+' "$f"; then
+      nk=$((nk + 1)); continue
+    fi
+    printf '%s constructs a doc/board/payload/fixture literal with no package import and no produced_by: marker - the input the check asserts is not the input the user gets\n' "$rel"
+    bad=1
+  done
+  [ "$bad" -eq 0 ] || return 1
+  printf '%d harness file(s); %d constructed input(s), each through a package import or a produced_by marker\n' \
+    "$n" "$nk"
+  return 0
+}
+
 check_gt_01() {
   # Every `- name:` under `gates:` is a DECLARED gate, and every declared gate must carry a
   # `cmd:`. Counting only the name+cmd PAIRS (what this row did) let a gate lose its `cmd:` -

@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 96 `expect_red` call sites and 26 `expect_green`
-# — 122 calls over all 61 of the rule set's target rows (the four source-scope rows
-# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 61 rows are
+# One control per target-scope row: 97 `expect_red` call sites and 28 `expect_green`
+# — 125 calls over all 62 of the rule set's target rows (the four source-scope rows
+# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 62 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
-# this revision: 61 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
+# this revision: 62 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `122 over 61 target rows`.
+# README's census sentence must read `125 over 62 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -106,7 +106,7 @@ restore_all() {
   # would expand to it, but an unquoted glob in a restore path is exactly the habit that control
   # exists to break.
   rm -f 'checks/z2;true;#.mjs'
-  rm -f checks/hv02-bbox.mjs checks/hv02-parse.mjs
+  rm -f checks/hv02-bbox.mjs checks/hv02-parse.mjs checks/hv01-lit.mjs
   cp -a "$BK/assert.mjs" checks/assert.mjs
   rm -f reviews/fixture-*.md
   rm -rf reports
@@ -751,6 +751,9 @@ m_hv02_parse_g() { printf '%s\n' 'import { execSync } from "node:child_process";
 # land in NOT verified, a different section the row never reads).
 m_hp06_open()    { awk '/^## Next steps$/ && !d { print; print "- Ship the thing."; d = 1; next } { print }' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md; }
 m_hp06_owned()   { awk '/^## Next steps$/ && !d { print; print "- Ship the thing — owner: Test Runner, since 2026-11-07."; d = 1; next } { print }' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md; }
+m_hv01_lit()     { printf '%s\n' 'const doc = { nodes: [{ id: "a", x: 0, y: 0 }] };' 'assert("has nodes", doc.nodes.length === 1);' > checks/hv01-lit.mjs; }
+m_hv01_import()  { printf '%s\n' 'import { toBoardDoc } from "@fixture/core";' 'const doc = toBoardDoc({});' 'assert("has nodes", Array.isArray(doc.nodes));' > checks/hv01-lit.mjs; }
+m_hv01_marker()  { printf '%s\n' '// produced_by: compileGobi pinned-9c3b0cc' 'const doc = { nodes: [{ id: "a" }] };' 'assert("one node", doc.nodes.length === 1);' > checks/hv01-lit.mjs; }
 
 expect_red   "a bounding box measured with no viewport guard"         HV-02 1 m_hv02_bbox
 expect_green "the same measurement guarded by innerWidth"             HV-02 m_hv02_bbox_g
@@ -760,6 +763,9 @@ expect_green "the parsed number asserted finite"                      HV-02 m_hv
 expect_red   "an open item with no date and no owner"                 HP-06 1 m_hp06_open
 expect_green "the same item owned with a date"                        HP-06 m_hp06_owned
 expect_green "no HANDOFF.md is a SKIP, never red"                     HP-06 m_drop_handoff
+expect_red   "a hand-written doc literal with no producer"            HV-01 1 m_hv01_lit
+expect_green "the doc built through a package import"                 HV-01 m_hv01_import
+expect_green "a produced_by marker with a pinned id"                  HV-01 m_hv01_marker
 
 # ---- P15: the reference-corpus rows, RC-01..RC-04 ------------------------------------------------
 # Four rows over two DECLARED values (`reference_manifest:`, and the `security: build_output:` key
