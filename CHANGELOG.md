@@ -42,6 +42,17 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   promotes them into catalogue.tsv by PR or edit. `--write` honours only the proposal's TICKED
   rows, through `gob extras install` itself — one allowlist, one code path.
 
+## 0.6.1
+
+A crash fix in the front door. `gob init --write` with a flag and no value hung forever, printing nothing: the
+flag loop called `shift 2` when only one argument remained, which fails silently under `set -uo pipefail`, so the
+argument was never consumed and the loop spun. The same shape hit every value flag, not just `--write`.
+
+Now a value flag with no value, an unknown option, and a proposal path that does not exist all print one line
+naming the problem and `usage: gob init --write <proposal-path>`, then exit 2 — nothing is installed. The
+documented path is unchanged: `gob init --write <proposal>` still installs (22 files on a bare repo) and the
+verifier then reports green.
+
 ## 0.6.0
 
 The first stable release of the v3 core: one `gob` verb set, an enforcement matrix that grows by data rather than by
