@@ -42,6 +42,25 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   promotes them into catalogue.tsv by PR or edit. `--write` honours only the proposal's TICKED
   rows, through `gob extras install` itself — one allowlist, one code path.
 
+## 0.6.0
+
+The first stable release of the v3 core: one `gob` verb set, an enforcement matrix that grows by data rather than by
+code, a bash engine with no runtime dependencies, the npm shim that makes `npx @techgoblin/gobstack` work, and the
+MCP surface an agent calls instead of a human running commands. Breaking against v2 by design (rows, docs and
+playbooks were cut, not renamed).
+
+This release adds the three rows curated from one shipped project: `HV-02`, `HP-06` and `HV-01` — an instrument
+that must prove itself before it accuses the product, a handoff where `cancelled` is not a shape of `pending`, and
+a check whose input is the input the user actually gets. Each is a text probe with its blind spot written into
+`docs/LIMITS.md` (#57–#59), each is covered by `tests/t-hvhp-rows.sh` (red on demand, green when removed), and
+`docs/CURATION-2026-11-07-gobigrams.md` records the twelve candidates behind them and why four stayed advisory
+while two were refused.
+
+Not in this release, on purpose: `AG-01` (instruction files need a recorded approval) changes the daily loop — every
+`AGENTS.md` edit becomes red until re-approved — so it ships with its own command in 0.6.1; and the release family
+`RL-01`/`VR-01` waits for a project that ships several artifacts, because its config surface must be designed against
+that shape rather than against the single-artifact project it was mined from.
+
 ## 0.6.0-beta.2
 
 The three curation rows from one project, and the sentence one of them had to lose after the drill.
