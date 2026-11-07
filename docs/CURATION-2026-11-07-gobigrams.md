@@ -173,11 +173,47 @@ Saying no is half of curation. These are Gobigrams facts with no general form:
 
 ---
 
-## 6. The two questions this file leaves open
+## 6. Decisions taken (Harvey: "làm sao theo ý bạn")
 
-1. **Does gobstack want a release concept at all?** Today the matrix stops at "the round is honest" (`HP-*`) and
-   "the gates run" (`GT-*`). C4/C5 add "the thing people install is the thing you verified" — a fifth family. If
-   the answer is no, C4/C5 must be deleted from this file rather than left as aspiration.
-2. **How is C2 enforced without lying?** A text probe can prove a guard is *present*, never *effective*. The
-   alternative is a runtime assertion helper shipped with the harness library, so the guard is code rather than a
-   comment — more expensive, and it binds gobstack to a language.
+Both open questions are answered here rather than left hanging, and the order of work is fixed.
+
+1. **gobstack gets a release family — but opt-in.** `RL-01`/`VR-01` were the whole argument for a fifth family, and
+   the argument holds: the gap that produced the plugin-bundling-an-old-core incident is real and general. But not
+   every project ships an artifact — a library workspace has nothing to download, and a mandatory release record
+   would manufacture red for a non-problem. So the family is declared in the one config (`artifacts:` block plus
+   `.gob/release-record.tsv`); a repo without that block gets `SKIP` with the reason, exactly the way `IN-01`
+   already skips a declaration-only repo.
+2. **C2 is a text probe now, and the limit is stated out loud.** A probe can prove a guard is *present*, not that it
+   is *effective*. That is the same honest boundary `BN-01` already draws ("text probe, not an AST"), and it is
+   enough to catch the failure that actually happened — a measurement reported with no viewport assertion at all.
+   A runtime helper becomes worth its cost only when a project already owns a shared harness library; until then,
+   shipping one would bind gobstack to a language for a benefit no check can measure.
+
+**Order of work, cheapest and most preventative first.**
+
+| Phase | Rules | Why this order |
+|---|---|---|
+| 1 (now) | `HV-02`, `HP-06`, `HV-01` | an afternoon of probes with negative controls; kills the two failure classes that cost the most (a false accusation, and a queue that lies) |
+| 2 | `AG-01` | same shape as `IN-02`, but touches install/inspect paths — do it with fresh attention |
+| 3 | `RL-01`, `VR-01` | needs the `artifacts:` config surface designed before the probe is written |
+| never | C12, plus everything in §5 | project-specific or class-shaped, not check-shaped |
+
+---
+
+## 7. What this file leaves open for the next curation
+
+Not questions about the rules above — those are decided. These are the things one project could not settle, and the
+next project with a different shape should test:
+
+1. **Does a false accusation cost more than a missed defect in every domain?** `HV-02` assumes yes: it is written to
+   stop the instrument from convicting a product. In a safety domain the trade flips. Nothing in gobstack can decide
+   that per-project yet.
+2. **What is the cheapest honest form of "reachable in N actions"?** C8 stayed advisory because "reachable" has no
+   shared definition. Gobigrams measured it as a checklist of six tasks; another product will measure it differently,
+   and the second measurement is where the definition will come from.
+3. **Does the release family survive a project that ships ten artifacts?** `RL-01` assumes one record file with one
+   row per release. A monorepo with five packages will want a row per artifact, and the `artifacts:` config has not
+   been designed against that shape yet — design it against the second project, not this one.
+
+The general rule this file is built on: a lesson earns a row only when its failure has been *measured* somewhere,
+and a rule earns a mechanism only when the mechanism can be proven red on demand.
