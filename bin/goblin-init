@@ -50,13 +50,28 @@ g_info() { printf '%s\n' "$*"; }
 
 usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
+# A value-taking flag at the end of the line once spun the loop below forever:
+# `shift 2` with $#=1 fails silently under `set -uo pipefail` (no -e), $1 is never
+# consumed, and `gob init --write` answered a missing argument by hanging with zero
+# bytes of output (INIT-WRITE-HANG, measured rc 124 on the published 0.6.0). The
+# root cause was that unbounded flag loop, NOT a stdin read: with stdin at /dev/null
+# the process still never exited. Each value flag now demands its argument up front,
+# names the usage shape, and exits 2 before any work is done. The check MUST run in
+# the main shell (an `exit` inside a $( ) substitution would only kill the subshell
+# and the loop would spin on).
+need_val() { # need_val <flag> <usage> <value> — refuse exit 2 unless the value is set
+  [ -n "${3:-}" ] && return 0
+  g_err "$1: missing value — usage: gob init $1 $2"
+  exit 2
+}
+
 # ------------------------------------------------------------------ flags -----
 TARGET="" WRITE="" HEURISTIC=0 DRYRUN=0 SKILLS_OPT="no" WITH_MCP=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    --target)    TARGET="${2:-}"; shift 2 ;;
-    --write)     WRITE="${2:-}"; shift 2 ;;
-    --skills)    SKILLS_OPT="${2:-}"; shift 2 ;;
+    --target)    need_val --target '<dir>' "${2:-}"; TARGET=$2; shift 2 ;;
+    --write)     need_val --write '<proposal-path>' "${2:-}"; WRITE=$2; shift 2 ;;
+    --skills)    need_val --skills '<spec>' "${2:-}"; SKILLS_OPT=$2; shift 2 ;;
     --list-skills) exec bash "$SRC/bin/goblin-install" --list-skills ;;
     --heuristic) HEURISTIC=1; shift ;;
     --dry-run)   DRYRUN=1; shift ;;
@@ -395,7 +410,14 @@ if [ -z "$WRITE" ]; then
 fi
 
 # ----------------------------------------------------------------- validate ----
-[ -f "$WRITE" ] || { g_err "proposal file not found: $WRITE"; exit 2; }
+if [ ! -e "$WRITE" ]; then
+  g_err "proposal file not found: $WRITE — usage: gob init --write <proposal-path>"
+  exit 2
+fi
+if [ -d "$WRITE" ]; then
+  g_err "proposal path is a directory, not a file: $WRITE — usage: gob init --write <proposal-path>"
+  exit 2
+fi
 PROP=$(cd "$(dirname "$WRITE")" && pwd)/$(basename "$WRITE")
 BLOCK_KEYS=$(g_agents_keys "$PROP")
 [ -n "$BLOCK_KEYS" ] || { g_err "$PROP carries no gob block — the agent did not write the schema"; exit 2; }
