@@ -26,6 +26,16 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   a library row off, then on and green, then red under its violation with its remedy, then refused
   when miswritten, then off again.
 
+- **Three rows adopted from one project's curation — an instrument, a queue, an input.** `HV-02` (a number taken
+  from a live surface carries its guard: a bounding box is asserted inside the capture viewport, a number parsed
+  from a Node child-process result is asserted finite), `HP-06` (every handoff next step is owned with a date, done
+  with evidence, or cancelled with the decision — `open` is not a shape) and `HV-01` (a check that asserts a
+  user-visible outcome builds its input through the producer the user's input comes through). All three are text
+  probes of the `BN-01` class and each states in its why-cell and in `docs/LIMITS.md` what it cannot see.
+  `tests/t-hvhp-rows.sh` plants one violation per row in a throwaway repo and requires red-then-green for each;
+  the per-clause escapes (`guarded:`, `produced_by:`) are controlled in `t-verify-red.sh`. Adopted from
+  `docs/CURATION-2026-11-07-gobigrams.md` §2 C1–C3.
+
 ## Unreleased (feat/extras-catalogue)
 
 - **`gob extras`: the curated catalogue (the surface is seven verbs).** The catalogue
