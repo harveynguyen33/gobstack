@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# goblin-approve — `gob approve-agents "<reason>"` (AG-01): record an approval of AGENTS.md
+# as it stands right now.
+#
+# The row AG-01 exists because the file that decides what "green" means (AGENTS.md's gates)
+# is editable by the worker the gate polices. This command is the human half of the loop:
+# after a person reads the diff, it appends ONE row to .gob/agents.approved —
+#
+#   date <TAB> sha256-of-AGENTS.md <TAB> approver <TAB> one-line reason
+#
+# append-only history, latest row wins. `goblin-verify --only AG-01` recomputes the hash and
+# compares it with the last row: match = PASS (printing date + approver), mismatch = FAIL,
+# no record at all = SKIP (an existing install never turns red by upgrading).
+#
+#   gob approve-agents "<reason>" [--approver <name>] [--target <dir>]
+#
+# --approver defaults to the target repo's git user.name, then $USER. The reason is one
+# line: tabs and newlines are flattened to spaces so the row stays 4 tab-separated fields.
+#
+# Exit codes: 0 recorded | 1 refusal (named path + fix) | 2 bad input.
+# No npm, no jq, no network. bash/awk/git only.
+set -uo pipefail
+
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=goblin-lib.sh
+. "$SELF_DIR/goblin-lib.sh"
+
+usage() { sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+# need_val <flag> <usage> <value> — refuse exit 2 unless the value is set. The same guard
+# goblin-init learned from INIT-WRITE-HANG: `shift 2` with $#=1 fails silently under
+# `set -uo pipefail`, so a value flag at the end of the line must demand its argument.
+need_val() {
+  [ -n "${3:-}" ] && return 0
+  g_err "$1: missing value — usage: gob approve-agents $2"
+  exit 2
+}
+
+REASON="" APPROVER="" TARGET=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --target)   need_val --target '[--target <dir>] "<reason>"' "${2:-}"; TARGET=$2; shift 2 ;;
+    --approver) need_val --approver '"<reason>" --approver <name>' "${2:-}"; APPROVER=$2; shift 2 ;;
+    -h|--help)  usage; exit 0 ;;
+    -*)         g_err "unknown option: $1"; usage >&2; exit 2 ;;
+    *)          [ -z "$REASON" ] || { g_err "one reason only — usage: gob approve-agents \"<reason>\""; exit 2; }
+                REASON=$1; shift ;;
+  esac
+done
+[ -n "$REASON" ] || { g_err "no reason given — usage: gob approve-agents \"<one-line reason>\""; usage >&2; exit 2; }
+
+command -v git >/dev/null 2>&1 || { g_err "missing dependency: git"; exit 2; }
+
+# Root resolution, the verifier's own rule (D20): the installed AGENTS.md is the marker, so
+# a nested target is not verified/approved as the outer repo that encloses it.
+if [ -n "$TARGET" ]; then
+  TARGET=$(g_expand_tilde "$TARGET")
+  [ -d "$TARGET" ] || { g_err "--target is not a directory: $TARGET"; exit 2; }
+  ROOT=$(cd "$TARGET" && pwd)
+else
+  ROOT=""
+  local_d="$PWD"
+  while :; do
+    if [ -f "$local_d/AGENTS.md" ] && grep -q "^$GOB_AGENTS_BEGIN" "$local_d/AGENTS.md" 2>/dev/null; then ROOT="$local_d"; break; fi
+    [ "$local_d" = "/" ] && break
+    local_d=$(dirname "$local_d")
+  done
+  [ -n "$ROOT" ] || ROOT="$PWD"
+fi
+AGENTS="$ROOT/AGENTS.md"
+[ -f "$AGENTS" ] || { g_err "no AGENTS.md at $ROOT — approve-agents records the file AG-01 polices; run it inside an installed repo"; exit 1; }
+
+# The approver: explicit, then the repo's own git identity, then $USER.
+if [ -z "$APPROVER" ]; then
+  APPROVER=$(git -C "$ROOT" config user.name 2>/dev/null | head -n 1)
+fi
+[ -n "$APPROVER" ] || APPROVER=${USER:-unknown}
+
+# The reason is one line: flatten tabs/newlines so the row stays exactly 4 fields.
+REASON=$(printf '%s' "$REASON" | tr '\t\r\n' '   ' | sed 's/  */ /g; s/^ //; s/ $//')
+
+RECORD="$ROOT/.gob/agents.approved"
+SHA=$(g_sha256_file "$AGENTS")
+DATE=$(date +%F)
+mkdir -p "$ROOT/.gob" || { g_err "could not create $ROOT/.gob"; exit 1; }
+printf '%s\t%s\t%s\t%s\n' "$DATE" "$SHA" "$APPROVER" "$REASON" >> "$RECORD" || { g_err "could not append to $RECORD"; exit 1; }
+
+N=$(grep -c . "$RECORD" || true)
+printf 'approved %s\n' "AGENTS.md"
+printf '  record   %s (row %s, latest wins)\n' "${RECORD#"$ROOT"/}" "$N"
+printf '  sha256   %s\n' "$SHA"
+printf '  date %s  by %s  — %s\n' "$DATE" "$APPROVER" "$REASON"
+exit 0

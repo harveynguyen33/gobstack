@@ -581,6 +581,19 @@ if [ "$WITH_MCP" -eq 1 ]; then
 fi
 do_hooks || exit 1
 
+# ------------------------------------------------- AG-01's first record --------
+# A fresh install is green on day one: `gob init --write` records an approval of the
+# AGENTS.md it just wrote. FIRST RECORD ONLY — a re-run over a repo that already has one
+# leaves it alone, so an init block-rewrite over unapproved edits stays AG-01 red with the
+# fix command, rather than this command silently rubber-stamping them.
+if [ ! -f "$TARGET/.gob/agents.approved" ]; then
+  bash "$SRC/bin/goblin-approve" --target "$TARGET" "gob init --write day one" >/dev/null 2>&1 \
+    || { g_err "could not write the first AG-01 approval record at $TARGET/.gob/agents.approved"; exit 1; }
+  g_info "recorded .gob/agents.approved (AG-01: re-approve after you edit AGENTS.md — gob approve-agents \"<reason>\")"
+else
+  g_info "kept .gob/agents.approved (an approval record already exists; AG-01 judges AGENTS.md against it)"
+fi
+
 # --------------------------------------------------------------------- done ----
 printf '\n'
 printf 'gob init: installed — feature map %s\n' "$FEATURE_MAP"

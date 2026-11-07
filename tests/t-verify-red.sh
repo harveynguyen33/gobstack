@@ -3,9 +3,9 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 97 `expect_red` call sites and 28 `expect_green`
-# — 125 calls over all 62 of the rule set's target rows (the four source-scope rows
-# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 62 rows are
+# One control per target-scope row: 100 `expect_red` call sites and 29 `expect_green`
+# — 128 calls over all 63 of the rule set's target rows (the four source-scope rows
+# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 63 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
 # this revision: 62 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
@@ -107,6 +107,9 @@ restore_all() {
   # exists to break.
   rm -f 'checks/z2;true;#.mjs'
   rm -f checks/hv02-bbox.mjs checks/hv02-parse.mjs checks/hv01-lit.mjs
+  # AG-01's controls leave an approval record behind (the fixture ships none by design):
+  # untracked, so no backup copy exists to restore over it.
+  rm -f .gob/agents.approved
   cp -a "$BK/assert.mjs" checks/assert.mjs
   rm -f reviews/fixture-*.md
   rm -rf reports
@@ -766,6 +769,22 @@ expect_green "no HANDOFF.md is a SKIP, never red"                     HP-06 m_dr
 expect_red   "a hand-written doc literal with no producer"            HV-01 1 m_hv01_lit
 expect_green "the doc built through a package import"                 HV-01 m_hv01_import
 expect_green "a produced_by marker with a pinned id"                  HV-01 m_hv01_marker
+
+# ---- AG-01 (CURATION-2026-11-07 §2 C6): an instruction file changes only with a recorded
+# approval. The fixture is a plain install, so every control plants its own record first
+# (goblin-approve writes one), then the violation. The different-file control pins that the
+# row's coverage is the HASH alone: a latest row whose reason names another file clears
+# nothing, because rows carry no file name and the reason is never parsed.
+m_ag01_edit()      { bash .gob/bin/goblin-approve "day one" >/dev/null 2>&1; printf '\n# a quiet gate edit\n' >> AGENTS.md; }
+m_ag01_ok()        { bash .gob/bin/goblin-approve "raised the test gate" >/dev/null 2>&1; }
+m_ag01_otherfile() {
+  bash .gob/bin/goblin-approve "approved the docs/LIMITS.md rewrite" >/dev/null 2>&1
+  printf '\n# a quiet gate edit\n' >> AGENTS.md
+}
+
+expect_red   "AGENTS.md edited with no new approval"                 AG-01 1 m_ag01_edit
+expect_green "the same file, deliberately re-approved"               AG-01 m_ag01_ok
+expect_red   "a record whose reason names a different file"          AG-01 1 m_ag01_otherfile
 
 # ---- P15: the reference-corpus rows, RC-01..RC-04 ------------------------------------------------
 # Four rows over two DECLARED values (`reference_manifest:`, and the `security: build_output:` key

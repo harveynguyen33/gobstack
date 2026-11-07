@@ -729,6 +729,11 @@ put ".gob/engine/categories.tsv" "$SRC/manifest/categories.tsv"
 # wish, so the table and the engine install together or not at all.
 put ".gob/manifest/bans.tsv" "$SRC/manifest/bans.tsv"
 put ".gob/bin/goblin-bans" "$SRC/bin/goblin-bans"
+# AG-01's approve command: shipped like the bans engine, hash-pinned by installed.json. The
+# record it appends to (.gob/agents.approved) is deliberately NOT in this list — it is the
+# project's own history, rewritten by every approval, so pinning it would turn IN-02 red on
+# every legitimate approve.
+put ".gob/bin/goblin-approve" "$SRC/bin/goblin-approve"
 put ".gob/bans/README.md" "$SRC/bans/README.md"
 put ".gob/bans/grep-ban.sh" "$SRC/bans/grep-ban.sh"
 put ".gob/bans/layer-check.sh" "$SRC/bans/layer-check.sh"

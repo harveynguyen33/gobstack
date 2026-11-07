@@ -47,7 +47,8 @@ goblin-verify — prove a goblin-stack install is still what it says it is.
   --json                machine-readable output
   --source <path>       read the manifest from a goblin-stack checkout instead of .gob/
 
-Exit codes: 0 pass | 1 a check failed | 2 could not run | 3 the manifest is broken.
+Exit codes: 0 pass | 1 a check failed | 2 could not run | 3 the manifest is broken
+             (also 3 for --only AG-01 with no approval record: not policed yet, not red).
 USAGE
 }
 
@@ -901,6 +902,45 @@ check_hv_01() {
   printf '%d harness file(s); %d constructed input(s), each through a package import or a produced_by marker\n' \
     "$n" "$nk"
   return 0
+}
+
+check_ag_01() {
+  # C6 / AG-01: the gate file itself changes only with a recorded approval. GT-01/GT-02 read
+  # the gates out of AGENTS.md, so the file that decides what "green" means must not be
+  # silently editable by the worker the gate polices. The record is .gob/agents.approved,
+  # append-only, one row per approval: date <TAB> sha256 <TAB> approver <TAB> reason — the
+  # LAST row wins, and only the HASH is coverage: a row carries no file name, so a reason
+  # mentioning some other file clears nothing (the control in tests/t-verify-red.sh pins
+  # that). No record at all is a SKIP, never a red: an existing install must not turn red
+  # just by upgrading to an engine that ships this row. What this cannot see (the hash is a
+  # witness, not a signature — a worker able to write both files forges a record) is
+  # docs/LIMITS.md #60.
+  local rec="$ROOT/.gob/agents.approved" agents="$ROOT/AGENTS.md"
+  if [ ! -s "$rec" ] || ! grep -q . "$rec" 2>/dev/null; then
+    printf 'no approval record; run gob approve-agents "<reason>"\n'
+    return 3
+  fi
+  local row rdate rsha rapp
+  row=$(grep . "$rec" | tail -n 1)
+  rdate=$(printf '%s' "$row" | awk -F'\t' '{print $1}')
+  rsha=$(printf '%s' "$row" | awk -F'\t' '{print $2}')
+  rapp=$(printf '%s' "$row" | awk -F'\t' '{print $3}')
+  if [ -z "$rsha" ]; then
+    printf 'no approval record; run gob approve-agents "<reason>"\n'
+    return 3
+  fi
+  local actual
+  actual=$(g_sha256_file "$agents")
+  if [ "$actual" = "$rsha" ]; then
+    printf 'AGENTS.md matches the approval recorded %s by %s\n' "$rdate" "$rapp"
+    return 0
+  fi
+  printf 'AGENTS.md changed with no recorded approval\n'
+  printf '  file     AGENTS.md\n'
+  printf '  recorded %s (approved %s by %s)\n' "$rsha" "$rdate" "$rapp"
+  printf '  actual   %s\n' "$actual"
+  printf '  fix: after a human reads the diff — gob approve-agents "<one-line reason>"\n'
+  return 1
 }
 
 check_gt_01() {
@@ -2174,7 +2214,7 @@ setup_local_override() {
 }
 setup_local_override
 
-PASS=0; FAIL=0; ADV=0; SKIP=0; BAD=0
+PASS=0; FAIL=0; ADV=0; SKIP=0; BAD=0; AG01_SKIP=0
 JSON_ROWS=""
 
 # json_escape <text> — a JSON string body. The detail of a check is arbitrary shell output
@@ -2267,6 +2307,11 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
     3) SKIP=$((SKIP + 1)); emit "$id" SKIP "$detail" ;;
     *) FAIL=$((FAIL + 1)); emit "$id" FAIL "$detail (exit $rc)" ;;
   esac
+  # AG-01's no-record skip is the one skip a CALLER must tell apart from green: `--only AG-01`
+  # on a repo with no approval record exits 3 (the card's contract; goblin-bans has the same
+  # single-selection rule). Scoped to AG-01 deliberately: every other row's skip stays exit 0,
+  # a shape the existing controls pin (HP-06's "no HANDOFF.md is a SKIP, never red").
+  if [ "$id" = "AG-01" ] && [ "$rc" -eq 3 ]; then AG01_SKIP=1; fi
 done < "$RUN_MANIFEST"
 
 # ---- the honesty gate, run-time half: a local check that produced no verdict ----------------
@@ -2404,4 +2449,8 @@ SEE
 fi
 
 if [ "$FAIL" -gt 0 ] || [ "$BAD" -eq 1 ]; then exit 1; fi
+# The adoption skip, surfaced: AG-01 skipped and nothing else ran (the `--only AG-01` shape)
+# is exit 3 — "not policed yet", distinguishable from a green 0 by a script running the gate.
+# A full run that skips AG-01 still exits 0 (a default install verifies green).
+if [ "$AG01_SKIP" -eq 1 ] && [ "$PASS" -eq 0 ] && [ "$FAIL" -eq 0 ]; then exit 3; fi
 exit 0

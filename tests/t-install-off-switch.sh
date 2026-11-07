@@ -81,8 +81,8 @@ check "  and no Hermes project tier was installed (it is still opt-in)" "$?"
 # globs, then 17/0/0/10 again under FIX 1: the electron bans are `dep:electron` NOW, so on this
 # no-package.json fixture they report NOT APPLICABLE instead of running vacuously off the shipped
 # checks/*.mjs. (The 21/0/0/6 shape was the false green FIX 1 removed.)
-printf '%s' "$NS_OUT" | grep -q '20 passed, 0 failed, 0 advisory, 10 skipped'
-check "  and the numbers are pinned (V3-3 + GAP-2/3 + FIX 1: core tier + predicate bans, 20/0/0/10)" "$?"
+printf '%s' "$NS_OUT" | grep -q '20 passed, 0 failed, 0 advisory, 11 skipped'
+check "  and the numbers are pinned (V3-3 + GAP-2/3 + FIX 1 + AG-01's skip: core tier + predicate bans, 20/0/0/11)" "$?"
 
 # ---- the part switch is still real: an explicit --opt-out skills turns the rows off ------------
 mkfix "$WORK/optout"
@@ -97,8 +97,8 @@ printf '%s' "$OO_OUT" | grep -q 'SKIP  SK-01  .*opt-out: skills'
 check "  and the skill rows are opt-out, not absent (the switch is real)" "$?"
 printf '%s' "$OO_OUT" | grep -q 'SKIP  SK-02'
 check "  and SK-02 is opt-out rather than FAIL" "$?"
-printf '%s' "$OO_OUT" | grep -q '17 passed, 0 failed, 0 advisory, 13 skipped'
-check "  and the opt-out numbers are pinned (17/0/0/13: the three skill rows skip again)" "$?"
+printf '%s' "$OO_OUT" | grep -q '17 passed, 0 failed, 0 advisory, 14 skipped'
+check "  and the opt-out numbers are pinned (17/0/0/14: the three skill rows skip again, AG-01 skips with no record)" "$?"
 
 # ---- W6 migration safety: an upgrade must not strip previously-installed skills ---------------
 # The pre-W6 default was --skills yes, so every existing install carries .hermes/skills recorded

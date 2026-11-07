@@ -528,6 +528,19 @@ the Node the gates ran under.
     so a fixture named anything else is invisible. The failure it was adopted from was a harness
     green on declared node sizes while every shared payload carried none (CURATION-2026-11-07
     §2 C1).
+60. **`AG-01` proves the file matches an approval, not that an approval happened.** The row
+    hashes `AGENTS.md` and compares it with the last row of `.gob/agents.approved` — the record
+    says a named person approved a file with that hash on that date, and nothing more. It cannot
+    see whether the approver read the diff (a rubber stamp records as cleanly as a review); a
+    worker able to write both files can forge a record, because the hash is a witness, not a
+    signature — nothing checks the approver's identity beyond the git `user.name` the command
+    happened to find; and a change that also rewrites or appends to the record is invisible to
+    the row itself (git history is the backstop: the record is a committed file, so a rewritten
+    history shows in `git log -p .gob/agents.approved`). A re-run of `gob init --write` over a
+    repo that already has a record deliberately does NOT re-approve: its own block rewrite then
+    leaves `AG-01` red until a human runs `gob approve-agents`, which is the honest direction
+    to fail in. The failure it was adopted from was a mid-run `AGENTS.md` edit that needed a
+    human Allow and left no trace of who approved it (CURATION-2026-11-07 §2 C6).
 
 ---
 

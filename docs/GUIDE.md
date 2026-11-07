@@ -127,7 +127,7 @@ then install it:
 
 Expected output (this is a real transcript, trimmed):
 
-    created 22 · updated 0 · unchanged 0 · skipped 0
+    created 23 · updated 0 · unchanged 0 · skipped 0
 
     next:
       1. cd /tmp/gs-try && git add -A && git commit   # the install is uncommitted by design
@@ -135,7 +135,7 @@ Expected output (this is a real transcript, trimmed):
       3. the gate is the one you declared and gob init measured (test: bash tests/run-tests.sh); edit AGENTS.md's gate_ keys when it changes
       4. the core goblin tier ships under .gob/skills/ by default; the .hermes/ project tier is opt-in: re-run with --skills yes
 
-**`created 22`** is the installer's count of the files it **tracks**. It writes **23**: the 23rd
+**`created 23`** is the installer's count of the files it **tracks**. It writes **24**: the 24th
 is `.gob/installed.json`, the record it keeps for itself, which it writes but does not count. It
 has written nothing outside this directory — and nothing under `.github/`: **v2 installs no
 CI, ever.** The default install ships **no agent skills** — the harness is neutral.
@@ -160,7 +160,7 @@ You will see one line per rule. The shape:
 
 and a summary line at the bottom:
 
-    19 passed, 1 failed, 0 advisory, 10 skipped     # the HP-05 placeholder, before you name a real commit
+    19 passed, 1 failed, 0 advisory, 11 skipped     # the HP-05 placeholder, before you name a real commit
 
 ### How to read that output
 
@@ -202,9 +202,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `25 passed, 0 failed, 0 advisory, 5 skipped` | none — the installer fills `HANDOFF.md`'s HEAD from the seed commit, and the uncommitted-install / untracked-SPEC reds (`CM-03`, `SP-02`) are now library rows, off by default |
-| 2. the first commit | `git add -A && git commit` | `25 passed, 0 failed, 0 advisory, 5 skipped` | none — green |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `25 passed, 0 failed, 0 advisory, 5 skipped` | none — `CM-03` is a library row, so a dirty tree no longer re-reds by default |
+| 1. the install ran | `gob init --write ... --yes` | `26 passed, 0 failed, 0 advisory, 5 skipped` | none — the installer fills `HANDOFF.md`'s HEAD from the seed commit, and the uncommitted-install / untracked-SPEC reds (`CM-03`, `SP-02`) are now library rows, off by default |
+| 2. the first commit | `git add -A && git commit` | `26 passed, 0 failed, 0 advisory, 5 skipped` | none — green |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `26 passed, 0 failed, 0 advisory, 5 skipped` | none — `CM-03` is a library row, so a dirty tree no longer re-reds by default |
 
 One of those deserves its name spelled out:
 
@@ -253,6 +253,15 @@ whichever three or four you would run before saying "this is fine."
 Why it matters: from then on, `goblin-verify` runs *your* definition of healthy, every time,
 without you remembering to. And the gate numbers are recorded with a date, so a number in
 `HANDOFF.md` can never quietly go stale.
+
+Because that edit changes `AGENTS.md`, row `AG-01` goes red the moment you save it — that is the
+row keeping the gate file itself honest. Make the edit, then record the approval:
+
+    gob approve-agents "replaced the gate with tsc --noEmit + npm test"
+
+One row is appended to `.gob/agents.approved` (date, the file's sha256, your git `user.name`,
+the reason — append-only, latest row wins), and the row is green again. An edit with no
+approval is a red that names both hashes and the fix command.
 
 ### The `practice:` key — the part that makes it yours
 
@@ -327,7 +336,7 @@ honest entry, and the harness treats it as one.
 > **Prove it was broken first.**
 
 Before you trust a check, break the thing it checks and watch it go red — then put it back and watch
-it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 18 files it
+it go green. Break it on a row this walkthrough can actually break: `IN-02` hashes the 19 files it
 tracks — not the ones it `owns` (including `AGENTS.md`, whose gob block §5 has you editing) and not
 `.gob/installed.json`; edit one of the tracked — the exercise below uses `.gob/bans/README.md`.
 
@@ -408,14 +417,14 @@ A default install lands on a specific shape. The first red is
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    19 passed, 1 failed, 0 advisory, 10 skipped     # straight after the install (the HP-05 placeholder)
-    20 passed, 0 failed, 0 advisory, 10 skipped     # name a real commit in HANDOFF.md, commit, and it is green
+    19 passed, 1 failed, 0 advisory, 11 skipped     # straight after the install (the HP-05 placeholder)
+    20 passed, 0 failed, 0 advisory, 11 skipped     # name a real commit in HANDOFF.md, commit, and it is green
 
 (On the older `gob init` walk the uncommitted-install and untracked-SPEC reds — `CM-03`, `SP-02`
 — were the first two FAILs; both are library rows now, off by default.) Name a real commit in
 `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is green:
 
-    20 passed, 0 failed, 0 advisory, 10 skipped     (on a real project; your numbers will differ)
+    20 passed, 0 failed, 0 advisory, 11 skipped     (on a real project; your numbers will differ)
 
 **Ten rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
@@ -464,7 +473,7 @@ same commands are available outside any repo through the npm CLI: `gob init` /
 | Command | Exit codes |
 |---|---|
 | `goblin-install` | `0` ok · `1` a refusal (with the path and the fix) · `2` bad input |
-| `goblin-verify` | `0` all checks passed · `1` a check failed · `2` could not run · `3` the manifest itself is broken |
+| `goblin-verify` | `0` all checks passed · `1` a check failed · `2` could not run · `3` the manifest is broken (or `--only AG-01` with no approval record: not policed yet, not red) |
 | `gob` (npm CLI) | propagates the subcommand's codes verbatim; a verb outside the surface (`audit`/`install`) is refused with exit 2 and the usage |
 
 `3` is the one to notice: it means gobstack's own rule table is malformed, not your project.
@@ -478,6 +487,7 @@ same commands are available outside any repo through the npm CLI: `gob init` /
     gob init [--heuristic] [--write <proposal>] [--target <dir>] [--dry-run] [--yes]
     gob mcp                                  # the MCP stdio server (three tools, local only)
 
+    gob approve-agents "<reason>" [--approver <name>]  # record who approved AGENTS.md (AG-01)
     .gob/bin/goblin-verify [--only <id[,id...]>] [--json] [--list]
     .gob/bin/goblin-bans           # run the ban list
     gob uninstall --target <dir>             # the uninstall job
@@ -698,12 +708,13 @@ Output is one line per executed row, in manifest order, plus a summary line at t
 
 Those three lines are one row of each marking a default run can show (no row of the shipped
 matrix is advisory — the advisory rows live in the library). The summary line of a green default
-run is `20 passed, 0 failed, 0 advisory, 10 skipped`.
+run is `20 passed, 0 failed, 0 advisory, 11 skipped` (the eleventh skip is `AG-01` — a plain `goblin-install` writes no approval record; `gob init --write` writes the first one).
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
 an unparseable config) · `3` the manifest itself is broken (a row with no check and no
-`advisory` label, or a duplicate id).
+`advisory` label, or a duplicate id) — and `3` for `--only AG-01` alone when no approval record
+exists: not policed yet, not red (an install never turns red by upgrading).
 
 **What verify asserts, in one sentence:** that the files it installed are the files on disk,
 that every rule in the manifest with a command still passes, and that the untestable remainder
@@ -721,7 +732,7 @@ product deleted is not a blind spot a run still carries (`docs/LIMITS.md` #13/#3
 #### A fresh install verifies green
 
 Measured on a fresh DEFAULT install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`20 passed, 0 failed, 0 advisory, 10 skipped`, exit 0.** The core procedure
+hand edit: **`20 passed, 0 failed, 0 advisory, 11 skipped`, exit 0.** The core procedure
 tier is vendored on every install (`.gob/skills/`), so `SK-01`, `SK-02` and `SK-04` RUN and
 pass on a fresh repo — the product no longer disables its own rows. Ten rows skip with a
 reason: every ban self-selects by its `applies_when` — a GLOB (`BN-01`/`BN-02`/`BN-03`/`BN-05`
@@ -746,7 +757,7 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a part's off state real.
 - **The opt-out numbers are pinned (V3-3).** A default install with the core tier vendored
-  verifies `20 passed, 0 failed, 0 advisory, 10 skipped`, exit 0, and
+  verifies `20 passed, 0 failed, 0 advisory, 11 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
   at v0.2 as the ban and feature-map rows landed; in v3 the model/role/loop and CI rows are cut,
@@ -845,10 +856,12 @@ Then, in order:
     .gob/bin/goblin-verify            # 20 passed, 0 failed - the uncommitted-install red (CM-03) is a library row now
 
 A default install (core tier, no agent skills) is **green** — `20 passed, 0 failed, 0 advisory,
-10 skipped`, exit 0 — once
+11 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
 the one expected red (`19 passed, 1 failed`). Both numbers are measured, not assumed
-(`docs/GUIDE.md`; step 2 of `docs/GUIDE.md`). Ten rows skip with a reason: `SK-01`, `SK-02`
+(`docs/GUIDE.md`; step 2 of `docs/GUIDE.md`). Eleven rows skip with a reason: `AG-01` has no approval record yet (a plain install writes
+none — `gob approve-agents "<reason>"` records the first, and `gob init --write` writes it for
+you); `SK-01`, `SK-02`
 and `SK-04` RUN (the core procedure tier is vendored under `.gob/skills/` on every install),
 plus the not-yet rows: `BN-01`/`BN-02`/`BN-03`/`BN-05` have no `.ts`/`.js` source for their
 `applies_when` glob and each reports itself *not applicable*; the four electron bans
@@ -898,7 +911,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .gob/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the full green path (`20 passed, 0 failed, 0 advisory, 10 skipped`, exit 0)
+   Success is the full green path (`20 passed, 0 failed, 0 advisory, 11 skipped`, exit 0)
    with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three
@@ -943,7 +956,7 @@ closed and now ENFORCED (`IN-03`'s third clause, Z1-5): `script`, `lint`, `gate`
 plus `test` for a source-scope row, whose check is a script under `tests/` run by
 `tests/run-tests.sh`.
 
-Measured shape of this table: **34 rows** - 30 target, 4 source; advisory 0, gate 4, lint 19, script 8, test 3 (the on-by-default matrix, `.gob/manifest/enforcement.tsv`). The **library** (`library.tsv`) holds a further **32 rows**, all `scope:target`, off by default. The table below renders the **full 66-rule set** (matrix + library) so a reader sees the whole contract; the 32 library rows are the ones `gob verify --library` names.
+Measured shape of this table: **35 rows** - 31 target, 4 source; advisory 0, gate 4, lint 19, script 9, test 3 (the on-by-default matrix, `.gob/manifest/enforcement.tsv`). The **library** (`library.tsv`) holds a further **32 rows**, all `scope:target`, off by default. The table below renders the **full 67-rule set** (matrix + library) so a reader sees the whole contract; the 32 library rows are the ones `gob verify --library` names.
 
 ### The rows
 
@@ -965,6 +978,7 @@ Measured shape of this table: **34 rows** - 30 target, 4 source; advisory 0, gat
 | `GT-01` | target | gate | The gate set is declared, never inferred from the stack. | goblin-verify --only GT-01 | Builtin: every `gate_<name>_cmd:` key in the AGENTS.md gob block is a DECLARED gate and its declaration and command are one line - a gate cannot lose its cmd and survive the count (G8-3, the condition of G8's own score sentence). The count is of declarations, not of runnable pairs. It cannot see whether a declared command is the RIGHT gate for the project: it proves a command exists, not that it is meaningful. |
 | `GT-02` | target | gate | Every declared gate runs and exits 0. | goblin-verify --only GT-02 | — |
 | `GT-03` | target | script | The round reports one line of measured numbers. | test -f .gob/last-gate-line && [ .gob/last-gate-line -nt "$(git rev-parse --git-dir)/logs/HEAD" ] | The freshness reference is HEAD's reflog (`.git/logs/HEAD`), which every HEAD movement rewrites - a commit in an attached or a detached worktree included, and independently of whether the refs are packed. The clause it replaced read `.git/HEAD`, a file a commit never rewrites (only branch operations do), so a commit landing after the measured line left the row GREEN while the round had moved on (D2, measured: `.git/HEAD`'s mtime unchanged across a real commit, `--only GT-03` exit 0). Two limits remain, recorded rather than hidden: a repo with the reflog disabled (`core.logAllRefUpdates=false`) has no reference to compare against, and `-nt` against a missing path is true, so the clause passes vacuously and the row then proves only that a measured line EXISTS (a repo with no commit yet is the same case); and the clause reads ANY HEAD movement as staleness, so a checkout, a branch rename or a reset FAILs it until the next gate run rewrites the line. That second behaviour is what makes a full run self-freshening: `GT-02` writes the line earlier in the same pass, so the row asserts that the line in front of you came from THIS run. `tests/t-gt03-freshness.sh` is the control, in both directions. |
+| `AG-01` | target | script | An instruction file changes only with a recorded approval: AGENTS.md hashes to the value in .gob/agents.approved, which carries the date, the approver and the one-line reason. | goblin-verify --only AG-01 | The record proves the file matches an approval, never that the approver read the diff: the row hashes AGENTS.md and compares it with the LAST row of the append-only .gob/agents.approved (latest row wins, and a row carries no file name — only the hash is coverage, so a reason naming some other file clears nothing; the control in tests/t-verify-red.sh pins that). A worker able to write both files can forge a record — the hash is a witness, not a signature — and a change that also rewrites the record is invisible to this row (git history is the backstop; LIMITS #60). No record at all is a SKIP, never a red: an existing install must not turn red just by upgrading to an engine that ships this row (CURATION-2026-11-07 §2 C6). |
 | `HV-02` | target | lint | A number taken from a live surface carries its guard: a bounding box is asserted inside the capture viewport, and a parsed number is asserted finite before it can fail an assertion. | goblin-verify --only HV-02 | Text probe over the harness dir, the same class as BN-01 (no AST): it proves a guard is PRESENT - innerWidth/innerHeight/visualViewport beside a getBoundingClientRect call, Number.isFinite/isNaN beside a number parsed out of execSync/spawnSync stdout, or a guarded: <reason> marker - never that the guard is EFFECTIVE (a decorative one passes), and a pattern inside a string or a comment is read as code. A number parsed by any other means than parseFloat/parseInt/Number( is unseen, and it cannot see a viewport override that silently did not apply - that needs a runtime probe the dependency contract forbids (CURATION-2026-11-07 §2 C2, the measured failure being a measurement reported with no viewport assertion at all). |
 | `HV-01` | target | lint | A check that asserts a user-visible outcome builds its input through the same producer the users input comes through; a hand-written fixture is generated by that producer and pinned. | goblin-verify --only HV-01 | Text probe: it proves a producer is NAMED - a bare-package import/require/dynamic import, or a produced_by: <function> <pinned id> marker beside a doc/board/payload/fixture literal - never that the call path matches the product wiring. A relative import (./ or ../) does not clear it, a literal built by spread or copy from another file is unseen, and a name other than doc/board/payload/fixture is invisible. The stronger form needs the product to export a single make-me-the-thing-the-user-gets factory, which is a design change, not a probe (CURATION-2026-11-07 §2 C1, the failure being a harness green on declared node sizes while the shared payload carried none). |
 | `GT-04` | target | gate | A ratchet is declared with a ceiling. | goblin-verify --only GT-04 | — |
@@ -1018,7 +1032,7 @@ Measured shape of this table: **34 rows** - 30 target, 4 source; advisory 0, gat
 
 ### Advisory rows, named
 
-0 of the 30 rows are labelled `advisory`. 0 of them carry no executable check at all — the six
+0 of the 31 rows are labelled `advisory`. 0 of them carry no executable check at all — the six
 advisory rows (`HP-04`, `HS-03`, `CM-02`, `DOC-01`, `DOC-02`, `SC-09`) all moved to the library
 (`gob verify --library`), so a default run carries no prose row (they are prose the matrix
 refuses to pretend about).
@@ -1215,7 +1229,7 @@ them: it reads the path from config, so moving the standard is a one-line config
     git init -b main
     gob init --heuristic                   # the brief + schema; answer it in a proposal file
     gob init --write .gob-init-proposal.md --yes
-                                           # expect: created 22 (the 5-skill core tier + the categories inventory vendor; the Hermes tier is opt-in; FIX 3 drops the unchecked SPEC/reviews)
+                                           # expect: created 23 (the 5-skill core tier + the categories inventory vendor; the Hermes tier is opt-in; FIX 3 drops the unchecked SPEC/reviews)
 
     # 2. commit and check
     git add -A && git commit -m "chore: install gobstack"

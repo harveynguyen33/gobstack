@@ -5,6 +5,18 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
 
 ## Unreleased (v3 core: a default row set + a library)
 
+- **`AG-01`: an instruction file changes only with a recorded approval.** `AGENTS.md` — the file
+  the gates are read from, editable by the very worker the gate polices — is now hash-pinned to
+  `.gob/agents.approved` (append-only: date · sha256 · approver · one-line reason, latest row
+  wins). New command `gob approve-agents "<reason>"` (`--approver` defaults to the repo's git
+  `user.name`, then `$USER`), shipped in `.gob/bin/goblin-approve` and routed through the npm
+  shim. `goblin-verify --only AG-01` passes when the hash matches, FAILs naming the file, both
+  hashes and the fix command when it does not, and SKIPs (exit 3 under `--only AG-01` alone)
+  when no record exists — an existing install never turns red by upgrading. `gob init --write`
+  writes the first record, so a fresh install is green on day one; a re-run never re-approves.
+  Only the hash is coverage: a record row carries no file name, so a reason naming another file
+  clears nothing (the control pins it). What the row cannot see — a forged record, an unread
+  diff, a record rewritten alongside the file — is docs/LIMITS.md #60.
 - **The default verifier is the ~19-row core; the rest lives in a library.** `verify` now runs a
   row set that is right for every repo — `IN-01..04`, `HP-01/02/03/05`, `GT-01/02/03`,
   `FM-01/02`, `SC-01`, `SK-01..04`, `BN-00`, plus the 8 `applies_when`-gated bans. The other 32

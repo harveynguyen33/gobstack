@@ -83,8 +83,10 @@ After installing, in this order:
     .gob/bin/goblin-verify                    # or gob verify, anywhere in the target
 
 **A default install verifies green — `20 passed, 0 failed, 0 advisory,
-10 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
-scaffold's `0000000` placeholder is the one expected red.** Ten rows skip: `SK-01`, `SK-02` and
+11 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
+scaffold's `0000000` placeholder is the one expected red.** Eleven rows skip: `AG-01` has no
+approval record yet (a plain install writes none; `gob approve-agents "<reason>"` records the
+first, and `gob init --write` writes it for you); `SK-01`, `SK-02` and
 `SK-04` **run** (the core procedure tier is vendored under `.gob/skills/` on every install);
 `BN-01`/`BN-02`/`BN-03`/`BN-05` match only `.ts`/`.tsx`/`.js`/`.jsx` and have no such source, so
 each reports itself *not applicable*; the four electron bans `BN-06`–`BN-09` are selected by the
@@ -116,8 +118,9 @@ and prints the usage.
 | command | what it does |
 |---|---|
 | `gob init` | the first step: print the AGENT BRIEF + proposal schema; `--heuristic` appends scanned hints as a fallback; `--write <proposal> [--yes]` validates the proposal and installs; `--target <dir>` aims elsewhere; `--dry-run` validates without writing |
-| `gob verify` | run the rule matrix against the current repo — `PASS`/`FAIL`/`SKIP` per row, exit 0 pass · 1 a check failed · 2 could not run · 3 the manifest is broken |
+| `gob verify` | run the rule matrix against the current repo — `PASS`/`FAIL`/`SKIP` per row, exit 0 pass · 1 a check failed · 2 could not run · 3 the manifest is broken (or `--only AG-01` with no approval record: not policed yet, not red) |
 | `gob bans` | run the ban list (per-pattern red lines over the source tree) |
+| `gob approve-agents "<reason>"` | record who approved the current `AGENTS.md` (row `AG-01`): appends date · sha256 · approver · reason to `.gob/agents.approved`; the row goes red when the file changes with no approval |
 | `gob mcp` | serve the harness to your coding agent over MCP stdio — three tools (`gob_verify`, `gob_map_status`, `gob_init_status`), local only, no SDK, no network |
 | `gob uninstall` | remove everything an install wrote, byte-exactly (the same job as `goblin-install --target <dir> --uninstall` from the checkout/install tree) |
 
@@ -195,14 +198,15 @@ flows; `manifest/glossary.tsv` for the vocabulary.
     gob verify [--only <id[,id...]>] [--json] [--list] [--source <path>]
 
 Exit codes: `0` pass · `1` a check failed · `2` could not
-run · `3` the manifest is broken. Every run prints what it cannot see.
+run · `3` the manifest is broken (`--only AG-01` with no approval record is also 3: not policed
+yet, not red). Every run prints what it cannot see.
 
 ## Develop
 
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-04) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (125 over 62 target rows), each required to go RED and then
+one control per target-scope row (128 over 63 target rows), each required to go RED and then
 restored. **A verifier that only ever prints GREEN is a failure**, so that file is the one that
 matters most.
 

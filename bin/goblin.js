@@ -9,6 +9,7 @@
 //   gob init    [...]                     -> bin/goblin-init (the prompt+schema engine)
 //   gob verify [...]                      -> bin/goblin-verify
 //   gob bans   [...]                      -> bin/goblin-bans
+//   gob approve-agents "<reason>" [...]   -> bin/goblin-approve (AG-01's approval record)
 //   gob mcp                               -> bin/goblin-mcp.js (the MCP stdio server)
 //   gob uninstall [--target <dir>]        -> bin/goblin-install --uninstall
 //   no args | -h/--help | any other first arg -> this file's short usage, exit 2.
@@ -35,7 +36,7 @@ if (arg0 === "--version" || arg0 === "-V" || arg0 === "-v") {
   process.exit(0);
 }
 
-const SCRIPT = { init: "goblin-init", verify: "goblin-verify", bans: "goblin-bans", mcp: "goblin-mcp.js" };
+const SCRIPT = { init: "goblin-init", verify: "goblin-verify", bans: "goblin-bans", mcp: "goblin-mcp.js", "approve-agents": "goblin-approve" };
 const [cmd, ...rest] = process.argv.slice(2);
 
 // No args, a help flag, or an unrecognized first arg: short usage, exit 2. A bare
@@ -49,6 +50,7 @@ function usage() {
 "  gob init      start here — prints the agent brief + proposal schema; --write installs it",
 "  gob verify    run the rule matrix against the current repo",
 "  gob bans      run the ban list (per-pattern red lines over the source tree)",
+"  gob approve-agents \"<reason>\"   record who approved the current AGENTS.md (row AG-01)",
 "  gob mcp       serve the harness to your agent over MCP stdio (verify/init tools)",
 "  gob uninstall --target .          remove exactly what an install wrote (preimages)",
 "",

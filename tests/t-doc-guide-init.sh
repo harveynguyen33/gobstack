@@ -101,11 +101,11 @@ EOF
 git add -A && git commit -q -m "chore: the proposal and its gate"
 OUT=$(HOME="$HOMEDIR" bash "$SRC/bin/goblin-init" --write proposal.md --yes 2>&1); RC=$?
 check "gob init --write exits 0 on the guide's proposal shape" "$RC"
-printf '%s' "$OUT" | grep -qF "created 22 · updated 0 · unchanged 0 · skipped 0"
-check "UX-i the install prints created 22 (installed.json is written but not counted)" "$?"
+printf '%s' "$OUT" | grep -qF "created 23 · updated 0 · unchanged 0 · skipped 0"
+check "UX-i the install prints created 23 (installed.json is written but not counted)" "$?"
 [ ! -e .github ]
 check "UX-i and writes NO .github anything (v2 installs no CI)" "$?"
-grep -qF "created 22" "$GUIDE"
+grep -qF "created 23" "$GUIDE"
 check "  and the guide quotes the created line" "$?"
 
 # ---- UX-ii: the day-one shapes -----------------------------------------------------------------
@@ -118,7 +118,7 @@ SUM() { HOME="$HOMEDIR" bash .gob/bin/goblin-verify 2>&1 | grep -m1 -E '^ +[0-9]
 
 PRE=$(SUM)
 check "UX-ii the pre-commit run is green (CM-03/SP-02 are library rows now)" \
-  "$(printf '%s' "$PRE" | grep -qF '25 passed, 0 failed, 0 advisory, 5 skipped' && echo 0 || echo 1)"
+  "$(printf '%s' "$PRE" | grep -qF '26 passed, 0 failed, 0 advisory, 5 skipped' && echo 0 || echo 1)"
 
 git add -A && git commit -q -m "chore: install gobstack"
 DAY1=$(SUM)
@@ -126,7 +126,7 @@ DAY1=$(SUM)
 # nothing to flag and the first-commit run is already green. The placeholder red the guide
 # teaches (HP-05) belongs to the verify-on-an-empty-repo path t-doc-guide.sh walks.
 check "UX-ii the first-commit run is green (the installer filled the HANDOFF HEAD)" \
-  "$(printf '%s' "$DAY1" | grep -qF '25 passed, 0 failed, 0 advisory, 5 skipped' && echo 0 || echo 1)"
+  "$(printf '%s' "$DAY1" | grep -qF '26 passed, 0 failed, 0 advisory, 5 skipped' && echo 0 || echo 1)"
 
 # ---- UX-iii: CM-03 is a library row now (batch 2b-ii) ------------------------------------------
 # The commit-as-you-go row CM-03 moved to the library, so a dirty tree no longer re-reds the
@@ -135,18 +135,18 @@ HEAD_NOW=$(git rev-parse --short HEAD)
 sed -i "s/^- HEAD when this file was written: .*/- HEAD when this file was written: \`$HEAD_NOW\`/" HANDOFF.md
 DIRTY=$(SUM)
 check "UX-iii the HANDOFF edit leaves the default run green (CM-03 is a library row now)" \
-  "$(printf '%s' "$DIRTY" | grep -qF '25 passed, 0 failed' && [ -n "$(git status --porcelain)" ] && echo 0 || echo 1)"
+  "$(printf '%s' "$DIRTY" | grep -qF '26 passed, 0 failed' && [ -n "$(git status --porcelain)" ] && echo 0 || echo 1)"
 printf '%s' "$(HOME="$HOMEDIR" bash .gob/bin/goblin-verify --library 2>&1)" | grep -qE '^CM-03 '
 check "  and CM-03 is listed in the library with its enable hint" "$?"
 
 git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 GREEN=$(SUM)
 note "MEASURED init-path shapes: PRE=[$PRE] DAY1=[$DAY1] DIRTY=[$DIRTY] GREEN=[$GREEN]"
-check "UX-ii the green path prints 25 passed, 0 failed, 0 advisory, 5 skipped" \
-  "$(printf '%s' "$GREEN" | grep -qF '25 passed, 0 failed, 0 advisory, 5 skipped' && echo 0 || echo 1)"
+check "UX-ii the green path prints 26 passed, 0 failed, 0 advisory, 5 skipped" \
+  "$(printf '%s' "$GREEN" | grep -qF '26 passed, 0 failed, 0 advisory, 5 skipped' && echo 0 || echo 1)"
 
 # ---- the guide quotes exactly these shapes ----------------------------------------------------
-for shape in "25 passed, 0 failed, 0 advisory, 5 skipped"; do
+for shape in "26 passed, 0 failed, 0 advisory, 5 skipped"; do
   grep -qF "$shape" "$GUIDE"
   check "the guide quotes the measured line ($shape)" "$?"
 done
@@ -155,9 +155,9 @@ done
 SHAPES=$(grep -E '^[[:space:]]*[0-9]+ passed, [0-9]+ failed, [0-9]+ advisory, [0-9]+ skipped' "$GUIDE" \
          | sed -n 's/^[[:space:]]*\([0-9]* passed, [0-9]* failed, [0-9]* advisory, [0-9]* skipped\).*/\1/p' | sort -u)
 MEASURED=$(printf '%s\n' \
-  "25 passed, 0 failed, 0 advisory, 5 skipped" \
-  "19 passed, 1 failed, 0 advisory, 10 skipped" \
-  "20 passed, 0 failed, 0 advisory, 10 skipped")
+  "26 passed, 0 failed, 0 advisory, 5 skipped" \
+  "19 passed, 1 failed, 0 advisory, 11 skipped" \
+  "20 passed, 0 failed, 0 advisory, 11 skipped")
 SUBSET=0
 while IFS= read -r s; do
   [ -n "$s" ] || continue

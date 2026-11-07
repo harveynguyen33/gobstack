@@ -30,8 +30,8 @@ git add -A && git commit -q -m "chore: seed"
 bash "$SRC/bin/goblin-install" --target "$WORK/target" \
   --practice "$WORK/standard.md" >/dev/null 2>&1
 check "install exits 0" "$?"
-check "the installer's .gob/bin holds exactly the three shipped scripts" \
-  "$([ "$(ls .gob/bin | sort | tr '\n' ' ')" = "goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
+check "the installer's .gob/bin holds exactly the four shipped scripts" \
+  "$([ "$(ls .gob/bin | sort | tr '\n' ' ')" = "goblin-approve goblin-bans goblin-lib.sh goblin-verify " ] && echo 0 || echo 1)"
 # v2: the CI lane is GONE from the product (no .github/workflows payload is ever written),
 # so the v1 placement probe has nothing to place. The uninstall's own contract is now pinned
 # by the two-survivors assertions below (the edited waiver + the project docs); a workflow
