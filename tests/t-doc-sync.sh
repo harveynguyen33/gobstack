@@ -335,15 +335,24 @@ norm_text docs/GUIDE.md | grep -q 'goblin remains as a legacy alias'
 check "docs/GUIDE.md §2 names goblin as the legacy alias (W6 gob rename)" "$?"
 
 for f in README.md docs/GUIDE.md; do
-  n=$(grep -c 'goblin-stack' "$f")
+  # A URL is a location, not a wordmark: the repository really is named goblin-stack, and a raw
+  # asset URL has to spell it. Strip URL tokens before counting, and prove with a control below
+  # that a PROSE occurrence is still counted — otherwise this refinement would have disarmed the row.
+  n=$(sed -E 's#https?://[^ )">]+##g' "$f" | grep -c 'goblin-stack')
   if [ "$n" -eq 0 ]; then
     note "ok   $f carries no 'goblin-stack' product wordmark (W6 gobstack rename)"
   else
     note "FAIL $f still carries the 'goblin-stack' wordmark $n time(s) (W6 gobstack rename)"
-    grep -n 'goblin-stack' "$f" | head -3
+    sed -E 's#https?://[^ )">]+##g' "$f" | grep -n 'goblin-stack' | head -3
     fail=1
   fi
 done
+# the control: the same filter must NOT hide a prose occurrence
+CTRL=$(mktemp)
+printf 'install goblin-stack and run it\n<img src="https://example.test/goblin-stack/x.svg">\n' > "$CTRL"
+n=$(sed -E 's#https?://[^ )">]+##g' "$CTRL" | grep -c 'goblin-stack')
+[ "$n" -eq 1 ]; check "the wordmark filter still counts a PROSE occurrence (1, not 0)" "$?"
+rm -f "$CTRL"
 
 # ---- the feature map: authored in the init proposal, no standalone verb ---------------------
 # v3 folds the map into `gob init`: the docs must teach the mandatory map authored INSIDE the

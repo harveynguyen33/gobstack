@@ -1,11 +1,16 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/harveynguyen33/goblin-stack/main/assets/brand/lockup.svg#gh-dark-mode-only" alt="gobstack — a goblin who turns rules into gates" width="380">
+  <img src="https://raw.githubusercontent.com/harveynguyen33/goblin-stack/main/assets/brand/lockup-light.svg#gh-light-mode-only" alt="gobstack — a goblin who turns rules into gates" width="380">
+</p>
+<p align="center"><sub>a goblin who turns rules into gates — and counts the ones he cannot check.</sub></p>
+
 # gobstack
 
-> **Personal layer note (2026-10-10):** this is Harvey's personal agent-enhancement layer — owner of one, zero users. Install = clone this repo + `gob init`; the npm package is FROZEN at 0.6.0-beta.1 and is not the install path.
-
-**gobstack** (npm: [`@techgoblin/gobstack`](https://www.npmjs.com/package/@techgoblin/gobstack))
-installs an **executable rule manifest**, a **vendored verifier**, and an **AGENTS.md-frontmatter
-config** into any project — so that an AI coding session never re-improvises, and a rule that
-cannot be checked is counted rather than asserted.
+**An executable rule manifest for AI coding sessions.** gobstack (npm:
+[`@techgoblin/gobstack`](https://www.npmjs.com/package/@techgoblin/gobstack)) installs an
+**executable rule manifest**, a **vendored verifier**, and an **AGENTS.md-frontmatter config** into any
+project — so that an AI coding session never re-improvises, and a rule that cannot be checked is
+counted rather than asserted.
 
 Start here — `init` is the first verb, and it needs no global install:
 
@@ -14,6 +19,29 @@ Start here — `init` is the first verb, and it needs no global install:
 or install the CLI globally (it is a CLI, not a library):
 
     npm install -g @techgoblin/gobstack  # gives you the `gob` CLI (`goblin` remains as a legacy alias)
+
+> **Status:** v0.6.0 — stable, 34 rule rows, 23 tests, published as `latest`. Gobstack is Harvey's
+> personal agent-enhancement layer, built for one owner; the source of truth is this repo, and the
+> npm package tracks it.
+
+## The short version
+
+- 🧾 **One install, three artifacts** — an executable rule manifest, the verifier that runs it, and the
+  `AGENTS.md` config block that names the gates.
+- 🔍 **A rule nobody can check is counted, not claimed** — every row either has a mechanism or is labelled
+  advisory, and the advisory count is printed on every run.
+- 🧪 **The gate lives in the repo** — `bash .gob/bin/goblin-verify` needs `git` and `bash`, not gobstack;
+  an initialized repo keeps working on a machine where gobstack was never installed.
+- 🤖 **The agent runs the gate, not you** — the same verifier is served over MCP, so a session checks its
+  own work instead of describing it.
+- 📋 **Two contracts are themselves gated** — the HANDOFF (`HP-*`) and the feature map (`FM-*`), so the
+  documents cannot quietly drift from the code.
+- 🧩 **Extend by data, not by code** — a library of extra rows is switched on per repo through a versioned
+  local override, and a miswritten row is refused rather than silently green.
+
+`gob init` refuses a gate command that does not exist (exit 127), refuses a proposal with no feature map,
+and writes only paths it records. What it will not do is listed under [What it is not](#what-it-is-not),
+and what it cannot see is in [docs/LIMITS.md](./docs/LIMITS.md).
 
 ## Install
 
@@ -227,6 +255,15 @@ then reports `practice pin ok`. Nothing re-pins automatically, not even a re-ins
 
 `bash`, `git`, `awk`, `sed`, `grep`, `python3` (the engine); node ≥ 18 for the npm shim only. No
 jq, no yq, no network at verify time.
+
+## Author
+
+[Harvey Nguyen](mailto:harvey.nguyen33@gmail.com) — the same address signs every commit and the LICENSE.
+
+## Support
+
+gobstack is free and MIT. If it saves you a review round, the goblin takes coffee:
+[buymeacoffee.com/harveynguyen33](https://buymeacoffee.com/harveynguyen33).
 
 ## License
 

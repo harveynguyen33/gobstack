@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="gobstack">
+  <!-- favicon cut: ears and eyes bigger, one slab under the head -->
+  <g fill="#5cec56">
+    <path d="M110 104 L36 28 L18 60 L92 128 Z"/>
+    <path d="M146 104 L220 28 L238 60 L164 128 Z"/>
+  </g>
+  <rect x="52" y="108" width="152" height="86" rx="18" fill="#e4833f"/>
+  <g fill="#131316">
+    <path d="M78 136 h38 v20 h-38 z"/>
+    <path d="M140 136 h38 v20 h-38 z"/>
+  </g>
+  <rect x="44" y="204" width="168" height="34" rx="12" fill="#e8e8ea"/>
+</svg>

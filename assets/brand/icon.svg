@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="gobstack">
+  <!-- gobstack: a goblin peering over the stack it keeps green -->
+  <g fill="#5cec56">
+    <path d="M108 100 L44 30 L28 58 L92 122 Z"/>
+    <path d="M148 100 L212 30 L228 58 L164 122 Z"/>
+  </g>
+  <rect x="60" y="104" width="136" height="62" rx="16" fill="#e4833f"/>
+  <g fill="#131316">
+    <path d="M84 126 h32 v16 h-32 z"/>
+    <path d="M140 126 h32 v16 h-32 z"/>
+  </g>
+  <rect x="46" y="172" width="164" height="40" rx="14" fill="#e8e8ea"/>
+  <rect x="70" y="218" width="116" height="26" rx="10" fill="#e4833f"/>
+</svg>
