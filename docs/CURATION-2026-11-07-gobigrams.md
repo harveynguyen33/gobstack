@@ -60,6 +60,10 @@ probe printed `NaNpx`, and two harnesses convicted a layout that was fine (`ec70
 viewport, a measurement is asserted non-`NaN` and non-zero, and a missing dependency raises a named error instead
 of degrading to a default.*
 
+*Scope, measured after implementation:* the probe reads Node shapes (`execSync`/`execFileSync`/`spawnSync`/
+`child_process` beside `parseFloat`/`parseInt`/`Number(`). A shell harness that parses a number is **not** seen —
+the row says `Node child-process result` for that reason, and `docs/LIMITS.md` #57 names the blind spot.
+
 **Mechanism.** `HV-02`, lint. Files calling `getBoundingClientRect()` must also reference `innerWidth`/`innerHeight`
 (or carry `guarded:`), and files that shell out to a text-metrics tool must raise a named missing-module error.
 Honest limit: it cannot tell a correct guard from a decorative one.
