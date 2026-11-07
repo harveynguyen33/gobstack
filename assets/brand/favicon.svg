@@ -1,13 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="gobstack">
-  <!-- favicon cut: ears and eyes bigger, one slab under the head -->
-  <g fill="#5cec56">
-    <path d="M110 104 L36 28 L18 60 L92 128 Z"/>
-    <path d="M146 104 L220 28 L238 60 L164 128 Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="gobstack">
+  <!-- favicon F1: three stack lines, thick enough for 32px -->
+  <rect width="512" height="512" rx="112" fill="#1b1b1b"/>
+  <path d="M 108 176 C 80 176 80 208 80 226 C 80 244 80 252 62 258 C 80 264 80 272 80 290 C 80 308 80 340 108 340"
+        fill="none" stroke="#c93801" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 404 176 C 432 176 432 208 432 226 C 432 244 432 252 450 258 C 432 264 432 272 432 290 C 432 308 432 340 404 340"
+        fill="none" stroke="#c93801" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <g stroke-linecap="round">
+    <path d="M 150 196 L 362 196" stroke="#e4833f" stroke-width="44"/>
+    <path d="M 178 258 L 334 258" stroke="#e4833f" stroke-width="44"/>
+    <path d="M 206 320 L 306 320" stroke="#5cec56" stroke-width="44"/>
   </g>
-  <rect x="52" y="108" width="152" height="86" rx="18" fill="#e4833f"/>
-  <g fill="#131316">
-    <path d="M78 136 h38 v20 h-38 z"/>
-    <path d="M140 136 h38 v20 h-38 z"/>
-  </g>
-  <rect x="44" y="204" width="168" height="34" rx="12" fill="#e8e8ea"/>
 </svg>

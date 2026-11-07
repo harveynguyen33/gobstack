@@ -1,14 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="gobstack">
-  <!-- gobstack: a goblin peering over the stack it keeps green -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 560" width="920" height="560" role="img" aria-label="gobstack">
+  <!-- GOBSTACK — derived from gobrand/marks/techgoblin-mark.svg.
+       Ears ({ }) and eyes are the family's shared identity, coordinates unchanged.
+       The lower face is the product: three stacked manifest lines, the last one green (the gate that passes). -->
+  <g stroke="#c93801" stroke-width="30" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 235 140 C 186 140 186 176 186 197 C 186 221 186 233 154 244 C 186 255 186 267 186 291 C 186 312 186 348 235 348"/>
+    <path d="M 685 140 C 734 140 734 176 734 197 C 734 221 734 233 766 244 C 734 255 734 267 734 291 C 734 312 734 348 685 348"/>
+  </g>
   <g fill="#5cec56">
-    <path d="M108 100 L44 30 L28 58 L92 122 Z"/>
-    <path d="M148 100 L212 30 L228 58 L164 122 Z"/>
+    <rect x="316" y="196" width="104" height="72" rx="16"/>
+    <rect x="500" y="196" width="104" height="72" rx="16"/>
   </g>
-  <rect x="60" y="104" width="136" height="62" rx="16" fill="#e4833f"/>
-  <g fill="#131316">
-    <path d="M84 126 h32 v16 h-32 z"/>
-    <path d="M140 126 h32 v16 h-32 z"/>
+  <path d="M 430 316 L 460 278 L 490 316" stroke="#e4833f" stroke-width="20" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="#e4833f">
+    <rect x="330" y="378" width="260" height="24" rx="12"/>
+    <rect x="360" y="416" width="200" height="24" rx="12"/>
   </g>
-  <rect x="46" y="172" width="164" height="40" rx="14" fill="#e8e8ea"/>
-  <rect x="70" y="218" width="116" height="26" rx="10" fill="#e4833f"/>
+  <rect x="390" y="454" width="140" height="24" rx="12" fill="#5cec56"/>
 </svg>
