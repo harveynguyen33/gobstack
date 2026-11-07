@@ -1,8 +1,10 @@
 # HANDOFF — the session-boundary contract. A new worker reads this FIRST.
 
 > Template. Written once by goblin-install and never overwritten. Update it every round:
-> every gate number carries `measured <date>`, the State line names the current HEAD, and the
-> NOT verified section is non-empty or says "nothing outstanding".
+> every gate number carries `measured <date>`, the State line names the current HEAD, the
+> NOT verified section is non-empty or says "nothing outstanding", and every Next-steps
+> bullet is owned with a date, done with evidence, or cancelled with a date and the
+> decision (HP-06).
 
 ## ▶ START HERE (new session)
 
@@ -30,10 +32,10 @@ Every number here is a measurement with a date, never a copy from a previous rou
 
 ## Next steps
 
-- Replace the default gate with this project's real commands (playbook P8 step 3).
-- Write the first round's SPEC (`*-SPEC.md`) before any code moves (playbook P3).
+- Replace the default gate with this project's real commands (playbook P8 step 3) — owner: you, since {{DATE}}.
+- Write the first round's SPEC (`*-SPEC.md`) before any code moves (playbook P3) — owner: you, since {{DATE}}.
 - Write the first asserting harness in the harness dir, and pin its pre-change commit so
-  `replay.commit` can be set (playbook P6, then HS-02).
+  `replay.commit` can be set (playbook P6, then HS-02) — owner: you, since {{DATE}}.
 
 ## NOT verified
 

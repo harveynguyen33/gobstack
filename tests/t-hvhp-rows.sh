@@ -44,6 +44,17 @@ rm -f checks/hv02-drill.mjs
 out=$(bash .gob/bin/goblin-verify --only HV-02 2>&1); rc=$?
 check "HV-02: the violation removed is GREEN" "$rc"
 
+# ---- HP-06: open is not a shape ---------------------------------------------------------------
+awk '/^## Next steps$/ && !d { print; print "- Ship the thing."; d = 1; next } { print }' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md
+out=$(bash .gob/bin/goblin-verify --only HP-06 2>&1); rc=$?
+[ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q 'HANDOFF.md: an open item'
+check "HP-06: an open item is RED, naming HANDOFF.md" "$?"
+printf '%s' "$out" | grep -q 'carries no date'
+check "  and the reason" "$?"
+git checkout -q -- HANDOFF.md
+out=$(bash .gob/bin/goblin-verify --only HP-06 2>&1); rc=$?
+check "HP-06: the violation removed is GREEN" "$rc"
+
 # ---- the rows a new enforcement row must not disturb ------------------------------------------
 out=$(bash .gob/bin/goblin-verify --only IN-03,SK-03 2>&1); rc=$?
 check "IN-03 and SK-03 stay green with the new row(s) in the matrix" "$rc"

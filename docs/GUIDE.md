@@ -160,7 +160,7 @@ You will see one line per rule. The shape:
 
 and a summary line at the bottom:
 
-    17 passed, 1 failed, 0 advisory, 10 skipped     # the HP-05 placeholder, before you name a real commit
+    18 passed, 1 failed, 0 advisory, 10 skipped     # the HP-05 placeholder, before you name a real commit
 
 ### How to read that output
 
@@ -202,9 +202,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `23 passed, 0 failed, 0 advisory, 5 skipped` | none — the installer fills `HANDOFF.md`'s HEAD from the seed commit, and the uncommitted-install / untracked-SPEC reds (`CM-03`, `SP-02`) are now library rows, off by default |
-| 2. the first commit | `git add -A && git commit` | `23 passed, 0 failed, 0 advisory, 5 skipped` | none — green |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `23 passed, 0 failed, 0 advisory, 5 skipped` | none — `CM-03` is a library row, so a dirty tree no longer re-reds by default |
+| 1. the install ran | `gob init --write ... --yes` | `24 passed, 0 failed, 0 advisory, 5 skipped` | none — the installer fills `HANDOFF.md`'s HEAD from the seed commit, and the uncommitted-install / untracked-SPEC reds (`CM-03`, `SP-02`) are now library rows, off by default |
+| 2. the first commit | `git add -A && git commit` | `24 passed, 0 failed, 0 advisory, 5 skipped` | none — green |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `24 passed, 0 failed, 0 advisory, 5 skipped` | none — `CM-03` is a library row, so a dirty tree no longer re-reds by default |
 
 One of those deserves its name spelled out:
 
@@ -408,14 +408,14 @@ A default install lands on a specific shape. The first red is
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    17 passed, 1 failed, 0 advisory, 10 skipped     # straight after the install (the HP-05 placeholder)
-    18 passed, 0 failed, 0 advisory, 10 skipped     # name a real commit in HANDOFF.md, commit, and it is green
+    18 passed, 1 failed, 0 advisory, 10 skipped     # straight after the install (the HP-05 placeholder)
+    19 passed, 0 failed, 0 advisory, 10 skipped     # name a real commit in HANDOFF.md, commit, and it is green
 
 (On the older `gob init` walk the uncommitted-install and untracked-SPEC reds — `CM-03`, `SP-02`
 — were the first two FAILs; both are library rows now, off by default.) Name a real commit in
 `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is green:
 
-    18 passed, 0 failed, 0 advisory, 10 skipped     (on a real project; your numbers will differ)
+    19 passed, 0 failed, 0 advisory, 10 skipped     (on a real project; your numbers will differ)
 
 **Ten rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
@@ -698,7 +698,7 @@ Output is one line per executed row, in manifest order, plus a summary line at t
 
 Those three lines are one row of each marking a default run can show (no row of the shipped
 matrix is advisory — the advisory rows live in the library). The summary line of a green default
-run is `18 passed, 0 failed, 0 advisory, 10 skipped`.
+run is `19 passed, 0 failed, 0 advisory, 10 skipped`.
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -721,7 +721,7 @@ product deleted is not a blind spot a run still carries (`docs/LIMITS.md` #13/#3
 #### A fresh install verifies green
 
 Measured on a fresh DEFAULT install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`18 passed, 0 failed, 0 advisory, 10 skipped`, exit 0.** The core procedure
+hand edit: **`19 passed, 0 failed, 0 advisory, 10 skipped`, exit 0.** The core procedure
 tier is vendored on every install (`.gob/skills/`), so `SK-01`, `SK-02` and `SK-04` RUN and
 pass on a fresh repo — the product no longer disables its own rows. Ten rows skip with a
 reason: every ban self-selects by its `applies_when` — a GLOB (`BN-01`/`BN-02`/`BN-03`/`BN-05`
@@ -746,7 +746,7 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a part's off state real.
 - **The opt-out numbers are pinned (V3-3).** A default install with the core tier vendored
-  verifies `18 passed, 0 failed, 0 advisory, 10 skipped`, exit 0, and
+  verifies `19 passed, 0 failed, 0 advisory, 10 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
   at v0.2 as the ban and feature-map rows landed; in v3 the model/role/loop and CI rows are cut,
@@ -842,12 +842,12 @@ arrives only with `--skills yes` (W6 neutral-first). The repo's other eleven ski
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .gob/bin/goblin-verify            # 18 passed, 0 failed - the uncommitted-install red (CM-03) is a library row now
+    .gob/bin/goblin-verify            # 19 passed, 0 failed - the uncommitted-install red (CM-03) is a library row now
 
-A default install (core tier, no agent skills) is **green** — `18 passed, 0 failed, 0 advisory,
+A default install (core tier, no agent skills) is **green** — `19 passed, 0 failed, 0 advisory,
 10 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
-the one expected red (`17 passed, 1 failed`). Both numbers are measured, not assumed
+the one expected red (`18 passed, 1 failed`). Both numbers are measured, not assumed
 (`docs/GUIDE.md`; step 2 of `docs/GUIDE.md`). Ten rows skip with a reason: `SK-01`, `SK-02`
 and `SK-04` RUN (the core procedure tier is vendored under `.gob/skills/` on every install),
 plus the not-yet rows: `BN-01`/`BN-02`/`BN-03`/`BN-05` have no `.ts`/`.js` source for their
@@ -898,7 +898,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .gob/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the full green path (`18 passed, 0 failed, 0 advisory, 10 skipped`, exit 0)
+   Success is the full green path (`19 passed, 0 failed, 0 advisory, 10 skipped`, exit 0)
    with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three
@@ -943,7 +943,7 @@ closed and now ENFORCED (`IN-03`'s third clause, Z1-5): `script`, `lint`, `gate`
 plus `test` for a source-scope row, whose check is a script under `tests/` run by
 `tests/run-tests.sh`.
 
-Measured shape of this table: **32 rows** - 28 target, 4 source; advisory 0, gate 4, lint 17, script 8, test 3 (the on-by-default matrix, `.gob/manifest/enforcement.tsv`). The **library** (`library.tsv`) holds a further **32 rows**, all `scope:target`, off by default. The table below renders the **full 64-rule set** (matrix + library) so a reader sees the whole contract; the 32 library rows are the ones `gob verify --library` names.
+Measured shape of this table: **33 rows** - 29 target, 4 source; advisory 0, gate 4, lint 18, script 8, test 3 (the on-by-default matrix, `.gob/manifest/enforcement.tsv`). The **library** (`library.tsv`) holds a further **32 rows**, all `scope:target`, off by default. The table below renders the **full 65-rule set** (matrix + library) so a reader sees the whole contract; the 32 library rows are the ones `gob verify --library` names.
 
 ### The rows
 
@@ -961,6 +961,7 @@ Measured shape of this table: **32 rows** - 28 target, 4 source; advisory 0, gat
 | `SP-01` | target | gate | A *-SPEC.md file exists at the repo root (any round, not the current one - round-scoping arrives with the W6 staged chain). | ls ./*-SPEC.md >/dev/null 2>&1 | Skipped when `spec` is in `disabled:`. |
 | `SP-02` | target | script | The SPEC is committed, not left untracked. | test -z "$(git ls-files --others --exclude-standard -- '*-SPEC.md')" | — |
 | `SP-03` | target | lint | Every AC: item is checkable without a human. | awk '/^[[:space:]]*[-*][[:space:]]/ && /AC[0-9]*:/ && !/`\|==\|===\|exit\|<\|>/ {print; bad=1} END{exit bad}' ./*-SPEC.md | Partial: structural only - a checkable-looking bullet can still be unfalsifiable. The matcher is `AC[0-9]*:` because the shipped template writes `- AC1: ...`; the literal `/AC:/` only saw a bullet that spelled the label without a number. |
+| `HP-06` | target | lint | Every item in the handoff NEXT STEPS is owned with a date, done with evidence, or cancelled with a date and the decision; open is not a shape. | goblin-verify --only HP-06 | Shape, not truth: a bullet can carry a date and the word owner and still be a lie, and work MISSING from the list entirely is invisible - a queue that lists nothing passes. Bare links, sub-headings and em-dash separator bullets are skipped by design, a wrapped bullet is read as one item, and only the first NEXT STEPS / NEXT section (the HP-02 alias set) is read. No HANDOFF.md is a SKIP with a reason, never red - HP-01 owns that failure. The measured failure it exists for is an item left open for a week after the decision to cancel it (CURATION-2026-11-07 §2 C3). |
 | `GT-01` | target | gate | The gate set is declared, never inferred from the stack. | goblin-verify --only GT-01 | Builtin: every `gate_<name>_cmd:` key in the AGENTS.md gob block is a DECLARED gate and its declaration and command are one line - a gate cannot lose its cmd and survive the count (G8-3, the condition of G8's own score sentence). The count is of declarations, not of runnable pairs. It cannot see whether a declared command is the RIGHT gate for the project: it proves a command exists, not that it is meaningful. |
 | `GT-02` | target | gate | Every declared gate runs and exits 0. | goblin-verify --only GT-02 | — |
 | `GT-03` | target | script | The round reports one line of measured numbers. | test -f .gob/last-gate-line && [ .gob/last-gate-line -nt "$(git rev-parse --git-dir)/logs/HEAD" ] | The freshness reference is HEAD's reflog (`.git/logs/HEAD`), which every HEAD movement rewrites - a commit in an attached or a detached worktree included, and independently of whether the refs are packed. The clause it replaced read `.git/HEAD`, a file a commit never rewrites (only branch operations do), so a commit landing after the measured line left the row GREEN while the round had moved on (D2, measured: `.git/HEAD`'s mtime unchanged across a real commit, `--only GT-03` exit 0). Two limits remain, recorded rather than hidden: a repo with the reflog disabled (`core.logAllRefUpdates=false`) has no reference to compare against, and `-nt` against a missing path is true, so the clause passes vacuously and the row then proves only that a measured line EXISTS (a repo with no commit yet is the same case); and the clause reads ANY HEAD movement as staleness, so a checkout, a branch rename or a reset FAILs it until the next gate run rewrites the line. That second behaviour is what makes a full run self-freshening: `GT-02` writes the line earlier in the same pass, so the row asserts that the line in front of you came from THIS run. `tests/t-gt03-freshness.sh` is the control, in both directions. |
@@ -1016,7 +1017,7 @@ Measured shape of this table: **32 rows** - 28 target, 4 source; advisory 0, gat
 
 ### Advisory rows, named
 
-0 of the 28 rows are labelled `advisory`. 0 of them carry no executable check at all — the six
+0 of the 29 rows are labelled `advisory`. 0 of them carry no executable check at all — the six
 advisory rows (`HP-04`, `HS-03`, `CM-02`, `DOC-01`, `DOC-02`, `SC-09`) all moved to the library
 (`gob verify --library`), so a default run carries no prose row (they are prose the matrix
 refuses to pretend about).

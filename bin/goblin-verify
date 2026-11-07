@@ -794,6 +794,72 @@ check_hv_02() {
   return 0
 }
 
+check_hp_06() {
+  # C3: cancelled is not pending. Shape, not truth: a bullet can carry a date and the word
+  # owner and still be a lie, and work MISSING from the list is invisible - the why cell and
+  # docs/LIMITS.md say so. Only the first NEXT STEPS / NEXT section is read (HP-02 alias set);
+  # bare links, sub-headings and em-dash separator bullets are skipped; a wrapped bullet is
+  # read as one item (continuation lines join the bullet that opened them).
+  if [ ! -f "$ROOT/HANDOFF.md" ]; then
+    printf 'no HANDOFF.md - HP-01 owns that failure; this row has nothing to read\n'
+    return 3
+  fi
+  local out rc n detail
+  rc=0
+  out=$(awk '
+    function levelOf(line,   i) {
+      i = 0
+      while (substr(line, i + 1, 1) == "#") i++
+      return i
+    }
+    function flush() {
+      if (bullet == "") return
+      text = bullet
+      sub(/^[[:space:]]*[-*][[:space:]]+/, "", text)
+      # a bare link carries no status at all; an em-dash separator bullet is layout, not an item
+      if (text ~ /^\[[^]]*\]\([^)]*\)[[:space:]]*$/) { bullet = ""; return }
+      if (text ~ /^—/) { bullet = ""; return }
+      n++
+      ok = 1
+      if (bullet !~ /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/) {
+        print "HANDOFF.md: an open item carries no date: " text
+        ok = 0
+      }
+      if (tolower(bullet) !~ /owner|done|cancelled/) {
+        print "HANDOFF.md: an open item is neither owned, done nor cancelled: " text
+        ok = 0
+      }
+      if (!ok) bad = 1
+      bullet = ""
+    }
+    /^#/ {
+      lvl = levelOf($0)
+      if (!sec) {
+        if (!seen && lvl <= 3 && tolower($0) ~ /^#+[[:space:]]+[^[:alpha:]]*next([^[:alpha:]]|$)/) {
+          sec = 1; secdepth = lvl
+        }
+      } else {
+        if (lvl <= secdepth) { flush(); sec = 0; seen = 1 }
+      }
+      next
+    }
+    !sec { next }
+    /^[[:space:]]*[-*][[:space:]]+/ { flush(); bullet = $0; next }
+    /^[[:space:]]*$/ { flush(); next }
+    bullet != "" { bullet = bullet " " $0; next }
+    END { flush(); printf "#count %d\n", n + 0; exit bad }
+  ' "$ROOT/HANDOFF.md") || rc=$?
+  n=$(printf '%s\n' "$out" | sed -n 's/^#count //p')
+  detail=$(printf '%s\n' "$out" | grep -v '^#count ' || true)
+  if [ "$rc" -ne 0 ]; then printf '%s\n' "$detail"; return 1; fi
+  if [ "${n:-0}" -eq 0 ]; then
+    printf '0 next-step bullet(s) - the section lists nothing pending (work missing from the list entirely is what this row cannot see)\n'
+  else
+    printf '%s next-step bullet(s), each owned with a date, done, or cancelled with a date and the decision\n' "${n:-0}"
+  fi
+  return 0
+}
+
 check_gt_01() {
   # Every `- name:` under `gates:` is a DECLARED gate, and every declared gate must carry a
   # `cmd:`. Counting only the name+cmd PAIRS (what this row did) let a gate lose its `cmd:` -

@@ -511,6 +511,14 @@ the Node the gates ran under.
     `parseFloat`/`parseInt`/`Number(` over `execSync`/`spawnSync` output is unseen. The failure the
     row was adopted from had no guard at all (CURATION-2026-11-07 §2 C2); it catches that class and
     says so about the rest.
+58. **`HP-06` checks the shape of a next-step bullet, never its truth.** The handoff probe proves
+    every bullet inside the first NEXT STEPS / NEXT section carries a date and one of owner /
+    done / cancelled — a bullet can carry all three tokens and still be a lie, work that is
+    missing from the list entirely is invisible (a queue that lists nothing passes), a second
+    NEXT section later in the file is unread, and the aliases `HP-02` accepts (`### NEXT`,
+    `Status`, `Pending <x> device test`) are inherited wholesale, so a heading shaped like an
+    alias is found by the same loose match. The failure it was adopted from was an item left
+    open for a week after the decision to cancel it (CURATION-2026-11-07 §2 C3).
 
 ---
 

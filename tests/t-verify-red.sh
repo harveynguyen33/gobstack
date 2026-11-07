@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 95 `expect_red` call sites and 24 `expect_green`
-# — 119 calls over all 60 of the rule set's target rows (the four source-scope rows
-# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 60 rows are
+# One control per target-scope row: 96 `expect_red` call sites and 26 `expect_green`
+# — 122 calls over all 61 of the rule set's target rows (the four source-scope rows
+# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 61 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
-# this revision: 60 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
+# this revision: 61 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `119 over 60 target rows`.
+# README's census sentence must read `122 over 61 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -747,12 +747,19 @@ m_hv02_bbox_g()  { printf '%s\n' 'const box = document.querySelector("#shot").ge
 m_hv02_marker()  { printf '%s\n' '// guarded: the frame owns its viewport; the driver asserts the shot target itself' 'const box = document.querySelector("#shot").getBoundingClientRect();' > checks/hv02-bbox.mjs; }
 m_hv02_parse()   { printf '%s\n' 'import { execSync } from "node:child_process";' 'const w = parseFloat(execSync("ttx -w shot.png").toString());' 'assert("wide", w > 100);' > checks/hv02-parse.mjs; }
 m_hv02_parse_g() { printf '%s\n' 'import { execSync } from "node:child_process";' 'const w = parseFloat(execSync("ttx -w shot.png").toString());' 'if (!Number.isFinite(w)) throw new Error("the tool spoke nonsense");' 'assert("wide", w > 100);' > checks/hv02-parse.mjs; }
+# HP-06: the bullet is planted INSIDE the Next steps section (an append to the file end would
+# land in NOT verified, a different section the row never reads).
+m_hp06_open()    { awk '/^## Next steps$/ && !d { print; print "- Ship the thing."; d = 1; next } { print }' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md; }
+m_hp06_owned()   { awk '/^## Next steps$/ && !d { print; print "- Ship the thing — owner: Test Runner, since 2026-11-07."; d = 1; next } { print }' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md; }
 
 expect_red   "a bounding box measured with no viewport guard"         HV-02 1 m_hv02_bbox
 expect_green "the same measurement guarded by innerWidth"             HV-02 m_hv02_bbox_g
 expect_green "a guarded: marker clears the whole file"                HV-02 m_hv02_marker
 expect_red   "a number parsed from tool stdout with no finite guard"  HV-02 1 m_hv02_parse
 expect_green "the parsed number asserted finite"                      HV-02 m_hv02_parse_g
+expect_red   "an open item with no date and no owner"                 HP-06 1 m_hp06_open
+expect_green "the same item owned with a date"                        HP-06 m_hp06_owned
+expect_green "no HANDOFF.md is a SKIP, never red"                     HP-06 m_drop_handoff
 
 # ---- P15: the reference-corpus rows, RC-01..RC-04 ------------------------------------------------
 # Four rows over two DECLARED values (`reference_manifest:`, and the `security: build_output:` key
