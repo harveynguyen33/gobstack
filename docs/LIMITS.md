@@ -501,9 +501,16 @@ the Node the gates ran under.
     same blind spot `.gob/installed.json` has (docs/LIMITS.md #18, one table over). What the honesty
     gate *does* hold is mechanical and narrow on purpose: a local row that names no check the engine
     can run (an id in neither the matrix nor the library, a `goblin-verify --only <ID>` marker with no
-    builtin, a check that cannot execute, or a bare id with no check cell) is refused at exit 3, so a
-    repo cannot add a rule that *nothing* verifies. It cannot judge whether a local check tests the
+    builtin, a check that cannot execute, or a bare id with no check cell) is refused at exit 3, so
+    a repo cannot add a rule that *nothing* verifies. It cannot judge whether a local check tests the
     right thing — no row here can.
+57. **`HV-02` proves a guard is present, never that it is effective.** The bounding-box/
+    parsed-number probe is a text probe over the harness dir (the `BN-01` class, no AST): a
+    decorative `innerWidth` mention beside a `getBoundingClientRect()` call passes, the patterns
+    inside a string or a comment are read as code, and a number parsed by any other means than
+    `parseFloat`/`parseInt`/`Number(` over `execSync`/`spawnSync` output is unseen. The failure the
+    row was adopted from had no guard at all (CURATION-2026-11-07 §2 C2); it catches that class and
+    says so about the rest.
 
 ---
 

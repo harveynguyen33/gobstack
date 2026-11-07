@@ -741,6 +741,59 @@ check_hp_05() {
   [ "$found" -eq 1 ]
 }
 
+# ---- the curation wave (CURATION-2026-11-07 §2/§6 phase 1): HV-02, HP-06, HV-01 ----------
+# Three text probes adopted from one project's measured failures, cheapest-and-most-
+# preventative first (§6): an instrument that convicts the product (C2 -> HV-02), a queue
+# that lies (C3 -> HP-06), and a check whose input is not the input the user gets (C1 ->
+# HV-01). All three are the BN-01 class - grep over text, no AST - and each carries its
+# honest limit in its why cell and in docs/LIMITS.md.
+
+check_hv_02() {
+  # C2: a number taken from a live surface carries its guard. Text probe over the harness dir:
+  # PRESENCE of a guard is provable, EFFECTIVENESS is not (a decorative guard passes - the
+  # limit is stated, not hidden). A `guarded: <reason>` marker comment is the escape hatch for
+  # a harness whose guard is not nameable in these tokens.
+  local d="$GOBLIN_HARNESS_DIR" f rel bad=0 n=0 nb=0 np=0
+  if [ -z "$d" ]; then
+    if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
+      printf 'harness_dir %s is declared and scaffold_checks is yes, but the directory is absent\n' \
+        "$GOBLIN_HARNESS_REL"
+      return 1
+    fi
+    printf 'no harness dir (%s absent, scaffold_checks is no) - nothing to guard\n' \
+      "$GOBLIN_HARNESS_REL"
+    return 3
+  fi
+  for f in "$d"/*; do
+    [ -f "$f" ] || continue
+    n=$((n + 1))
+    rel="${f#"$ROOT"/}"
+    # the marker clears every clause in the file: it names the reason the guard lives elsewhere
+    grep -Eq 'guarded:[[:space:]]*[^[:space:]]' "$f" && continue
+    if grep -q 'getBoundingClientRect(' "$f"; then
+      if grep -Eq 'innerWidth|innerHeight|visualViewport' "$f"; then
+        nb=$((nb + 1))
+      else
+        printf '%s measures a bounding box (getBoundingClientRect) with no viewport guard (innerWidth/innerHeight/visualViewport) and no guarded: marker\n' "$rel"
+        bad=1
+      fi
+    fi
+    if grep -Eq 'execSync|execFileSync|spawnSync|child_process' "$f" \
+       && grep -Eq 'parseFloat|parseInt|Number[[:space:]]*\(' "$f"; then
+      if grep -Eq 'Number[.]isFinite|isNaN|isFinite' "$f"; then
+        np=$((np + 1))
+      else
+        printf '%s parses a number out of another process stdout with no finite guard (Number.isFinite/isNaN) and no guarded: marker\n' "$rel"
+        bad=1
+      fi
+    fi
+  done
+  [ "$bad" -eq 0 ] || return 1
+  printf '%d harness file(s); %d guarded bounding-box measurement(s), %d guarded parsed-number measurement(s)\n' \
+    "$n" "$nb" "$np"
+  return 0
+}
+
 check_gt_01() {
   # Every `- name:` under `gates:` is a DECLARED gate, and every declared gate must carry a
   # `cmd:`. Counting only the name+cmd PAIRS (what this row did) let a gate lose its `cmd:` -

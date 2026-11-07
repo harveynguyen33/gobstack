@@ -11,7 +11,7 @@ Use when adopting goblin-stack in a repo, or starting one.
    no agent skills. Vendor the Hermes project tier with `--skills yes` if you want them installed.
 2. **`goblin-verify`** — a default install (core procedure tier vendored under `.gob/skills/`)
    verifies green:
-   `17 passed, 0 failed, 0 advisory, 10 skipped`, exit 0, once `HANDOFF.md` names a commit that
+   `18 passed, 0 failed, 0 advisory, 10 skipped`, exit 0, once `HANDOFF.md` names a commit that
    exists; before that edit the
    scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`16 passed, 1 failed`).
    Ten rows skip with a reason, and the reason matters: `SK-01`, `SK-02` and `SK-04` **run** (the

@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 93 `expect_red` call sites and 21 `expect_green`
-# — 114 calls over all 59 of the rule set's target rows (the four source-scope rows
-# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 59 rows are
+# One control per target-scope row: 95 `expect_red` call sites and 24 `expect_green`
+# — 119 calls over all 60 of the rule set's target rows (the four source-scope rows
+# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 60 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
-# this revision: 59 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
+# this revision: 60 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `114 over 59 target rows`.
+# README's census sentence must read `119 over 60 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -106,6 +106,7 @@ restore_all() {
   # would expand to it, but an unquoted glob in a restore path is exactly the habit that control
   # exists to break.
   rm -f 'checks/z2;true;#.mjs'
+  rm -f checks/hv02-bbox.mjs checks/hv02-parse.mjs
   cp -a "$BK/assert.mjs" checks/assert.mjs
   rm -f reviews/fixture-*.md
   rm -rf reports
@@ -735,6 +736,23 @@ expect_red   "an entry path changed after the map was verified" FM-02 1 m_fm_02_
 expect_red   "Z1-6: an entry path only an untracked file holds" FM-02 1 m_fm_02_untracked
 expect_red   "a verify_doctor that exits non-zero" VA-01 1 m_va_01_fail
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip
+
+# ---- the curation wave (CURATION-2026-11-07 §6 phase 1): HV-02, HP-06, HV-01 --------------------
+# Three new text probes; each control is a deliberately-broken copy of the class it checks
+# (PR-03's second branch - a new row has no pre-change tree to be RED on). Every mutation
+# plants the exact violation the row exists to catch into the fixture's own harness dir or
+# HANDOFF, and restore_all takes the planted files back out.
+m_hv02_bbox()    { printf '%s\n' 'const box = document.querySelector("#shot").getBoundingClientRect();' 'assert("inside", box.bottom < 4096);' > checks/hv02-bbox.mjs; }
+m_hv02_bbox_g()  { printf '%s\n' 'const box = document.querySelector("#shot").getBoundingClientRect();' 'if (box.right > window.innerWidth) throw new Error("outside the capture viewport");' > checks/hv02-bbox.mjs; }
+m_hv02_marker()  { printf '%s\n' '// guarded: the frame owns its viewport; the driver asserts the shot target itself' 'const box = document.querySelector("#shot").getBoundingClientRect();' > checks/hv02-bbox.mjs; }
+m_hv02_parse()   { printf '%s\n' 'import { execSync } from "node:child_process";' 'const w = parseFloat(execSync("ttx -w shot.png").toString());' 'assert("wide", w > 100);' > checks/hv02-parse.mjs; }
+m_hv02_parse_g() { printf '%s\n' 'import { execSync } from "node:child_process";' 'const w = parseFloat(execSync("ttx -w shot.png").toString());' 'if (!Number.isFinite(w)) throw new Error("the tool spoke nonsense");' 'assert("wide", w > 100);' > checks/hv02-parse.mjs; }
+
+expect_red   "a bounding box measured with no viewport guard"         HV-02 1 m_hv02_bbox
+expect_green "the same measurement guarded by innerWidth"             HV-02 m_hv02_bbox_g
+expect_green "a guarded: marker clears the whole file"                HV-02 m_hv02_marker
+expect_red   "a number parsed from tool stdout with no finite guard"  HV-02 1 m_hv02_parse
+expect_green "the parsed number asserted finite"                      HV-02 m_hv02_parse_g
 
 # ---- P15: the reference-corpus rows, RC-01..RC-04 ------------------------------------------------
 # Four rows over two DECLARED values (`reference_manifest:`, and the `security: build_output:` key
