@@ -37,6 +37,15 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   bare id with no check cell. `tests/t-extend.sh` proves the loop end to end through the real file:
   a library row off, then on and green, then red under its violation with its remedy, then refused
   when miswritten, then off again.
+- **A re-install no longer blanks `feature_map:`.** The block is rendered from the template on every
+  install and written wholesale, and the template carries `feature_map:` empty — so a plain
+  `goblin-install` (no `--upgrade`) erased a declared map and `FM-01`/`FM-02` fell back to SKIP: both
+  rows a re-install could switch off. The installer now carries the previous value forward through
+  the round-trip reader (`g_agents_pairs`, so a value containing ": " or a raw tab survives), and the
+  carry replaces the rendered line rather than appending a duplicate. A map the project blanked stays
+  blank — the carry never resurrects a value. `tests/t-install-feature-map-carry.sh` plants a value,
+  re-installs twice, and asserts the block is byte-identical (RED on the previous engine: value
+  erased).
 
 ## Unreleased (feat/extras-catalogue)
 

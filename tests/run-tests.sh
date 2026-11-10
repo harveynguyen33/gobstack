@@ -64,7 +64,7 @@ else
 fi
 
 # ---- the test scripts --------------------------------------------------------
-for t in t-install-idempotent t-install-off-switch t-skills-library t-install-refusal t-verify-green t-verify-red \
+for t in t-install-idempotent t-install-feature-map-carry t-install-off-switch t-skills-library t-install-refusal t-verify-green t-verify-red \
          t-extend t-verify-nested t-uninstall t-doc-sync t-doc-promises t-practice-repin \
          t-render-tokens t-gt03-freshness t-doc-guide t-doc-guide-init t-version-sync \
          t-init t-init-argguard t-banner-stderr t-shim t-mcp t-hooks t-hvhp-rows t-ag01-rows; do

@@ -758,6 +758,27 @@ if [ "$DRY_RUN" -eq 0 ] && [ -f "$CONFIG" ]; then
     if [ -n "$KEEP_PRACTICE" ]; then
       sed -i "s#^practice: .*\$#practice: $KEEP_PRACTICE#; s#^practice_sha256: .*\$#practice_sha256: $KEEP_PRACTICE_SHA#" "$TMP/agents-block"
     fi
+    # feature_map (FM-01/FM-02): the map's README is the PROJECT's answer, but the template
+    # renders the key with the literal empty value - so a plain re-install (no --upgrade) used
+    # to blank a declared map, and both rows fell back to SKIP: a gate a re-install can switch
+    # off. Carry the previous value forward through the round-trip reader, not g_agents_read:
+    # a value containing ": " would otherwise be rebuilt from the first colon (g_agents_pairs
+    # keeps the bytes, tabs included). The carry REPLACES the rendered line rather than being
+    # appended: g_agents_read stops at the first match, so an appended pair would sit behind
+    # the empty rendered one and read back empty. An EMPTY previous value carries nothing - a
+    # map the project blanked stays blank, and a fresh install is unchanged.
+    KEEP_FEATURE_MAP=$(g_agents_pairs "$CONFIG" \
+      | awk -F'\t' '$1 == "feature_map" { print substr($0, length($1) + 2); exit }')
+    if [ -n "$KEEP_FEATURE_MAP" ]; then
+      KFM="$KEEP_FEATURE_MAP" awk '
+        BEGIN { v = ENVIRON["KFM"] }
+        /^feature_map:/ && !done { print "feature_map: " v; done = 1; next }
+        { print }
+        END { if (!done) print "feature_map: " v }
+      ' "$TMP/agents-block" > "$TMP/agents-block.fm" \
+        && mv "$TMP/agents-block.fm" "$TMP/agents-block" \
+        || { g_err "could not carry feature_map forward into $CONFIG"; exit 1; }
+    fi
   fi
   g_agents_write "$CONFIG" < "$TMP/agents-block" >/dev/null \
     || { g_err "could not write the gob block into $CONFIG"; exit 1; }
