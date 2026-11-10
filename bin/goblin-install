@@ -678,6 +678,46 @@ render_config() {
   grep -v '^gate__cmd: $' "$TMP/agents-block.raw" > "$TMP/agents-block"
 }
 
+# Every key the render-call above draws from a HARDCODED LITERAL rather than from a flag or the
+# previous install record — enumerated, not sampled. A re-install must carry the project's
+# previous value forward for each: g_agents_write replaces the block WHOLESALE, so a declared
+# value used to be written over by the literal on every install, and every gate that reads such
+# a key fell back to SKIP. That is a re-install switching a check off by deleting its subject,
+# in silence: FM-01/FM-02 read feature_map:, FM-02 resolves under source_root:, VA-01 reads
+# verify_doctor:, RC-01 reads reference_manifest:, CM-03 reads max_dirty:, and goblin-bans reads
+# bans_exempt:. The render-call's other pairs all come from variables (a flag, or the previous
+# record), so they are not in this list.
+CARRY_KEYS="feature_map source_root verify_doctor reference_manifest quarantine_root max_dirty bans_exempt"
+
+# carry_forward — replace each rendered literal line with the PREVIOUS block's value, byte for
+# byte. The read is the round-trip reader (g_agents_pairs), not g_agents_read: the latter strips
+# after the first colon, so a value carrying ": " (or a raw tab) is rebuilt and drifts on every
+# rewrite. The carry REPLACES the rendered line rather than being appended: g_agents_read stops
+# at the first match, so an appended pair would sit behind the empty rendered one and still read
+# back empty. An EMPTY or absent previous value carries nothing — a value the project blanked
+# stays blank, and a fresh install (no block yet) is untouched: the render is the answer on day
+# one. Called only when the target AGENTS.md exists (it is a no-op over a body with no block).
+# A failure here EXITS: a re-install that cannot read the previous block must not go on and
+# write the literals over it (that is this card's bug by another route).
+carry_forward() {
+  local k v
+  [ -f "$CONFIG" ] || return 0
+  g_agents_pairs "$CONFIG" > "$TMP/carry.tsv" \
+    || { g_err "could not read the previous gob block in $CONFIG"; exit 1; }
+  for k in $CARRY_KEYS; do
+    v=$(awk -F'\t' -v k="$k" '$1 == k { print substr($0, length($1) + 2); exit }' "$TMP/carry.tsv")
+    [ -n "$v" ] || continue
+    CK="$k" CV="$v" awk '
+      BEGIN { k = ENVIRON["CK"]; v = ENVIRON["CV"] }
+      index($0, k ":") == 1 && !done { print k ": " v; done = 1; next }
+      { print }
+      END { if (!done) print k ": " v }
+    ' "$TMP/agents-block" > "$TMP/agents-block.carry" \
+      && mv "$TMP/agents-block.carry" "$TMP/agents-block" \
+      || { g_err "could not carry $k forward into $CONFIG"; exit 1; }
+  done
+}
+
 render_config
 # The re-shadow refusal (W3 §5.3): a record with engine.mode=global is a MIGRATED repo.
 # Re-installing would recreate the 18-file payload (the vendored step of the resolution
@@ -758,28 +798,15 @@ if [ "$DRY_RUN" -eq 0 ] && [ -f "$CONFIG" ]; then
     if [ -n "$KEEP_PRACTICE" ]; then
       sed -i "s#^practice: .*\$#practice: $KEEP_PRACTICE#; s#^practice_sha256: .*\$#practice_sha256: $KEEP_PRACTICE_SHA#" "$TMP/agents-block"
     fi
-    # feature_map (FM-01/FM-02): the map's README is the PROJECT's answer, but the template
-    # renders the key with the literal empty value - so a plain re-install (no --upgrade) used
-    # to blank a declared map, and both rows fell back to SKIP: a gate a re-install can switch
-    # off. Carry the previous value forward through the round-trip reader, not g_agents_read:
-    # a value containing ": " would otherwise be rebuilt from the first colon (g_agents_pairs
-    # keeps the bytes, tabs included). The carry REPLACES the rendered line rather than being
-    # appended: g_agents_read stops at the first match, so an appended pair would sit behind
-    # the empty rendered one and read back empty. An EMPTY previous value carries nothing - a
-    # map the project blanked stays blank, and a fresh install is unchanged.
-    KEEP_FEATURE_MAP=$(g_agents_pairs "$CONFIG" \
-      | awk -F'\t' '$1 == "feature_map" { print substr($0, length($1) + 2); exit }')
-    if [ -n "$KEEP_FEATURE_MAP" ]; then
-      KFM="$KEEP_FEATURE_MAP" awk '
-        BEGIN { v = ENVIRON["KFM"] }
-        /^feature_map:/ && !done { print "feature_map: " v; done = 1; next }
-        { print }
-        END { if (!done) print "feature_map: " v }
-      ' "$TMP/agents-block" > "$TMP/agents-block.fm" \
-        && mv "$TMP/agents-block.fm" "$TMP/agents-block" \
-        || { g_err "could not carry feature_map forward into $CONFIG"; exit 1; }
-    fi
   fi
+  # The install-once contract for the keys the renderer draws from a hardcoded literal
+  # (feature_map, source_root, verify_doctor, reference_manifest, quarantine_root, max_dirty,
+  # bans_exempt — CARRY_KEYS, enumerated above): a re-install must not ERASE a project's
+  # declaration and turn the gate that reads it into a SKIP. Gated on the BLOCK's presence, not
+  # on the previous install record: an AGENTS.md that carries a gob block is the project's
+  # answers whether or not installed.json survived, and the carry is a no-op when no block
+  # exists (so a fresh install still renders today's defaults).
+  carry_forward
   g_agents_write "$CONFIG" < "$TMP/agents-block" >/dev/null \
     || { g_err "could not write the gob block into $CONFIG"; exit 1; }
 fi

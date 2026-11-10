@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# t-install-feature-map-carry.sh — `feature_map:` is the PROJECT's answer, and a re-install
-# must not blank it.
+# t-install-feature-map-carry.sh — a re-install must never ERASE a declaration.
 #
 # `render_config` (bin/goblin-install) re-renders the gob:block from
-# templates/agents-block.tmpl, which carries `feature_map:` with the literal empty value, and
-# g_agents_write replaces the block wholesale — so a PLAIN re-install (no --upgrade) erased a
-# declared map and FM-01/FM-02 fell back to SKIP, i.e. a re-install switched both gates off.
-# The carry-forward below reads the previous block through the round-trip reader
-# (g_agents_pairs), so a value containing ": " or a raw tab survives intact.
+# templates/agents-block.tmpl on EVERY install, and for a set of keys it draws the value from a
+# HARDCODED LITERAL (`FEATURE_MAP ""`, `VERIFY_DOCTOR ""`, `REFERENCE_MANIFEST ""`,
+# `QUARANTINE_ROOT ""`, `SOURCE_ROOT "."`, `MAX_DIRTY "0"`, `BANS_EXEMPT ""` — CARRY_KEYS in
+# the installer is that whole enumeration). g_agents_write then replaces the block wholesale, so
+# a PLAIN re-install wrote the literal over the project's answer and every gate reading such a
+# key fell back to SKIP: a re-install switched a check off by deleting its subject. This file
+# covers the feature_map case end to end, then each of the other keys, then the two honest
+# edges — a fresh install keeps today's defaults, a blanked value stays blank — and finally the
+# negative control (the same tree with the carry switched off, measured 4 in -> 0 out).
+#
+# The carry reads the previous block through the round-trip reader (g_agents_pairs), so a value
+# containing ": " or a raw tab survives intact.
 # House fixture: tests/t-install-idempotent.sh.
 set -uo pipefail
 
@@ -75,6 +81,122 @@ sed -i 's|^feature_map:.*$|feature_map:|' AGENTS.md
 $INSTALL >/dev/null 2>&1
 check "a blanked feature_map stays blank (the carry never resurrects a value)" \
   "$(grep -qx 'feature_map:' AGENTS.md && echo 0 || echo 1)"
+
+# ---- the REST of the render-call's literal keys (INSTALL-CARRY) ----------------
+# `render_config` (bin/goblin-install) draws these keys from a HARDCODED LITERAL in the same
+# render call: `VERIFY_DOCTOR ""`, `REFERENCE_MANIFEST ""`, `QUARANTINE_ROOT ""`, plus
+# `SOURCE_ROOT "."`, `MAX_DIRTY "0"` and `BANS_EXEMPT ""`. Every one is read by a gate
+# (VA-01 / RC-01 / FM-02 / CM-03 / goblin-bans' exemptions), so writing the literal over a
+# project's declaration switches that gate off exactly the way feature_map's was switched off.
+# The feature_map cases above already prove the mechanism; these are the ENUMERATION — the
+# whole render-call was read, so this is every literal-drawn key in it, not a sample.
+OTHER_KEYS="verify_doctor reference_manifest quarantine_root source_root max_dirty bans_exempt"
+oval() {
+  case "$1" in
+    feature_map)        printf 'features/README.md' ;;
+    verify_doctor)      printf 'bash scripts/doctor.sh --fast' ;;
+    reference_manifest) printf 'assets/reference-manifest.json' ;;
+    quarantine_root)    printf '.quarantine' ;;
+    source_root)        printf 'src' ;;
+    max_dirty)          printf '3' ;;
+    bans_exempt)        printf '[- BN-01 vendor/]' ;;
+  esac
+}
+for k in $OTHER_KEYS; do
+  sed -i "s|^$k:.*\$|$k: $(oval "$k")|" AGENTS.md
+done
+printf '      before:\n'
+for k in $OTHER_KEYS; do printf '        %s: %s\n' "$k" "$(sed -n "s|^$k: ||p" AGENTS.md | head -n 1)"; done
+n=0; for k in $OTHER_KEYS; do grep -qxF "$k: $(oval "$k")" AGENTS.md && n=$((n + 1)); done
+check "the 6 other literal keys are planted ($n/6)" "$([ "$n" -eq 6 ] && echo 0 || echo 1)"
+SNAP2=$(sha256sum AGENTS.md | awk '{print $1}')
+
+$INSTALL >/dev/null 2>&1
+printf '      after:\n'
+for k in $OTHER_KEYS; do printf '        %s: %s\n' "$k" "$(sed -n "s|^$k: ||p" AGENTS.md | head -n 1)"; done
+n=0; for k in $OTHER_KEYS; do grep -qxF "$k: $(oval "$k")" AGENTS.md && n=$((n + 1)); done
+check "all 6 survive the re-install byte-identically (measured $n/6)" \
+  "$([ "$n" -eq 6 ] && echo 0 || echo 1)"
+check "AGENTS.md is byte-identical after carrying 6 more keys" \
+  "$([ "$(sha256sum AGENTS.md | awk '{print $1}')" = "$SNAP2" ] && echo 0 || echo 1)"
+n=0; for k in $OTHER_KEYS; do [ "$(grep -c "^$k:" AGENTS.md)" -eq 1 ] && n=$((n + 1)); done
+check "each carried key appears exactly once ($n/6 — replace, never append)" \
+  "$([ "$n" -eq 6 ] && echo 0 || echo 1)"
+
+# ---- the delete direction, for every one of them ------------------------------
+# The carry reads what is THERE. A value the project blanked carries nothing, so a key whose
+# default is EMPTY stays blank: the installer must never resurrect a declaration it cannot see.
+# (source_root: "." and max_dirty: "0" are the two whose default is a REAL value — a blank
+# there re-renders today's default, which is the same thing a fresh install writes.)
+BLANKABLE="verify_doctor reference_manifest quarantine_root"
+for k in $BLANKABLE; do sed -i "s|^$k:.*\$|$k:|" AGENTS.md; done
+sed -i 's|^source_root:.*$|source_root:|; s|^max_dirty:.*$|max_dirty:|' AGENTS.md
+$INSTALL >/dev/null 2>&1
+n=0; for k in $BLANKABLE; do grep -qxF "$k:" AGENTS.md && n=$((n + 1)); done
+check "the 3 empty-default keys stay blank when the project blanked them ($n/3)" \
+  "$([ "$n" -eq 3 ] && echo 0 || echo 1)"
+check "a blanked source_root:/max_dirty: re-renders today's default (., 0 — not a carry)" \
+  "$(grep -qx 'source_root: \.' AGENTS.md && grep -qx 'max_dirty: 0' AGENTS.md && echo 0 || echo 1)"
+
+# ---- a fresh install still renders today's defaults ---------------------------
+# With no previous block the carry does nothing, so the block a fresh install renders must be
+# byte-identical to the one the PRE-CHANGE renderer renders into an empty repo. That copy is
+# also the negative control below: this tree with the carry call switched off — the renderer
+# this card was measured on. It is a copy of the shipped dirs, never the repo.
+fixture() { # fixture <dir>
+  mkdir -p "$1"
+  printf '# target\n' > "$1/README.md"
+  ( cd "$1" \
+    && git init -q -b main \
+    && git config user.name "Test Runner" \
+    && git config user.email "runner@example.com" \
+    && git add -A && git commit -q -m "chore: seed" )
+}
+block() { sed -n '/^<!-- gob:begin/,/^<!-- gob:end/p' "$1"; }
+PRE="$WORK/pre"
+mkdir -p "$PRE"
+cp -a "$SRC/bin" "$SRC/templates" "$SRC/manifest" "$SRC/bans" "$SRC/skills" "$SRC/VERSION" "$PRE/"
+CARRY_CALLS=$(grep -c '^[[:space:]]*carry_forward$' "$PRE/bin/goblin-install" 2>/dev/null || true)
+check "the pre-change copy has exactly one carry_forward call to switch off" \
+  "$([ "${CARRY_CALLS:-0}" -eq 1 ] && echo 0 || echo 1)"
+sed -i 's/^\([[:space:]]*\)carry_forward$/\1: # negative control: the carry is OFF/' \
+  "$PRE/bin/goblin-install"
+check "the negative control really switched it off (no active call left)" \
+  "$([ "$(grep -c '^[[:space:]]*carry_forward$' "$PRE/bin/goblin-install")" -eq 0 ] && echo 0 || echo 1)"
+
+fixture "$WORK/fresh"
+fixture "$WORK/today"
+bash "$SRC/bin/goblin-install" --target "$WORK/fresh" >/dev/null 2>&1
+bash "$PRE/bin/goblin-install" --target "$WORK/today" >/dev/null 2>&1
+block "$WORK/fresh/AGENTS.md" > "$WORK/fresh.block"
+block "$WORK/today/AGENTS.md" > "$WORK/today.block"
+check "a fresh install renders the SAME block as the pre-change renderer (no invented default)" \
+  "$(diff -q "$WORK/fresh.block" "$WORK/today.block" >/dev/null && echo 0 || echo 1)"
+n=0
+for k in feature_map verify_doctor reference_manifest quarantine_root; do
+  grep -qx "$k:" "$WORK/fresh.block" && n=$((n + 1))
+done
+check "a fresh install still ships the 4 gates EMPTY ($n/4 — the honest day-one state)" \
+  "$([ "$n" -eq 4 ] && echo 0 || echo 1)"
+check "a fresh install still ships source_root: . (today's literal default)" \
+  "$(grep -qx 'source_root: \.' "$WORK/fresh.block" && echo 0 || echo 1)"
+
+# ---- the negative control: the same test on the pre-change renderer -----------
+# D: if this harness cannot fail, it proves nothing. Plant the card's 4 keys, re-install with
+# the carry switched off, and measure 4 in -> 0 out.
+fixture "$WORK/neg"
+AG_NEG="$WORK/neg/AGENTS.md"
+bash "$PRE/bin/goblin-install" --target "$WORK/neg" >/dev/null 2>&1
+for k in feature_map verify_doctor reference_manifest quarantine_root; do
+  sed -i "s|^$k:.*\$|$k: $(oval "$k")|" "$AG_NEG"
+done
+BEFORE_NEG=$(grep -cE '^(feature_map|verify_doctor|reference_manifest|quarantine_root): .+' "$AG_NEG")
+check "the 4 declarations are planted before the control's re-install (4 in)" \
+  "$([ "$BEFORE_NEG" -eq 4 ] && echo 0 || echo 1)"
+bash "$PRE/bin/goblin-install" --target "$WORK/neg" >/dev/null 2>&1
+AFTER_NEG=$(grep -cE '^(feature_map|verify_doctor|reference_manifest|quarantine_root): .+' "$AG_NEG")
+check "NEGATIVE CONTROL: the same re-install erases them — 4 in -> $AFTER_NEG out" \
+  "$([ "$AFTER_NEG" -eq 0 ] && echo 0 || echo 1)"
 
 if [ "$fail" -eq 0 ]; then note "t-install-feature-map-carry: PASS"; else note "t-install-feature-map-carry: FAIL"; fi
 exit "$fail"
