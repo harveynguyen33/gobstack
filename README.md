@@ -206,7 +206,7 @@ yet, not red). Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-04) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (144 over 65 target rows), each required to go RED and then
+one control per target-scope row (148 over 65 target rows), each required to go RED and then
 restored. **A verifier that only ever prints GREEN is a failure**, so that file is the one that
 matters most.
 

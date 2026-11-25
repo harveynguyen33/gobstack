@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 107 `expect_red` call sites and 37 `expect_green`
-# — 144 calls over all 65 of the rule set's target rows (the four source-scope rows
+# One control per target-scope row: 108 `expect_red` call sites and 40 `expect_green`
+# — 148 calls over all 65 of the rule set's target rows (the four source-scope rows
 # carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 34 of those 65 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
 # this revision: 65 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
-# without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `144 over 65 target rows`.
+# The census is recomputed from this file by tests/t-doc-promises.sh;
+# README's census sentence must read `148 over 65 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -1214,6 +1214,48 @@ m_pv01_alias() {
 }
 m_pv01_alias_restore() { rm -f tsconfig.json; restore_all; }
 expect_green "PV-01: a shared import through a tsconfig paths alias resolves and is GREEN" PV-01 m_pv01_alias '' m_pv01_alias_restore
+
+# PV-01 round 4 (2026-11-25 preview-surfaces): the relative branch's normalisation keyed on the
+# ABSOLUTE path (cur = the layout's absolute dir) while the alias branch keyed ROOT-relative —
+# keys from two different spaces never intersect, so two layouts naming the SAME module in
+# different styles was a guaranteed false RED in any repo with tsconfig paths. Every branch now
+# emits one canonical key: ROOT-relative, extension stripped, trailing /index stripped. Four
+# controls: mixed styles both directions (GREEN), a directory entry named two ways (GREEN), and
+# the guard against the fix going style-blind (RED — genuinely different modules stay RED).
+# The fixture ships no tsconfig.json, so the controls' own copy is removed on restore.
+m_pv01_rel_vs_alias() {
+  mkdir -p app/preview
+  printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
+  printf 'export const SiteShell = 1\n' > app/site-shell.tsx
+  printf "import './site-shell';\n" > app/layout.tsx
+  printf "import { SiteShell } from '@/site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a preview naming the shared module through a resolvable alias while the public layout names it relative is GREEN" PV-01 m_pv01_rel_vs_alias '' m_pv01_alias_restore
+m_pv01_alias_vs_rel() {
+  mkdir -p app/preview
+  printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
+  printf 'export const SiteShell = 1\n' > app/site-shell.tsx
+  printf "import { SiteShell } from '@/site-shell'\n" > app/layout.tsx
+  printf "import '../site-shell';\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: the reverse direction - public layout through the alias, preview relative - is GREEN" PV-01 m_pv01_alias_vs_rel '' m_pv01_alias_restore
+m_pv01_rel_vs_alias_dir() {
+  mkdir -p app/preview app/site-dir
+  printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
+  printf 'export const SiteShell = 1\n' > app/site-dir/index.tsx
+  printf "import './site-dir';\n" > app/layout.tsx
+  printf "import { SiteShell } from '@/site-dir/index.tsx'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a directory entry named relative in one layout and as @/dir/index.tsx in the other keys as one module and is GREEN" PV-01 m_pv01_rel_vs_alias_dir '' m_pv01_alias_restore
+m_pv01_rel_vs_alias_red() {
+  mkdir -p app/preview
+  printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
+  printf 'export const A = 1\n' > app/site-a.tsx
+  printf 'export const B = 1\n' > app/site-b.tsx
+  printf "import './site-a';\n" > app/layout.tsx
+  printf "import { B } from '@/site-b'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: a relative in one layout and an alias naming a DIFFERENT file in the other is still RED" PV-01 1 m_pv01_rel_vs_alias_red '' m_pv01_alias_restore
 
 # PV-02 red: a boundary owns its whole subtree — the offending page sits DEEP under it
 # (the measured failure this row exists for).

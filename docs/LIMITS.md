@@ -545,14 +545,22 @@ the Node the gates ran under.
 61. **`PV-01` compares project-resolvable modules, and an import still proves reachability, not an identical render.**
     The check collects the module specifiers a review surface's `layout.*` imports and compares
     them with the public layout at the equivalent position — but the intersection counts
-    PROJECT-RESOLVABLE modules only: a relative specifier normalises across the two positions
-    and counts, while a bare specifier counts only when it resolves to a file that exists inside
+    PROJECT-RESOLVABLE modules only: both sides are reduced to ONE canonical key space —
+    ROOT-relative module paths with the probed extension and a trailing `/index` stripped —
+    so the surface and its public layout may name the same module in different styles (one
+    relative, the other through a resolvable alias) and still intersect (2026-11-25
+    preview-surfaces round 4: the keys used to come from two different spaces and never
+    intersect — a guaranteed false RED in any repo with tsconfig `paths`). A relative
+    specifier counts once normalised, while a bare specifier counts only when it resolves to
+    a file that exists inside
     the repo (tsconfig.json/jsconfig.json `baseUrl`+`paths` first — read as strict JSON, so a
     commented JSONC leaves its aliases unresolvable — then `<ROOT>/<spec>` with the usual
     extension and index probing). An installed package, a `node:` builtin or anything else the
     probe cannot resolve is NEVER evidence that a surface pulls in the published shell: two
     layouts both importing `react` or `next/link` are RED (PR #2 review round 2 — both used to
-    be a false GREEN, the worse direction). A specifier that resolves nowhere is dropped from
+    be a false GREEN, the worse direction). A specifier that resolves nowhere — including a
+    relative one that climbs out of the project root, which names a module outside the repo —
+    is dropped from
     the intersection and the RED message says so, so the reader knows an unresolvable alias may
     be the cause and that `preview_differs: <list>` is the escape hatch. The comparison cannot
     see past the import: a shell imported and then overridden by a local wrapper (its own
