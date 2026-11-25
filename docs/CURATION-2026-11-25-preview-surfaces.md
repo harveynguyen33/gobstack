@@ -18,12 +18,22 @@ the cause).
 
 ---
 
+## 0. The standing rule this file is held to
+
+A lesson may enter gobstack only if it is true regardless of framework: a row states a rule that holds with
+no framework named, and framework-specific mechanics stay in the project's own skill. A mechanism may read
+per-framework conventions ONLY as heuristics — a repo without those conventions gets `SKIP` with the reason,
+never a RED. This rule governs everything below, including the verdicts in §1, the withdrawal recorded in §3
+and what §5 refuses.
+
+---
+
 ## 1. The seven candidates, ranked by leverage
 
 | # | Lesson | Class | Mechanisable today | Verdict |
 |---|---|---|---|---|
 | P1 | A surface that exists to be reviewed must render the artifact that will be published | verification / review | partly, import probe | **adopt (opt-in lint)** |
-| P2 | A streaming boundary above a "not found" decision commits the status before the decision is made | verification / web | yes, text probe | **adopt (opt-in lint)** |
+| P2 | A streaming boundary above a "not found" decision commits the status before the decision is made | verification / web | yes, text probe | **withdrawn after review — framework-specific (`loading.*` / `notFound()`); see §3** |
 | P3 | A build-time list is not a runtime list | publishing / caching | shape only | advisory |
 | P4 | A preload claim needs two timestamps, not one stopwatch | verification | no | advisory |
 | P5 | "Cannot leak" is proven by the absence of a code path, not by the absence of an observed behaviour | isolation / security | partly | advisory (strong later row) |
@@ -32,7 +42,10 @@ the cause).
 
 ---
 
-## 2. The two adoptions, with the failure that justifies each
+## 2. The adoptions, with the failure that justifies each
+
+P2 was **withdrawn after review** as framework-specific; its failure story now lives in §3 with the
+withdrawal reason. What follows is the one adoption that survived the standing rule (§0).
 
 ### P1 — a review surface must render the artifact that will be published
 
@@ -44,53 +57,37 @@ fix (`91a5955`) mounts the production shell — the same provider, nav, footer a
 fonts and dark class — and leaves exactly three differences, each one declared: a banner strip in normal
 flow above the nav, `noindex`, and no analytics/JSON-LD (owner visits must not pollute the numbers).
 
-**Rule (project-independent).** *A surface whose purpose is review — preview, staging, draft, "view as
-published" — renders the same shell, layout and content component as the published route; every remaining
-difference is enumerated in the surface's own source as a marker, so a difference is a decision rather than
-an accident.*
+**Rule (project-independent).** *A surface that exists to be reviewed renders the same shell the published
+surface renders; every remaining difference is enumerated in the surface's own source, so a difference is a
+decision rather than an accident.*
 
 **Mechanism (proposed `PV-01`, opt-in lint).** For each route directory the project config names as a review
 surface, the layout file must import the same shell module(s) the public layout imports, **or** carry
 `preview_differs: <comma list>` naming every difference it keeps. Red when the surface renders a shell the
-public tree does not use and declares nothing.
+public tree does not use and declares nothing. The detection reads route-tree/shell conventions — what
+counts as a review surface, what names the shell — as heuristics: a repo whose conventions the probe cannot
+read gets `SKIP` with the reason, never a RED (the standing rule, §0). The intersection counts project CODE
+modules only: a shared stylesheet or any style/asset import proves the same theme, never the same shell,
+and a side-effect import wires a module without naming what renders — neither is evidence.
 
 **Honest limit (goes in the row's `if_not_why`).** An import probe proves the module is reachable from the
 file, never that the render is identical: a shell imported and then overridden by a local wrapper passes
 while still differing. The stronger form is a design change — one `SiteShell` component both trees import —
 and this project needed the probe *before* it had the design.
 
-### P2 — a streaming boundary above a decision commits the status code first
-
-**Failure, in three acts.** (a) `/writing/why-i-built-gobigrams` — a draft slug that must 404 on the public
-site — answered **HTTP 200** with a body reading "Not Found". Root cause: a `loading.tsx` at the segment
-makes the route stream; the response headers flush `200` with the shell, and `notFound()` afterwards can only
-swap the body. The leak was not content (the body carried no draft text, flight data showed
-`NEXT_HTTP_ERROR_FALLBACK;404`) but the *status* was a lie, and every status-code check in the project read
-the lie as truth. (b) Deleting the boundary in the child segment changed nothing: a `loading.tsx` owns its
-**whole subtree**, so the parent's boundary was the one doing it. (c) The same class then blocked a separate
-decision: a page exporting `generateStaticParams` with `dynamicParams = false` looked safe *because* the
-404 test passed — and it would have 404'd every article published after the last deploy, since the params
-list is build-time only.
-
-**Rule.** *A route that can decide "not found" at render time mounts no streaming boundary above that
-decision; either the decision is taken before the first byte (existence check in metadata/generateMetadata,
-a non-streamed lookup) or the boundary is removed for that subtree. A 404 assertion is made by a client
-outside the framework's own boundary, never by code that reads the same stream.*
-
-**Mechanism (proposed `PV-02`, opt-in lint).** For every route directory carrying a loading boundary
-(`loading.*`, or a `<Suspense>` wrapping the page in its layout), grep the subtree for pages that call
-`notFound()` / throw a 404. Red names the boundary file and the page. Escape hatch: `status_checked: <where>`
-in the page when the existence is settled before streaming.
-
-**Honest limit.** The probe reads a framework convention, not a runtime: it cannot see a boundary added by a
-component the page imports, and it cannot tell whether an `status_checked:` marker is true. It is also
-JS/Next-shaped — the same defect class in another framework needs its own convention map, which is why the
-row is opt-in (`library.tsv`) rather than mandatory.
-
 ---
 
 ## 3. The advisory set (no mechanism yet, and why)
 
+- **P2 — withdrawn after review (framework-specific).** The failure was real — a draft slug that must 404
+  answered **HTTP 200** with a body reading "Not Found": a streaming boundary at the segment flushed `200`
+  before the not-found decision could run, and every status-code check read the lie as truth (the same class
+  then hid a build-time-params trap behind a passing 404 test). But the rule as stated is only true where
+  one framework's conventions exist: the boundary is `loading.*`, the decision API is `notFound()`, both live
+  in a single framework's route tree. Under the standing rule (§0) that cannot be a gobstack row — the
+  proposed `PV-02` was **removed from `library.tsv`, the verifier and LIMITS** (a one-line tombstone keeps
+  the old number stable), and the defect class moved to the project's own skill. The general residue that
+  *did* travel: P3 below.
 - **P3 — a build-time list is not a runtime list.** `generateStaticParams` runs at build; `dynamicParams =
   false` then 404s anything published since. The honest mechanism is only a *shape* check ("a page exporting
   generateStaticParams declares `dynamicParams` explicitly"), which proves a decision was made, not that it
@@ -128,39 +125,34 @@ row is opt-in (`library.tsv`) rather than mandatory.
 | Proposal | Matrix row | Skill touch | Doc touch |
 |---|---|---|---|
 | P1 | `PV-01` (opt-in, lint) | `goblin-verify-author`: "render the artifact, not a sketch of it" | LIMITS: an import is not a render |
-| P2 | `PV-02` (opt-in, lint) | `goblin-verify-author`: "the status is decided before the first byte" | LIMITS: convention map is per framework |
+| P2 | withdrawn after review (was proposed `PV-02`) — framework-specific | — (defect class in the project skill) | LIMITS: one-line tombstone at the old number |
 | P3, P4 | — (advisory) | `goblin-verify-author`: two sentences, dated failures named | — |
 | P5, P6 | — (advisory, named candidates) | `goblin-handoff` / `practice`: the grep and the branch proof | GUIDE: recovery commands |
 | P7 | none (covered by `HP-03`) | — | — |
 
-Cost estimate, from the shape of the existing checks: both `PV-*` rows are the `BN-01` class — grep over
-text, no AST — each two hours including a negative control that proves the row RED under its own violation.
-Both are opt-in: a repo that declares no review surface and no streaming boundary gets `SKIP` with the
-reason, never red.
+Cost estimate, from the shape of the existing checks: the surviving `PV-*` row is the `BN-01` class — grep
+over text, no AST — two hours including a negative control that proves the row RED under its own violation.
+It is opt-in: a repo that declares no review surface gets `SKIP` with the reason, never red. (The withdrawn
+`PV-02` would have cost the same and was not paid — see §3.)
 
 ---
 
 ## 5. What this project must NOT push into gobstack
 
-Saying no is half of curation. These are tech-goblin facts with no general form:
-
-- Next.js version behaviour (which route kinds are prefetched, what `loading.tsx` owns), router internals,
-  `force-dynamic` / ISR / `revalidate` semantics as *policy*. The **defect class** survives (P2); the
-  framework mechanics do not travel.
-- The cookie design (HMAC payload, 30-day expiry, httpOnly/SameSite), the secret names, the redirect codes.
-  One sound answer to "owner-only preview", shaped by one auth story.
-- The measured numbers: TTFB 470–615 → 181–211 ms, click-to-locale 28 ms, 25 harness gates, six commits.
-  Numbers are evidence for the rule, never the rule.
-- Strapi/webhook shapes (`x-revalidate-secret`, `{"slug":…}`), the CMS content model, the `DRAFT — ` prefix
-  convention. Product.
-- The chrome inventory itself (which chips exist, where they sit, their pixel offsets). The **principle**
-  (P1) is what travels; the inventory is this site's.
+Saying no is half of curation, and the standing rule (§0) **is** the reason this section exists — it is cited
+here instead of re-listing what it refuses: a tech-goblin fact enters gobstack only if it survives being
+separated from its framework. Route-kind behaviour, `loading.*` ownership, `force-dynamic` / ISR /
+`revalidate` semantics as policy, the cookie design and its secret names, the measured numbers (TTFB
+470–615 → 181–211 ms, 25 harness gates, six commits), the Strapi/webhook shapes, the CMS content model and
+the chrome inventory are this project's facts or this framework's mechanics; they stay here and in the
+project skill. What the rule already admitted: P1 passed the test and became `PV-01`; P2 failed it and was
+withdrawn (§3); P3–P7 are held advisory in §3 for exactly the same test.
 
 ---
 
 ## 6. What this file leaves open for the next curation
 
-Not questions about the two adopted rules — those are decided. These are the things one project could not
+Not questions about the adopted rule — that one is decided. These are the things one project could not
 settle, and the next project with a different shape should test:
 
 1. **Is "review surface" a route kind or a config declaration?** `PV-01` reads a directory the config names.
