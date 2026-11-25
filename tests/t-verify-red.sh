@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 105 `expect_red` call sites and 36 `expect_green`
-# — 141 calls over all 65 of the rule set's target rows (the four source-scope rows
+# One control per target-scope row: 107 `expect_red` call sites and 37 `expect_green`
+# — 144 calls over all 65 of the rule set's target rows (the four source-scope rows
 # carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 34 of those 65 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
 # this revision: 65 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `141 over 65 target rows`.
+# README's census sentence must read `144 over 65 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -1173,6 +1173,34 @@ m_pv01_builtin() {
   printf "import { readFileSync } from 'node:fs'\n" > app/preview/layout.tsx
 }
 expect_red "PV-01: two layouts importing only a node: builtin are RED" PV-01 1 m_pv01_builtin
+
+# PR #2 review round 3: the from-clause keyword scan had an off-by-one in its dynamic-import(
+# guard (`we = p + RSTART + RLENGTH - 1` landed on the keyword, not past it), so every segment
+# containing import/export was called static on the first hit — and a specifier-shaped STRING
+# literal could vouch for an in-string ` from '<spec>'`. The scan now masks quoted runs before
+# it looks for keywords. Both fixtures are one line whose only import-ish text lives inside a
+# string; each was GREEN (false) before the fix.
+m_pv01_str_dyn() {
+  mkdir -p app/preview
+  printf "import './shared-a';\n" > app/layout.tsx
+  printf "const s = \"await import('./x') from '../shared-a'\";\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: an in-string dynamic import(...) after a from is RED (the off-by-one fixture)" PV-01 1 m_pv01_str_dyn
+m_pv01_str_kw() {
+  mkdir -p app/preview
+  printf "import './shared-a';\n" > app/layout.tsx
+  printf "const s = \"import x from '../shared-a'\";\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: an in-string 'import x from ...' without parens is RED (the masking fixture)" PV-01 1 m_pv01_str_kw
+
+# Green preserved: a REAL import standing after a string that merely mentions the word — the
+# mask must eat the string only, not the statement outside it.
+m_pv01_str_then_real() {
+  mkdir -p app/preview
+  printf "import './shared-a';\n" > app/layout.tsx
+  printf "const a = \"import x\"; import { b } from '../shared-a';\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a real import after a string that merely mentions the word is GREEN" PV-01 m_pv01_str_then_real
 
 # The other side of the same rule: a bare specifier DOES count when it resolves to a file
 # inside the repo, so a shared import through a tsconfig paths alias is still evidence.

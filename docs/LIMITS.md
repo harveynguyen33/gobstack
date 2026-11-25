@@ -564,14 +564,22 @@ the Node the gates ran under.
     `require(` are all seen), and what it still cannot see after that fix, in the two directions
     it admits honestly: an alias the bundler resolves but this text probe cannot (a JSONC
     tsconfig, a non-file target), or a specifier built at runtime (`import(someVar)` has no
-    literal to read) — the surface reads as if it imports nothing, a false RED; and a
-    specifier-shaped string literal that sits after a statement-shaped keyword can still
-    over-match — one false specifier in both files is a false GREEN, which is the worse
-    direction. A module reached only through a re-export barrel (`index.ts`) whose own
-    specifiers live in another file is not followed, so a barrel pass proves nothing about
-    what the barrel re-exports; and the scan is TEXT, so a `from '<spec>'` in a comment is
-    stripped first (comments cannot vouch for an import) but a contrived string still could
-    (PR #2 review).
+    literal to read) — the surface reads as if it imports nothing, a false RED. A
+    specifier-shaped string literal no longer over-matches either (PR #2 review round 3: an
+    off-by-one in the scan's dynamic-`import(` guard made every keyword-bearing segment read as
+    static, so an in-string `from '<spec>'` was vouched by a string that merely mentioned
+    `import`): the from-clause keyword scan now masks quoted runs in the segment it inspects,
+    so an in-string from-specifier no longer vouches. What remains is a MASK — a text rule,
+    not a lexer — that an escaped quote inside a string or an apostrophe in JSX text can break
+    by resynchronising at the wrong quote; the truncated segment loses keywords, so the
+    resulting error is a false RED (fewer specifiers vouched), never a false GREEN. The
+    literal scans (side-effect `import '...'`, dynamic `import(`, `require(`) still read any
+    quoted run, so a string shaped exactly like one of those can still be extracted — the
+    text-probe floor this row sits on. A module reached only through a re-export barrel
+    (`index.ts`) whose own specifiers live in another file is not followed, so a barrel pass
+    proves nothing about what the barrel re-exports; and the scan is TEXT, so a
+    `from '<spec>'` in a comment is stripped first (comments cannot vouch for an import) and,
+    since round 3, a contrived string no longer can either (PR #2 review).
 
 62. **`PV-02` reads a framework convention, not a runtime.** The check walks every `loading.*`
     boundary and requires each `page.*` in the boundary's subtree that calls `notFound(` to

@@ -828,26 +828,52 @@ _pv01_imports_of() {
   # calls, read over the WHOLE file text, not line by line: prettier wraps a brace list
   # across lines, so the line-anchored grep this replaces never saw a `} from './x'` line
   # and a compliant surface was falsely RED (PR #2 review). awk is already a checked
-  # dependency of this script (and RS="\001" makes the file one record portably). Text
-  # only: comments are stripped first, but a specifier-shaped string literal can still
-  # over-match — the false-GREEN direction is recorded in docs/LIMITS.md #61.
+  # and RS="\001" makes the file one record portably). Text
+  # only: comments are stripped first. The from-clause keyword scan masks quoted runs in the
+  # segment it inspects, so a specifier-shaped string literal no longer vouches for an
+  # in-string ` from '<spec>'` even when the string mentions `import`; the mask itself is
+  # text, not a lexer — an escaped quote or a JSX apostrophe can break it, and the resulting
+  # error is a false RED (docs/LIMITS.md #61).
   awk -v Q1="'" -v Q2='"' '
-    function seg_has_static_kw(seg,   i, k, p, we, nxt) {
+    function seg_has_static_kw(seg,   i, k, p, we, nxt, out, q, j) {
       # the segment between the last consumed specifier and a `from` may only own that
-      # from-clause if a STATIC import/export keyword stands in the SAME statement: take
-      # the slice after the last statement boundary (`;`) so a bare `import './x'` earlier
-      # in the segment cannot vouch for a stray ` from "` (say, inside a string literal),
-      # and inside that slice the LAST keyword may not be a dynamic import( call, which
-      # owns no from-clause
+      # from-clause if a STATIC import/export keyword stands in the SAME statement. Take the
+      # slice after the last statement boundary (`;`) so a bare `import './x'` earlier in the
+      # segment cannot vouch for a stray ` from "` — but MASK QUOTED RUNS FIRST, because a
+      # string literal that merely mentions `import` must not vouch for the in-string
+      # ` from "` either (`const s = "import x from '../shared-a'"` was exactly such a false
+      # GREEN): every quoted run becomes an empty pair, and an UNTERMINATED
+      # quote drops the rest of the segment (an unbalanced quote means the keyword, if any,
+      # sits inside that string). The mask is a text rule, not a lexer: a JSX-text apostrophe
+      # (the possessive kind) or an escaped quote makes it resynchronise at the wrong quote,
+      # and the truncated segment loses keywords — fewer specifiers vouched, a false RED,
+      # never a false GREEN (LIMITS #61). Inside the masked slice the LAST keyword may not
+      # be a dynamic import( call, which owns no from-clause.
+      # Off-by-one, fixed (PR #2 review round 3): the old `we = p + RSTART + RLENGTH - 1`
+      # landed on the last character OF the keyword, so `nxt` was `t(`/`t ` and the `!= "("` test
+      # fired on every segment containing import/export — the loop never continued and the
+      # dynamic exclusion never ran. Now `we = p + RSTART + RLENGTH` is one past the keyword:
+      # for seg = "import x" the match is "^import" (RSTART=1, RLENGTH=7), so we = 8 and
+      # substr(seg, we, 1) is "x", the character after the keyword.
+      out = ""; p = 1
+      qqre = "[" Q1 Q2 "]"
+      while (match(substr(seg, p), qqre)) {
+        out = out substr(seg, p, RSTART - 1) Q1 Q1
+        q = substr(seg, p + RSTART - 1, 1)
+        j = index(substr(seg, p + RSTART), q)
+        if (j == 0) { seg = out; break }         # unterminated: the rest is string content
+        p = p + RSTART + j                        # one past the closing quote
+      }
+      if (p > 0) seg = out substr(seg, p)
       k = 0; p = 1
       while ((i = index(substr(seg, p), ";")) > 0) { k = p + i - 1; p = k + 1 }
       if (k > 0) seg = substr(seg, k + 1)
       p = 0
       while (match(substr(seg, p + 1), /(^|[^A-Za-z0-9_$])(import|export)/)) {
-        we = p + RSTART + RLENGTH - 1            # one past the keyword, absolute in seg
-        nxt = substr(seg, we, 2)                 # what follows the keyword
-        if (nxt != "(" && substr(nxt, 1, 1) != "(") return 1
-        p = we
+        we = p + RSTART + RLENGTH                 # one past the keyword, absolute in seg
+        nxt = substr(seg, we, 1)                  # the character after the keyword
+        if (nxt != "(") return 1                  # a static import/export owns the from-clause
+        p = we                                    # a dynamic import(: keep scanning
       }
       return 0
     }
@@ -1120,7 +1146,10 @@ check_pv_01() {
   # named in the RED message. Honest limit (LIMITS #61): an import proves reachability,
   # never an identical render — a shell imported and then overridden by a local wrapper
   # passes, and an unresolvable alias or a runtime-built specifier is a false RED the
-  # preview_differs: hatch exists to clear.
+  # preview_differs: hatch exists to clear. The from-clause keyword scan masks quoted runs
+  # in the segment it inspects, so a specifier-shaped string literal no longer vouches for
+  # an in-string ` from '<spec>'`; the mask is text, not a lexer — an escaped quote or a JSX
+  # apostrophe breaks it toward a false RED, never a false GREEN.
   local tree d b surf up pub sameshell=0 bad=0 n=0 declared=0 inherited=0 unjudged=0 shared
   local s_out p_out surf_dropped pub_dropped
   local trees
