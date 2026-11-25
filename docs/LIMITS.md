@@ -605,13 +605,11 @@ the Node the gates ran under.
     `from '<spec>'` in a comment is stripped first (comments cannot vouch for an import) and,
     since round 3, a contrived string no longer can either (PR #2 review).
 
-62. **`PV-02` reads a framework convention, not a runtime.** The check walks every `loading.*`
-    boundary and requires each `page.*` in the boundary's subtree that calls `notFound(` to
-    carry `status_checked: <why>`. A boundary introduced by an imported component (a package
-    layout, a wrapper that suspends) is invisible to a directory walk, and a page can answer
-    under the wrong status with a marker that says otherwise — the check reads the marker, it
-    cannot execute the route. Whether the marker is true is a human's call (CURATION-2026-11-25
-    §2 P2).
+62. **`PV-02` was withdrawn (2026-11-25, after review): framework-specific.** The row read Next.js
+    App Router conventions (`loading.*` boundaries, `notFound()`) that exist in no other framework —
+    a lesson lifted into gobstack must be true regardless of framework (CURATION-2026-11-25 §0),
+    and a mechanism may probe per-framework conventions only where a repo without them gets
+    SKIP-with-a-reason, never a RED. The defect class stays advisory (CURATION-2026-11-25 §3 P2).
 
 ---
 

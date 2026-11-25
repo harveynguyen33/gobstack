@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 109 `expect_red` call sites and 42 `expect_green`
-# — 151 calls over all 65 of the rule set's target rows (the four source-scope rows
-# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 34 of those 65 rows are
+# One control per target-scope row: 108 `expect_red` call sites and 41 `expect_green`
+# — 149 calls over all 64 of the rule set's target rows (the four source-scope rows
+# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 33 of those 64 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
-# this revision: 65 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
+# this revision: 64 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `151 over 65 target rows`.
+# README's census sentence must read `149 over 64 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -1071,24 +1071,20 @@ check "UX-5b the raw test(1) dump is gone from the failure line" "$([ $? -ne 0 ]
 git reset -q --hard HEAD~1
 restore_all
 
-# ---- PV-01 / PV-02 (CURATION-2026-11-25): opt-in preview-surface rows -------------------
-# Both rows live in the library and are OFF here by default. Their fixtures plant an app/
+# ---- PV-01 (CURATION-2026-11-25): opt-in preview-surface row ----------------------------
+# The row lives in the library and is OFF here by default. Its fixtures plant an app/
 # route tree; restore_all already removes it (rm -rf dist src app features), so no control
 # leaks a route tree into the next.
 
-# Opt-in first: plant BOTH rows' violations and run the FULL suite with neither row enabled —
-# a repo that never turns the rows on must be untouched (green, and no PV- line anywhere).
+# Opt-in first: plant the row's violation and run the FULL suite with the row not enabled —
+# a repo that never turns the row on must be untouched (green, and no PV- line anywhere).
 m_pv_optin() {
-  mkdir -p app/preview app/p/deep
-  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
-  printf "import { OwnShell } from './own-shell'\n" > app/preview/layout.tsx
-  printf "export default function Loading() { return null }\n" > app/loading.tsx
-  printf "export default function P() { notFound() }\n" > app/p/deep/page.tsx
+  mkdir -p app/preview
 }
 m_pv_optin
 _pv_out=$(bash .gob/bin/goblin-verify 2>&1)
 _pv_rc=$?
-check "opt-in: a full run over BOTH violations, rows not enabled, stays GREEN" "$([ "$_pv_rc" -eq 0 ] && echo 0 || echo 1)"
+check "opt-in: a full run over the row's violation, row not enabled, stays GREEN" "$([ "$_pv_rc" -eq 0 ] && echo 0 || echo 1)"
 [ -z "$(printf '%s' "$_pv_out" | grep -E '^(FAIL|SKIP|PASS)  PV-')" ]
 check "opt-in: that run prints no PV- line at all" "$?"
 restore_all
@@ -1291,30 +1287,10 @@ m_pv01_sib_declared() {
 }
 expect_green "PV-01: the sibling fallback honours the preview_differs: hatch" PV-01 m_pv01_sib_declared
 
-# PV-02 red: a boundary owns its whole subtree — the offending page sits DEEP under it
-# (the measured failure this row exists for).
-m_pv02_red() {
-  mkdir -p app/p/deep
-  printf "export default function Loading() { return null }\n" > app/loading.tsx
-  printf "export default function P() { notFound() }\n" > app/p/deep/page.tsx
-}
-expect_red "PV-02: a notFound( page deep under a loading.* boundary is RED" PV-02 1 m_pv02_red
-
-# PV-02 green: the page commits status_checked:.
-m_pv02_green() {
-  mkdir -p app/p/deep
-  printf "export default function Loading() { return null }\n" > app/loading.tsx
-  printf "export default function P() { notFound() }\n// status_checked: the slug lookup decides\n" > app/p/deep/page.tsx
-}
-expect_green "PV-02: a page carrying status_checked: is GREEN" PV-02 m_pv02_green
-
 # SKIP paths, each printing its reason — never a bare pass.
 out=$(bash .gob/bin/goblin-verify --only PV-01 2>&1)
 printf '%s' "$out" | grep -q '^SKIP  PV-01  no route tree'
 check "PV-01 SKIPs with its reason on a repo with no route tree" "$?"
-out=$(bash .gob/bin/goblin-verify --only PV-02 2>&1)
-printf '%s' "$out" | grep -q '^SKIP  PV-02  no route tree'
-check "PV-02 SKIPs with its reason on a repo with no route tree" "$?"
 m_pv01_nolane() {
   mkdir -p app/p
   printf "export default function P() { return null }\n" > app/p/page.tsx

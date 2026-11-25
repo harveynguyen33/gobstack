@@ -802,11 +802,13 @@ check_hv_02() {
   return 0
 }
 
-# ---- PV-01 / PV-02 (CURATION-2026-11-25, opt-in library rows) -----------------
-# Both are plain text probes over a route tree, the same class as check_hv_02: no AST, no
-# runtime, no config key — the framework's own directory conventions are the config. Return
-# 0 pass / 1 red / 3 skip, and a skip PRINTS its reason: an opt-in row whose lane is absent
-# says so out loud, it never vanishes into a bare green.
+# ---- PV-01 (CURATION-2026-11-25, opt-in library row) ---------------------------
+# A plain text probe over a route tree, the same class as check_hv_02: no AST, no
+# runtime, no config key — the framework's own directory conventions are read as
+# HEURISTICS, so a repo without them gets SKIP-with-a-reason, never a RED. PV-02 was
+# withdrawn as framework-specific (see LIMITS #62). Return 0 pass / 1 red / 3 skip, and
+# a skip PRINTS its reason: an opt-in row whose lane is absent says so out loud, it
+# never vanishes into a bare green.
 
 _pv_route_trees() {
   # the route-tree roots the framework conventions name; any one of them counts
@@ -1322,51 +1324,6 @@ PV
   [ "$bad" -eq 0 ] || return 1
   printf "%d review surface(s): %d share the published shell, %d via a sibling group's shell, %d declared via preview_differs:, %d inherit the public layout, %d not judged (no public layout above and no sibling layout)\n" \
     "$n" "$sameshell" "$sibshell" "$declared" "$inherited" "$unjudged"
-  return 0
-}
-
-check_pv_02() {
-  # P2 (CURATION-2026-11-25): a streaming boundary above a not-found decision commits the
-  # status before the decision. For every loading.* boundary in a route tree, the page
-  # files in the boundary's WHOLE subtree (a boundary owns everything below it — the
-  # measured failure) must carry `status_checked: <why>` when they call notFound(.
-  # Honest limit (LIMITS #62): reads a framework convention, not a runtime — a boundary
-  # added by an imported component is unseen, and it cannot tell whether a marker is true.
-  local tree bd dir pg bad=0 nb=0 pages=0 marked=0
-  local trees
-  trees=$(_pv_route_trees)
-  if [ -z "$trees" ]; then
-    printf 'no route tree (no app/, src/app/, pages/ or routes/)\n'
-    return 3
-  fi
-  while IFS= read -r tree; do
-    [ -n "$tree" ] || continue
-    while IFS= read -r bd; do
-      [ -n "$bd" ] || continue
-      nb=$((nb + 1))
-      dir="${bd%/*}"
-      while IFS= read -r pg; do
-        [ -n "$pg" ] || continue
-        grep -Eq 'notFound[[:space:]]*\(' "$pg" || continue
-        pages=$((pages + 1))
-        if grep -Eq 'status_checked:[[:space:]]*[^[:space:]]' "$pg"; then
-          marked=$((marked + 1)); continue
-        fi
-        printf '%s streams above %s, which calls notFound( with no status_checked: marker - the not-found decision answers 200 under the boundary\n' \
-          "${bd#"$ROOT"/}" "${pg#"$ROOT"/}"
-        bad=1
-      done < <(_pv_find "$dir" -type f -name 'page.*')
-    done < <(_pv_find "$tree" -type f -name 'loading.*')
-  done <<PV
-$trees
-PV
-  if [ "$nb" -eq 0 ]; then
-    printf 'no loading.* boundary in the route tree - no streaming boundary sits above a not-found decision\n'
-    return 3
-  fi
-  [ "$bad" -eq 0 ] || return 1
-  printf '%d loading boundary(ies): %d page(s) calling notFound( beneath them, %d cleared by status_checked:\n' \
-    "$nb" "$pages" "$marked"
   return 0
 }
 
