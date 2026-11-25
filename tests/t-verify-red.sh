@@ -106,7 +106,7 @@ restore_all() {
   # would expand to it, but an unquoted glob in a restore path is exactly the habit that control
   # exists to break.
   rm -f 'checks/z2;true;#.mjs'
-  rm -f checks/hv02-bbox.mjs checks/hv02-parse.mjs checks/hv01-lit.mjs checks/harness.py
+  rm -f checks/hv01-lit.mjs checks/harness.py
   # AG-01's controls leave an approval record behind (the fixture ships none by design):
   # untracked, so no backup copy exists to restore over it.
   rm -f .gob/agents.approved
@@ -328,7 +328,9 @@ m_drop_ds_report()  { rm -f .gob/.ds-report; }
 m_doc_01()        { m_row_fails DOC-01; }
 m_doc_02()        { m_row_fails DOC-02; }
 
-# ---- the security and perf rows (G4): SC-01..SC-09, PF-01 -------------------------------------
+# ---- the security and perf rows (G4): SC-01..SC-05, PF-01 --------------------------------------
+# (SC-09 was a library advisory and is withdrawn 2026-11-25; see
+# docs/AUDIT-2026-11-25-framework-agnostic.md.)
 # Every mutation is the exact failure the row's why-cell names, and every one is a file a real
 # repo produces by accident: a dotenv-family file that got added, an ignore rule narrowed by
 # hand, a client-visible key name, a cookie written without flags, a write route with no
@@ -340,7 +342,6 @@ m_sc_03()  { mkdir -p src; printf 'export const k = process.env.NEXT_PUBLIC_API_
 m_sc_04()  { mkdir -p src; printf 'document.cookie = "theme=dark";\n' > src/cookie.ts; }
 m_sc_05()  { mkdir -p app/api/contact; printf 'export async function POST(req) {\n  const b = await req.json();\n  await save(b);\n}\n' > app/api/contact/route.ts; }
 m_sc_06()  { printf '{"name":"fixture","version":"1.0.0"}\n' > package.json; }
-m_sc_09()  { m_row_fails SC-09; }
 m_pf_01()  { sed -i -e 's/^perf\.metric:.*/perf.metric: client_js_bytes/' -e 's/^perf\.baseline_commit:.*/perf.baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^perf\.baseline_value:.*/perf.baseline_value: 1/' -e 's/^perf\.measured:.*/perf.measured: 2026-01-01/' AGENTS.md; }
 # G8-6b: the budget and the measurement have to be the SAME number. Two controls - the honest
 # record passes, and a one-line `ceiling:` raise that leaves the baseline alone FAILs. Before the
@@ -373,18 +374,6 @@ m_bn_05()          { sed -i 's|^layers:\([[:space:]]*\).*|layers: [src/renderer 
 # A tree BN-05 can read (so its globs match) but with no `layers:` declared: the row must SKIP
 # with that reason, never pass vacuously.
 m_bn_05_nolayers() { mkdir -p src/renderer; printf 'export const r = 1;\n' > src/renderer/p.ts; }
-
-# ---- W4/G6: the Electron failure surface, as bans (BN-06..BN-09) -----------------------------
-# FIX 1: selection is the PREDICATE `dep:electron` — the ban runs only when the repo's package.json
-# names electron under dependencies or devDependencies, so these four never run (and never vacuously
-# pass) on a repo with no electron. Each mutation therefore plants BOTH the dep AND the file the
-# ban's scope reads. m_bn_06_disabled is the DISABLE list's control (the only config knob).
-plant_electron() { printf '{"name":"fixture","devDependencies":{"electron":"^30"}}\n' > package.json; }
-m_bn_06()  { plant_electron; mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
-m_bn_06_disabled() { m_bn_06; sed -i 's/^bans_disabled: \[.*\]/bans_disabled: [BN-06]/' AGENTS.md; }
-m_bn_07()  { plant_electron; mkdir -p src; printf 'export const prefs = { contextIsolation: false };\n' > src/isolate.ts; }
-m_bn_08()  { plant_electron; mkdir -p src; printf 'export const prefs = { webSecurity: false };\n' > src/webs.ts; }
-m_bn_09()  { plant_electron; mkdir -p src; printf 'const v = ipcRenderer.sendSync("chan", 1);\n' > src/ipc.ts; }
 
 # ---- W5-1/W5-2: the two documented escapes, in BOTH directions ---------------------------------
 # `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` were documented in three places and
@@ -444,7 +433,7 @@ set_bn01_probe() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "test \"$GO
 m_skill_frontmatter() { sed -i '1d' .gob/skills/goblin-handoff/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .gob/skills/goblin-handoff/SKILL.md; }
 # batch 2b-ii: the default matrix carries NO advisory rows — every advisory row (HP-04, HS-03,
-# CM-02, DOC-01/02, SC-09) moved to the library. So the ceiling can only be exceeded once an
+# CM-02, DOC-01/02) moved to the library. So the ceiling can only be exceeded once an
 # advisory row is present in the run. This control enables the advisory library row HP-04 and
 # sets the ceiling BELOW the resulting count (1) — the exact condition SK-03 must FAIL on.
 m_adv_ceiling()   { awk -F'\t' -v x="HP-04" 'NR>1 && $1==x {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7}' .gob/manifest/library.tsv >> .gob/manifest/enforcement.tsv; sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 0/' AGENTS.md; }
@@ -579,7 +568,6 @@ expect_skip "an undeclared security.write_routes"                      SC-05 m_s
 expect_skip "a pinned replay over a harness dir holding no harness"    HS-02 m_hs_02_no_harness
 expect_skip "a pinned replay whose only harness is outside the replay set" HS-02 m_hs_02_py_harness
 expect_red "a manifest with no lockfile"           SC-06 1 m_sc_06
-expect_red "SC-09 (advisory row: wired, not biting)" SC-09 1 m_sc_09
 expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
 expect_green "G8-6b: the ceiling matches the recorded baseline"        PF-01 m_pf_ceiling_match
 expect_red   "G8-6b: the ceiling raised by hand, the baseline untouched" PF-01 1 m_pf_ceiling_raise
@@ -622,15 +610,22 @@ expect_red "an import across a declared layer boundary"       BN-05 1 m_bn_05
 # BN-05 is a SKIP (not a FAIL) when no layers are declared - the HS-01 precedent: nothing to
 # read is reported as a reason, never as a pass.
 expect_green "no layers declared -> BN-05 skips with a reason"  BN-05 m_bn_05_nolayers
-# W4/G6 + GAP-3: the Electron surface, one control per row, plus the DISABLE-knob half. A new row
-# has no pre-change tree to be RED on, so PR-03's other branch applies: the mutation writes the
-# file the glob matches (deliberately broken), and the DISABLE control proves the knob is real.
-expect_red   "a renderer with nodeIntegration: true"            BN-06 1 m_bn_06
-expect_green "a ban turned OFF by bans_disabled: skips with the key named" BN-06 m_bn_06_disabled
-expect_red   "a renderer with contextIsolation: false"          BN-07 1 m_bn_07
-expect_red   "a renderer with webSecurity: false"               BN-08 1 m_bn_08
-expect_red   "a synchronous IPC call in a hot path"             BN-09 1 m_bn_09
-
+# ---- the ecosystem-gate half of the B rows (CURATION-2026-11-25 audit) -------------------------
+# A B row names its ecosystem in its artifact cell (an `ecosystem:<token>`), and a fixture of
+# ANOTHER shape must get SKIP(3) with the reason named - never a PASS graded on nothing, never a
+# FAIL. The base fixture carries no TS-family source, so the typescript bans need only a no-op
+# mutation to pin the gate; the library rows get their own foreign-shape deletions.
+m_foreign_noop()    { :; }
+m_sc_02_foreign()   { rm -f .gitignore; }
+m_sc_06_foreign()   { rm -f package.json; }
+expect_skip "a typescript ban over a tree with no typescript source"     BN-01 m_foreign_noop
+expect_skip "  BN-02 under the same gate"                                BN-02 m_foreign_noop
+expect_skip "  BN-03 under the same gate"                                BN-03 m_foreign_noop
+expect_skip "  BN-05 under the same gate"                                BN-05 m_foreign_noop
+expect_skip "the secret surface with no ignore/dependency surface"       SC-02 m_sc_02_foreign
+expect_skip "the lockfile row over a repo with no dependency manifest"   SC-06 m_sc_06_foreign
+expect_skip "the reference row with no declared corpus"                  RC-02 m_foreign_noop
+expect_skip "the acquisition row with no declared manifest"              RC-04 m_foreign_noop
 # ---- W5-1/W5-2: both documented escapes, both directions --------------------------------------
 # The exempt path must PASS with a real violation inside it, and the SAME violation must still
 # FAIL when the exception names another path. That pair is the control whose absence let W5-1 ship.
@@ -790,16 +785,7 @@ expect_red   "Z1-6: an entry path only an untracked file holds" FM-02 1 m_fm_02_
 expect_red   "a verify_doctor that exits non-zero" VA-01 1 m_va_01_fail
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip
 
-# ---- the curation wave (CURATION-2026-11-07 §6 phase 1): HV-02, HP-06, HV-01 --------------------
-# Three new text probes; each control is a deliberately-broken copy of the class it checks
-# (PR-03's second branch - a new row has no pre-change tree to be RED on). Every mutation
-# plants the exact violation the row exists to catch into the fixture's own harness dir or
-# HANDOFF, and restore_all takes the planted files back out.
-m_hv02_bbox()    { printf '%s\n' 'const box = document.querySelector("#shot").getBoundingClientRect();' 'assert("inside", box.bottom < 4096);' > checks/hv02-bbox.mjs; }
-m_hv02_bbox_g()  { printf '%s\n' 'const box = document.querySelector("#shot").getBoundingClientRect();' 'if (box.right > window.innerWidth) throw new Error("outside the capture viewport");' > checks/hv02-bbox.mjs; }
-m_hv02_marker()  { printf '%s\n' '// guarded: the frame owns its viewport; the driver asserts the shot target itself' 'const box = document.querySelector("#shot").getBoundingClientRect();' > checks/hv02-bbox.mjs; }
-m_hv02_parse()   { printf '%s\n' 'import { execSync } from "node:child_process";' 'const w = parseFloat(execSync("ttx -w shot.png").toString());' 'assert("wide", w > 100);' > checks/hv02-parse.mjs; }
-m_hv02_parse_g() { printf '%s\n' 'import { execSync } from "node:child_process";' 'const w = parseFloat(execSync("ttx -w shot.png").toString());' 'if (!Number.isFinite(w)) throw new Error("the tool spoke nonsense");' 'assert("wide", w > 100);' > checks/hv02-parse.mjs; }
+# ---- the curation wave (CURATION-2026-11-07 §6 phase 1): HP-06, HV-01 ----------------------
 # HP-06: the bullet is planted INSIDE the Next steps section (an append to the file end would
 # land in NOT verified, a different section the row never reads).
 m_hp06_open()    { awk '/^## Next steps$/ && !d { print; print "- Ship the thing."; d = 1; next } { print }' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md; }
@@ -808,11 +794,6 @@ m_hv01_lit()     { printf '%s\n' 'const doc = { nodes: [{ id: "a", x: 0, y: 0 }]
 m_hv01_import()  { printf '%s\n' 'import { toBoardDoc } from "@fixture/core";' 'const doc = toBoardDoc({});' 'assert("has nodes", Array.isArray(doc.nodes));' > checks/hv01-lit.mjs; }
 m_hv01_marker()  { printf '%s\n' '// produced_by: compileGobi pinned-9c3b0cc' 'const doc = { nodes: [{ id: "a" }] };' 'assert("one node", doc.nodes.length === 1);' > checks/hv01-lit.mjs; }
 
-expect_red   "a bounding box measured with no viewport guard"         HV-02 1 m_hv02_bbox
-expect_green "the same measurement guarded by innerWidth"             HV-02 m_hv02_bbox_g
-expect_green "a guarded: marker clears the whole file"                HV-02 m_hv02_marker
-expect_red   "a number parsed from tool stdout with no finite guard"  HV-02 1 m_hv02_parse
-expect_green "the parsed number asserted finite"                      HV-02 m_hv02_parse_g
 expect_red   "an open item with no date and no owner"                 HP-06 1 m_hp06_open
 expect_green "the same item owned with a date"                        HP-06 m_hp06_owned
 expect_green "no HANDOFF.md is a SKIP, never red"                     HP-06 m_drop_handoff
