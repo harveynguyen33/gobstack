@@ -562,7 +562,23 @@ the Node the gates ran under.
     relative one that climbs out of the project root, which names a module outside the repo —
     is dropped from
     the intersection and the RED message says so, so the reader knows an unresolvable alias may
-    be the cause and that `preview_differs: <list>` is the escape hatch. The comparison cannot
+    be the cause and that `preview_differs: <list>` is the escape hatch. When NO ancestor layout
+    exists inside the route tree, the public layout is searched among SIBLING route groups of the
+    same tree instead (2026-11-25 preview-surfaces round 5: the rule's own real-world instance had
+    the public shell in `app/(frontend)/[locale]/layout.tsx` beside a review surface
+    `app/(preview)/preview/layout.tsx`, so the ancestor-only walk found nothing, printed
+    `not judged` and still returned PASS — a green that judged nothing, and a row whose only
+    real-world instance is `not judged` does not earn its place). A grouped sibling contributes
+    every `layout.*` under it, a plain sibling its depth-1 layout only; a depth-1 sibling that
+    itself looks like a review surface is not a candidate — a sibling review surface is not
+    published furniture, and comparing two surfaces proves nothing. The fallback passes if ANY
+    sibling group shares at least one project-resolvable module, and the PASS names the group and
+    the shared modules (max 3, then +N more); when candidates exist but none shares a module, the
+    row is RED, naming the candidates tried and the specifiers dropped as unresolvable. What a
+    sibling match MEANS stays honest: a shared module is reachability of the same furniture, not
+    proof of an identical render, and because any matching sibling passes, a sibling group that
+    shares only a trivial util clears the surface too; an unresolvable alias or a runtime-built
+    specifier is still a false RED the `preview_differs:` hatch clears. The comparison cannot
     see past the import: a shell imported and then overridden by a local wrapper (its own
     headers, its own routing context, an extra provider) passes, because reachability is all a
     text probe has, and a surface whose layout shares no module with the public layout passes

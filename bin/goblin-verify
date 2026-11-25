@@ -1158,16 +1158,31 @@ check_pv_01() {
   # out of the project root names a module outside the repo and is dropped like any
   # unresolvable specifier — an installed package or a builtin is
   # never evidence of a shared shell, and a specifier that resolves nowhere is dropped and
-  # named in the RED message. Honest limit (LIMITS #61): an import proves reachability,
+  # named in the RED message. When NO ancestor layout exists inside the route tree, the
+  # public layout is searched among SIBLING route groups of the same tree: every depth-1
+  # entry under the tree that is not on the surface's own path and does not itself look
+  # like a review surface — a grouped sibling contributes EVERY layout.* under it, a plain
+  # sibling its depth-1 layout only. This is the shape that produced the rule (the public
+  # shell in `app/(frontend)/[locale]/layout.tsx`, the review surface in
+  # `app/(preview)/preview/layout.tsx`, nothing above it): the ancestor-only walk found no
+  # public layout, printed `not judged` and still returned PASS — a green that judged
+  # nothing. The fallback compares the surface against EACH candidate and passes if ANY
+  # candidate shares at least one project-resolvable module, naming the group and the
+  # shared modules (max 3, then +N more); when candidates exist but none shares a module
+  # the row is RED, naming the candidates tried and the specifiers dropped as
+  # unresolvable. Honest limit (LIMITS #61): an import proves reachability,
   # never an identical render — a shell imported and then overridden by a local wrapper
-  # passes, and an unresolvable alias or a runtime-built specifier is a false RED the
+  # passes; the sibling fallback passes if ANY sibling group matches, so a group that
+  # shares only a trivial util clears the surface too; and an unresolvable alias or a
+  # runtime-built specifier is a false RED the
   # preview_differs: hatch exists to clear. The from-clause keyword scan masks quoted runs
   # in the segment it inspects, so a specifier-shaped string literal no longer vouches for
   # an in-string ` from '<spec>'`; the mask is text, not a lexer — an escaped quote or a JSX
   # apostrophe breaks it toward a false RED, never a false GREEN.
   local tree d b surf up pub sameshell=0 bad=0 n=0 declared=0 inherited=0 unjudged=0 shared
   local s_out p_out surf_dropped pub_dropped
-  local trees
+  local trees sibshell=0 cands ent name rel first_seg label cand
+  local sib_ok cand_names cand_dropped sn sdisp sd all_dropped
   _pv01_tsconfig_load
   trees=$(_pv_route_trees)
   if [ -z "$trees" ]; then
@@ -1202,8 +1217,79 @@ check_pv_01() {
         esac
       done
       if [ -z "$pub" ]; then
-        unjudged=$((unjudged + 1))
-        printf 'note: %s has no public layout above it to compare with - not judged\n' "${surf#"$ROOT"/}"
+        # No ancestor layout inside the route tree: fall back to the layouts of SIBLING
+        # route groups of the same tree (see the header comment). Candidates are the
+        # depth-1 entries under the tree except the surface's own depth-1 ancestor and
+        # any entry that itself looks like a review surface — a sibling review surface is
+        # not published furniture, and comparing two surfaces proves nothing.
+        s_out=$(_pv01_imports_of "$surf" | while IFS= read -r s; do _pv01_resolve_spec "${surf%/*}" "$s"; done)
+        rel="${d#"$tree"/}"
+        first_seg="${rel%%/*}"
+        cands=""
+        for ent in "$tree"/*; do
+          [ -d "$ent" ] || continue
+          name="${ent##*/}"
+          case "$name" in
+            .*|node_modules|.next|dist) continue ;;
+          esac
+          [ "$name" = "$first_seg" ] && continue
+          printf '%s' "$name" | grep -Eqi 'preview|previewed|draft|staging' && continue
+          case "$name" in
+            \(*)
+              # a grouped sibling: every layout.* in its subtree is a candidate
+              while IFS= read -r cand; do
+                [ -n "$cand" ] || continue
+                cands="$cands$name"$'\t'"$cand"$'\n'
+              done < <(_pv_find "$ent" -type f -name 'layout.*')
+              ;;
+            *)
+              # a plain sibling: its depth-1 layout only
+              cand=$(ls "$ent"/layout.* 2>/dev/null | head -1)
+              [ -n "$cand" ] && cands="$cands$name"$'\t'"$cand"$'\n'
+              ;;
+          esac
+        done
+        if [ -z "$cands" ]; then
+          unjudged=$((unjudged + 1))
+          printf 'note: %s has no public layout above it and no sibling route group layout to fall back to - not judged\n' "${surf#"$ROOT"/}"
+          continue
+        fi
+        sib_ok=0
+        cand_names=""
+        cand_dropped=""
+        while IFS=$'\t' read -r label cand; do
+          [ -n "$cand" ] || continue
+          cand_names="$cand_names ${cand#"$ROOT"/}"
+          p_out=$(_pv01_imports_of "$cand" | while IFS= read -r s; do _pv01_resolve_spec "${cand%/*}" "$s"; done)
+          cand_dropped="$cand_dropped$(printf '%s\n' "$p_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')"
+          shared=$(comm -12 \
+            <(printf '%s\n' "$s_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u) \
+            <(printf '%s\n' "$p_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u))
+          if [ -n "$shared" ]; then
+            sib_ok=1
+            sn=$(printf '%s\n' "$shared" | grep -c .)
+            sdisp=$(printf '%s\n' "$shared" | head -3 | paste -sd ',' - | sed 's/,/, /g')
+            [ "$sn" -gt 3 ] && sdisp="$sdisp (+$((sn - 3)) more)"
+            sibshell=$((sibshell + 1))
+            # two lines: a single-line PASS payload truncates at the report width under
+            # --only (GOB_VERIFY_VERBOSE=1), which would cut the shared-module list off;
+            # a multi-line PASS payload prints whole (g_pass)
+            printf 'note: %s renders the published shell of group %s\n' \
+              "${surf#"$ROOT"/}" "$label"
+            printf '      shares %s\n' "$sdisp"
+            break
+          fi
+        done <<< "$cands"
+        if [ "$sib_ok" -eq 0 ]; then
+          bad=1
+          printf "%s imports no module any sibling route group's public layout imports and carries no preview_differs: marker - it does not render any published shell (tried:%s)\n" \
+            "${surf#"$ROOT"/}" "$cand_names"
+          sd=$(printf '%s\n' "$s_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')
+          all_dropped=$(printf '%s%s' "$sd" "$cand_dropped" | tr ' ' '\n' | awk '!seen[$0]++ && $0 != "" {printf "%s ", $0}')
+          if [ -n "$all_dropped" ]; then
+            printf 'note: specifier(s) dropped as unresolvable (not counted as shared evidence): %s\n' "$all_dropped"
+          fi
+        fi
         continue
       fi
       s_out=$(_pv01_imports_of "$surf" | while IFS= read -r s; do _pv01_resolve_spec "${surf%/*}" "$s"; done)
@@ -1234,8 +1320,8 @@ PV
     return 3
   fi
   [ "$bad" -eq 0 ] || return 1
-  printf '%d review surface(s): %d share the published shell, %d declared via preview_differs:, %d inherit the public layout, %d not judged (no public layout above)\n' \
-    "$n" "$sameshell" "$declared" "$inherited" "$unjudged"
+  printf "%d review surface(s): %d share the published shell, %d via a sibling group's shell, %d declared via preview_differs:, %d inherit the public layout, %d not judged (no public layout above and no sibling layout)\n" \
+    "$n" "$sameshell" "$sibshell" "$declared" "$inherited" "$unjudged"
   return 0
 }
 

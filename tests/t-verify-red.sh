@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 108 `expect_red` call sites and 40 `expect_green`
-# — 148 calls over all 65 of the rule set's target rows (the four source-scope rows
+# One control per target-scope row: 109 `expect_red` call sites and 42 `expect_green`
+# — 151 calls over all 65 of the rule set's target rows (the four source-scope rows
 # carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 34 of those 65 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
 # this revision: 65 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `148 over 65 target rows`.
+# README's census sentence must read `151 over 65 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -1256,6 +1256,40 @@ m_pv01_rel_vs_alias_red() {
   printf "import { B } from '@/site-b'\n" > app/preview/layout.tsx
 }
 expect_red "PV-01: a relative in one layout and an alias naming a DIFFERENT file in the other is still RED" PV-01 1 m_pv01_rel_vs_alias_red '' m_pv01_alias_restore
+
+# Sibling-group fallback (2026-11-25 preview-surfaces round 5): the rule's only real-world
+# instance had NO layout above the review surface - the public shell lived in a SIBLING route
+# group (app/(frontend)/[locale]/layout.tsx beside app/(preview)/preview/layout.tsx), where
+# the ancestor-only walk printed `not judged` and still returned PASS. The check now falls
+# back to sibling route groups' layouts; these controls pin the fallback's three directions.
+# RED: a surface in a group with no ancestor layout whose sibling group's shell shares nothing.
+m_pv01_sib_red() {
+  mkdir -p 'app/(frontend)/site' 'app/(preview)/preview'
+  printf 'export const SiteShell = 1\n' > 'app/(frontend)/site/site-shell.tsx'
+  printf 'export const OwnShell = 1\n' > 'app/(preview)/preview/own-shell.tsx'
+  printf "import { SiteShell } from './site-shell'\n" > 'app/(frontend)/site/layout.tsx'
+  printf "import { OwnShell } from './own-shell'\n" > 'app/(preview)/preview/layout.tsx'
+}
+expect_red "PV-01: a group-less surface falls back to sibling groups - a sibling sharing nothing is still RED" PV-01 1 m_pv01_sib_red
+
+# GREEN: the same topology, but the sibling group's shell shares a project-resolvable module.
+m_pv01_sib_green() {
+  mkdir -p 'app/(frontend)/site' 'app/(preview)/preview'
+  printf 'export const Shell = 1\n' > app/shell.tsx
+  printf "import { Shell } from '../../shell'\n" > 'app/(frontend)/site/layout.tsx'
+  printf "import { Shell } from '../../shell'\n" > 'app/(preview)/preview/layout.tsx'
+}
+expect_green "PV-01: the sibling fallback is GREEN when a sibling group's shell shares a module" PV-01 m_pv01_sib_green
+
+# GREEN: the hatch clears the sibling fallback's RED too.
+m_pv01_sib_declared() {
+  mkdir -p 'app/(frontend)/site' 'app/(preview)/preview'
+  printf 'export const SiteShell = 1\n' > 'app/(frontend)/site/site-shell.tsx'
+  printf 'export const OwnShell = 1\n' > 'app/(preview)/preview/own-shell.tsx'
+  printf "import { SiteShell } from './site-shell'\n" > 'app/(frontend)/site/layout.tsx'
+  printf "import { OwnShell } from './own-shell'\n// preview_differs: preview keeps its own chrome\n" > 'app/(preview)/preview/layout.tsx'
+}
+expect_green "PV-01: the sibling fallback honours the preview_differs: hatch" PV-01 m_pv01_sib_declared
 
 # PV-02 red: a boundary owns its whole subtree — the offending page sits DEEP under it
 # (the measured failure this row exists for).
