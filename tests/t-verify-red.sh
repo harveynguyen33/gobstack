@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 101 `expect_red` call sites and 32 `expect_green`
-# — 133 calls over all 65 of the rule set's target rows (the four source-scope rows
+# One control per target-scope row: 102 `expect_red` call sites and 35 `expect_green`
+# — 137 calls over all 65 of the rule set's target rows (the four source-scope rows
 # carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 34 of those 65 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
 # this revision: 65 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `133 over 65 target rows`.
+# README's census sentence must read `137 over 65 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -1116,6 +1116,41 @@ m_pv01_declared() {
   printf "import { OwnShell } from './own-shell'\n// preview_differs: preview keeps its own chrome\n" > app/preview/layout.tsx
 }
 expect_green "PV-01: a surface declaring preview_differs: is GREEN" PV-01 m_pv01_declared
+
+# Prettier wraps a brace list across lines, so the specifier lives on a `} from` line that the
+# old line-anchored extractor never matched: a compliant surface was falsely RED (PR #2 review).
+m_pv01_multiline() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import {\n  SiteShell,\n} from '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a prettier multi-line import of the published shell is GREEN" PV-01 m_pv01_multiline
+
+# A dynamic import() in any position pulls the shell in too.
+m_pv01_dynamic() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "export default async function Layout() {\n  const m = await import('../site-shell')\n  return null\n}\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a dynamic import() of the published shell is GREEN" PV-01 m_pv01_dynamic
+
+# A multi-line export { ... } from names the shell too.
+m_pv01_exportfrom() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "export {\n  SiteShell,\n} from '../site-shell'\nexport default function Layout() { return null }\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a multi-line export { } from the published shell is GREEN" PV-01 m_pv01_exportfrom
+
+# The negative control survives the broader extractor: a surface whose only import is an
+# unrelated module, formatted the same prettier way, must stay RED — a fix that turns this
+# green is a regression, not a fix.
+m_pv01_multiline_red() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import {\n  OwnShell,\n} from './own-shell'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: a prettier-formatted surface importing only an unrelated module is still RED" PV-01 1 m_pv01_multiline_red
 
 # PV-02 red: a boundary owns its whole subtree — the offending page sits DEEP under it
 # (the measured failure this row exists for).
