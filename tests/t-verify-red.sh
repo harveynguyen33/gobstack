@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 102 `expect_red` call sites and 35 `expect_green`
-# — 137 calls over all 65 of the rule set's target rows (the four source-scope rows
+# One control per target-scope row: 105 `expect_red` call sites and 36 `expect_green`
+# — 141 calls over all 65 of the rule set's target rows (the four source-scope rows
 # carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 34 of those 65 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
 # this revision: 65 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `137 over 65 target rows`.
+# README's census sentence must read `141 over 65 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -1151,6 +1151,41 @@ m_pv01_multiline_red() {
   printf "import {\n  OwnShell,\n} from './own-shell'\n" > app/preview/layout.tsx
 }
 expect_red "PV-01: a prettier-formatted surface importing only an unrelated module is still RED" PV-01 1 m_pv01_multiline_red
+
+# PR #2 review round 2: a bare specifier used to pass through unchanged, so two layouts both
+# importing `react` cleared the surface — a package is not a shell, and the intersection now
+# counts PROJECT-RESOLVABLE modules only. Each of these three was a false GREEN before the fix.
+m_pv01_pkg_react() {
+  mkdir -p app/preview
+  printf "import { useState } from 'react'\n" > app/layout.tsx
+  printf "import { useState } from 'react'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: two layouts importing only the react package are RED (an installed package is never evidence)" PV-01 1 m_pv01_pkg_react
+m_pv01_pkg_link() {
+  mkdir -p app/preview
+  printf "import Link from 'next/link'\n" > app/layout.tsx
+  printf "import Link from 'next/link'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: two layouts importing only next/link are RED" PV-01 1 m_pv01_pkg_link
+m_pv01_builtin() {
+  mkdir -p app/preview
+  printf "import { readFileSync } from 'node:fs'\n" > app/layout.tsx
+  printf "import { readFileSync } from 'node:fs'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: two layouts importing only a node: builtin are RED" PV-01 1 m_pv01_builtin
+
+# The other side of the same rule: a bare specifier DOES count when it resolves to a file
+# inside the repo, so a shared import through a tsconfig paths alias is still evidence.
+# The fixture ships no tsconfig.json, so the control's own copy is removed on restore.
+m_pv01_alias() {
+  mkdir -p app/preview src
+  printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./src/*"]}}}' > tsconfig.json
+  printf 'export const SiteShell = 1\n' > src/site-shell.ts
+  printf "import { SiteShell } from '@/site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '@/site-shell'\n" > app/preview/layout.tsx
+}
+m_pv01_alias_restore() { rm -f tsconfig.json; restore_all; }
+expect_green "PV-01: a shared import through a tsconfig paths alias resolves and is GREEN" PV-01 m_pv01_alias '' m_pv01_alias_restore
 
 # PV-02 red: a boundary owns its whole subtree — the offending page sits DEEP under it
 # (the measured failure this row exists for).

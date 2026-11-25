@@ -937,8 +937,9 @@ _pv01_imports_of() {
 
 _pv_norm_spec() {
   # resolve a relative specifier against the importing file's directory so `../layout` from
-  # a preview dir and `./layout` from the root name the same module; package names and
-  # aliases pass through unchanged
+  # a preview dir and `./layout` from the root name the same module; only relative
+  # specifiers reach this function (a bare specifier is resolved or dropped by
+  # _pv01_resolve_spec first)
   local cur="$1" rest="$2" seg
   case "$rest" in ./*|../*) ;; *) printf '%s' "$rest"; return ;; esac
   rest=${rest#./}
@@ -954,17 +955,176 @@ _pv_norm_spec() {
   printf '%s' "$cur"
 }
 
+# ---- PV-01 module resolution: the intersection counts project-resolvable modules only ----
+# A bare specifier (an installed package, a builtin, an alias) used to pass through unchanged
+# and was counted as shared evidence — `react` in both layouts cleared the surface (false
+# GREEN, the worse direction). The rule now: relative specifiers normalise and count as
+# before; a bare specifier counts only when it resolves to a file that exists inside $ROOT
+# (tsconfig.json/jsconfig.json baseUrl+paths first, then <ROOT>/<spec> with extension and
+# index probing); everything else is dropped from the intersection and named in the RED
+# message (LIMITS #61, PR #2 review round 2).
+
+_pv01_tsconfig_load() {
+  # read compilerOptions.baseUrl + paths once per run, best effort and STRICT JSON only: a
+  # commented JSONC file fails the parse and the aliases it declares stay unresolvable (the
+  # documented false-RED direction). Sets _PV01_BASEURL and _PV01_PATHS (pattern<TAB>target
+  # lines, longest pattern first).
+  _PV01_BASEURL=""
+  _PV01_PATHS=""
+  local f parsed
+  for f in "$ROOT/tsconfig.json" "$ROOT/jsconfig.json"; do
+    [ -f "$f" ] || continue
+    parsed=$(python3 - "$f" <<'PYEOF' 2>/dev/null
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        cfg = json.load(fh)
+except Exception:
+    sys.exit(0)
+co = cfg.get("compilerOptions") or {}
+bu = co.get("baseUrl")
+if isinstance(bu, str):
+    print("BASE\t" + bu)
+paths = co.get("paths")
+if isinstance(paths, dict):
+    for pat, targets in paths.items():
+        if not isinstance(targets, list):
+            continue
+        for tgt in targets:
+            if isinstance(tgt, str):
+                print("PATH\t" + pat + "\t" + tgt)
+PYEOF
+) || parsed=""
+    [ -n "$parsed" ] || continue
+    _PV01_BASEURL=$(printf '%s\n' "$parsed" | awk -F'\t' '$1=="BASE"{print $2; exit}')
+    _PV01_PATHS=$(printf '%s\n' "$parsed" \
+      | awk -F'\t' '$1=="PATH"{print length($2)"\t"$2"\t"$3}' | sort -nr | cut -f2-)
+    return 0
+  done
+}
+
+_pv01_probe() {
+  # does a ROOT-relative candidate exist as a file inside the project? print the found path
+  # (relative to ROOT, with the probed extension) or nothing. Extension probing follows the
+  # bundler's usual order; index probing maps a directory onto its entry file.
+  local p="$1" ext
+  case "$p" in ""|.|/*|./*|../*) return 1 ;; esac
+  [ -f "$ROOT/$p" ] && { printf '%s' "$p"; return 0; }
+  for ext in ts tsx js jsx mjs cjs mts cts json; do
+    [ -f "$ROOT/$p.$ext" ] && { printf '%s' "$p.$ext"; return 0; }
+  done
+  for ext in ts tsx js jsx mjs cjs mts cts; do
+    [ -f "$ROOT/$p/index.$ext" ] && { printf '%s' "$p/index.$ext"; return 0; }
+  done
+  return 1
+}
+
+_pv01_key_of_found() {
+  # canonical comparison key of a resolved file: the ROOT-relative path without its probed
+  # extension and without a trailing /index, so `@/layout`, `./layout.tsx` and an index entry
+  # name the same module as the relative normalisation does
+  local k="$1"
+  case "$k" in *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.mts|*.cts|*.json) k="${k%.*}" ;; esac
+  case "$k" in */index) k="${k%/index}" ;; esac
+  printf '%s' "$k"
+}
+
+_pv01_norm_base() {
+  # a baseUrl of "." or "./" means the tsconfig's own directory (= ROOT): normalise to empty
+  local b="${1#./}"; b="${b#/}"; b="${b%/}"
+  [ "$b" = "." ] && b=""
+  printf '%s' "$b"
+}
+
+_pv01_probe_target() {
+  # substitute the star of a paths target, join the baseUrl (or the tsconfig dir = ROOT when
+  # there is none), and probe. $1 = target (may carry exactly one *), $2 = substituted text
+  local tgt="$1" sub="$2" p b
+  case "$tgt" in
+    *\**) p="${tgt/\*/$sub}" ;;
+    *) [ -z "$sub" ] || return 1; p="$tgt" ;;
+  esac
+  p="${p#./}"
+  case "$p" in
+    ""|.) return 1 ;;
+    /*) p="${p#/}" ;;
+    *)
+      if [ -n "$_PV01_BASEURL" ]; then
+        b=$(_pv01_norm_base "$_PV01_BASEURL")
+        [ -n "$b" ] && p="$b/$p"
+      fi
+      ;;
+  esac
+  _pv01_probe "$p"
+}
+
+_pv01_resolve_spec() {
+  # classify one import specifier of the layout living in dir $1:
+  #   K<TAB><key>   counts as shared evidence (relative specifiers always do, normalised)
+  #   D<TAB><spec>  dropped: a bare specifier that resolves to nothing inside the project
+  #                 (an installed package, a builtin, an unresolvable alias)
+  local cur="$1" spec="$2" pat tgt sub prefix suffix found
+  case "$spec" in
+    ./*|../*) printf 'K\t%s\n' "$(_pv_norm_spec "$cur" "$spec")"; return 0 ;;
+  esac
+  if [ -n "$_PV01_PATHS" ]; then
+    while IFS=$'\t' read -r pat tgt; do
+      [ -n "$pat" ] || continue
+      case "$pat" in
+        *\*)
+          prefix="${pat%\**}"; suffix="${pat#*\*}"
+          case "$spec" in "$prefix"*) ;; *) continue ;; esac
+          sub="${spec#"$prefix"}"
+          case "$sub" in
+            *"$suffix") sub="${sub%"$suffix"}" ;;
+            *) continue ;;
+          esac
+          if found=$(_pv01_probe_target "$tgt" "$sub"); then
+            printf 'K\t%s\n' "$(_pv01_key_of_found "$found")"; return 0
+          fi
+          ;;
+        *)
+          [ "$spec" = "$pat" ] || continue
+          if found=$(_pv01_probe_target "$tgt" ""); then
+            printf 'K\t%s\n' "$(_pv01_key_of_found "$found")"; return 0
+          fi
+          ;;
+      esac
+    done <<< "$_PV01_PATHS"
+  fi
+  if [ -n "$_PV01_BASEURL" ]; then
+    sub="$(_pv01_norm_base "$_PV01_BASEURL")"
+    [ -n "$sub" ] && sub="$sub/" || sub=""
+    if found=$(_pv01_probe "$sub${spec#./}"); then
+      printf 'K\t%s\n' "$(_pv01_key_of_found "$found")"; return 0
+    fi
+  fi
+  if found=$(_pv01_probe "${spec#./}"); then
+    printf 'K\t%s\n' "$(_pv01_key_of_found "$found")"; return 0
+  fi
+  printf 'D\t%s\n' "$spec"
+}
+
 check_pv_01() {
   # P1 (CURATION-2026-11-25): a surface that exists to be reviewed renders the same shell
   # the published route renders. A candidate review surface is a directory in a route tree
   # whose name matches preview|previewed|draft|staging; its layout must import at least one
-  # module the public layout at the equivalent position (the same route tree without that
-  # segment, or the nearest layout.* above it) also imports — unless the file carries
-  # `preview_differs: <list>` declaring the difference. Honest limit (LIMITS #61): an
-  # import proves reachability, never an identical render — a shell imported and then
-  # overridden by a local wrapper passes.
+  # PROJECT-RESOLVABLE module the public layout at the equivalent position (the same route
+  # tree without that segment, or the nearest layout.* above it) also imports — unless the
+  # file carries `preview_differs: <list>` declaring the difference. The intersection is
+  # over modules the project can resolve: a relative specifier normalises across the two
+  # positions and counts; a bare specifier counts only when it resolves to a file that
+  # exists inside the repo (tsconfig.json/jsconfig.json baseUrl+paths first, then
+  # <ROOT>/<spec> with extension and index probing) — an installed package or a builtin is
+  # never evidence of a shared shell, and a specifier that resolves nowhere is dropped and
+  # named in the RED message. Honest limit (LIMITS #61): an import proves reachability,
+  # never an identical render — a shell imported and then overridden by a local wrapper
+  # passes, and an unresolvable alias or a runtime-built specifier is a false RED the
+  # preview_differs: hatch exists to clear.
   local tree d b surf up pub sameshell=0 bad=0 n=0 declared=0 inherited=0 unjudged=0 shared
+  local s_out p_out surf_dropped pub_dropped
   local trees
+  _pv01_tsconfig_load
   trees=$(_pv_route_trees)
   if [ -z "$trees" ]; then
     printf 'no route tree (no app/, src/app/, pages/ or routes/)\n'
@@ -1002,13 +1162,21 @@ check_pv_01() {
         printf 'note: %s has no public layout above it to compare with - not judged\n' "${surf#"$ROOT"/}"
         continue
       fi
+      s_out=$(_pv01_imports_of "$surf" | while IFS= read -r s; do _pv01_resolve_spec "${surf%/*}" "$s"; done)
+      p_out=$(_pv01_imports_of "$pub" | while IFS= read -r s; do _pv01_resolve_spec "${pub%/*}" "$s"; done)
+      surf_dropped=$(printf '%s\n' "$s_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')
+      pub_dropped=$(printf '%s\n' "$p_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')
       shared=$(comm -12 \
-        <(_pv01_imports_of "$surf" | while IFS= read -r s; do _pv_norm_spec "${surf%/*}" "$s"; done | sort -u) \
-        <(_pv01_imports_of "$pub" | while IFS= read -r s; do _pv_norm_spec "${pub%/*}" "$s"; done | sort -u) \
+        <(printf '%s\n' "$s_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u) \
+        <(printf '%s\n' "$p_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u) \
         | head -1)
       if [ -z "$shared" ]; then
         printf '%s imports no module the public layout %s imports and carries no preview_differs: marker - it does not render the published shell\n' \
           "${surf#"$ROOT"/}" "${pub#"$ROOT"/}"
+        if [ -n "$surf_dropped" ] || [ -n "$pub_dropped" ]; then
+          printf 'note: %s specifier(s) of those layouts did not resolve inside the project (an installed package, a builtin or an unresolvable alias) and were NOT counted as shared evidence - an alias the bundler resolves but this text probe cannot is a known false RED here; declare the surface with preview_differs: <list> to clear it\n' \
+            "$(printf '%s %s' "$surf_dropped" "$pub_dropped" | wc -w | tr -d ' ')"
+        fi
         bad=1
       else
         sameshell=$((sameshell + 1))

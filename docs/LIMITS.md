@@ -542,27 +542,36 @@ the Node the gates ran under.
     to fail in. The failure it was adopted from was a mid-run `AGENTS.md` edit that needed a
     human Allow and left no trace of who approved it (CURATION-2026-11-07 §2 C6).
 
-61. **`PV-01` proves an import reaches the published shell, not that the render is identical.**
+61. **`PV-01` compares project-resolvable modules, and an import still proves reachability, not an identical render.**
     The check collects the module specifiers a review surface's `layout.*` imports and compares
-    them with the public layout at the equivalent position; sharing one module means the surface
-    pulls in the published shell. It cannot see past the import: a shell imported and then
-    overridden by a local wrapper (its own headers, its own routing context, an extra provider)
-    passes, because reachability is all a text probe has. A surface whose layout shares no
-    module with the public layout passes too if the file carries `preview_differs: <list>` —
-    the marker is a declared difference, and the check cannot tell whether the declaration is
-    honest (CURATION-2026-11-25 §2 P1). The extractor reads whole-file text (a prettier-wrapped
-    brace list, a dynamic `import(`, a `require(` are all seen), and what it still cannot see
-    after that fix: a specifier built at runtime (`import(someVar)` has no literal to read, so
-    the surface reads as if it imports nothing — the false-RED direction); a module reached only
-    through a re-export barrel (`index.ts`) whose own specifiers live in another file, which the
-    check does not follow, so a barrel pass proves nothing about what the barrel re-exports; TS
-    path aliases (`@/layout`) are compared as opaque strings while the bundler resolves them,
-    so an alias and its target can pass or fail as different modules; and the scan is TEXT, so
-    a specifier-shaped string literal that sits after a statement-shaped keyword can still
+    them with the public layout at the equivalent position — but the intersection counts
+    PROJECT-RESOLVABLE modules only: a relative specifier normalises across the two positions
+    and counts, while a bare specifier counts only when it resolves to a file that exists inside
+    the repo (tsconfig.json/jsconfig.json `baseUrl`+`paths` first — read as strict JSON, so a
+    commented JSONC leaves its aliases unresolvable — then `<ROOT>/<spec>` with the usual
+    extension and index probing). An installed package, a `node:` builtin or anything else the
+    probe cannot resolve is NEVER evidence that a surface pulls in the published shell: two
+    layouts both importing `react` or `next/link` are RED (PR #2 review round 2 — both used to
+    be a false GREEN, the worse direction). A specifier that resolves nowhere is dropped from
+    the intersection and the RED message says so, so the reader knows an unresolvable alias may
+    be the cause and that `preview_differs: <list>` is the escape hatch. The comparison cannot
+    see past the import: a shell imported and then overridden by a local wrapper (its own
+    headers, its own routing context, an extra provider) passes, because reachability is all a
+    text probe has, and a surface whose layout shares no module with the public layout passes
+    too if the file carries `preview_differs: <list>` — the marker is a declared difference,
+    and the check cannot tell whether the declaration is honest (CURATION-2026-11-25 §2 P1).
+    The extractor reads whole-file text (a prettier-wrapped brace list, a dynamic `import(`, a
+    `require(` are all seen), and what it still cannot see after that fix, in the two directions
+    it admits honestly: an alias the bundler resolves but this text probe cannot (a JSONC
+    tsconfig, a non-file target), or a specifier built at runtime (`import(someVar)` has no
+    literal to read) — the surface reads as if it imports nothing, a false RED; and a
+    specifier-shaped string literal that sits after a statement-shaped keyword can still
     over-match — one false specifier in both files is a false GREEN, which is the worse
-    direction, and the same text blindness means a `from '<spec>'` in a comment is stripped
-    first (comments cannot vouch for an import) but a contrived string still could (PR #2
-    review).
+    direction. A module reached only through a re-export barrel (`index.ts`) whose own
+    specifiers live in another file is not followed, so a barrel pass proves nothing about
+    what the barrel re-exports; and the scan is TEXT, so a `from '<spec>'` in a comment is
+    stripped first (comments cannot vouch for an import) but a contrived string still could
+    (PR #2 review).
 
 62. **`PV-02` reads a framework convention, not a runtime.** The check walks every `loading.*`
     boundary and requires each `page.*` in the boundary's subtree that calls `notFound(` to
