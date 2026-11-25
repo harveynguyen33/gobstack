@@ -3,7 +3,7 @@
 A step-by-step guide for your first week. **Read this before the README.** The README tells you
 what the pieces are; this tells you what to *do*, in order, and what you should see when it works.
 
-Version: `0.6.1` · Last measured: 2026-10-09 · Every command and every output below was run on a
+Version: `0.7.0` · Last measured: 2026-11-25 · Every command and every output below was run on a
 real repository while writing this guide.
 
 ---
@@ -156,11 +156,11 @@ You will see one line per rule. The shape:
     PASS  IN-02  20 installed files hashed
     FAIL  HP-05  HANDOFF.md names no commit that exists in this repo
     SKIP  FM-01  feature_map: is empty - this state is UNREACHABLE ...
-    SKIP  BN-06  No renderer with Node access ... (not applicable: no package.json, so nothing declares electron)
+    SKIP  BN-01  No `any` in application TypeScript. (not applicable: no file matches applies_when: **/*.ts **/*.tsx ...)
 
 and a summary line at the bottom:
 
-    19 passed, 1 failed, 0 advisory, 11 skipped     # the HP-05 placeholder, before you name a real commit
+    18 passed, 1 failed, 0 advisory, 7 skipped     # the HP-05 placeholder, before you name a real commit
 
 ### How to read that output
 
@@ -202,9 +202,9 @@ section.
 
 | Step | Command | Verify prints | The FAILs |
 |---|---|---|---|
-| 1. the install ran | `gob init --write ... --yes` | `26 passed, 0 failed, 0 advisory, 5 skipped` | none — the installer fills `HANDOFF.md`'s HEAD from the seed commit, and the uncommitted-install / untracked-SPEC reds (`CM-03`, `SP-02`) are now library rows, off by default |
-| 2. the first commit | `git add -A && git commit` | `26 passed, 0 failed, 0 advisory, 5 skipped` | none — green |
-| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `26 passed, 0 failed, 0 advisory, 5 skipped` | none — `CM-03` is a library row, so a dirty tree no longer re-reds by default |
+| 1. the install ran | `gob init --write ... --yes` | `25 passed, 0 failed, 0 advisory, 1 skipped` | none — the installer fills `HANDOFF.md`'s HEAD from the seed commit, and the uncommitted-install / untracked-SPEC reds (`CM-03`, `SP-02`) are now library rows, off by default |
+| 2. the first commit | `git add -A && git commit` | `25 passed, 0 failed, 0 advisory, 1 skipped` | none — green |
+| 3. name a real HEAD — and **commit that too** | edit `HANDOFF.md`, then `git add -A && git commit` | `25 passed, 0 failed, 0 advisory, 1 skipped` | none — `CM-03` is a library row, so a dirty tree no longer re-reds by default |
 
 One of those deserves its name spelled out:
 
@@ -417,14 +417,14 @@ A default install lands on a specific shape. The first red is
 the scaffold teaching on purpose — `HP-05`, the `0000000` placeholder in `HANDOFF.md` (§4). The
 walk in §4 measured, step by step:
 
-    19 passed, 1 failed, 0 advisory, 11 skipped     # straight after the install (the HP-05 placeholder)
-    20 passed, 0 failed, 0 advisory, 11 skipped     # name a real commit in HANDOFF.md, commit, and it is green
+    18 passed, 1 failed, 0 advisory, 7 skipped     # straight after the install (the HP-05 placeholder)
+    19 passed, 0 failed, 0 advisory, 7 skipped     # name a real commit in HANDOFF.md, commit, and it is green
 
 (On the older `gob init` walk the uncommitted-install and untracked-SPEC reds — `CM-03`, `SP-02`
 — were the first two FAILs; both are library rows now, off by default.) Name a real commit in
 `HANDOFF.md`, commit, and give the gate lines real commands (§5), and it is green:
 
-    20 passed, 0 failed, 0 advisory, 11 skipped     (on a real project; your numbers will differ)
+    19 passed, 0 failed, 0 advisory, 7 skipped     (on a real project; your numbers will differ)
 
 **Ten rows skipping is correct**, and each skip prints its reason. In plain terms: the
 harness is telling you which of its rules have nothing to read yet. It is a checklist, not a
@@ -433,7 +433,7 @@ scolding.
 Two readings that are easy to get wrong:
 
 - **Advisory rows are not passes.** No row of the shipped matrix is labelled `advisory` — the
-  six advisory rows moved to the library (`gob verify --library`), so a default install sits at
+  five advisory rows moved to the library (`gob verify --library`), so a default install sits at
   0 of 10 on `advisory_ceiling: 10`. Enabling one from the library spends a slot: adding
   unenforceable rules eventually fails verify until one is removed. That is intentional.
 - **Vacuously-passing rows are not proven.** A rule about "the first review note" passes when there
@@ -704,11 +704,11 @@ Output is one line per executed row, in manifest order, plus a summary line at t
     PASS  HP-01  (test -f HANDOFF.md)
     FAIL  GT-02  gate commit: false -> exit 1
     SKIP  FM-01  feature_map: is empty - this state is UNREACHABLE ...
-    SKIP  BN-06  No renderer with Node access ... (not applicable: no package.json, so nothing declares electron)
+    SKIP  BN-01  No `any` in application TypeScript. (not applicable: no file matches applies_when: **/*.ts **/*.tsx ...)
 
 Those three lines are one row of each marking a default run can show (no row of the shipped
 matrix is advisory — the advisory rows live in the library). The summary line of a green default
-run is `20 passed, 0 failed, 0 advisory, 11 skipped` (the eleventh skip is `AG-01` — a plain `goblin-install` writes no approval record; `gob init --write` writes the first one).
+run is `19 passed, 0 failed, 0 advisory, 7 skipped` (the first skip is `AG-01` — a plain `goblin-install` writes no approval record; `gob init --write` writes the first one).
 
 **Exit codes:** `0` every executed check passed (advisories and skips do not fail the run) ·
 `1` at least one check FAILED · `2` verify could not run (not installed, a missing dependency,
@@ -732,14 +732,12 @@ product deleted is not a blind spot a run still carries (`docs/LIMITS.md` #13/#3
 #### A fresh install verifies green
 
 Measured on a fresh DEFAULT install (skills opt-in, W6 neutral-first), committed with no
-hand edit: **`20 passed, 0 failed, 0 advisory, 11 skipped`, exit 0.** The core procedure
+hand edit: **`19 passed, 0 failed, 0 advisory, 7 skipped`, exit 0.** The core procedure
 tier is vendored on every install (`.gob/skills/`), so `SK-01`, `SK-02` and `SK-04` RUN and
-pass on a fresh repo — the product no longer disables its own rows. Ten rows skip with a
+pass on a fresh repo — the product no longer disables its own rows. Seven rows skip with a
 reason: every ban self-selects by its `applies_when` — a GLOB (`BN-01`/`BN-02`/`BN-03`/`BN-05`
 match only `.ts`/`.tsx`/`.js`/`.jsx`, so with no such source each reports itself *not
-applicable*) or the `dep:electron` PREDICATE (the four electron bans `BN-06`..`BN-09` run only
-when `package.json` names electron, so with none they too report *not applicable* — never running
-vacuously off the harness's own `checks/*.mjs`) — and `FM-01`/`FM-02`, which
+applicable*) — and `FM-01`/`FM-02`, which
 have no feature map yet (`feature_map:` ships empty on purpose: a fresh install must not be
 born RED — G1, `docs/LIMITS.md` #30). Thirty-two further rows are **not skipped but OFF** —
 they live in the library (`gob verify --library`), the rows that are not right for every repo.
@@ -757,7 +755,7 @@ verifier is reporting FAILs.
   the part's rows as `SKIP (opt-out)` in the summary, so the opt-out is **visible rather than
   absent**. The same mechanism is what makes a part's off state real.
 - **The opt-out numbers are pinned (V3-3).** A default install with the core tier vendored
-  verifies `20 passed, 0 failed, 0 advisory, 11 skipped`, exit 0, and
+  verifies `19 passed, 0 failed, 0 advisory, 7 skipped`, exit 0, and
   `tests/t-install-off-switch.sh` asserts that line: a silent drift in the opt-out path is caught
   rather than left as a number nobody wrote down (the `--skills no` count moved from `37/0/9/11`
   at v0.2 as the ban and feature-map rows landed; in v3 the model/role/loop and CI rows are cut,
@@ -853,21 +851,18 @@ arrives only with `--skills yes` (W6 neutral-first). The repo's other eleven ski
 Then, in order:
 
     git add -A && git commit          # the install is a change like any other
-    .gob/bin/goblin-verify            # 20 passed, 0 failed - the uncommitted-install red (CM-03) is a library row now
+    .gob/bin/goblin-verify            # 19 passed, 0 failed - the uncommitted-install red (CM-03) is a library row now
 
-A default install (core tier, no agent skills) is **green** — `20 passed, 0 failed, 0 advisory,
-11 skipped`, exit 0 — once
+A default install (core tier, no agent skills) is **green** — `19 passed, 0 failed, 0 advisory,
+7 skipped`, exit 0 — once
 `HANDOFF.md` names a commit that exists; before that edit the scaffold's `0000000` placeholder is
-the one expected red (`19 passed, 1 failed`). Both numbers are measured, not assumed
-(`docs/GUIDE.md`; step 2 of `docs/GUIDE.md`). Eleven rows skip with a reason: `AG-01` has no approval record yet (a plain install writes
+the one expected red (`18 passed, 1 failed`). Both numbers are measured, not assumed
+(`docs/GUIDE.md`; step 2 of `docs/GUIDE.md`). Seven rows skip with a reason: `AG-01` has no approval record yet (a plain install writes
 none — `gob approve-agents "<reason>"` records the first, and `gob init --write` writes it for
 you); `SK-01`, `SK-02`
 and `SK-04` RUN (the core procedure tier is vendored under `.gob/skills/` on every install),
 plus the not-yet rows: `BN-01`/`BN-02`/`BN-03`/`BN-05` have no `.ts`/`.js` source for their
-`applies_when` glob and each reports itself *not applicable*; the four electron bans
-`BN-06`/`BN-07`/`BN-08`/`BN-09` are selected by the `dep:electron` predicate, so with **no
-`package.json`** they too report *not applicable* — never passing vacuously off the harness's own
-`checks/*.mjs` — and `FM-01`/`FM-02`
+`applies_when` glob and each reports itself *not applicable* — and `FM-01`/`FM-02`
 (no feature map yet). Thirty-two further rows are held in the **library** (`gob verify
 --library`) — off by default, each with the line that turns it on. The round-shaped rows
 (`PG-*`) and the corpus rows (`RC-*`) are library rows now, so the first-step list is a list of
@@ -911,7 +906,7 @@ The remedy is a reconciliation. The project's file stays the file of record; not
        git add -A && git commit
        .gob/bin/goblin-verify        # HP-02, HP-03, HP-05 go green
 
-   Success is the full green path (`20 passed, 0 failed, 0 advisory, 11 skipped`, exit 0)
+   Success is the full green path (`19 passed, 0 failed, 0 advisory, 7 skipped`, exit 0)
    with `git status --short` empty.
 
 The edit is additive and small — measured on the model repo (§1's exemplar, 2450 lines): three
@@ -956,7 +951,7 @@ closed and now ENFORCED (`IN-03`'s third clause, Z1-5): `script`, `lint`, `gate`
 plus `test` for a source-scope row, whose check is a script under `tests/` run by
 `tests/run-tests.sh`.
 
-Measured shape of this table: **35 rows** - 31 target, 4 source; advisory 0, gate 4, lint 19, script 9, test 3 (the on-by-default matrix, `.gob/manifest/enforcement.tsv`). The **library** (`library.tsv`) holds a further **32 rows**, all `scope:target`, off by default. The table below renders the **full 67-rule set** (matrix + library) so a reader sees the whole contract; the 32 library rows are the ones `gob verify --library` names.
+Measured shape of this table: **30 rows** - 26 target, 4 source; advisory 0, gate 4, lint 14, script 9, test 3 (the on-by-default matrix, `.gob/manifest/enforcement.tsv`). The **library** (`library.tsv`) holds a further **32 rows**, all `scope:target`, off by default. The table below renders the **full 67-rule set** (matrix + library) so a reader sees the whole contract; the 32 library rows are the ones `gob verify --library` names.
 
 ### The rows
 
@@ -979,7 +974,6 @@ Measured shape of this table: **35 rows** - 31 target, 4 source; advisory 0, gat
 | `GT-02` | target | gate | Every declared gate runs and exits 0. | goblin-verify --only GT-02 | — |
 | `GT-03` | target | script | The round reports one line of measured numbers. | test -f .gob/last-gate-line && [ .gob/last-gate-line -nt "$(git rev-parse --git-dir)/logs/HEAD" ] | The freshness reference is HEAD's reflog (`.git/logs/HEAD`), which every HEAD movement rewrites - a commit in an attached or a detached worktree included, and independently of whether the refs are packed. The clause it replaced read `.git/HEAD`, a file a commit never rewrites (only branch operations do), so a commit landing after the measured line left the row GREEN while the round had moved on (D2, measured: `.git/HEAD`'s mtime unchanged across a real commit, `--only GT-03` exit 0). Two limits remain, recorded rather than hidden: a repo with the reflog disabled (`core.logAllRefUpdates=false`) has no reference to compare against, and `-nt` against a missing path is true, so the clause passes vacuously and the row then proves only that a measured line EXISTS (a repo with no commit yet is the same case); and the clause reads ANY HEAD movement as staleness, so a checkout, a branch rename or a reset FAILs it until the next gate run rewrites the line. That second behaviour is what makes a full run self-freshening: `GT-02` writes the line earlier in the same pass, so the row asserts that the line in front of you came from THIS run. `tests/t-gt03-freshness.sh` is the control, in both directions. |
 | `AG-01` | target | script | An instruction file changes only with a recorded approval: AGENTS.md hashes to the value in .gob/agents.approved, which carries the date, the approver and the one-line reason. | goblin-verify --only AG-01 | The record proves the file matches an approval, never that the approver read the diff: the row hashes AGENTS.md and compares it with the LAST row of the append-only .gob/agents.approved (latest row wins, and a row carries no file name — only the hash is coverage, so a reason naming some other file clears nothing; the control in tests/t-verify-red.sh pins that). A worker able to write both files can forge a record — the hash is a witness, not a signature — and a change that also rewrites the record is invisible to this row (git history is the backstop; LIMITS #60). No record at all is a SKIP, never a red: an existing install must not turn red just by upgrading to an engine that ships this row (CURATION-2026-11-07 §2 C6). |
-| `HV-02` | target | lint | A number taken from a live surface carries its guard: a bounding box is asserted inside the capture viewport, and a parsed number is asserted finite before it can fail an assertion. | goblin-verify --only HV-02 | Text probe over the harness dir, the same class as BN-01 (no AST): it proves a guard is PRESENT - innerWidth/innerHeight/visualViewport beside a getBoundingClientRect call, Number.isFinite/isNaN beside a number parsed out of execSync/spawnSync stdout, or a guarded: <reason> marker - never that the guard is EFFECTIVE (a decorative one passes), and a pattern inside a string or a comment is read as code. A number parsed by any other means than parseFloat/parseInt/Number( is unseen, and it cannot see a viewport override that silently did not apply - that needs a runtime probe the dependency contract forbids (CURATION-2026-11-07 §2 C2, the measured failure being a measurement reported with no viewport assertion at all). |
 | `HV-01` | target | lint | A check that asserts a user-visible outcome builds its input through the same producer the users input comes through; a hand-written fixture is generated by that producer and pinned. | goblin-verify --only HV-01 | Text probe: it proves a producer is NAMED - a bare-package import/require/dynamic import, or a produced_by: <function> <pinned id> marker beside a doc/board/payload/fixture literal - never that the call path matches the product wiring. A relative import (./ or ../) does not clear it, a literal built by spread or copy from another file is unseen, and a name other than doc/board/payload/fixture is invisible. The stronger form needs the product to export a single make-me-the-thing-the-user-gets factory, which is a design change, not a probe (CURATION-2026-11-07 §2 C1, the failure being a harness green on declared node sizes while the shared payload carried none). |
 | `GT-04` | target | gate | A ratchet is declared with a ceiling. | goblin-verify --only GT-04 | — |
 | `GT-05` | target | gate | The ratchet has not risen. | goblin-verify --only GT-05 | — |
@@ -1007,17 +1001,12 @@ Measured shape of this table: **35 rows** - 31 target, 4 source; advisory 0, gat
 | `SC-04` | target | lint | Every cookie write carries its flags. | goblin-verify --only SC-04 | Builtin, same-statement only: a write spread over three lines is not seen, and the row says so. It REPORTS that a JS-written cookie is readable by any script rather than failing on it - that is a design fact, not a bug - so the pass is about the flags, never about the choice. |
 | `SC-05` | target | gate | Every write route validates its input, or is waived. | goblin-verify --only SC-05 | Builtin: it proves a validator is CALLED (`safeParse\|zod\|valibot\|yup\|ajv\|superstruct\|validate(`), never that the schema is right - a schema that accepts everything passes. `.gob/boundary-waivers` is the escape hatch, and the waived count is printed, so a silent pile-up is visible. |
 | `SC-06` | target | gate | A lockfile exists, and the repo tracks it. | goblin-verify --only SC-06 | Builtin: presence, then `git ls-files --error-unmatch`. It cannot see that the lockfile is STALE relative to `package.json` - resolving that needs the package manager, which is a deliberate network-shaped step, not a check. SKIPs with a reason when there is no `package.json`. |
-| `SC-09` | target | advisory | Auth is applied consistently across sibling routes. | advisory | Prose on purpose: "consistently" is a semantic judgement about a private surface no repo here has yet. Counted (advisory; the library holds it now) so the matrix cannot quietly grow prose. |
 | `PF-01` | target | lint | The perf baseline names the commit it measured. | goblin-verify --only PF-01 | Builtin: the metric must equal `ratchet.name` so the budget and the measurement cannot silently disagree, the value must be numeric, the date must exist, the baseline commit must exist AND be an ancestor of HEAD (`HP-05`'s mechanic, reused rather than re-derived), and `ratchet.ceiling` must equal `perf.baseline_value` - otherwise a one-line ceiling raise passes while the row prints the contradiction, which is `I raised the budget and never measured again` (G8-6b). It cannot see whether the metric is the right one for the product, and it never re-measures: re-anchoring is a deliberate operator action. SKIPs with a reason when no perf metric is declared, or none has been recorded yet. |
 | `BN-00` | target | script | Every ban has an enforcement row, every ban row names a replacement, and the ban table is not empty. | goblin-verify --only BN-00 | — (this row is the reason the ban list cannot decay into prose: IN-03's shape applied to bans.tsv, and it agrees in both directions) |
 | `BN-01` | target | lint | No `any` in application TypeScript. | goblin-verify --only BN-01 | Text probe, not an AST: a `: any` inside a string or a comment is reported, and `Record<string, any>` (no leading colon) is missed. The AST form needs a parser the no-npm contract (docs/GUIDE.md) forbids (docs/LIMITS.md #27). SKIPs when an explicit `bans_disabled:` names it, or its globs match no file. |
 | `BN-02` | target | lint | No `@ts-ignore` / `@ts-expect-error` suppressions. | goblin-verify --only BN-02 | Text probe: it sees the directive wherever it appears, including inside a string, and cannot tell a suppression hiding a real error from one on a line that would compile anyway. SKIPs when an explicit `bans_disabled:` names it, or its globs match no file. |
 | `BN-03` | target | lint | No direct network call from a component. | goblin-verify --only BN-03 | Text probe over the declared component globs: it stops the call and cannot tell whether a data layer was written or the call merely moved into a helper. SKIPs when an explicit `bans_disabled:` names it, or its globs match no file. |
 | `BN-05` | target | lint | No import across a declared layer boundary. | goblin-verify --only BN-05 | Reads the `layers:` list; an empty list SKIPs with a reason, never a vacuous pass. It matches an import path naming the target directory's last segment - module aliases and dynamic imports are not seen. SKIPs when no file matches its globs. |
-| `BN-06` | target | lint | No renderer with Node access (`nodeIntegration: true`). | goblin-verify --only BN-06 | Text probe over the ban table's globs, the same mechanism as BN-01..BN-05: it sees `nodeIntegration: true` wherever it appears, including inside a string, and cannot see a webPreferences object built at run time or spread in from another module. The STRONGER form is a runtime measurement - the renderer prints `process.contextIsolated` and `process.sandboxed` and the check requires true/true - and that needs a real Electron process, which the dependency contract (docs/GUIDE.md) does not allow a shipped rule to launch: it is the project's host gate (docs/LIMITS.md #34). SKIPs when an explicit `bans_disabled:` names it, or `package.json` does not name electron (the `dep:electron` predicate). |
-| `BN-07` | target | lint | No renderer with context isolation or the process sandbox turned off. | goblin-verify --only BN-07 | One probe for two properties because Electron's own documentation makes them one: disabling `contextIsolation` "also disables process sandboxing", so a repo that has turned either off has lost both. Text probe, with the same false-positive set as BN-06. SKIPs when an explicit `bans_disabled:` names it, or `package.json` does not name electron (the `dep:electron` predicate). |
-| `BN-08` | target | lint | No dangerous webPreferences. | goblin-verify --only BN-08 | Four one-line patterns from Electron's own security checklist (`webSecurity: false`, `allowRunningInsecureContent: true`, `enableBlinkFeatures`, `<webview allowpopups>`). Text probe: `enableBlinkFeatures` is banned by name rather than by value, so the string is reported even in a comment. SKIPs when an explicit `bans_disabled:` names it, or `package.json` does not name electron (the `dep:electron` predicate). |
-| `BN-09` | target | lint | No synchronous IPC and no `@electron/remote`. | goblin-verify --only BN-09 | The banned-list shape the wave's note 9 asks for, applied to Electron: `sendSync(` and `@electron/remote` block the renderer's own thread, which is the freeze these bans exist to prevent. Text probe - it sees the call site, not the call graph, so a wrapper around `sendSync` in a file the globs do not match is missed. SKIPs when an explicit `bans_disabled:` names it, or `package.json` does not name electron (the `dep:electron` predicate). |
 | `FM-01` | target | lint | Every feature file is indexed from the map README, declares its slug and at least one entry path, and carries the four-H2 entry contract. | goblin-verify --only FM-01 | SKIPs (exit 3) when feature_map: is empty - a fresh install has no map and must not be born RED (the D8 shape). When a map IS declared: the README must exist, every features/*.md must be linked from it in the (./<slug>.md) form and every relative .md link must resolve, each feature file's `feature:` must equal its filename stem, it must declare >=1 `entry_paths:`, and its H2s must be exactly Sub-features / How to get to it (user POV) / Driving it with <harness> / Gotchas, in that order. Partial: the README's own H2s are prose this row does not read, and 'the map lists every user-facing feature' is not mechanically checkable - that is docs/LIMITS.md #30, not a row. |
 | `FM-02` | target | lint | Every entry point a feature declares still resolves in source, and no entry path changed after the map was verified. | goblin-verify --only FM-02 | SKIPs (exit 3) when feature_map: is empty. A tripwire, not a proof. The token is searched under source_root with occurrences under the map's own directory excluded - without that exclusion the map's own entry-path list satisfies the search and the row could never go RED. Freshness is `git log -1 --format=%cs` on the resolved file against the feature's `verified:` date, and git sees a FILE change, not a behaviour change: the row can be RED-when-stale and never GREEN-means-fresh. A token that also occurs in a vendored copy or a build artifact is read as resolved, and a `verified:` date is itself a claim the row cannot test (docs/LIMITS.md #30). W5-4: the search skips the harness's own directories (`.gob/`, `.hermes/`, the declared `harness_dir`) and the map's own directory, so a stub map whose token occurs only in the install no longer resolves; a token that occurs only in the target's own `docs/`, `tests/` or build output still does (docs/LIMITS.md #37). Z1-6: the resolved file must be TRACKED (`git ls-files --error-unmatch`) before its date is compared - an untracked file used to make the freshness clause skip in silence, so a map could claim `verified: 2020-01-01` over source that was never committed. |
 | `VA-01` | target | gate | The generated verification skill's doctor command runs and exits 0. | goblin-verify --only VA-01 | SKIPs (exit 3) when verify_doctor: is empty (the replay.commit: "" shape). Runs the DECLARED command exactly as GT-02 runs a declared gate, and never a string read out of file content (the v0.2 blocker). Closes P6's stated-but-unenforced clause 'a generated skill that was never executed is a draft': the doctor is the smallest executable proof that the skill's own instructions still run - and it proves only that, never that the doctor tests the right path. |
@@ -1032,8 +1021,8 @@ Measured shape of this table: **35 rows** - 31 target, 4 source; advisory 0, gat
 
 ### Advisory rows, named
 
-0 of the 31 rows are labelled `advisory`. 0 of them carry no executable check at all — the six
-advisory rows (`HP-04`, `HS-03`, `CM-02`, `DOC-01`, `DOC-02`, `SC-09`) all moved to the library
+0 of the 26 rows are labelled `advisory`. 0 of them carry no executable check at all — the five
+advisory rows (`HP-04`, `HS-03`, `CM-02`, `DOC-01`, `DOC-02`) all moved to the library
 (`gob verify --library`), so a default run carries no prose row (they are prose the matrix
 refuses to pretend about).
 
@@ -1042,17 +1031,16 @@ refuses to pretend about).
 - **CM-02** (no check at all) - The commit message was written to a file, not passed with -m.
 - **DOC-01** (no check at all) - A significant change updates the docs that teach it.
 - **DOC-02** (no check at all) - System-level changes are recorded wherever the project's standard says they live.
-- **SC-09** (no check at all) - Auth is applied consistently across sibling routes. Added when the missing entry was measured: the count said 9 and this list held 8.
 
 `advisory_ceiling` (default 10) caps that count: **SK-03 fails the run when the advisory
 count exceeds it.** The number of unenforceable rules is itself a gate. Measured (v3):
-`advisory 6 of ceiling 10`.
+`advisory 5 of ceiling 10`.
 
 **The budget, stated so the next rule author does not have to work it out (V1/G8-5).** The
-count is 6 of a ceiling of 10, so **four advisory slots are free**: a tenth advisory row is
+count is 5 of a ceiling of 10, so **five advisory slots are free**: a tenth advisory row is
 available, but the one after the ceiling FAILs `SK-03` unless the ceiling is raised in the same
 change, with the reason written down. `SK-03` prints the arithmetic on every run
-(`advisory 6 of ceiling 10 (4 free slots)`), and a ceiling that is not a number is a FAIL rather
+(`advisory 5 of ceiling 10 (5 free slots)`), and a ceiling that is not a number is a FAIL rather
 than a silent ADVISORY. The v3 cuts returned the slots the model/role/loop, dependency-audit and
 CI rows had spent.
 
@@ -1061,7 +1049,7 @@ OR its `enforced_by` cell does.
 
 ### The ban list (G5)
 
-`BN-00`..`BN-09` are not ordinary rows: they read `.gob/manifest/bans.tsv`, a table whose
+`BN-00`..`BN-05` are not ordinary rows: they read `.gob/manifest/bans.tsv`, a table whose
 every row carries a real command. A ban with no mechanism is a wish, so `.gob/manifest/bans.tsv`
 holds `id`, the ban, the globs, the `applies_when` glob, the `detect` command, the replacement
 code, the escape hatch, the reviewer and the source — and `BN-00` fails the whole list if any ban has no enforcement

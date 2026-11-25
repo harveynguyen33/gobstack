@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 111 `expect_red` call sites and 42 `expect_green`
-# — 153 calls over all 64 of the rule set's target rows (the four source-scope rows
-# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 33 of those 64 rows are
+# One control per target-scope row: 104 `expect_red` call sites and 38 `expect_green`
+# — 142 calls over all 58 of the rule set's target rows (the four source-scope rows
+# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 58 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
-# this revision: 64 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
+# this revision: 58 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `153 over 64 target rows`.
+# README's census sentence must read `142 over 58 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule

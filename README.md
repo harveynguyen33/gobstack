@@ -82,22 +82,20 @@ After installing, in this order:
     cd <target> && git add -A && git commit   # the install is a change like any other
     .gob/bin/goblin-verify                    # or gob verify, anywhere in the target
 
-**A default install verifies green — `20 passed, 0 failed, 0 advisory,
-11 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
-scaffold's `0000000` placeholder is the one expected red.** Eleven rows skip: `AG-01` has no
+**A default install verifies green — `19 passed, 0 failed, 0 advisory,
+7 skipped`, exit 0 — once `HANDOFF.md` names a commit that exists. Before that edit the
+scaffold's `0000000` placeholder is the one expected red.** Seven rows skip: `AG-01` has no
 approval record yet (a plain install writes none; `gob approve-agents "<reason>"` records the
 first, and `gob init --write` writes it for you); `SK-01`, `SK-02` and
 `SK-04` **run** (the core procedure tier is vendored under `.gob/skills/` on every install);
 `BN-01`/`BN-02`/`BN-03`/`BN-05` match only `.ts`/`.tsx`/`.js`/`.jsx` and have no such source, so
-each reports itself *not applicable*; the four electron bans `BN-06`–`BN-09` are selected by the
-`dep:electron` predicate, so with no `package.json` they too report *not applicable* — never
-running vacuously off the harness's own `.mjs`/`.json`;
+each reports itself *not applicable*;
 and `FM-01`/`FM-02` have no feature map yet. **Thirty-two further rows are OFF by default** —
 they are not skipped, they are held in the **library** (`gob verify --library`), the discovery
 surface for the extend mechanism: the spec/round rows (`SP-01`..`SP-03`), the ratchet rows
 (`GT-04`/`GT-05`), the replay rows (`HS-01`..`HS-03`), commit hygiene (`CM-02`/`CM-03`),
 the PR-gate rows (`PG-01`..`PG-03`), the runtime-data rows (`DS-01`/`DS-02`), the doc rows
-(`DOC-01`/`DOC-02`), the security rows (`SC-02`..`SC-06`, `SC-09`), the perf baseline (`PF-01`),
+(`DOC-01`/`DOC-02`), the security rows (`SC-02`..`SC-06`), the perf baseline (`PF-01`),
 the reference corpus (`RC-01`..`RC-04`), the archive switch (`CL-02`), the portability row
 (`PT-01`) and the doctor row (`VA-01`). A default run states the library count in its summary, so
 a green run is never the whole story. Full inventory: `gob verify --library`. Turn one on by
@@ -206,7 +204,7 @@ yet, not red). Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-04) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (153 over 64 target rows), each required to go RED and then
+one control per target-scope row (142 over 58 target rows), each required to go RED and then
 restored. **A verifier that only ever prints GREEN is a failure**, so that file is the one that
 matters most.
 
@@ -397,14 +395,13 @@ state), and CI and `goblin-verify` were free to report different truths about on
 
 No row of the shipped matrix is labelled `advisory` — the **six advisory rows moved to the
 library**, so a default run sits at **0 of 10** on the `SK-03` cap (`gob verify --library` lists
-them). Those six carry **no executable check at all**:
+them). Those five carry **no executable check at all**:
 
 - **HP-04** — a stale sentence is corrected in place with a dated parenthetical, never deleted.
 - **HS-03** — source probes read text with comments blanked first.
 - **CM-02** — the commit message was written to a file, not passed inline.
 - **DOC-01** — a significant change updates the docs that teach it.
 - **DOC-02** — system-level changes are recorded wherever the project's standard says they live.
-- **SC-09** — auth is applied consistently across sibling routes.
 
 `HP-04` and `CM-02` additionally print a heuristic when run with `--only`. A heuristic is not a
 check: it never fails a run. A counted rule is still not an enforced one, and the cap is a policy,

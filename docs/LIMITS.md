@@ -38,8 +38,9 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 8. **A new surface to maintain.** Per-repo vendored `.gob/` plus `.hermes/skills/` means
    upgrade debt in every adopted repo, plus one more command pair to learn. The counter is that
    the alternative — profile copies — already failed.
-9. **Six rows are labelled `advisory`, and all six are prose with no check at all:**
-   `HP-04`, `HS-03`, `CM-02`, `DOC-01`, `DOC-02` and `SC-09`. Each is counted and capped, but a
+9. **Five rows are labelled `advisory`, and all five are prose with no check at all:**
+   `HP-04`, `HS-03`, `CM-02`, `DOC-01` and `DOC-02` (`SC-09` was withdrawn on 2026-11-25 — see
+   #67 and docs/AUDIT-2026-11-25-framework-agnostic.md). Each is counted and capped, but a
    counted rule is still not an enforced one, and **the cap is a policy, not a proof.**
 10. **It does not reduce the profile-skill surface.** It only stops that surface from growing
     with project procedures; the existing divergence is a separate cleanup.
@@ -126,7 +127,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 25. **`SC-04` reads one statement, not one program.** A cookie write spread over three lines (or
     assembled through a helper) is not seen, and the row says so in its own cell.
 26. **The advisory slots are a count, not a strict bound.** Measured (v3): 0 advisory rows in the
-    default matrix at a ceiling of 10 (all six moved to the library), so `SK-03` reports
+    default matrix at a ceiling of 10 (all five moved to the library), so `SK-03` reports
     `advisory 0 of ceiling 10 (10 free slots)`. A row is advisory
     if its `check` cell says so OR its `enforced_by` cell does; the cap is a count — 10 advisory
     rows at a ceiling of 10 **pass**, and the 11th FAILs (10 at a ceiling of 9 FAILs). The v3 cuts
@@ -610,13 +611,44 @@ the Node the gates ran under.
     a lesson lifted into gobstack must be true regardless of framework (CURATION-2026-11-25 §0),
     and a mechanism may probe per-framework conventions only where a repo without them gets
     SKIP-with-a-reason, never a RED. The defect class stays advisory (CURATION-2026-11-25 §3 P2).
+63. **`SC-03` still cannot read the secrets it never scans.** The fixed gate (2026-11-25) refuses
+    to PASS on zero inspection: with no JS-family source and no declared build output the row now
+    SKIPs with the reason instead of printing `0 client-visible secret-shaped name(s)`. What it
+    still cannot see: secret-shaped names in non-JS sources (it skips, naming that), and
+    clause 2 still reads only the build output `security.build_output` declares — an undeclared
+    artifact directory is invisible, not clean.
+64. **`SC-04` still cannot see a cookie write it did not parse.** The fixed gate SKIPs when zero
+    cookie writes were examined (`no cookie write found in N examined file(s)`), so a non-JS
+    repo (a Python `response.set_cookie`) can no longer PASS vacuously. What it still cannot
+    see: a write assembled through a helper or split across lines (see #25), and writes in the
+    languages the read set excludes — those get the named skip, never a green.
+65. **`SC-05` still trusts the declaration it is given.** The fixed gate SKIPs when
+    `security.write_routes` is undeclared (`there is no route surface to check`) and when the
+    declaration matched zero handlers (naming the declaration and the 0 matches) instead of
+    passing `0 write handler(s)`. What it still cannot see: a write handler that matches none of
+    the declared route patterns, and writes made outside any declared route (middleware, raw
+    server code) — the declaration bounds the check, and nothing verifies the declaration is
+    complete.
+66. **`HS-02` proves RED only for the replay set it ran.** The fixed gate counts the harnesses
+    actually replayed: zero → SKIP (`no harness in <dir> matched the replay set`); the PASS now
+    names the count, the pinned commit and the extension set, and files present that the replay
+    set does not run are listed in a `not replayed:` tail instead of being silently outside the
+    proof. What it still cannot see: it cannot replay a harness in another extension — it names
+    the excluded extensions, it does not grade them.
+67. **Six rows were withdrawn on 2026-11-25: framework-bound statements.** `BN-06`..`BN-09`
+    (Electron), `HV-02` (browser bounding-box + Node child-process) and `SC-09` ("sibling
+    routes", web routing) state mechanics no repo in the fleet has; on every other shape they
+    graded nothing and went green. The rule text survives in
+    docs/AUDIT-2026-11-25-framework-agnostic.md under "withdrawn — where it went", with the
+    resurrection recipe; `--only <id>` on a removed row reports it is in neither the manifest,
+    the library nor the local override.
 
 ---
 
 ## The guard rails — the security and perf rows
 
 `manifest/enforcement.tsv` is the machine-readable form; this is the prose for the ten rows it
-gained in v0.2 (`SC-01`..`SC-09`, `PF-01`). Every one of them is **declared** in
+gained in v0.2 (`SC-01`..`SC-08`, `PF-01` — `SC-09` withdrawn 2026-11-25, see #67). Every one of them is **declared** in
 the `AGENTS.md` gob block under `security:` and `perf:` - a stack-specific rule guessed from the
 files on disk is how a matrix starts lying, so nothing here infers a stack.
 

@@ -11,15 +11,15 @@ Use when adopting goblin-stack in a repo, or starting one.
    no agent skills. Vendor the Hermes project tier with `--skills yes` if you want them installed.
 2. **`goblin-verify`** — a default install (core procedure tier vendored under `.gob/skills/`)
    verifies green:
-   `20 passed, 0 failed, 0 advisory, 11 skipped`, exit 0, once `HANDOFF.md` names a commit that
-   exists; before that edit the
-   scaffold's `0000000` placeholder is `HP-05`'s one expected day-one red (`19 passed, 1 failed`).
-   Ten rows skip with a reason, and the reason matters: `SK-01`, `SK-02` and `SK-04` **run** (the
+   `19 passed, 0 failed, 0 advisory, 7 skipped`, exit 0, once `HANDOFF.md` names a commit that
+   exists (a target that already has a commit gets it filled in by the install; a repo with no
+   commit yet keeps the scaffold's `0000000` placeholder, and that is the day-one red:
+   `17 passed, 2 failed` - `HP-05` and `GT-02`).
+   Seven rows skip with a reason, and the reason matters: `SK-01`, `SK-02` and `SK-04` **run** (the
    core procedure tier is vendored on every install, so the product no longer disables its own
    rows);
    `BN-01`/`BN-02`/`BN-03`/`BN-05` (this fresh repo has no `.ts` file for a ban's `applies_when`
-   glob, so each reports *not applicable*) and the four electron bans `BN-06`..`BN-09` (selected by
-   the `dep:electron` predicate, so with no `package.json` they too report *not applicable*);
+   glob, so each reports *not applicable*);
    and `FM-01`/`FM-02` (no feature map yet). Each is a *not yet*, not a pass. The other 32 target
    rows are held in the **library** (`gob verify --library`), off by default — the rows that are
    not right for every repo. The round-shaped rows (a first review, a real gate) are library rows

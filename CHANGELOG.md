@@ -54,6 +54,52 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   promotes them into catalogue.tsv by PR or edit. `--write` honours only the proposal's TICKED
   rows, through `gob extras install` itself — one allowlist, one code path.
 
+## 0.7.0 (curation: framework-agnostic)
+
+Rows removed is a breaking change: a repo upgrading from 0.6.x loses six rows (see Removed) and
+four rows stop passing vacuously (see Fixed). Measured default green after this change:
+`19 passed, 0 failed, 0 advisory, 7 skipped` on a fresh install of every shape (Godot, Python,
+docs-only) — was `20 passed, 0 failed, 0 advisory, 11 skipped`.
+
+### Removed
+
+- **`BN-06`..`BN-09` (Electron renderer isolation).** The four bans state Electron mechanics
+  (`nodeIntegration`, `contextIsolation`+`sandbox`, `webPreferences`, `sendSync`+`@electron/remote`)
+  that no repo in the fleet has. They were gated on a `dep:electron` predicate so other shapes
+  skipped them, but the statement itself is framework-bound; the rule text moves to the audit doc
+  for the project that needs it. Their `bans.tsv` rows went with them (`BN-00` recount: 4 bans).
+- **`HV-02` (browser bounding box guard).** A `getBoundingClientRect` probe run through a Node
+  child process — the web-automation surface of one project. On every other shape it graded the
+  kit's own `checks/*.mjs` scaffold and passed by measuring nothing.
+- **`SC-09` (auth consistency across sibling routes).** "Sibling routes" is web routing; the row
+  was advisory prose with no check at all.
+
+### Fixed
+
+- **`SC-03` no longer passes without inspecting.** Zero JS-family source files and no declared
+  build output used to print `PASS  0 client-visible secret-shaped name(s); no build output to
+  scan for clause 2`; it now SKIPs with that reason. PASS requires at least one examined artifact.
+- **`SC-04` no longer passes without inspecting.** Zero cookie writes examined now SKIPs
+  (`no cookie write found in N examined file(s)`) instead of `PASS  0 cookie write(s) checked`;
+  a non-JS repo's `set_cookie` is a named skip, not a green.
+- **`SC-05` no longer passes on an undeclared or unmatched route surface.** Undeclared
+  `security.write_routes` now SKIPs (`there is no route surface to check`); a declared surface
+  matching zero handlers now SKIPs naming the declaration and the 0 matches, instead of
+  `PASS  0 write handler(s), 0 waived`.
+- **`HS-02` counts what it actually replayed.** Zero replayed harnesses now SKIPs
+  (`no harness in <dir> matched the replay set`) instead of `PASS  every harness was RED at <sha>`;
+  the PASS names the count, the commit and the extension set, and files outside the replay set
+  are listed as `not replayed:` rather than silently ungraded.
+- **`HV-01` no longer false-REDs a non-JS harness file.** A harness directory whose only files are
+  not JS-family now SKIPs (`the text probe reads import/require syntax it cannot see in other
+  languages`) instead of accusing the file.
+- **Nine rows now name their ecosystem and prove their skip.** `BN-01`/`BN-02`/`BN-03`/`BN-05`,
+  `HV-01`, `SC-02`, `SC-06`, `RC-02`, `RC-04` carry an `ecosystem:` token in the artifact cell,
+  and a fixture of another shape must get SKIP(3) with a reason — never a PASS graded on nothing
+  (controls in tests/t-verify-red.sh).
+
+Method, class counts and the empirical baseline: docs/AUDIT-2026-11-25-framework-agnostic.md.
+
 ## 0.6.1
 
 A crash fix in the front door. `gob init --write` with a flag and no value hung forever, printing nothing: the
