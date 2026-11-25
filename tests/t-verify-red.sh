@@ -106,7 +106,7 @@ restore_all() {
   # would expand to it, but an unquoted glob in a restore path is exactly the habit that control
   # exists to break.
   rm -f 'checks/z2;true;#.mjs'
-  rm -f checks/hv02-bbox.mjs checks/hv02-parse.mjs checks/hv01-lit.mjs
+  rm -f checks/hv02-bbox.mjs checks/hv02-parse.mjs checks/hv01-lit.mjs checks/harness.py
   # AG-01's controls leave an approval record behind (the fixture ships none by design):
   # untracked, so no backup copy exists to restore over it.
   rm -f .gob/agents.approved
@@ -162,6 +162,29 @@ function expect_green {
     note "ok   $label -> $id exit 0 ($(printf '%s' "$out" | grep -m1 -E '^PASS' | cut -c1-88))"
   else
     note "FAIL $label -> $id exit $rc, wanted 0"
+    printf '%s\n' "$out" | sed 's/^/        /'
+    fail=1
+  fi
+  if [ -n "$dir" ]; then ( cd "$dir" && "$restore" ); else "$restore"; fi
+}
+
+# expect_skip <label> <row id> <mutate fn> [workdir] [restore fn]
+# The gate contract the SC/HS fixes enforce: a row that inspected ZERO items returns SKIP(3)
+# with a non-empty reason naming what it could not see - never a green count, never a FAIL.
+# Every row's skip except AG-01's stays exit 0 under --only (the engine's single-selection
+# rule), so the control reads the LINE, not the code: it wants a SKIP verdict and a reason.
+# Declared with `function` so `grep -c '^expect_skip'` counts controls, not the definition.
+function expect_skip {
+  local label="$1" id="$2" mutate="$3" dir="${4:-}" restore="${5:-restore_all}"
+  local out rc line
+  if [ -n "$dir" ]; then ( cd "$dir" && enable_lib_row "$id" && "$mutate" ); else enable_lib_row "$id"; "$mutate"; fi
+  if [ -n "$dir" ]; then out=$( cd "$dir" && bash .gob/bin/goblin-verify --only "$id" 2>&1 ); rc=$?
+  else out=$(bash .gob/bin/goblin-verify --only "$id" 2>&1); rc=$?; fi
+  line=$(printf '%s\n' "$out" | grep -m1 -E "^SKIP +$id  ")
+  if [ "$rc" = "0" ] && [ -n "$line" ] && [ -n "$(printf '%s' "$line" | sed -E "s/^SKIP +$id  //")" ]; then
+    note "ok   $label -> $id skip ($(printf '%s' "$line" | cut -c1-88))"
+  else
+    note "FAIL $label -> $id exit $rc, wanted a SKIP with a non-empty reason"
     printf '%s\n' "$out" | sed 's/^/        /'
     fail=1
   fi
@@ -276,6 +299,20 @@ m_replay_cmd_false() { m_replay_all_red; sed -i 's/^replay\.cmd:.*/replay.cmd: f
 # "z2;true;#.mjs was GREEN on the pre-change tree". Quoted, `node` receives ONE argument, the
 # harness runs, exits 1, and the row passes - which is what this control asserts.
 m_replay_meta_name() { rm -f checks/*.mjs; printf 'process.exit(1)\n' > 'checks/z2;true;#.mjs'; pin_pre_change; }
+# D-row gates (audit 2026-11-25): a surface the row cannot see into used to answer with a green
+# count of things it never read. Each mutation strips the surface to zero; the expect_skip
+# controls below assert the SKIP with a reason, and the mirror controls above keep the shapes
+# the row CAN see passing and failing exactly as before.
+m_no_js_files()      { rm -f checks/assert.mjs; }
+m_sc_05_noroutes()   { sed -i 's|^security\.write_routes:.*|security.write_routes:|' AGENTS.md; }
+# SC-05's default-fixture shape: the declaration stands (installed default `app src/app`) and
+# the fixture plants no route file, so the row matches nothing.
+m_sc_05_no_handler() { :; }
+m_hs_02_no_harness() { rm -f checks/*.mjs; pin_pre_change; }
+m_hs_02_py_harness() { rm -f checks/*.mjs; printf 'def test_placeholder():\n    pass\n' > checks/harness.py; pin_pre_change; }
+# HV-01's false-RED fix: the probe reads import/require syntax, so a non-JS harness file is
+# not examined; a dir with only non-JS files is a zero-inspection SKIP.
+m_hv01_py_harness()  { rm -f checks/*.mjs; printf 'doc = {"nodes": [{"id": "a"}]}\nassert doc["nodes"], "has nodes"\n' > checks/harness.py; }
 
 m_cm_02()         { m_row_fails CM-02; }
 m_dirty_tree()    { printf 'untracked\n' > newfile.txt; }
@@ -528,6 +565,19 @@ check "W5-11: SC-03 reports ONE hit, not the character count of the matching lin
 restore_all
 expect_red "a JS cookie write with no flags"        SC-04 1 m_sc_04
 expect_red "a write route with no validator"        SC-05 1 m_sc_05
+# ---- D-row gates: zero inspection is SKIP(3) with a reason, never a vacuous green -----------
+# Each of these rows used to answer a foreign shape with a green count of things it never read
+# (measured pre-change: `PASS SC-03 0 client-visible secret-shaped name(s); no build output to
+# scan for clause 2`, `PASS SC-04 0 cookie write(s) checked`, `PASS SC-05 0 write handler(s),
+# 0 waived; 2 dir(s) declared`, and HS-02 `PASS every harness was RED` over zero harnesses).
+# The controls assert the new SKIP; the expect_red/expect_green controls above stay, so a shape
+# the row genuinely inspects still PASSes and FAILs as before.
+expect_skip "a repo with no JS-family file and no build output"        SC-03 m_no_js_files
+expect_skip "a repo with no JS-family file to scan for cookies"        SC-04 m_no_js_files
+expect_skip "a declared route surface with no matching handler"        SC-05 m_sc_05_no_handler
+expect_skip "an undeclared security.write_routes"                      SC-05 m_sc_05_noroutes
+expect_skip "a pinned replay over a harness dir holding no harness"    HS-02 m_hs_02_no_harness
+expect_skip "a pinned replay whose only harness is outside the replay set" HS-02 m_hs_02_py_harness
 expect_red "a manifest with no lockfile"           SC-06 1 m_sc_06
 expect_red "SC-09 (advisory row: wired, not biting)" SC-09 1 m_sc_09
 expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
@@ -769,6 +819,7 @@ expect_green "no HANDOFF.md is a SKIP, never red"                     HP-06 m_dr
 expect_red   "a hand-written doc literal with no producer"            HV-01 1 m_hv01_lit
 expect_green "the doc built through a package import"                 HV-01 m_hv01_import
 expect_green "a produced_by marker with a pinned id"                  HV-01 m_hv01_marker
+expect_skip  "a harness dir whose only file is not JS-family"         HV-01 m_hv01_py_harness
 
 # ---- AG-01 (CURATION-2026-11-07 §2 C6): an instruction file changes only with a recorded
 # approval. The fixture is a plain install, so every control plants its own record first

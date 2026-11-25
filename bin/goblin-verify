@@ -1468,7 +1468,7 @@ check_hv_01() {
   # beside a hand-written doc/board/payload/fixture literal - never that the call path matches
   # the product wiring. The stronger form needs the product to export a single factory, which is
   # a design change, not a probe (the why cell and docs/LIMITS.md say so).
-  local d="$GOBLIN_HARNESS_DIR" f rel bad=0 n=0 nk=0
+  local d="$GOBLIN_HARNESS_DIR" f rel bad=0 n=0 nk=0 js=0
   if [ -z "$d" ]; then
     if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
       printf 'harness_dir %s is declared and scaffold_checks is yes, but the directory is absent\n' \
@@ -1481,6 +1481,14 @@ check_hv_01() {
   fi
   for f in "$d"/*; do
     [ -f "$f" ] || continue
+    # OCA: the probe reads import/require syntax it cannot see in other languages. A non-JS
+    # harness file is not examined (it used to be false-REDed on a doc literal alone); a dir
+    # with no JS-family harness at all is a zero-inspection SKIP, not a vacuous PASS.
+    case "$f" in
+      *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.vue|*.svelte) ;;
+      *) continue ;;
+    esac
+    js=$((js + 1))
     n=$((n + 1))
     rel="${f#"$ROOT"/}"
     # a document/board/payload/fixture literal: an object, array or JSON string assigned to a
@@ -1499,6 +1507,10 @@ check_hv_01() {
     printf '%s constructs a doc/board/payload/fixture literal with no package import and no produced_by: marker - the input the check asserts is not the input the user gets\n' "$rel"
     bad=1
   done
+  if [ "$js" -eq 0 ]; then
+    printf 'no JS-family harness file in %s - the text probe reads import/require syntax it cannot see in other languages\n' "$GOBLIN_HARNESS_REL"
+    return 3
+  fi
   [ "$bad" -eq 0 ] || return 1
   printf '%d harness file(s); %d constructed input(s), each through a package import or a produced_by marker\n' \
     "$n" "$nk"
@@ -1687,6 +1699,7 @@ check_hs_01() {
 
 check_hs_02() {
   local env cmd commit d tmp bad=0 f rc base name qname pat
+  local replayed=0 excluded=0 excluded_exts="" tail_note=""
   env=$(g_agents_read "$CONFIG" replay.env)
   cmd=$(g_agents_read "$CONFIG" replay.cmd)
   commit=$(g_unquote "$(g_agents_read "$CONFIG" replay.commit)")
@@ -1728,10 +1741,22 @@ check_hs_02() {
   fi
   mkdir -p "$tmp/wt/$GOBLIN_HARNESS_REL"
   cp -a "$d/." "$tmp/wt/$GOBLIN_HARNESS_REL/"
-  for f in "$tmp/wt/$GOBLIN_HARNESS_REL"/*.mjs; do
-    [ -e "$f" ] || continue
+  replayed=0 excluded=0 excluded_exts=""
+  for f in "$tmp/wt/$GOBLIN_HARNESS_REL"/*; do
+    [ -f "$f" ] || continue
     base=$(basename "$f")
-    name=${base%.mjs}
+    case "$base" in
+      *.mjs) name=${base%.mjs} ;;
+      *)
+        # OCA: a harness the replay set does not run is NAMED, never silently outside it.
+        excluded=$((excluded + 1))
+        case " $excluded_exts " in
+          *" .${base##*.} "*) ;;
+          *) excluded_exts="$excluded_exts .${base##*.}" ;;
+        esac
+        continue ;;
+    esac
+    replayed=$((replayed + 1))
     # Z2-3: the name is SHELL-QUOTED before it is substituted, because it now reaches a shell.
     # This row runs the DECLARED command rather than `node "$f"` (Z1-4), so a file in the harness
     # dir - a name the row does not control - is part of the command text `bash -c` parses.
@@ -1755,7 +1780,24 @@ check_hs_02() {
   done
   git -C "$ROOT" worktree remove --force "$tmp/wt" >/dev/null 2>&1
   rm -rf "$tmp"
-  [ "$bad" -eq 0 ] && printf 'every harness was RED at %s (run as: %s)\n' "${commit:0:7}" "$cmd"
+  # OCA: zero harnesses replayed proves nothing about the pre-change tree - SKIP naming the
+  # dir, and (when the dir held files the replay set does not run) the excluded extensions.
+  if [ "$replayed" -eq 0 ]; then
+    if [ "$excluded" -gt 0 ]; then
+      printf 'no harness in %s matched the replay set - %d file(s) present with extension(s)%s, which the replay set (*.mjs) does not run\n' \
+        "$GOBLIN_HARNESS_REL" "$excluded" "${excluded_exts# }"
+    else
+      printf 'no harness in %s matched the replay set\n' "$GOBLIN_HARNESS_REL"
+    fi
+    return 3
+  fi
+  # OCA: the RED-proof line says how many harnesses carried it, and what the replay set did
+  # and did not run - so a PASS can never silently shrink its own coverage.
+  tail_note=""
+  [ "$excluded" -gt 0 ] \
+    && tail_note=$(printf '; not replayed:%s (%d file(s), the replay set runs *.mjs)' "${excluded_exts# }" "$excluded")
+  [ "$bad" -eq 0 ] && printf 'every harness was RED at %s (replayed %d: .mjs; run as: %s)%s\n' \
+    "${commit:0:7}" "$replayed" "$cmd" "$tail_note"
   return $bad
 }
 
@@ -1881,6 +1923,19 @@ check_ds_02() {
   return 0
 }
 
+# The JS-family source set sc_sources greps, as a FILE count. The include/exclude list is
+# duplicated on purpose: find counts the files the grep would read, which is the "examined"
+# denominator the zero-inspection gates (SC-03, SC-04) skip on — a repo where this is 0 is a
+# repo the row saw nothing of.
+js_source_count() {
+  ( cd "$ROOT" && find . -type f \
+      \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \
+         -o -name '*.mjs' -o -name '*.cjs' -o -name '*.vue' -o -name '*.svelte' \) \
+      -not -path './.next/*' -not -path './node_modules/*' -not -path './.gob/*' \
+      -not -path './.hermes/*' -not -path './dist/*' -not -path './build/*' \
+      -not -path './out/*' -not -path './coverage/*' 2>/dev/null | grep -c . )
+}
+
 check_sc_02() {
   # Clause 1 is a file rule; clause 2 is BEHAVIOURAL - it asks git's own matcher, so an ignore
   # rule that looks right but does not match still fails. `git check-ignore -q` accepts exactly
@@ -1911,7 +1966,7 @@ check_sc_03() {
   # Clause 1: a client-visible NAME that is secret-shaped. Clause 2: a known secret PREFIX in
   # real build output. The second clause is reported, never silently skipped: a repo with no
   # build output is told so on the line.
-  local hits hits_all hits_n vs_keys vs_files out n=0 bad=0
+  local hits hits_all hits_n vs_keys vs_files out n=0 bad=0 src_n=0
   hits_all=$(sc_sources 'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD|PASSWD|PRIVATE)')
   # W5-11: this line printed a CHARACTER count as a hit count - `${#hits}` on a multiline
   # string - so ONE matching line of 70 characters was reported as "70 client-visible
@@ -1933,6 +1988,14 @@ check_sc_03() {
     grep -qE '(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|eyJ[A-Za-z0-9_-]{20,}\.)' "$f" 2>/dev/null \
       && { printf 'a secret-shaped literal is in build output: %s\n' "${f#"$ROOT"/}"; bad=1; }
   done
+  # OCA: the files this row examined are the JS-family source set (js_source_count) plus
+  # whatever clause 2 found. Zero of both means the row inspected nothing - SKIP with the
+  # reason naming what it could not see, never a vacuous green "0 ... name(s)".
+  src_n=$(js_source_count)
+  if [ "$src_n" -eq 0 ] && [ "$n" -eq 0 ]; then
+    printf 'no file in the JS-family set and no declared build output to scan\n'
+    return 3
+  fi
   if [ "$n" -eq 0 ]; then
     printf '%d client-visible secret-shaped name(s); no build output to scan for clause 2\n' "$hits_n"
   else
@@ -1945,7 +2008,8 @@ check_sc_04() {
   # A JS-written cookie needs `secure` + `samesite` in the SAME statement; a server-side set
   # needs `httpOnly` + `sameSite`. Same-statement only: a write spread over three lines is not
   # seen, and the row says so rather than implying it read the statement.
-  local js srv bad=0 n=0 line
+  local js srv bad=0 n=0 line files=0
+  files=$(js_source_count)
   js=$(sc_sources 'document\.cookie[[:space:]]*=')
   srv=$(sc_sources '(cookies\(\)\.set\(|res\.cookie\(|NextResponse\.cookie\()')
   if [ -n "$js" ]; then
@@ -1966,6 +2030,13 @@ EOF
 $srv
 EOF
   fi
+  # OCA: zero cookie writes examined proves nothing about cookies. SKIP with the examined
+  # count - a Python web repo (`response.set_cookie`) is not in the JS-family set, so 0 is
+  # exactly what it gets, instead of the old vacuous PASS.
+  if [ "$n" -eq 0 ]; then
+    printf 'no cookie write found in %d examined file(s)\n' "$files"
+    return 3
+  fi
   printf '%d cookie write(s) checked; a JS-written cookie is readable by any script - reported, not failed\n' "$n"
   [ "$bad" -eq 0 ]
 }
@@ -1975,6 +2046,14 @@ check_sc_05() {
   # or be named in .gob/boundary-waivers. Partial by design: it proves a validator is called,
   # not that the schema is right.
   local d f rel n=0 bad=0 w=0
+  # OCA: an undeclared security.write_routes is a route surface the row cannot see - SKIP
+  # with that reason, per the contract "a declared key that is absent is a skip with a
+  # reason, never a silent pass" (the engine's own contract note). Declared but unmatched
+  # gets the same treatment below: a handler count of 0 examined nothing.
+  if [ -z "$SEC_WRITE_ROUTES" ]; then
+    printf 'security.write_routes is not declared - there is no route surface to check\n'
+    return 3
+  fi
   for d in $SEC_WRITE_ROUTES; do
     [ -d "$ROOT/$d" ] || continue
     while IFS= read -r f; do
@@ -1991,6 +2070,12 @@ check_sc_05() {
 $(find "$ROOT/$d" -type f \( -name 'route.ts' -o -name 'route.js' -o -name 'route.tsx' \) 2>/dev/null)
 EOF
   done
+  # OCA: declared but zero handlers matched is still zero inspection - SKIP naming the
+  # declaration and the 0 matches, never "0 write handler(s)" green.
+  if [ "$n" -eq 0 ]; then
+    printf 'security.write_routes is declared (%s) and no write handler matched it\n' "$SEC_WRITE_ROUTES"
+    return 3
+  fi
   printf '%d write handler(s), %d waived; %d dir(s) declared\n' "$n" "$w" "${#SEC_WRITE_ROUTES}"
   [ "$bad" -eq 0 ]
 }
