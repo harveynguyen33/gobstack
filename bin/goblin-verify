@@ -1087,11 +1087,24 @@ _pv01_probe_target() {
 _pv01_resolve_spec() {
   # classify one import specifier of the layout living in dir $1:
   #   K<TAB><key>   counts as shared evidence (relative specifiers always do, normalised)
-  #   D<TAB><spec>  dropped: a bare specifier that resolves to nothing inside the project
-  #                 (an installed package, a builtin, an unresolvable alias)
-  local cur="$1" spec="$2" pat tgt sub prefix suffix found
+  #   D<TAB><spec>  dropped: a specifier that resolves to nothing inside the project
+  #                 (an installed package, a builtin, an unresolvable alias) or names
+  #                 a module outside the project root (a relative that climbs out)
+  local cur="$1" spec="$2" pat tgt sub prefix suffix found norm
   case "$spec" in
-    ./*|../*) printf 'K\t%s\n' "$(_pv_norm_spec "$cur" "$spec")"; return 0 ;;
+    ./*|../*)
+      # one canonical key space for every branch: _pv_norm_spec yields an ABSOLUTE path, the
+      # alias/baseUrl branches yield ROOT-relative ones — keys from two different spaces never
+      # intersect, so a surface naming the same module relative while the public layout names it
+      # through a resolvable alias was a guaranteed false RED. Strip $ROOT/ and canonicalise
+      # (extension off, trailing /index off) exactly as _pv01_key_of_found does. A relative
+      # specifier that climbs out of ROOT names a module outside the project: dropped and named
+      # in the RED message like any other unresolvable specifier, never a silent empty key.
+      norm=$(_pv_norm_spec "$cur" "$spec")
+      case "$norm" in
+        "$ROOT"/*) printf 'K\t%s\n' "$(_pv01_key_of_found "${norm#"$ROOT"/}")"; return 0 ;;
+      esac
+      printf 'D\t%s\n' "$spec"; return 0 ;;
   esac
   if [ -n "$_PV01_PATHS" ]; then
     while IFS=$'\t' read -r pat tgt; do
@@ -1138,10 +1151,12 @@ check_pv_01() {
   # PROJECT-RESOLVABLE module the public layout at the equivalent position (the same route
   # tree without that segment, or the nearest layout.* above it) also imports — unless the
   # file carries `preview_differs: <list>` declaring the difference. The intersection is
-  # over modules the project can resolve: a relative specifier normalises across the two
-  # positions and counts; a bare specifier counts only when it resolves to a file that
-  # exists inside the repo (tsconfig.json/jsconfig.json baseUrl+paths first, then
-  # <ROOT>/<spec> with extension and index probing) — an installed package or a builtin is
+  # over CANONICAL KEYS — ROOT-relative module paths, extension and trailing /index
+  # stripped — so both layouts may name the same module relative or through a resolvable
+  # alias (tsconfig.json/jsconfig.json baseUrl+paths first, then <ROOT>/<spec> with
+  # extension and index probing) and still intersect; a relative specifier that climbs
+  # out of the project root names a module outside the repo and is dropped like any
+  # unresolvable specifier — an installed package or a builtin is
   # never evidence of a shared shell, and a specifier that resolves nowhere is dropped and
   # named in the RED message. Honest limit (LIMITS #61): an import proves reachability,
   # never an identical render — a shell imported and then overridden by a local wrapper
