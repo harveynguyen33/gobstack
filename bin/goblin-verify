@@ -302,9 +302,12 @@ if [ -n "$ONLY" ]; then
     if [ "$_hit" -eq 0 ] && [ -n "$LOCAL_FILE" ]; then
       awk -F'\t' -v x="$want" '$1==x {f=1} END{exit !f}' "$LOCAL_FILE" && _hit=1
     fi
+    if [ "$_hit" -eq 0 ] && [ -n "$LIBRARY_FILE" ]; then
+      awk -F'\t' -v x="$want" 'NR>1 && $1==x {f=1} END{exit !f}' "$LIBRARY_FILE" && _hit=1
+    fi
     [ "$_hit" -eq 1 ] || UNKNOWN="$UNKNOWN $want"
   done
-  [ -z "$UNKNOWN" ] || { g_err "--only names id(s) in neither the manifest nor the local override:$UNKNOWN"; exit 2; }
+  [ -z "$UNKNOWN" ] || { g_err "--only names id(s) in neither the manifest, the library nor the local override:$UNKNOWN"; exit 2; }
   # A valid id that is SOURCE-scope (PR-01..PR-04) selects no target row: the run emits
   # nothing and exits 0, which is the same no-op gate D15 closed for a typo (F2-6).
   TARGET_ROWS=0
@@ -314,6 +317,10 @@ if [ -n "$ONLY" ]; then
       && TARGET_ROWS=1
     if [ "$TARGET_ROWS" -eq 0 ] && [ -n "$LOCAL_FILE" ]; then
       awk -F'\t' -v x="$want" '$1==x && $2=="target" {f=1} END{exit !f}' "$LOCAL_FILE" \
+        && TARGET_ROWS=1
+    fi
+    if [ "$TARGET_ROWS" -eq 0 ] && [ -n "$LIBRARY_FILE" ]; then
+      awk -F'\t' -v x="$want" 'NR>1 && $1==x && $2=="target" {f=1} END{exit !f}' "$LIBRARY_FILE" \
         && TARGET_ROWS=1
     fi
   done
@@ -792,6 +799,171 @@ check_hv_02() {
   [ "$bad" -eq 0 ] || return 1
   printf '%d harness file(s); %d guarded bounding-box measurement(s), %d guarded parsed-number measurement(s)\n' \
     "$n" "$nb" "$np"
+  return 0
+}
+
+# ---- PV-01 / PV-02 (CURATION-2026-11-25, opt-in library rows) -----------------
+# Both are plain text probes over a route tree, the same class as check_hv_02: no AST, no
+# runtime, no config key — the framework's own directory conventions are the config. Return
+# 0 pass / 1 red / 3 skip, and a skip PRINTS its reason: an opt-in row whose lane is absent
+# says so out loud, it never vanishes into a bare green.
+
+_pv_route_trees() {
+  # the route-tree roots the framework conventions name; any one of them counts
+  local t
+  for t in "$ROOT/app" "$ROOT/src/app" "$ROOT/pages" "$ROOT/routes"; do
+    [ -d "$t" ] && printf '%s\n' "$t"
+  done
+}
+
+_pv_find() {
+  # find under one route-tree root, pruned of vendored and generated trees
+  local root="$1"
+  shift
+  find "$root" \( -name node_modules -o -name .next -o -name dist -o -name .git \) -prune -o "$@" -print
+}
+
+_pv01_imports_of() {
+  # the module specifiers of one file's import / export-from / require lines, text only
+  grep -E "^[[:space:]]*(import[[:space:]]|export[[:space:]].*from[[:space:]]|const[[:space:]].*require\()" \
+    "$1" 2>/dev/null \
+    | grep -oE "['\"][^'\"]+['\"]" | tr -d "'\""
+}
+
+_pv_norm_spec() {
+  # resolve a relative specifier against the importing file's directory so `../layout` from
+  # a preview dir and `./layout` from the root name the same module; package names and
+  # aliases pass through unchanged
+  local cur="$1" rest="$2" seg
+  case "$rest" in ./*|../*) ;; *) printf '%s' "$rest"; return ;; esac
+  rest=${rest#./}
+  while [ -n "$rest" ]; do
+    seg="${rest%%/*}"
+    if [ "$rest" = "${rest#*/}" ]; then rest=""; else rest="${rest#*/}"; fi
+    case "$seg" in
+      ""|".") : ;;
+      "..") cur="${cur%/*}" ;;
+      *) cur="$cur/$seg" ;;
+    esac
+  done
+  printf '%s' "$cur"
+}
+
+check_pv_01() {
+  # P1 (CURATION-2026-11-25): a surface that exists to be reviewed renders the same shell
+  # the published route renders. A candidate review surface is a directory in a route tree
+  # whose name matches preview|previewed|draft|staging; its layout must import at least one
+  # module the public layout at the equivalent position (the same route tree without that
+  # segment, or the nearest layout.* above it) also imports — unless the file carries
+  # `preview_differs: <list>` declaring the difference. Honest limit (LIMITS #61): an
+  # import proves reachability, never an identical render — a shell imported and then
+  # overridden by a local wrapper passes.
+  local tree d b surf up pub sameshell=0 bad=0 n=0 declared=0 inherited=0 unjudged=0 shared
+  local trees
+  trees=$(_pv_route_trees)
+  if [ -z "$trees" ]; then
+    printf 'no route tree (no app/, src/app/, pages/ or routes/)\n'
+    return 3
+  fi
+  while IFS= read -r tree; do
+    [ -n "$tree" ] || continue
+    while IFS= read -r d; do
+      [ -n "$d" ] || continue
+      b="${d##*/}"
+      printf '%s\n' "$b" | grep -Eqi 'preview|previewed|draft|staging' || continue
+      surf=$(ls "$d"/layout.* 2>/dev/null | head -1)
+      if [ -z "$surf" ]; then
+        # no layout of its own: it inherits the public layout, nothing to compare
+        inherited=$((inherited + 1)); n=$((n + 1)); continue
+      fi
+      n=$((n + 1))
+      if grep -Eq 'preview_differs:[[:space:]]*[^[:space:]]' "$surf"; then
+        declared=$((declared + 1)); continue
+      fi
+      # the public layout at the equivalent position, then the nearest layout.* above
+      up="${d%/*}"
+      pub=""
+      while :; do
+        pub=$(ls "$up"/layout.* 2>/dev/null | head -1)
+        [ -n "$pub" ] && break
+        case "$up" in
+          "$tree") break ;;
+          "$tree"/*) up="${up%/*}" ;;
+          *) break ;;
+        esac
+      done
+      if [ -z "$pub" ]; then
+        unjudged=$((unjudged + 1))
+        printf 'note: %s has no public layout above it to compare with - not judged\n' "${surf#"$ROOT"/}"
+        continue
+      fi
+      shared=$(comm -12 \
+        <(_pv01_imports_of "$surf" | while IFS= read -r s; do _pv_norm_spec "${surf%/*}" "$s"; done | sort -u) \
+        <(_pv01_imports_of "$pub" | while IFS= read -r s; do _pv_norm_spec "${pub%/*}" "$s"; done | sort -u) \
+        | head -1)
+      if [ -z "$shared" ]; then
+        printf '%s imports no module the public layout %s imports and carries no preview_differs: marker - it does not render the published shell\n' \
+          "${surf#"$ROOT"/}" "${pub#"$ROOT"/}"
+        bad=1
+      else
+        sameshell=$((sameshell + 1))
+      fi
+    done < <(_pv_find "$tree" -type d)
+  done <<PV
+$trees
+PV
+  if [ "$n" -eq 0 ]; then
+    printf 'no candidate review surface directory (no dir named *preview*/draft*/staging* under the route tree)\n'
+    return 3
+  fi
+  [ "$bad" -eq 0 ] || return 1
+  printf '%d review surface(s): %d share the published shell, %d declared via preview_differs:, %d inherit the public layout, %d not judged (no public layout above)\n' \
+    "$n" "$sameshell" "$declared" "$inherited" "$unjudged"
+  return 0
+}
+
+check_pv_02() {
+  # P2 (CURATION-2026-11-25): a streaming boundary above a not-found decision commits the
+  # status before the decision. For every loading.* boundary in a route tree, the page
+  # files in the boundary's WHOLE subtree (a boundary owns everything below it — the
+  # measured failure) must carry `status_checked: <why>` when they call notFound(.
+  # Honest limit (LIMITS #62): reads a framework convention, not a runtime — a boundary
+  # added by an imported component is unseen, and it cannot tell whether a marker is true.
+  local tree bd dir pg bad=0 nb=0 pages=0 marked=0
+  local trees
+  trees=$(_pv_route_trees)
+  if [ -z "$trees" ]; then
+    printf 'no route tree (no app/, src/app/, pages/ or routes/)\n'
+    return 3
+  fi
+  while IFS= read -r tree; do
+    [ -n "$tree" ] || continue
+    while IFS= read -r bd; do
+      [ -n "$bd" ] || continue
+      nb=$((nb + 1))
+      dir="${bd%/*}"
+      while IFS= read -r pg; do
+        [ -n "$pg" ] || continue
+        grep -Eq 'notFound[[:space:]]*\(' "$pg" || continue
+        pages=$((pages + 1))
+        if grep -Eq 'status_checked:[[:space:]]*[^[:space:]]' "$pg"; then
+          marked=$((marked + 1)); continue
+        fi
+        printf '%s streams above %s, which calls notFound( with no status_checked: marker - the not-found decision answers 200 under the boundary\n' \
+          "${bd#"$ROOT"/}" "${pg#"$ROOT"/}"
+        bad=1
+      done < <(_pv_find "$dir" -type f -name 'page.*')
+    done < <(_pv_find "$tree" -type f -name 'loading.*')
+  done <<PV
+$trees
+PV
+  if [ "$nb" -eq 0 ]; then
+    printf 'no loading.* boundary in the route tree - no streaming boundary sits above a not-found decision\n'
+    return 3
+  fi
+  [ "$bad" -eq 0 ] || return 1
+  printf '%d loading boundary(ies): %d page(s) calling notFound( beneath them, %d cleared by status_checked:\n' \
+    "$nb" "$pages" "$marked"
   return 0
 }
 
@@ -2213,6 +2385,21 @@ setup_local_override() {
   fi
 }
 setup_local_override
+
+# --only may drive a LIBRARY row directly: probe one shipped row without turning it on
+# repo-wide. Append the row's matrix line to the run set for this run only; an id the run
+# set already carries (the matrix or the local override) is left alone, never duplicated.
+if [ -n "$ONLY" ] && [ -n "$LIBRARY_FILE" ]; then
+  _only_tmp=$(mktemp "${TMPDIR:-/tmp}/gob-only.XXXXXX")
+  cp "$RUN_MANIFEST" "$_only_tmp"
+  for _want in $(printf '%s' "$ONLY" | tr ',' ' '); do
+    [ -n "$_want" ] || continue
+    awk -F'\t' -v x="$_want" '$1==x {f=1} END{exit !f}' "$RUN_MANIFEST" && continue
+    awk -F'\t' -v x="$_want" 'NR>1 && $1==x {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7}' \
+      "$LIBRARY_FILE" >> "$_only_tmp"
+  done
+  RUN_MANIFEST="$_only_tmp"
+fi
 
 PASS=0; FAIL=0; ADV=0; SKIP=0; BAD=0; AG01_SKIP=0
 JSON_ROWS=""

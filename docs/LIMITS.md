@@ -542,6 +542,24 @@ the Node the gates ran under.
     to fail in. The failure it was adopted from was a mid-run `AGENTS.md` edit that needed a
     human Allow and left no trace of who approved it (CURATION-2026-11-07 §2 C6).
 
+61. **`PV-01` proves an import reaches the published shell, not that the render is identical.**
+    The check collects the module specifiers a review surface's `layout.*` imports and compares
+    them with the public layout at the equivalent position; sharing one module means the surface
+    pulls in the published shell. It cannot see past the import: a shell imported and then
+    overridden by a local wrapper (its own headers, its own routing context, an extra provider)
+    passes, because reachability is all a text probe has. A surface whose layout shares no
+    module with the public layout passes too if the file carries `preview_differs: <list>` —
+    the marker is a declared difference, and the check cannot tell whether the declaration is
+    honest (CURATION-2026-11-25 §2 P1).
+
+62. **`PV-02` reads a framework convention, not a runtime.** The check walks every `loading.*`
+    boundary and requires each `page.*` in the boundary's subtree that calls `notFound(` to
+    carry `status_checked: <why>`. A boundary introduced by an imported component (a package
+    layout, a wrapper that suspends) is invisible to a directory walk, and a page can answer
+    under the wrong status with a marker that says otherwise — the check reads the marker, it
+    cannot execute the route. Whether the marker is true is a human's call (CURATION-2026-11-25
+    §2 P2).
+
 ---
 
 ## The guard rails — the security and perf rows
