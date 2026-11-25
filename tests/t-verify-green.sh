@@ -37,7 +37,7 @@ printf '%s' "$OUT" | grep -q 'cannot see'
 check "the run states what it cannot see" "$?"
 printf '%s' "$OUT" | grep -q 'not signed'
 check "the run says the record every drift check trusts is not signed (F2-3)" "$?"
-printf '%s' "$OUT" | grep -q 'library: 32 off-by-default row(s)'
+printf '%s' "$OUT" | grep -q 'library: 34 off-by-default row(s)'
 check "the summary counts the off-by-default library (HS-02/PG-03 live there, held back)" "$?"
 printf '%s' "$OUT" | grep -q 'gob verify --library'
 check "  and the summary names the discovery surface for the off rows" "$?"

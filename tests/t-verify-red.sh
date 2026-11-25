@@ -1071,6 +1071,86 @@ check "UX-5b the raw test(1) dump is gone from the failure line" "$([ $? -ne 0 ]
 git reset -q --hard HEAD~1
 restore_all
 
+# ---- PV-01 / PV-02 (CURATION-2026-11-25): opt-in preview-surface rows -------------------
+# Both rows live in the library and are OFF here by default. Their fixtures plant an app/
+# route tree; restore_all already removes it (rm -rf dist src app features), so no control
+# leaks a route tree into the next.
+
+# Opt-in first: plant BOTH rows' violations and run the FULL suite with neither row enabled —
+# a repo that never turns the rows on must be untouched (green, and no PV- line anywhere).
+m_pv_optin() {
+  mkdir -p app/preview app/p/deep
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { OwnShell } from './own-shell'\n" > app/preview/layout.tsx
+  printf "export default function Loading() { return null }\n" > app/loading.tsx
+  printf "export default function P() { notFound() }\n" > app/p/deep/page.tsx
+}
+m_pv_optin
+_pv_out=$(bash .gob/bin/goblin-verify 2>&1)
+_pv_rc=$?
+check "opt-in: a full run over BOTH violations, rows not enabled, stays GREEN" "$([ "$_pv_rc" -eq 0 ] && echo 0 || echo 1)"
+[ -z "$(printf '%s' "$_pv_out" | grep -E '^(FAIL|SKIP|PASS)  PV-')" ]
+check "opt-in: that run prints no PV- line at all" "$?"
+restore_all
+
+# PV-01 red: a review surface whose layout imports nothing the public layout imports,
+# and carries no preview_differs: marker.
+m_pv01_red() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { OwnShell } from './own-shell'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: a review surface rendering its own shell is RED" PV-01 1 m_pv01_red
+
+# PV-01 green, both directions: the SAME specifier (relative paths resolved, so ../site-shell
+# from the surface equals ./site-shell from the root), and the declared-difference hatch.
+m_pv01_green() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a review surface importing the published shell is GREEN" PV-01 m_pv01_green
+m_pv01_declared() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { OwnShell } from './own-shell'\n// preview_differs: preview keeps its own chrome\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a surface declaring preview_differs: is GREEN" PV-01 m_pv01_declared
+
+# PV-02 red: a boundary owns its whole subtree — the offending page sits DEEP under it
+# (the measured failure this row exists for).
+m_pv02_red() {
+  mkdir -p app/p/deep
+  printf "export default function Loading() { return null }\n" > app/loading.tsx
+  printf "export default function P() { notFound() }\n" > app/p/deep/page.tsx
+}
+expect_red "PV-02: a notFound( page deep under a loading.* boundary is RED" PV-02 1 m_pv02_red
+
+# PV-02 green: the page commits status_checked:.
+m_pv02_green() {
+  mkdir -p app/p/deep
+  printf "export default function Loading() { return null }\n" > app/loading.tsx
+  printf "export default function P() { notFound() }\n// status_checked: the slug lookup decides\n" > app/p/deep/page.tsx
+}
+expect_green "PV-02: a page carrying status_checked: is GREEN" PV-02 m_pv02_green
+
+# SKIP paths, each printing its reason — never a bare pass.
+out=$(bash .gob/bin/goblin-verify --only PV-01 2>&1)
+printf '%s' "$out" | grep -q '^SKIP  PV-01  no route tree'
+check "PV-01 SKIPs with its reason on a repo with no route tree" "$?"
+out=$(bash .gob/bin/goblin-verify --only PV-02 2>&1)
+printf '%s' "$out" | grep -q '^SKIP  PV-02  no route tree'
+check "PV-02 SKIPs with its reason on a repo with no route tree" "$?"
+m_pv01_nolane() {
+  mkdir -p app/p
+  printf "export default function P() { return null }\n" > app/p/page.tsx
+}
+m_pv01_nolane
+out=$(bash .gob/bin/goblin-verify --only PV-01 2>&1)
+printf '%s' "$out" | grep -q '^SKIP  PV-01  no candidate review surface directory'
+check "PV-01 SKIPs with its reason when the route tree has no candidate surface" "$?"
+restore_all
+
 FINAL=$(bash .gob/bin/goblin-verify 2>&1); FINAL_RC=$?
 [ "$FINAL_RC" -eq 0 ] || printf '%s\n' "$FINAL" | grep -E '^(FAIL|SKIP|ADV)' | sed 's/^/        /'
 check "the fixture is GREEN again after every mutation was restored" "$FINAL_RC"
