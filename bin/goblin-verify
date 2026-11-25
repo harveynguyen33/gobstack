@@ -1150,12 +1150,31 @@ _pv01_asset_note() {
   fi
 }
 
+# PV-01 route-layout selection: the first EXISTING exact code basename in this
+# precedence order. The exclusion of layout.test.tsx, layout.spec.tsx, layout.d.ts,
+# layout.css and layout.module.css is structural - they are different basenames, the
+# candidate list simply does not contain them, no suffix blacklist is involved - so a
+# stylesheet or a test sitting beside a layout is never compared and a directory whose
+# only layout.* files are such siblings is reported as NO LAYOUT, not as an import
+# mismatch. Deterministic when two code layouts sit side by side (tsx wins over js).
+_pv01_layout_in() {
+  local f
+  for f in layout.tsx layout.ts layout.jsx layout.js layout.mts layout.mjs layout.cts layout.cjs; do
+    if [ -f "$1/$f" ]; then
+      printf '%s\n' "$1/$f"
+      return 0
+    fi
+  done
+  return 1
+}
+
 check_pv_01() {
   # P1 (CURATION-2026-11-25): a surface that exists to be reviewed renders the same shell
   # the published route renders. A candidate review surface is a directory in a route tree
   # whose name matches preview|previewed|draft|staging; its layout must import at least one
   # PROJECT-RESOLVABLE module the public layout at the equivalent position (the same route
-  # tree without that segment, or the nearest layout.* above it) also imports — unless the
+  # tree without that segment, or the nearest code layout above it — chosen by exact
+  # basename, see _pv01_layout_in) also imports — unless the
   # file carries `preview_differs: <list>` declaring the difference. The intersection is
   # over CANONICAL KEYS — ROOT-relative module paths, extension and trailing /index
   # stripped — so both layouts may name the same module relative or through a resolvable
@@ -1173,7 +1192,7 @@ check_pv_01() {
   # those, the RED message says exactly that). When NO ancestor layout exists inside the route tree, the
   # public layout is searched among SIBLING route groups of the same tree: every depth-1
   # entry under the tree that is not on the surface's own path and does not itself look
-  # like a review surface — a grouped sibling contributes EVERY layout.* under it, a plain
+  # like a review surface — a grouped sibling contributes EVERY code layout under it, a plain
   # sibling its depth-1 layout only. This is the shape that produced the rule (the public
   # shell in `app/(frontend)/[locale]/layout.tsx`, the review surface in
   # `app/(preview)/preview/layout.tsx`, nothing above it): the ancestor-only walk found no
@@ -1207,8 +1226,15 @@ check_pv_01() {
       [ -n "$d" ] || continue
       b="${d##*/}"
       printf '%s\n' "$b" | grep -Eqi 'preview|previewed|draft|staging' || continue
-      surf=$(ls "$d"/layout.* 2>/dev/null | head -1)
+      surf=$(_pv01_layout_in "$d")
       if [ -z "$surf" ]; then
+        if [ -n "$(ls "$d"/layout.* 2>/dev/null)" ]; then
+          # layout-shaped files exist but none is an exact code basename: report the
+          # truth - there is no route layout here - instead of comparing a stylesheet
+          bad=1; n=$((n + 1))
+          printf 'no layout file was found in %s - the layout.* files there are not route layouts, nothing to compare against the published shell\n' "${d#"$ROOT"/}"
+          continue
+        fi
         # no layout of its own: it inherits the public layout, nothing to compare
         inherited=$((inherited + 1)); n=$((n + 1)); continue
       fi
@@ -1220,7 +1246,7 @@ check_pv_01() {
       up="${d%/*}"
       pub=""
       while :; do
-        pub=$(ls "$up"/layout.* 2>/dev/null | head -1)
+        pub=$(_pv01_layout_in "$up")
         [ -n "$pub" ] && break
         case "$up" in
           "$tree") break ;;
@@ -1248,15 +1274,18 @@ check_pv_01() {
           printf '%s' "$name" | grep -Eqi 'preview|previewed|draft|staging' && continue
           case "$name" in
             \(*)
-              # a grouped sibling: every layout.* in its subtree is a candidate
-              while IFS= read -r cand; do
+              # a grouped sibling: every code layout in its subtree is a candidate,
+              # chosen by exact basename (_pv01_layout_in) so stylesheets and tests
+              # under the group are never candidates
+              while IFS= read -r sdir; do
+                cand=$(_pv01_layout_in "$sdir")
                 [ -n "$cand" ] || continue
                 cands="$cands$name"$'\t'"$cand"$'\n'
-              done < <(_pv_find "$ent" -type f -name 'layout.*')
+              done < <(_pv_find "$ent" -type d)
               ;;
             *)
-              # a plain sibling: its depth-1 layout only
-              cand=$(ls "$ent"/layout.* 2>/dev/null | head -1)
+              # a plain sibling: its depth-1 code layout only
+              cand=$(_pv01_layout_in "$ent")
               [ -n "$cand" ] && cands="$cands$name"$'\t'"$cand"$'\n'
               ;;
           esac

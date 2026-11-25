@@ -556,7 +556,18 @@ the Node the gates ran under.
     a file that exists inside
     the repo (tsconfig.json/jsconfig.json `baseUrl`+`paths` first — read as strict JSON, so a
     commented JSONC leaves its aliases unresolvable — then `<ROOT>/<spec>` with the usual
-    extension and index probing). An installed package, a `node:` builtin or anything else the
+    extension and index probing). The route layout itself is chosen by EXACT basename with a
+    code extension (`layout.tsx`, `layout.ts`, `layout.jsx`, `layout.js`, `layout.mts`,
+    `layout.mjs`, `layout.cts`, `layout.cjs`, in that precedence order), never by globbing
+    `layout.*`: a stylesheet, a type declaration or a test beside a layout (`layout.css`,
+    `layout.module.css`, `layout.scss`, `layout.d.ts`, `layout.test.tsx`, `layout.spec.tsx`)
+    is a different basename and is never a candidate, and when two code layouts sit side by
+    side the tsx one wins deterministically. A directory whose only `layout.*` files are such
+    siblings fails as `no layout file was found`, not as an import mismatch — the reader is
+    never told to compare a stylesheet against code (2026-11-25 preview-surfaces round 6:
+    before the exact-name list, `ls layout.* | head -1` picked whichever sibling sorted first
+    — `layout.css`, `layout.d.ts` and `layout.test.tsx` all sort before `layout.tsx` — so all
+    six sibling shapes were false REDs, each accusing the sibling by name). An installed package, a `node:` builtin or anything else the
     probe cannot resolve is NEVER evidence that a surface pulls in the published shell: two
     layouts both importing `react` or `next/link` are RED (PR #2 review round 2 — both used to
     be a false GREEN, the worse direction). A specifier that resolves nowhere — including a
@@ -570,7 +581,7 @@ the Node the gates ran under.
     `app/(preview)/preview/layout.tsx`, so the ancestor-only walk found nothing, printed
     `not judged` and still returned PASS — a green that judged nothing, and a row whose only
     real-world instance is `not judged` does not earn its place). A grouped sibling contributes
-    every `layout.*` under it, a plain sibling its depth-1 layout only; a depth-1 sibling that
+    every `layout.*` under it becomes a candidate only through the same exact-name list, a plain sibling its depth-1 layout only; a depth-1 sibling that
     itself looks like a review surface is not a candidate — a sibling review surface is not
     published furniture, and comparing two surfaces proves nothing. The fallback passes if ANY
     sibling group shares at least one project-resolvable module, and the PASS names the group and

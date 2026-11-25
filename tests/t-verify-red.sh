@@ -3,8 +3,8 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 104 `expect_red` call sites and 38 `expect_green`
-# — 142 calls over all 58 of the rule set's target rows (the four source-scope rows
+# One control per target-scope row: 105 `expect_red` call sites and 42 `expect_green`
+# — 147 calls over all 58 of the rule set's target rows (the four source-scope rows
 # carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 58 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
@@ -1362,6 +1362,61 @@ m_pv01_sib_declared() {
   printf "import { OwnShell } from './own-shell'\n// preview_differs: preview keeps its own chrome\n" > 'app/(preview)/preview/layout.tsx'
 }
 expect_green "PV-01: the sibling fallback honours the preview_differs: hatch" PV-01 m_pv01_sib_declared
+
+# ---- PV-01 layout selection: exact code basenames only ---------------------------------------
+# The route layout is chosen by EXACT code basename (_pv01_layout_in), never by globbing
+# layout.* and never by suffix blacklist: a stylesheet, a type declaration or a test beside a
+# layout is a different basename, so it is never a candidate. Before the exact-name list,
+# `ls layout.* | head -1` picked the sibling (layout.css, layout.d.ts and layout.test.tsx all
+# sort before layout.tsx) and the RED message told the reader to compare a stylesheet against
+# code. Each of these four was a false RED before the fix, proven RED-failing on the
+# pre-change tree from the same fixtures.
+m_pv01_css_sib() {
+  mkdir -p app/preview
+  printf '' > app/layout.css
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a layout.css beside the public layout is not compared - the shell still matches" PV-01 m_pv01_css_sib
+m_pv01_mcss_sib() {
+  mkdir -p app/preview
+  printf '' > app/layout.module.css
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a layout.module.css beside the public layout is not compared either" PV-01 m_pv01_mcss_sib
+m_pv01_dts_sib() {
+  mkdir -p app/preview
+  printf '' > app/layout.d.ts
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a layout.d.ts beside the public layout is not compared either" PV-01 m_pv01_dts_sib
+m_pv01_test_sib() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell'\n" > app/preview/layout.tsx
+  printf '' > app/preview/layout.test.tsx
+}
+expect_green "PV-01: a layout.test.tsx beside the preview layout is not compared either" PV-01 m_pv01_test_sib
+
+# A preview directory whose ONLY layout.* file is a stylesheet has NO route layout at all -
+# a different failure from "imports no module it shares", and the RED message must say which,
+# so a reader is never told to compare a stylesheet. This is a text assertion rather than
+# part of expect_red because the claim is about the MESSAGE, not just the exit.
+m_pv01_nolayout() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf '' > app/preview/layout.css
+}
+expect_red "PV-01: a preview dir whose only layout.* is a stylesheet is RED - no layout, not an import mismatch" PV-01 1 m_pv01_nolayout
+m_pv01_nolayout
+out=$(bash .gob/bin/goblin-verify --only PV-01 2>&1)
+printf '%s' "$out" | grep -qF 'no layout file was found in app/preview'
+check "PV-01: that RED says no layout file was found (the empty/absent-layout failure)" "$?"
+printf '%s' "$out" | grep -qF 'imports no module'
+check "PV-01: and that RED never accuses the surface of an import mismatch" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+restore_all
 
 # SKIP paths, each printing its reason — never a bare pass.
 out=$(bash .gob/bin/goblin-verify --only PV-01 2>&1)
