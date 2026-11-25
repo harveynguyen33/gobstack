@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 108 `expect_red` call sites and 41 `expect_green`
-# — 149 calls over all 64 of the rule set's target rows (the four source-scope rows
+# One control per target-scope row: 111 `expect_red` call sites and 42 `expect_green`
+# — 153 calls over all 64 of the rule set's target rows (the four source-scope rows
 # carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 33 of those 64 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
 # this revision: 64 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `149 over 64 target rows`.
+# README's census sentence must read `153 over 64 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -1170,6 +1170,42 @@ m_pv01_builtin() {
 }
 expect_red "PV-01: two layouts importing only a node: builtin are RED" PV-01 1 m_pv01_builtin
 
+# The theme is not the shell (PR #2 review round 2, measured pre-fix on a reporting tenant): the
+# pre-fix row counted a SHARED STYLESHEET as proof the review surface renders the published
+# shell — the two layouts shared globals.css (one via a side-effect import) and PV-01 PASSED
+# on the exact file that shipped the bug. The intersection now counts project CODE modules
+# only: a style/asset import is the theme, a side-effect import is wiring that never names
+# what renders, and neither is evidence. These three controls were GREEN (false) before the
+# fix — proven RED-failing on the pre-change tree in the round log.
+m_pv01_css_se() {
+  mkdir -p app/preview
+  printf '' > app/globals.css
+  printf "import '../globals.css'\n" > app/layout.tsx
+  printf "import '../../globals.css'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: two layouts sharing only a stylesheet via side-effect import are RED - the theme is not the shell (the 8ea81ec shape)" PV-01 1 m_pv01_css_se
+m_pv01_css_from() {
+  mkdir -p app/preview
+  printf '' > app/globals.css
+  printf "import styles from '../globals.css'\n" > app/layout.tsx
+  printf "import styles from '../../globals.css'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: two layouts sharing only a stylesheet through a from-import are RED too" PV-01 1 m_pv01_css_from
+m_pv01_se_code() {
+  mkdir -p app/preview
+  printf 'export const SiteShell = 1\n' > app/site-shell.tsx
+  printf "import './site-shell'\n" > app/layout.tsx
+  printf "import '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: a side-effect import of a code module is not evidence either - wiring proves no render" PV-01 1 m_pv01_se_code
+m_pv01_code_green() {
+  mkdir -p app/preview
+  printf 'export const Nav = 1\nexport const Footer = 2\nexport const FloatingActions = 3\nexport const Lang = 4\n' > app/shell.tsx
+  printf "import { Nav, Footer } from './shell'\n" > app/layout.tsx
+  printf "import { Nav, Footer, FloatingActions, Lang } from '../shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: two layouts sharing project CODE modules are GREEN and the PASS names them" PV-01 m_pv01_code_green
+
 # PR #2 review round 3: the from-clause keyword scan had an off-by-one in its dynamic-import(
 # guard (`we = p + RSTART + RLENGTH - 1` landed on the keyword, not past it), so every segment
 # containing import/export was called static on the first hit — and a specifier-shaped STRING
@@ -1193,7 +1229,7 @@ expect_red "PV-01: an in-string 'import x from ...' without parens is RED (the m
 # mask must eat the string only, not the statement outside it.
 m_pv01_str_then_real() {
   mkdir -p app/preview
-  printf "import './shared-a';\n" > app/layout.tsx
+  printf "import { b } from './shared-a';\n" > app/layout.tsx
   printf "const a = \"import x\"; import { b } from '../shared-a';\n" > app/preview/layout.tsx
 }
 expect_green "PV-01: a real import after a string that merely mentions the word is GREEN" PV-01 m_pv01_str_then_real
@@ -1223,7 +1259,7 @@ m_pv01_rel_vs_alias() {
   mkdir -p app/preview
   printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
   printf 'export const SiteShell = 1\n' > app/site-shell.tsx
-  printf "import './site-shell';\n" > app/layout.tsx
+  printf "import { SiteShell } from './site-shell';\n" > app/layout.tsx
   printf "import { SiteShell } from '@/site-shell'\n" > app/preview/layout.tsx
 }
 expect_green "PV-01: a preview naming the shared module through a resolvable alias while the public layout names it relative is GREEN" PV-01 m_pv01_rel_vs_alias '' m_pv01_alias_restore
@@ -1232,14 +1268,14 @@ m_pv01_alias_vs_rel() {
   printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
   printf 'export const SiteShell = 1\n' > app/site-shell.tsx
   printf "import { SiteShell } from '@/site-shell'\n" > app/layout.tsx
-  printf "import '../site-shell';\n" > app/preview/layout.tsx
+  printf "import { SiteShell } from '../site-shell';\n" > app/preview/layout.tsx
 }
 expect_green "PV-01: the reverse direction - public layout through the alias, preview relative - is GREEN" PV-01 m_pv01_alias_vs_rel '' m_pv01_alias_restore
 m_pv01_rel_vs_alias_dir() {
   mkdir -p app/preview app/site-dir
   printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
   printf 'export const SiteShell = 1\n' > app/site-dir/index.tsx
-  printf "import './site-dir';\n" > app/layout.tsx
+  printf "import { SiteShell } from './site-dir';\n" > app/layout.tsx
   printf "import { SiteShell } from '@/site-dir/index.tsx'\n" > app/preview/layout.tsx
 }
 expect_green "PV-01: a directory entry named relative in one layout and as @/dir/index.tsx in the other keys as one module and is GREEN" PV-01 m_pv01_rel_vs_alias_dir '' m_pv01_alias_restore

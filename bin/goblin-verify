@@ -927,7 +927,10 @@ _pv01_imports_of() {
         }
         prev = qpos + 1
       }
-      # side-effect import "<spec>"
+      # side-effect import "<spec>" - printed with a SE: prefix so the resolver can EXCLUDE
+      # it from the shared-evidence intersection: an import with no from clause loads a
+      # module without naming what renders, so two layouts wiring the same module by side
+      # effect prove nothing about the shell (PR #2 review round 2, theme-is-not-the-shell)
       imp = "(^|[^A-Za-z0-9_$])import [" Q1 Q2 "]"
       t = s
       while (match(t, imp)) {
@@ -935,7 +938,7 @@ _pv01_imports_of() {
         rest = substr(t, qpos)
         if (match(rest, qq)) {
           sp = substr(rest, RSTART + 1, RLENGTH - 2)
-          if (sp != "") print sp
+          if (sp != "") print "SE:" sp
           t = substr(t, qpos + RSTART + RLENGTH)
         } else {
           t = substr(t, qpos + 1)
@@ -1086,13 +1089,43 @@ _pv01_probe_target() {
   _pv01_probe "$p"
 }
 
+_pv01_is_asset_spec() {
+  # is this specifier a style/asset import? A shared stylesheet (or image, or font) proves
+  # the same THEME, never the same SHELL: a reported tenant's preview layout and its public
+  # layout both imported the same globals.css and the pre-fix row PASSED on the exact file
+  # that shipped the bug (PR #2 review round 2, measured pre-fix). These extensions are
+  # never evidence.
+  case "$1" in
+    *.css|*.scss|*.sass|*.less|*.styl|*.svg|*.png|*.jpg|*.jpeg|*.webp|*.gif|*.ico|*.woff|*.woff2|*.ttf) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_pv01_emit_key() {
+  # print the classification line of one resolved module:
+  #   A<TAB><key>  an asset/side-effect import - NEVER shared-shell evidence
+  #   K<TAB><key>  project CODE the layout really pulls in
+  # $1 = canonical key, $2 = the specifier as written, $3 = the resolved ROOT-relative
+  # path, $4 = 1 when the specifier came from a side-effect import
+  local key="$1" spec="$2" found="$3" se="$4" k="K"
+  if [ "$se" -eq 1 ] || _pv01_is_asset_spec "$spec" || _pv01_is_asset_spec "$found"; then k="A"; fi
+  printf '%s\t%s\n' "$k" "$key"
+}
+
 _pv01_resolve_spec() {
   # classify one import specifier of the layout living in dir $1:
-  #   K<TAB><key>   counts as shared evidence (relative specifiers always do, normalised)
+  #   K<TAB><key>   counts as shared evidence: project CODE (relative specifiers always do,
+  #                 normalised; bare specifiers when they resolve inside the project)
+  #   A<TAB><key>   a style/asset import, or any side-effect import (no from clause) - the
+  #                 theme and the wiring, never evidence of a shared shell; still tracked so
+  #                 the RED message can say when a surface shares ONLY those
   #   D<TAB><spec>  dropped: a specifier that resolves to nothing inside the project
   #                 (an installed package, a builtin, an unresolvable alias) or names
   #                 a module outside the project root (a relative that climbs out)
-  local cur="$1" spec="$2" pat tgt sub prefix suffix found norm
+  local cur="$1" spec="$2" pat tgt sub prefix suffix found norm se=0
+  case "$spec" in
+    "SE:"*) se=1; spec="${spec#SE:}" ;;
+  esac
   case "$spec" in
     ./*|../*)
       # one canonical key space for every branch: _pv_norm_spec yields an ABSOLUTE path, the
@@ -1104,7 +1137,7 @@ _pv01_resolve_spec() {
       # in the RED message like any other unresolvable specifier, never a silent empty key.
       norm=$(_pv_norm_spec "$cur" "$spec")
       case "$norm" in
-        "$ROOT"/*) printf 'K\t%s\n' "$(_pv01_key_of_found "${norm#"$ROOT"/}")"; return 0 ;;
+        "$ROOT"/*) _pv01_emit_key "$(_pv01_key_of_found "${norm#"$ROOT"/}")" "$spec" "${norm#"$ROOT"/}" "$se"; return 0 ;;
       esac
       printf 'D\t%s\n' "$spec"; return 0 ;;
   esac
@@ -1121,13 +1154,13 @@ _pv01_resolve_spec() {
             *) continue ;;
           esac
           if found=$(_pv01_probe_target "$tgt" "$sub"); then
-            printf 'K\t%s\n' "$(_pv01_key_of_found "$found")"; return 0
+            _pv01_emit_key "$(_pv01_key_of_found "$found")" "$spec" "$found" "$se"; return 0
           fi
           ;;
         *)
           [ "$spec" = "$pat" ] || continue
           if found=$(_pv01_probe_target "$tgt" ""); then
-            printf 'K\t%s\n' "$(_pv01_key_of_found "$found")"; return 0
+            _pv01_emit_key "$(_pv01_key_of_found "$found")" "$spec" "$found" "$se"; return 0
           fi
           ;;
       esac
@@ -1137,13 +1170,28 @@ _pv01_resolve_spec() {
     sub="$(_pv01_norm_base "$_PV01_BASEURL")"
     [ -n "$sub" ] && sub="$sub/" || sub=""
     if found=$(_pv01_probe "$sub${spec#./}"); then
-      printf 'K\t%s\n' "$(_pv01_key_of_found "$found")"; return 0
+      _pv01_emit_key "$(_pv01_key_of_found "$found")" "$spec" "$found" "$se"; return 0
     fi
   fi
   if found=$(_pv01_probe "${spec#./}"); then
-    printf 'K\t%s\n' "$(_pv01_key_of_found "$found")"; return 0
+    _pv01_emit_key "$(_pv01_key_of_found "$found")" "$spec" "$found" "$se"; return 0
   fi
   printf 'D\t%s\n' "$spec"
+}
+
+_pv01_asset_note() {
+  # called when the code-module intersection is empty: if what the layouts DO share is
+  # only stylesheet/asset (or side-effect) imports, say so in the FAIL message - the theme
+  # is not the shell (PR #2 review round 2). $1 surface path, $2/$3 sorted shared-evidence
+  # A-key lists (one key per line) of the two layouts.
+  local surf="$1" aov
+  aov=$(comm -12 <(printf '%s\n' "$2") <(printf '%s\n' "$3"))
+  [ -n "$aov" ] || return 0
+  if printf '%s\n' "$aov" | grep -Eq '\.(css|scss|sass|less|styl|svg|png|jpe?g|webp|gif|ico|woff2?|ttf)$'; then
+    printf 'note: %s shares only stylesheet/asset imports, which are the theme and not the shell\n' "$surf"
+  else
+    printf 'note: %s shares only side-effect imports, which load modules without naming what renders\n' "$surf"
+  fi
 }
 
 check_pv_01() {
@@ -1160,7 +1208,13 @@ check_pv_01() {
   # out of the project root names a module outside the repo and is dropped like any
   # unresolvable specifier — an installed package or a builtin is
   # never evidence of a shared shell, and a specifier that resolves nowhere is dropped and
-  # named in the RED message. When NO ancestor layout exists inside the route tree, the
+  # named in the RED message. Neither is a style/asset import or a side-effect import: the
+  # shared stylesheet is the THEME the two surfaces agree on, not the SHELL one renders
+  # (the bug that motivated this paragraph passed PV-01 on a preview layout whose only
+  # project imports were globals.css and a banner), and `import '<x>'` wires a module
+  # without naming what renders — the intersection counts project CODE modules only
+  # (_pv01_resolve_spec classes them A and they never count; when a surface shares ONLY
+  # those, the RED message says exactly that). When NO ancestor layout exists inside the route tree, the
   # public layout is searched among SIBLING route groups of the same tree: every depth-1
   # entry under the tree that is not on the surface's own path and does not itself look
   # like a review surface — a grouped sibling contributes EVERY layout.* under it, a plain
@@ -1184,7 +1238,7 @@ check_pv_01() {
   local tree d b surf up pub sameshell=0 bad=0 n=0 declared=0 inherited=0 unjudged=0 shared
   local s_out p_out surf_dropped pub_dropped
   local trees sibshell=0 cands ent name rel first_seg label cand
-  local sib_ok cand_names cand_dropped sn sdisp sd all_dropped
+  local sib_ok cand_names cand_dropped sn sdisp sd all_dropped s_a cand_a
   _pv01_tsconfig_load
   trees=$(_pv_route_trees)
   if [ -z "$trees" ]; then
@@ -1259,11 +1313,14 @@ check_pv_01() {
         sib_ok=0
         cand_names=""
         cand_dropped=""
+        s_a=$(printf '%s\n' "$s_out" | awk -F'\t' '$1=="A"{print $2}' | sort -u)
+        cand_a=""
         while IFS=$'\t' read -r label cand; do
           [ -n "$cand" ] || continue
           cand_names="$cand_names ${cand#"$ROOT"/}"
           p_out=$(_pv01_imports_of "$cand" | while IFS= read -r s; do _pv01_resolve_spec "${cand%/*}" "$s"; done)
           cand_dropped="$cand_dropped$(printf '%s\n' "$p_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')"
+          cand_a="$cand_a$(printf '%s\n' "$p_out" | awk -F'\t' '$1=="A"{print $2}' | sort -u)"
           shared=$(comm -12 \
             <(printf '%s\n' "$s_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u) \
             <(printf '%s\n' "$p_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u))
@@ -1286,6 +1343,7 @@ check_pv_01() {
           bad=1
           printf "%s imports no module any sibling route group's public layout imports and carries no preview_differs: marker - it does not render any published shell (tried:%s)\n" \
             "${surf#"$ROOT"/}" "$cand_names"
+          _pv01_asset_note "${surf#"$ROOT"/}" "$s_a" "$cand_a"
           sd=$(printf '%s\n' "$s_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')
           all_dropped=$(printf '%s%s' "$sd" "$cand_dropped" | tr ' ' '\n' | awk '!seen[$0]++ && $0 != "" {printf "%s ", $0}')
           if [ -n "$all_dropped" ]; then
@@ -1300,11 +1358,13 @@ check_pv_01() {
       pub_dropped=$(printf '%s\n' "$p_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')
       shared=$(comm -12 \
         <(printf '%s\n' "$s_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u) \
-        <(printf '%s\n' "$p_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u) \
-        | head -1)
+        <(printf '%s\n' "$p_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u))
       if [ -z "$shared" ]; then
         printf '%s imports no module the public layout %s imports and carries no preview_differs: marker - it does not render the published shell\n' \
           "${surf#"$ROOT"/}" "${pub#"$ROOT"/}"
+        _pv01_asset_note "${surf#"$ROOT"/}" \
+          "$(printf '%s\n' "$s_out" | awk -F'\t' '$1=="A"{print $2}' | sort -u)" \
+          "$(printf '%s\n' "$p_out" | awk -F'\t' '$1=="A"{print $2}' | sort -u)"
         if [ -n "$surf_dropped" ] || [ -n "$pub_dropped" ]; then
           printf 'note: %s specifier(s) of those layouts did not resolve inside the project (an installed package, a builtin or an unresolvable alias) and were NOT counted as shared evidence - an alias the bundler resolves but this text probe cannot is a known false RED here; declare the surface with preview_differs: <list> to clear it\n' \
             "$(printf '%s %s' "$surf_dropped" "$pub_dropped" | wc -w | tr -d ' ')"
@@ -1312,6 +1372,15 @@ check_pv_01() {
         bad=1
       else
         sameshell=$((sameshell + 1))
+        sn=$(printf '%s\n' "$shared" | grep -c .)
+        sdisp=$(printf '%s\n' "$shared" | head -3 | paste -sd ',' - | sed 's/,/, /g')
+        [ "$((sn - 3))" -gt 0 ] && sdisp="$sdisp (+$((sn - 3)) more)"
+        # two lines: a single-line PASS payload folds at the report width and would cut
+        # the module list off; each line prints whole - the sibling branch has written its
+        # note as its own line since PV-01 landed
+        printf 'note: %s renders the published shell of %s\n' \
+          "${surf#"$ROOT"/}" "${pub#"$ROOT"/}"
+        printf '      shares %s\n' "$sdisp"
       fi
     done < <(_pv_find "$tree" -type d)
   done <<PV
