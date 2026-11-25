@@ -550,7 +550,19 @@ the Node the gates ran under.
     passes, because reachability is all a text probe has. A surface whose layout shares no
     module with the public layout passes too if the file carries `preview_differs: <list>` —
     the marker is a declared difference, and the check cannot tell whether the declaration is
-    honest (CURATION-2026-11-25 §2 P1).
+    honest (CURATION-2026-11-25 §2 P1). The extractor reads whole-file text (a prettier-wrapped
+    brace list, a dynamic `import(`, a `require(` are all seen), and what it still cannot see
+    after that fix: a specifier built at runtime (`import(someVar)` has no literal to read, so
+    the surface reads as if it imports nothing — the false-RED direction); a module reached only
+    through a re-export barrel (`index.ts`) whose own specifiers live in another file, which the
+    check does not follow, so a barrel pass proves nothing about what the barrel re-exports; TS
+    path aliases (`@/layout`) are compared as opaque strings while the bundler resolves them,
+    so an alias and its target can pass or fail as different modules; and the scan is TEXT, so
+    a specifier-shaped string literal that sits after a statement-shaped keyword can still
+    over-match — one false specifier in both files is a false GREEN, which is the worse
+    direction, and the same text blindness means a `from '<spec>'` in a comment is stripped
+    first (comments cannot vouch for an import) but a contrived string still could (PR #2
+    review).
 
 62. **`PV-02` reads a framework convention, not a runtime.** The check walks every `loading.*`
     boundary and requires each `page.*` in the boundary's subtree that calls `notFound(` to

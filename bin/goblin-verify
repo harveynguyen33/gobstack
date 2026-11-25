@@ -824,10 +824,115 @@ _pv_find() {
 }
 
 _pv01_imports_of() {
-  # the module specifiers of one file's import / export-from / require lines, text only
-  grep -E "^[[:space:]]*(import[[:space:]]|export[[:space:]].*from[[:space:]]|const[[:space:]].*require\()" \
-    "$1" 2>/dev/null \
-    | grep -oE "['\"][^'\"]+['\"]" | tr -d "'\""
+  # the module specifiers of one file's import / export-from / require / dynamic import()
+  # calls, read over the WHOLE file text, not line by line: prettier wraps a brace list
+  # across lines, so the line-anchored grep this replaces never saw a `} from './x'` line
+  # and a compliant surface was falsely RED (PR #2 review). awk is already a checked
+  # dependency of this script (and RS="\001" makes the file one record portably). Text
+  # only: comments are stripped first, but a specifier-shaped string literal can still
+  # over-match — the false-GREEN direction is recorded in docs/LIMITS.md #61.
+  awk -v Q1="'" -v Q2='"' '
+    function seg_has_static_kw(seg,   i, k, p, we, nxt) {
+      # the segment between the last consumed specifier and a `from` may only own that
+      # from-clause if a STATIC import/export keyword stands in the SAME statement: take
+      # the slice after the last statement boundary (`;`) so a bare `import './x'` earlier
+      # in the segment cannot vouch for a stray ` from "` (say, inside a string literal),
+      # and inside that slice the LAST keyword may not be a dynamic import( call, which
+      # owns no from-clause
+      k = 0; p = 1
+      while ((i = index(substr(seg, p), ";")) > 0) { k = p + i - 1; p = k + 1 }
+      if (k > 0) seg = substr(seg, k + 1)
+      p = 0
+      while (match(substr(seg, p + 1), /(^|[^A-Za-z0-9_$])(import|export)/)) {
+        we = p + RSTART + RLENGTH - 1            # one past the keyword, absolute in seg
+        nxt = substr(seg, we, 2)                 # what follows the keyword
+        if (nxt != "(" && substr(nxt, 1, 1) != "(") return 1
+        p = we
+      }
+      return 0
+    }
+    BEGIN { RS = "\001" }   # the whole file is one record; no source text carries \001
+    {
+      s = $0
+      # strip block comments (they span lines)
+      out = ""
+      while ((i = index(s, "/*")) > 0) {
+        out = out substr(s, 1, i - 1)
+        s = substr(s, i + 2)
+        j = index(s, "*/")
+        if (j == 0) { s = ""; break }
+        s = substr(s, j + 2)
+      }
+      s = out s
+      # strip line comments: a // not preceded by : (a URL scheme) ends at its line end
+      out = ""
+      while ((i = index(s, "//")) > 0) {
+        if (i > 1 && substr(s, i - 1, 1) == ":") {
+          out = out substr(s, 1, i + 1)
+          s = substr(s, i + 2)
+          continue
+        }
+        out = out substr(s, 1, i - 1) "\n"
+        s = substr(s, i)
+        j = index(s, "\n")
+        if (j == 0) { s = ""; break }
+        s = substr(s, j)
+      }
+      s = out s
+      gsub(/[ \t\r\n]+/, " ", s)
+      qq = "[" Q1 Q2 "][^" Q1 Q2 "]*[" Q1 Q2 "]"        # a quoted string
+      fromre = " from [" Q1 Q2 "]"                       # ... from "<spec>"
+      # static import ... from / export ... from. RSTART is relative to the
+      # substr(s, prev) window, so absolute positions add prev - 1.
+      prev = 1
+      while (match(substr(s, prev), fromre)) {
+        seg = substr(s, prev, RSTART - 1)
+        qpos = prev - 1 + RSTART + RLENGTH - 1    # the opening quote, in s
+        if (seg_has_static_kw(seg)) {
+          rest = substr(s, qpos)                  # starts AT the quote
+          if (match(rest, qq)) {
+            sp = substr(rest, RSTART + 1, RLENGTH - 2)
+            if (sp != "") print sp
+            prev = qpos + RSTART + RLENGTH        # one past the closing quote
+            continue
+          }
+        }
+        prev = qpos + 1
+      }
+      # side-effect import "<spec>"
+      imp = "(^|[^A-Za-z0-9_$])import [" Q1 Q2 "]"
+      t = s
+      while (match(t, imp)) {
+        qpos = RSTART + RLENGTH - 1               # the opening quote, in t
+        rest = substr(t, qpos)
+        if (match(rest, qq)) {
+          sp = substr(rest, RSTART + 1, RLENGTH - 2)
+          if (sp != "") print sp
+          t = substr(t, qpos + RSTART + RLENGTH)
+        } else {
+          t = substr(t, qpos + 1)
+        }
+      }
+      # dynamic import("<spec>") and require("<spec>") in any position
+      dyn = "(^|[^A-Za-z0-9_$])import ?\\( ?[" Q1 Q2 "]"
+      req = "(^|[^A-Za-z0-9_$])require ?\\( ?[" Q1 Q2 "]"
+      for (di = 1; di <= 2; di++) {
+        t = s
+        pat = (di == 1 ? dyn : req)
+        while (match(t, pat)) {
+          qpos = RSTART + RLENGTH - 1             # the opening quote, in t
+          rest = substr(t, qpos)
+          if (match(rest, qq)) {
+            sp = substr(rest, RSTART + 1, RLENGTH - 2)
+            if (sp != "") print sp
+            t = substr(t, qpos + RSTART + RLENGTH)
+          } else {
+            t = substr(t, qpos + 1)
+          }
+        }
+      }
+    }
+  ' "$1" 2>/dev/null
 }
 
 _pv_norm_spec() {
