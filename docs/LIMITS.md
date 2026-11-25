@@ -613,10 +613,14 @@ the Node the gates ran under.
     SKIP-with-a-reason, never a RED. The defect class stays advisory (CURATION-2026-11-25 §3 P2).
 63. **`SC-03` still cannot read the secrets it never scans.** The fixed gate (2026-11-25) refuses
     to PASS on zero inspection: with no JS-family source and no declared build output the row now
-    SKIPs with the reason instead of printing `0 client-visible secret-shaped name(s)`. What it
-    still cannot see: secret-shaped names in non-JS sources (it skips, naming that), and
-    clause 2 still reads only the build output `security.build_output` declares — an undeclared
-    artifact directory is invisible, not clean.
+    SKIPs with the reason instead of printing `0 client-visible secret-shaped name(s)`. The
+    JS-family set that decides "examined anything" also excludes the kit's own harness scaffold
+    (`AGENTS.md` `harness_dir:`, the installer's default `checks/`): a repo whose only JS-family
+    file is the scaffold the kit itself installed (e.g. `checks/assert.mjs`) is told so — SKIP
+    with the zero-inspection reason — never a green `0 ... name(s)` graded over the kit's own
+    file. What it still cannot see: secret-shaped names in non-JS sources (it skips, naming
+    that), and clause 2 still reads only the build output `security.build_output` declares — an
+    undeclared artifact directory is invisible, not clean.
 64. **`SC-04` still cannot see a cookie write it did not parse.** The fixed gate SKIPs when zero
     cookie writes were examined (`no cookie write found in N examined file(s)`), so a non-JS
     repo (a Python `response.set_cookie`) can no longer PASS vacuously. What it still cannot

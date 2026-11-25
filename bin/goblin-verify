@@ -1882,14 +1882,21 @@ check_ds_02() {
 # The JS-family source set sc_sources greps, as a FILE count. The include/exclude list is
 # duplicated on purpose: find counts the files the grep would read, which is the "examined"
 # denominator the zero-inspection gates (SC-03, SC-04) skip on — a repo where this is 0 is a
-# repo the row saw nothing of.
+# repo the row saw nothing of. The declared harness directory (AGENTS.md harness_dir:, the
+# installer's default checks/) is excluded: a harness file is scaffold the kit itself wrote,
+# not application source, and counting it let a repo whose ONLY JS-family file was the kit's
+# own checks/assert.mjs answer SC-03 with a green "0 ... name(s)" over zero application
+# source — the same grade-the-scaffold pathology the audit accused HV-02 of.
 js_source_count() {
+  local hd="${GOBLIN_HARNESS_REL#./}"
+  hd="${hd%/}"
   ( cd "$ROOT" && find . -type f \
       \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \
          -o -name '*.mjs' -o -name '*.cjs' -o -name '*.vue' -o -name '*.svelte' \) \
       -not -path './.next/*' -not -path './node_modules/*' -not -path './.gob/*' \
       -not -path './.hermes/*' -not -path './dist/*' -not -path './build/*' \
-      -not -path './out/*' -not -path './coverage/*' 2>/dev/null | grep -c . )
+      -not -path './out/*' -not -path './coverage/*' \
+      ${hd:+-not -path "./$hd/*"} 2>/dev/null | grep -c . )
 }
 
 check_sc_02() {

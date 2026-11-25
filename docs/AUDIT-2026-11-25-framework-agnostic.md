@@ -58,6 +58,29 @@ syntax, so a non-JS harness file was accused instead of skipped. Now: a harness 
 only files are not JS-family → SKIP (`no JS-family harness file in <dir> - the text probe reads
 import/require syntax it cannot see in other languages`).
 
+### Second defect, found reviewing the fixes (2026-11-25)
+
+The SC-03/SC-04 zero-inspection gate counted the kit's OWN scaffold. `js_source_count` — the
+"examined" denominator both rows skip on — excluded the build and dependency directories but not
+the declared harness directory, so on a fresh Python install the one JS-family file it found was
+the `checks/assert.mjs` file `goblin-install` itself had written. Measured, same repo, no
+application JS anywhere:
+
+    PASS  SC-03  0 client-visible secret-shaped name(s); no build output to scan for clause 2
+
+Move that one scaffold file away and the same row answers:
+
+    SKIP  SC-03  no file in the JS-family set and no declared build output to scan
+
+The PASS came from grading the kit's scaffold — the exact pathology class D accused `HV-02` of.
+`SC-04` shared the counter and printed it: `no cookie write found in 1 examined file(s)`, where
+the 1 was the kit's own file. Fix: the harness directory (`AGENTS.md` `harness_dir:`, the
+installer's default `checks/`) is excluded from the JS-family set that decides whether the row
+examined anything. Clause semantics and messages are unchanged; a repo whose only JS-family file
+is the harness is now told so (the SKIP above), and a repo with real application sources still
+PASSes. Re-measured on the same Python fixture: `SKIP  SC-03  no file in the JS-family set and
+no declared build output to scan`, `SKIP  SC-04  no cookie write found in 0 examined file(s)`.
+
 ## C — the withdrawn rows
 
 A statement the fleet cannot grade is noise at best and a false green at worst: on every shape

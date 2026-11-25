@@ -304,6 +304,13 @@ m_replay_meta_name() { rm -f checks/*.mjs; printf 'process.exit(1)\n' > 'checks/
 # controls below assert the SKIP with a reason, and the mirror controls above keep the shapes
 # the row CAN see passing and failing exactly as before.
 m_no_js_files()      { rm -f checks/assert.mjs; }
+# The audit's second defect (found reviewing the SC-03 fix above): the zero-inspection gate
+# counted the kit's OWN scaffold, so a fresh install with zero application JS answered
+# `PASS  SC-03  0 client-visible secret-shaped name(s); no build output to scan for clause 2`
+# over the checks/assert.mjs file the installer itself wrote. The fixture's resting state IS
+# that shape - scaffold installed, no application source - so this control's mutation is a
+# no-op, like m_sc_05_no_handler; js_source_count now excludes the declared harness dir.
+m_sc_03_scaffold_only() { :; }
 m_sc_05_noroutes()   { sed -i 's|^security\.write_routes:.*|security.write_routes:|' AGENTS.md; }
 # SC-05's default-fixture shape: the declaration stands (installed default `app src/app`) and
 # the fixture plants no route file, so the row matches nothing.
@@ -561,6 +568,7 @@ expect_red "a write route with no validator"        SC-05 1 m_sc_05
 # 0 waived; 2 dir(s) declared`, and HS-02 `PASS every harness was RED` over zero harnesses).
 # The controls assert the new SKIP; the expect_red/expect_green controls above stay, so a shape
 # the row genuinely inspects still PASSes and FAILs as before.
+expect_skip "a repo whose only JS-family file is the kit's own scaffold" SC-03 m_sc_03_scaffold_only
 expect_skip "a repo with no JS-family file and no build output"        SC-03 m_no_js_files
 expect_skip "a repo with no JS-family file to scan for cookies"        SC-04 m_no_js_files
 expect_skip "a declared route surface with no matching handler"        SC-05 m_sc_05_no_handler
