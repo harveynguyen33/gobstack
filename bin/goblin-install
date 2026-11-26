@@ -470,7 +470,14 @@ LAYERS_BLOCK=""
 # skill rows (SK-01/02/04) — a fresh repo's harness runs them instead of skipping. An
 # explicit --opt-out is the only thing that records a part in disabled:.
 DISABLED=""
-if [ -n "$OPT_OUT" ]; then DISABLED="$DISABLED$OPT_OUT,"; fi
+if [ -n "$OPT_OUT" ]; then
+  # An opt-out ADDS to the parts already recorded: seed from the PREVIOUS value — brackets
+  # stripped — or the flag merge lets this run's render ([skills]) replace the carried
+  # [mcp] and the older opt-outs are lost (measured on this tree). A fresh install has no
+  # previous value, so the list is exactly this run's part.
+  PREV_DISABLED=$(g_agents_read "$CONFIG" disabled 2>/dev/null || true)
+  DISABLED="${PREV_DISABLED//[][]/},$OPT_OUT,"
+fi
 DISABLED=$(printf '%s' "$DISABLED" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
 
 # FIX 3: a *-SPEC.md and reviews/ are policed by LIBRARY rows (SP-01..03, PG-01..03, off by
@@ -1026,7 +1033,12 @@ if [ "$DRY_RUN" -eq 0 ]; then
   fi
   if [ -n "$OPT_OUT" ] && grep -q "^$GOB_AGENTS_BEGIN" "$CONFIG" 2>/dev/null; then
     cur=$(g_agents_read "$CONFIG" disabled)
-    new=$(printf '%s,%s' "${cur#[]}" "${OPT_OUT}" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
+    # The strip must remove BOTH brackets: ${cur#[]} is an empty glob class and matches
+    # nothing, so the previous value's own brackets flowed into the re-wrap — a fresh
+    # --opt-out mcp measured `disabled: [[mcp],mcp]` (nested, part twice) on 0.7.1. Strip,
+    # append this run's part, dedupe, sort, wrap once.
+    cur=${cur//[][]/}
+    new=$(printf '%s,%s' "$cur" "${OPT_OUT}" | tr ',' '\n' | grep -v '^$' | sort -u | paste -sd, -)
     {
       while IFS=$'\t' read -r k v; do
         [ "$k" = "disabled" ] && continue

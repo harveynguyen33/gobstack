@@ -67,7 +67,16 @@ AGENTS.md adopted into a fixture: `ratchet.ceiling: 1105500`, `gate_tsc_build_cm
 `perf.baseline_commit: 0bde816`, `perf.baseline_value: 831522`, `security.build_output:
 dist/assets` and its 301-line ratchet comment block all kept through a re-install (`rc=0`);
 the only change to the block is the three keys this template emits that the old block lacked,
-appended at the end. The carry is no longer a list: the previous block is read as LINES and
+appended at the end.
+
+Two measured fixes round out the same carry: the `--opt-out` re-record stripped no brackets
+(`${cur#[]}` is an empty glob class), so a fresh install with `--opt-out mcp` rendered the
+malformed `disabled: [[mcp],mcp]` on 0.7.1 AND on this build — now the opt-out seeds from the
+previous value with brackets stripped, appends its part once, dedupes and sorts: `[mcp]` stays
+`[mcp]` across re-installs, `--opt-out skills` on top gives `[mcp,skills]`, and an empty set
+renders `disabled: []`.
+
+The carry is no longer a list: the previous block is read as LINES and
 every line the new render did not reproduce under the same key is kept — a pair's previous
 value replaces the rendered one, a pair the render does not emit is re-inserted, a comment
 survives verbatim in its old relative position. Two rules sit above the merge: a flag is a

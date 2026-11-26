@@ -261,6 +261,57 @@ bash "$SRC/bin/goblin-install" --target "$WORK/ac1" >/dev/null 2>&1
 check "AC4 a blanked non-emitted key stays blank (re-inserted, not invented)" \
   "$(grep -qx 'gate_tsc_build_cmd:' "$AG1" && echo 0 || echo 1)"
 
+# ---- --opt-out: disabled: must always render as a flat, deduped [a,b] ------------
+# The renderer writes `disabled: [{{DISABLED}}]` — a flat list. The opt-out re-record then
+# re-wraps the PREVIOUS value, and its bracket strip (${cur#[]}) matches nothing, so the
+# brackets survived: a fresh install with --opt-out mcp measured `disabled: [[mcp],mcp]` on
+# 0.7.1 AND on the carry build, and the carry then preserved the malformed value (sticky).
+# The re-record strips the brackets before re-wrapping. Every shape below is measured.
+fixture "$WORK/opt1"
+AG_OPT="$WORK/opt1/AGENTS.md"
+bash "$SRC/bin/goblin-install" --target "$WORK/opt1" --opt-out mcp >/dev/null 2>&1
+check "OPT AC1 a fresh install --opt-out mcp renders disabled: [mcp] (flat, not nested)" \
+  "$(grep -qxF 'disabled: [mcp]' "$AG_OPT" && ! grep -qF '[[' "$AG_OPT" && echo 0 || echo 1)"
+bash "$SRC/bin/goblin-install" --target "$WORK/opt1" --opt-out mcp >/dev/null 2>&1
+check "OPT AC2 a second --opt-out mcp is idempotent (still one disabled: [mcp])" \
+  "$([ "$(grep -cxF 'disabled: [mcp]' "$AG_OPT")" -eq 1 ] && echo 0 || echo 1)"
+bash "$SRC/bin/goblin-install" --target "$WORK/opt1" --opt-out skills >/dev/null 2>&1
+check "OPT AC2 adding --opt-out skills gives disabled: [mcp,skills] (deduped, sorted)" \
+  "$(grep -qxF 'disabled: [mcp,skills]' "$AG_OPT" && echo 0 || echo 1)"
+OPT_SNAP=$(sha256sum "$AG_OPT" | awk '{print $1}')
+bash "$SRC/bin/goblin-install" --target "$WORK/opt1" >/dev/null 2>&1
+check "OPT AC3 a plain re-install keeps the opt-out byte-for-byte" \
+  "$([ "$(sha256sum "$AG_OPT" | awk '{print $1}')" = "$OPT_SNAP" ] && echo 0 || echo 1)"
+check "OPT AC4 two opt-outs survive the re-install as [mcp,skills] (no nesting)" \
+  "$(grep -qxF 'disabled: [mcp,skills]' "$AG_OPT" && echo 0 || echo 1)"
+fixture "$WORK/opt2"
+AG_OPT2="$WORK/opt2/AGENTS.md"
+bash "$SRC/bin/goblin-install" --target "$WORK/opt2" >/dev/null 2>&1
+check "OPT AC5 the un-flagged render is disabled: []" \
+  "$(grep -qxF 'disabled: []' "$AG_OPT2" && echo 0 || echo 1)"
+bash "$SRC/bin/goblin-install" --target "$WORK/opt2" --opt-out mcp >/dev/null 2>&1
+check "OPT AC5 an opt-out over an existing disabled: [] yields disabled: [mcp]" \
+  "$(grep -qxF 'disabled: [mcp]' "$AG_OPT2" && echo 0 || echo 1)"
+bash "$SRC/bin/goblin-install" --target "$WORK/opt2" >/dev/null 2>&1
+check "OPT AC5 and a plain re-install keeps that [mcp]" \
+  "$(grep -qxF 'disabled: [mcp]' "$AG_OPT2" && echo 0 || echo 1)"
+
+# ---- RED control: the 0.7.1 renderer, verbatim -----------------------------------
+# The render bug is PRE-EXISTING (it shipped in 0.7.1; the carry only made it sticky). The
+# assertions above must fail on 0.7.1's installer or they prove nothing: run the same fresh
+# --opt-out against an archive of origin/main and require the measured malformation.
+PRE071="$WORK/pre071"; mkdir -p "$PRE071"
+git -C "$SRC" archive origin/main | tar -x -C "$PRE071"
+fixture "$WORK/opt-red"
+AG_OPTRED="$WORK/opt-red/AGENTS.md"
+bash "$PRE071/bin/goblin-install" --target "$WORK/opt-red" --opt-out mcp >/dev/null 2>&1
+RED_VAL=$(sed -n 's/^disabled: //p' "$AG_OPTRED" | head -1)
+check "OPT RED CONTROL (0.7.1): fresh --opt-out mcp renders the malformed value (got: ${RED_VAL:-none})" \
+  "$(grep -qxF 'disabled: [[mcp],mcp]' "$AG_OPTRED" && echo 0 || echo 1)"
+bash "$PRE071/bin/goblin-install" --target "$WORK/opt-red" >/dev/null 2>&1
+check "OPT RED CONTROL (0.7.1): a plain re-install does NOT keep the opt-out (carry drops it)" \
+  "$(grep -qxF 'disabled: []' "$AG_OPTRED" && echo 0 || echo 1)"
+
 # ---- the negative control: the same tree with the carry switched off ------------
 # D: if this harness cannot fail, it proves nothing. The control is the PRE copy (this
 # tree's dirs with the carry call commented out) — for the AC1 keys it is exactly the
