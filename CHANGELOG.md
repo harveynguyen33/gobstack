@@ -54,6 +54,29 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   promotes them into catalogue.tsv by PR or edit. `--write` honours only the proposal's TICKED
   rows, through `gob extras install` itself — one allowlist, one code path.
 
+## 0.7.2 (installer: a re-install keeps every line the project declared)
+
+The carry in 0.7.1 was a LIST of seven names (`CARRY_KEYS`). Every other key the render drew
+from a hardcoded literal was overwritten with the template default on a plain re-install, and
+every key the render did not emit at all was silently deleted — comment lines included.
+Measured on a fixture (kit 0.7.1, declare, then re-install with no flags): `ratchet.ceiling:
+1105500` -> `0`; `gate_tsc_build_cmd: npx tsc --noEmit && npx vite build` -> line gone; three
+`#` comment lines -> gone (same fixture against this build: all three kept, second consecutive
+re-install byte-identical). Measured on `~/projects/tech-goblin/lab/diagram-studio`'s restored
+AGENTS.md adopted into a fixture: `ratchet.ceiling: 1105500`, `gate_tsc_build_cmd`,
+`perf.baseline_commit: 0bde816`, `perf.baseline_value: 831522`, `security.build_output:
+dist/assets` and its 301-line ratchet comment block all kept through a re-install (`rc=0`);
+the only change to the block is the three keys this template emits that the old block lacked,
+appended at the end. The carry is no longer a list: the previous block is read as LINES and
+every line the new render did not reproduce under the same key is kept — a pair's previous
+value replaces the rendered one, a pair the render does not emit is re-inserted, a comment
+survives verbatim in its old relative position. Two rules sit above the merge: a flag is a
+decision (`--gate`, `--archive`, `--opt-out` keep the rendered value), and a value the project
+deliberately blanked stays blank. The practice pin's own contract is unchanged and sits above
+the merge — an `--upgrade` never re-pins the standard by itself, even when `--practice` names a
+file; `--re-pin` remains the deliberate path. Fresh installs render exactly as before. No row
+changes: 26 enforcement + 32 library stays.
+
 ## 0.7.1 (installer: a re-install keeps the block's declared values)
 
 Two fixes that landed after 0.7.0 was tagged, both about `goblin-install` erasing a value the
