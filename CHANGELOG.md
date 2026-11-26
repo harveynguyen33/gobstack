@@ -37,21 +37,6 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   bare id with no check cell. `tests/t-extend.sh` proves the loop end to end through the real file:
   a library row off, then on and green, then red under its violation with its remedy, then refused
   when miswritten, then off again.
-- **A re-install no longer blanks a declared key.** The block is rendered from the template on every
-  install and written wholesale, and the render call draws a set of keys from hardcoded literals
-  (`feature_map`, `verify_doctor`, `reference_manifest`, `quarantine_root`, `source_root`, `max_dirty`,
-  `bans_exempt` — `CARRY_KEYS`, the whole enumeration) — so a plain `goblin-install` (no `--upgrade`)
-  erased every declared value and the gate reading it fell back to SKIP: `FM-01`/`FM-02`, `VA-01`,
-  `RC-01`, `CM-03` and the `bans_exempt:` route were all rows a re-install could switch off by
-  deleting their subject. The installer now carries each previous value forward through the
-  round-trip reader (`g_agents_pairs`, so a value containing ": " or a raw tab survives), and the
-  carry replaces the rendered line rather than appending a duplicate. A value the project blanked
-  stays blank — the carry never resurrects one — and a key whose literal default is real
-  (`source_root: .`, `max_dirty: 0`) re-renders that default, exactly as a fresh install does.
-  `tests/t-install-feature-map-carry.sh` plants every key, re-installs twice, asserts the block is
-  byte-identical, diffs a fresh install against the pre-change renderer, and carries the negative
-  control (4 in -> 0 out with the carry switched off; on the previous engine the same plants measure
-  0/6 and 4 in -> 1 out).
 
 ## Unreleased (feat/extras-catalogue)
 
@@ -68,6 +53,29 @@ version recorded in a target's `.goblin/installed.json` and the source `VERSION`
   fixed schema (`source_url`/`license`/`rationale`/`suggested_kind`), inert until the curator
   promotes them into catalogue.tsv by PR or edit. `--write` honours only the proposal's TICKED
   rows, through `gob extras install` itself — one allowlist, one code path.
+
+## 0.7.1 (installer: a re-install keeps the block's declared values)
+
+Two fixes that landed after 0.7.0 was tagged, both about `goblin-install` erasing a value the
+repo had declared. No row changes: 58 target rows, the same measured baseline.
+
+### Fixed
+
+- **A re-install no longer blanks a declared key.** The block is rendered from the template on every
+  install and written wholesale, and the render call draws a set of keys from hardcoded literals
+  (`feature_map`, `verify_doctor`, `reference_manifest`, `quarantine_root`, `source_root`, `max_dirty`,
+  `bans_exempt` — `CARRY_KEYS`, the whole enumeration) — so a plain `goblin-install` (no `--upgrade`)
+  erased every declared value and the gate reading it fell back to SKIP: `FM-01`/`FM-02`, `VA-01`,
+  `RC-01`, `CM-03` and the `bans_exempt:` route were all rows a re-install could switch off by
+  deleting their subject. The installer now carries each previous value forward through the
+  round-trip reader (`g_agents_pairs`, so a value containing ": " or a raw tab survives), and the
+  carry replaces the rendered line rather than appending a duplicate. A value the project blanked
+  stays blank — the carry never resurrects one — and a key whose literal default is real
+  (`source_root: .`, `max_dirty: 0`) re-renders that default, exactly as a fresh install does.
+  `tests/t-install-feature-map-carry.sh` plants every key, re-installs twice, asserts the block is
+  byte-identical, diffs a fresh install against the pre-change renderer, and carries the negative
+  control (4 in -> 0 out with the carry switched off; on the previous engine the same plants measure
+  0/6 and 4 in -> 1 out).
 
 ## 0.7.0 (curation: framework-agnostic)
 
