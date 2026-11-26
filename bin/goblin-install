@@ -28,7 +28,7 @@
 
 set -uo pipefail
 
-GOBLIN_INSTALL_VERSION="0.6.1"
+GOBLIN_INSTALL_VERSION="0.7.0"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC=$(cd "$SELF_DIR/.." && pwd)
 # shellcheck source=goblin-lib.sh
@@ -447,7 +447,7 @@ ADV_CEILING=$(default_ advisory_ceiling); [ -n "$ADV_CEILING" ] || ADV_CEILING=1
 # The optional second gate (the TODO ceiling); blank it to render one gate only.
 GATE2_NAME=$(default_ gate2_name)
 GATE2_CMD=$(default_ gate2_cmd)
-# The security surface (SC-01..SC-09) and the perf baseline (PF-01).
+# The security surface (SC-01..SC-08 enforcement; SC-09 is a library advisory) and the perf baseline (PF-01).
 SEC_GITIGNORE_FAMILY=$(default_ sec_gitignore_family); [ -n "$SEC_GITIGNORE_FAMILY" ] || SEC_GITIGNORE_FAMILY=no
 SEC_BUILD_OUTPUT=$(default_ sec_build_output)
 SEC_WRITE_ROUTES=$(default_ sec_write_routes)

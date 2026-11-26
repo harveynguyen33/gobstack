@@ -38,8 +38,9 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 8. **A new surface to maintain.** Per-repo vendored `.gob/` plus `.hermes/skills/` means
    upgrade debt in every adopted repo, plus one more command pair to learn. The counter is that
    the alternative — profile copies — already failed.
-9. **Six rows are labelled `advisory`, and all six are prose with no check at all:**
-   `HP-04`, `HS-03`, `CM-02`, `DOC-01`, `DOC-02` and `SC-09`. Each is counted and capped, but a
+9. **Five rows are labelled `advisory`, and all five are prose with no check at all:**
+   `HP-04`, `HS-03`, `CM-02`, `DOC-01` and `DOC-02` (`SC-09` was withdrawn on 2026-11-25 — see
+   #67 and docs/AUDIT-2026-11-25-framework-agnostic.md). Each is counted and capped, but a
    counted rule is still not an enforced one, and **the cap is a policy, not a proof.**
 10. **It does not reduce the profile-skill surface.** It only stops that surface from growing
     with project procedures; the existing divergence is a separate cleanup.
@@ -126,7 +127,7 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 25. **`SC-04` reads one statement, not one program.** A cookie write spread over three lines (or
     assembled through a helper) is not seen, and the row says so in its own cell.
 26. **The advisory slots are a count, not a strict bound.** Measured (v3): 0 advisory rows in the
-    default matrix at a ceiling of 10 (all six moved to the library), so `SK-03` reports
+    default matrix at a ceiling of 10 (all five moved to the library), so `SK-03` reports
     `advisory 0 of ceiling 10 (10 free slots)`. A row is advisory
     if its `check` cell says so OR its `enforced_by` cell does; the cap is a count — 10 advisory
     rows at a ceiling of 10 **pass**, and the 11th FAILs (10 at a ceiling of 9 FAILs). The v3 cuts
@@ -542,12 +543,127 @@ the Node the gates ran under.
     to fail in. The failure it was adopted from was a mid-run `AGENTS.md` edit that needed a
     human Allow and left no trace of who approved it (CURATION-2026-11-07 §2 C6).
 
+61. **`PV-01` compares project-resolvable modules, and an import still proves reachability, not an identical render.**
+    The check collects the module specifiers a review surface's `layout.*` imports and compares
+    them with the public layout at the equivalent position — but the intersection counts
+    PROJECT-RESOLVABLE modules only: both sides are reduced to ONE canonical key space —
+    ROOT-relative module paths with the probed extension and a trailing `/index` stripped —
+    so the surface and its public layout may name the same module in different styles (one
+    relative, the other through a resolvable alias) and still intersect (2026-11-25
+    preview-surfaces round 4: the keys used to come from two different spaces and never
+    intersect — a guaranteed false RED in any repo with tsconfig `paths`). A relative
+    specifier counts once normalised, while a bare specifier counts only when it resolves to
+    a file that exists inside
+    the repo (tsconfig.json/jsconfig.json `baseUrl`+`paths` first — read as strict JSON, so a
+    commented JSONC leaves its aliases unresolvable — then `<ROOT>/<spec>` with the usual
+    extension and index probing). The route layout itself is chosen by EXACT basename with a
+    code extension (`layout.tsx`, `layout.ts`, `layout.jsx`, `layout.js`, `layout.mts`,
+    `layout.mjs`, `layout.cts`, `layout.cjs`, in that precedence order), never by globbing
+    `layout.*`: a stylesheet, a type declaration or a test beside a layout (`layout.css`,
+    `layout.module.css`, `layout.scss`, `layout.d.ts`, `layout.test.tsx`, `layout.spec.tsx`)
+    is a different basename and is never a candidate, and when two code layouts sit side by
+    side the tsx one wins deterministically. A directory whose only `layout.*` files are such
+    siblings fails as `no layout file was found`, not as an import mismatch — the reader is
+    never told to compare a stylesheet against code (2026-11-25 preview-surfaces round 6:
+    before the exact-name list, `ls layout.* | head -1` picked whichever sibling sorted first
+    — `layout.css`, `layout.d.ts` and `layout.test.tsx` all sort before `layout.tsx` — so all
+    six sibling shapes were false REDs, each accusing the sibling by name). An installed package, a `node:` builtin or anything else the
+    probe cannot resolve is NEVER evidence that a surface pulls in the published shell: two
+    layouts both importing `react` or `next/link` are RED (PR #2 review round 2 — both used to
+    be a false GREEN, the worse direction). A specifier that resolves nowhere — including a
+    relative one that climbs out of the project root, which names a module outside the repo —
+    is dropped from
+    the intersection and the RED message says so, so the reader knows an unresolvable alias may
+    be the cause and that `preview_differs: <list>` is the escape hatch. When NO ancestor layout
+    exists inside the route tree, the public layout is searched among SIBLING route groups of the
+    same tree instead (2026-11-25 preview-surfaces round 5: the rule's own real-world instance had
+    the public shell in `app/(frontend)/[locale]/layout.tsx` beside a review surface
+    `app/(preview)/preview/layout.tsx`, so the ancestor-only walk found nothing, printed
+    `not judged` and still returned PASS — a green that judged nothing, and a row whose only
+    real-world instance is `not judged` does not earn its place). A grouped sibling contributes
+    every `layout.*` under it becomes a candidate only through the same exact-name list, a plain sibling its depth-1 layout only; a depth-1 sibling that
+    itself looks like a review surface is not a candidate — a sibling review surface is not
+    published furniture, and comparing two surfaces proves nothing. The fallback passes if ANY
+    sibling group shares at least one project-resolvable module, and the PASS names the group and
+    the shared modules (max 3, then +N more); when candidates exist but none shares a module, the
+    row is RED, naming the candidates tried and the specifiers dropped as unresolvable. What a
+    sibling match MEANS stays honest: a shared module is reachability of the same furniture, not
+    proof of an identical render, and because any matching sibling passes, a sibling group that
+    shares only a trivial util clears the surface too; an unresolvable alias or a runtime-built
+    specifier is still a false RED the `preview_differs:` hatch clears. The comparison cannot
+    see past the import: a shell imported and then overridden by a local wrapper (its own
+    headers, its own routing context, an extra provider) passes, because reachability is all a
+    text probe has, and a surface whose layout shares no module with the public layout passes
+    too if the file carries `preview_differs: <list>` — the marker is a declared difference,
+    and the check cannot tell whether the declaration is honest (CURATION-2026-11-25 §2 P1).
+    The extractor reads whole-file text (a prettier-wrapped brace list, a dynamic `import(`, a
+    `require(` are all seen), and what it still cannot see after that fix, in the two directions
+    it admits honestly: an alias the bundler resolves but this text probe cannot (a JSONC
+    tsconfig, a non-file target), or a specifier built at runtime (`import(someVar)` has no
+    literal to read) — the surface reads as if it imports nothing, a false RED. A
+    specifier-shaped string literal no longer over-matches either (PR #2 review round 3: an
+    off-by-one in the scan's dynamic-`import(` guard made every keyword-bearing segment read as
+    static, so an in-string `from '<spec>'` was vouched by a string that merely mentioned
+    `import`): the from-clause keyword scan now masks quoted runs in the segment it inspects,
+    so an in-string from-specifier no longer vouches. What remains is a MASK — a text rule,
+    not a lexer — that an escaped quote inside a string or an apostrophe in JSX text can break
+    by resynchronising at the wrong quote; the truncated segment loses keywords, so the
+    resulting error is a false RED (fewer specifiers vouched), never a false GREEN. The
+    literal scans (side-effect `import '...'`, dynamic `import(`, `require(`) still read any
+    quoted run, so a string shaped exactly like one of those can still be extracted — the
+    text-probe floor this row sits on. A module reached only through a re-export barrel
+    (`index.ts`) whose own specifiers live in another file is not followed, so a barrel pass
+    proves nothing about what the barrel re-exports; and the scan is TEXT, so a
+    `from '<spec>'` in a comment is stripped first (comments cannot vouch for an import) and,
+    since round 3, a contrived string no longer can either (PR #2 review).
+
+62. **`PV-02` was withdrawn (2026-11-25, after review): framework-specific.** The row read Next.js
+    App Router conventions (`loading.*` boundaries, `notFound()`) that exist in no other framework —
+    a lesson lifted into gobstack must be true regardless of framework (CURATION-2026-11-25 §0),
+    and a mechanism may probe per-framework conventions only where a repo without them gets
+    SKIP-with-a-reason, never a RED. The defect class stays advisory (CURATION-2026-11-25 §3 P2).
+63. **`SC-03` still cannot read the secrets it never scans.** The fixed gate (2026-11-25) refuses
+    to PASS on zero inspection: with no JS-family source and no declared build output the row now
+    SKIPs with the reason instead of printing `0 client-visible secret-shaped name(s)`. The
+    JS-family set that decides "examined anything" also excludes the kit's own harness scaffold
+    (`AGENTS.md` `harness_dir:`, the installer's default `checks/`): a repo whose only JS-family
+    file is the scaffold the kit itself installed (e.g. `checks/assert.mjs`) is told so — SKIP
+    with the zero-inspection reason — never a green `0 ... name(s)` graded over the kit's own
+    file. What it still cannot see: secret-shaped names in non-JS sources (it skips, naming
+    that), and clause 2 still reads only the build output `security.build_output` declares — an
+    undeclared artifact directory is invisible, not clean.
+64. **`SC-04` still cannot see a cookie write it did not parse.** The fixed gate SKIPs when zero
+    cookie writes were examined (`no cookie write found in N examined file(s)`), so a non-JS
+    repo (a Python `response.set_cookie`) can no longer PASS vacuously. What it still cannot
+    see: a write assembled through a helper or split across lines (see #25), and writes in the
+    languages the read set excludes — those get the named skip, never a green.
+65. **`SC-05` still trusts the declaration it is given.** The fixed gate SKIPs when
+    `security.write_routes` is undeclared (`there is no route surface to check`) and when the
+    declaration matched zero handlers (naming the declaration and the 0 matches) instead of
+    passing `0 write handler(s)`. What it still cannot see: a write handler that matches none of
+    the declared route patterns, and writes made outside any declared route (middleware, raw
+    server code) — the declaration bounds the check, and nothing verifies the declaration is
+    complete.
+66. **`HS-02` proves RED only for the replay set it ran.** The fixed gate counts the harnesses
+    actually replayed: zero → SKIP (`no harness in <dir> matched the replay set`); the PASS now
+    names the count, the pinned commit and the extension set, and files present that the replay
+    set does not run are listed in a `not replayed:` tail instead of being silently outside the
+    proof. What it still cannot see: it cannot replay a harness in another extension — it names
+    the excluded extensions, it does not grade them.
+67. **Six rows were withdrawn on 2026-11-25: framework-bound statements.** `BN-06`..`BN-09`
+    (Electron), `HV-02` (browser bounding-box + Node child-process) and `SC-09` ("sibling
+    routes", web routing) state mechanics no repo in the fleet has; on every other shape they
+    graded nothing and went green. The rule text survives in
+    docs/AUDIT-2026-11-25-framework-agnostic.md under "withdrawn — where it went", with the
+    resurrection recipe; `--only <id>` on a removed row reports it is in neither the manifest,
+    the library nor the local override.
+
 ---
 
 ## The guard rails — the security and perf rows
 
 `manifest/enforcement.tsv` is the machine-readable form; this is the prose for the ten rows it
-gained in v0.2 (`SC-01`..`SC-09`, `PF-01`). Every one of them is **declared** in
+gained in v0.2 (`SC-01`..`SC-08`, `PF-01` — `SC-09` withdrawn 2026-11-25, see #67). Every one of them is **declared** in
 the `AGENTS.md` gob block under `security:` and `perf:` - a stack-specific rule guessed from the
 files on disk is how a matrix starts lying, so nothing here infers a stack.
 

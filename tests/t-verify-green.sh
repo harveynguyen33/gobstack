@@ -42,34 +42,17 @@ check "the summary counts the off-by-default library (HS-02/PG-03 live there, he
 printf '%s' "$OUT" | grep -q 'gob verify --library'
 check "  and the summary names the discovery surface for the off rows" "$?"
 
-# ---- the ban table self-selects per row: GLOB or `dep:` PREDICATE (FIX 1) ---------------------
+# ---- the ban table self-selects per row: GLOB applicability (FIX 1) ---------------------------
 # A ban is code-shaped: it runs only when the repo actually HAS the stack it polices, and a ban
-# with no surface REPORTS itself not applicable, never silently green. Two applicability forms:
-#   * a GLOB (BN-01/02/03/05): the ban runs when at least one real file matches;
-#   * `dep:<pkg>` (BN-06..09): the ban runs only when package.json names the package under
-#     dependencies or devDependencies. This tree has NEITHER .ts source NOR a package.json, so ALL
-#     eight bans report themselves not applicable. This is the FIX-1 false green: the electron
-#     bans' globs used to include `**/*.mjs`, which matched the harness's OWN shipped
-#     checks/*.mjs, so on a repo with no electron they RAN and PASSED vacuously.
+# with no surface REPORTS itself not applicable, never silently green. Applicability is a GLOB
+# (BN-01/02/03/05): the ban runs when at least one real file matches. This tree has no .ts source,
+# so every ban reports itself not applicable. This is the FIX-1 false green fix: the electron
+# bans' globs used to include `**/*.mjs`, which matched the harness's OWN shipped checks/*.mjs,
+# so a repo with no electron got bans that RAN and PASSED vacuously. (The `dep:<pkg>` predicate
+# form and its electron bans are withdrawn 2026-11-25 — docs/AUDIT-2026-11-25-framework-agnostic.md
+# keeps the statement and the resurrection recipe.)
 printf '%s' "$OUT" | grep -qE 'SKIP  BN-01 .*not applicable: no file matches applies_when'
 check "a ban the tree has no surface for reports itself NOT APPLICABLE" "$?"
-printf '%s' "$OUT" | grep -qE 'SKIP  BN-06 .*not applicable: no package' && \
-printf '%s' "$OUT" | grep -qE 'SKIP  BN-07 .*not applicable: no package' && \
-printf '%s' "$OUT" | grep -qE 'SKIP  BN-08 .*not applicable: no package' && \
-printf '%s' "$OUT" | grep -qE 'SKIP  BN-09 .*not applicable: no package'
-check "FIX 1: the four electron bans report NOT APPLICABLE on a repo with no package.json" "$?"
-printf '%s' "$OUT" | grep -qE '^PASS  BN-06'
-check "FIX 1: and NONE of them RUNS on the harness's own shipped checks/*.mjs (no false green)" \
-  "$([ $? -ne 0 ] && echo 0 || echo 1)"
-# The predicate's positive half: declare electron and the SAME ban RUNS (no file matches its scope,
-# so it PASSes on a clean tree, but the point is it is no longer not-applicable).
-printf '{"name":"x","devDependencies":{"electron":"^30"}}\n' > package.json
-git add -A >/dev/null 2>&1; git commit -q -m "test: declare electron"
-printf '%s' "$(bash .gob/bin/goblin-verify --only BN-06 2>&1)" | grep -qE '^PASS  BN-06'
-check "FIX 1: once package.json names electron, the same ban RUNS (predicate selects it)" "$?"
-rm -f package.json; git add -A >/dev/null 2>&1; git commit -q -m "test: drop the electron dep"
-
-
 # ---- UX pass: remedy lines, day-one banners, recovery lines, GT-03's sentence --------------
 # (review 1 scope 4-7) Five print contracts live in the printers and the summary block:
 #   R1  the matrix's remedy column rides under a FAIL (g_fail -> g_remedy, _GOB_MANIFEST) -

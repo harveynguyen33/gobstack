@@ -16,7 +16,7 @@
 #     - name: typecheck        four-space-indented second member of a list entry
 #       cmd: npx tsc --noEmit
 
-GOBLIN_LIB_VERSION="0.6.1"
+GOBLIN_LIB_VERSION="0.7.0"
 
 # ---------------------------------------------------------------- output -----
 # g_trunc <width> <text> — fold a long detail to one line at <width> columns, keeping the
@@ -50,12 +50,15 @@ g_fold() {
     }'
 }
 g_pass() {
-  if [ "${GOB_VERIFY_VERBOSE:-0}" -eq 1 ]; then
-    printf 'PASS  %-6s %s\n' "$1" "$(g_trunc "${GOB_REPORT_COLS:-100}" "$2")"
-  elif printf '%s' "$2" | grep -q "$(printf '\n')"; then
-    # Multi-line PASS payloads print whole: the payload often IS the pin a test reads
-    # (SK-03's advisory-ceiling line), and the collapse must not swallow it.
+  if printf '%s' "$2" | grep -q "$(printf '\n')"; then
+    # Multi-line PASS payloads print whole in every mode: the payload often IS the pin a
+    # test reads (SK-03's advisory-ceiling line), and under --only this used to run the
+    # whole payload through g_trunc below — whose length counts the newlines too, so the
+    # second line was cut mid-token (the ~100-col fold is for single-line payloads,
+    # exactly as g_adv has always done it).
     printf 'PASS  %-6s %s\n' "$1" "$2"
+  elif [ "${GOB_VERIFY_VERBOSE:-0}" -eq 1 ]; then
+    printf 'PASS  %-6s %s\n' "$1" "$(g_trunc "${GOB_REPORT_COLS:-100}" "$2")"
   else
     printf 'PASS  %-6s (ok)\n' "$1"
   fi

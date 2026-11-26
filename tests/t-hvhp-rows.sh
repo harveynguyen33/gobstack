@@ -2,9 +2,11 @@
 # t-hvhp-rows.sh — the curation phase-1 rows (CURATION-2026-11-07 §6), RED on demand in a
 # throwaway repo. Each row gets its exact violation planted, must exit 1 naming the file and
 # the reason, and must return to exit 0 when the violation is removed — the drill an operator
-# runs before trusting the row on a real repo. The per-clause controls (both HV-02 clauses,
-# the marker escapes) live in t-verify-red.sh; this file pins one violation per row, red then
-# green, plus the two rows a new enforcement row must not disturb (IN-03, SK-03).
+# runs before trusting the row on a real repo. The per-clause controls (the marker escapes)
+# live in t-verify-red.sh; this file pins one violation per row, red then green, plus the two
+# rows a new enforcement row must not disturb (IN-03, SK-03). HV-02 was withdrawn on
+# 2026-11-25 (framework-bound statement; docs/AUDIT-2026-11-25-framework-agnostic.md) and its
+# drill went with it.
 #
 # Run by tests/run-tests.sh.
 set -uo pipefail
@@ -30,19 +32,6 @@ git add -A && git commit -q -m "docs: HANDOFF names the HEAD it describes"
 
 out=$(bash .gob/bin/goblin-verify 2>&1); rc=$?
 check "the throwaway repo starts GREEN with the new row(s) on it" "$rc"
-
-# ---- HV-02: a number taken from a live surface carries its guard ------------------------------
-printf '%s\n' \
-  'const box = document.querySelector("#shot").getBoundingClientRect();' \
-  'assert("inside", box.bottom < 4096);' > checks/hv02-drill.mjs
-out=$(bash .gob/bin/goblin-verify --only HV-02 2>&1); rc=$?
-[ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q 'checks/hv02-drill.mjs'
-check "HV-02: an unguarded bounding box is RED, naming the file" "$?"
-printf '%s' "$out" | grep -q 'viewport guard'
-check "  and the reason" "$?"
-rm -f checks/hv02-drill.mjs
-out=$(bash .gob/bin/goblin-verify --only HV-02 2>&1); rc=$?
-check "HV-02: the violation removed is GREEN" "$rc"
 
 # ---- HP-06: open is not a shape ---------------------------------------------------------------
 awk '/^## Next steps$/ && !d { print; print "- Ship the thing."; d = 1; next } { print }' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md

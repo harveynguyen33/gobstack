@@ -19,7 +19,7 @@
 
 set -uo pipefail
 
-GOBLIN_VERIFY_VERSION="0.6.1"
+GOBLIN_VERIFY_VERSION="0.7.0"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=goblin-lib.sh
 . "$SELF_DIR/goblin-lib.sh"
@@ -302,9 +302,12 @@ if [ -n "$ONLY" ]; then
     if [ "$_hit" -eq 0 ] && [ -n "$LOCAL_FILE" ]; then
       awk -F'\t' -v x="$want" '$1==x {f=1} END{exit !f}' "$LOCAL_FILE" && _hit=1
     fi
+    if [ "$_hit" -eq 0 ] && [ -n "$LIBRARY_FILE" ]; then
+      awk -F'\t' -v x="$want" 'NR>1 && $1==x {f=1} END{exit !f}' "$LIBRARY_FILE" && _hit=1
+    fi
     [ "$_hit" -eq 1 ] || UNKNOWN="$UNKNOWN $want"
   done
-  [ -z "$UNKNOWN" ] || { g_err "--only names id(s) in neither the manifest nor the local override:$UNKNOWN"; exit 2; }
+  [ -z "$UNKNOWN" ] || { g_err "--only names id(s) in neither the manifest, the library nor the local override:$UNKNOWN"; exit 2; }
   # A valid id that is SOURCE-scope (PR-01..PR-04) selects no target row: the run emits
   # nothing and exits 0, which is the same no-op gate D15 closed for a typo (F2-6).
   TARGET_ROWS=0
@@ -314,6 +317,10 @@ if [ -n "$ONLY" ]; then
       && TARGET_ROWS=1
     if [ "$TARGET_ROWS" -eq 0 ] && [ -n "$LOCAL_FILE" ]; then
       awk -F'\t' -v x="$want" '$1==x && $2=="target" {f=1} END{exit !f}' "$LOCAL_FILE" \
+        && TARGET_ROWS=1
+    fi
+    if [ "$TARGET_ROWS" -eq 0 ] && [ -n "$LIBRARY_FILE" ]; then
+      awk -F'\t' -v x="$want" 'NR>1 && $1==x && $2=="target" {f=1} END{exit !f}' "$LIBRARY_FILE" \
         && TARGET_ROWS=1
     fi
   done
@@ -422,7 +429,7 @@ export _GOB_MANIFEST="$MANIFEST"
 export GOBLIN_ROOT="$ROOT"
 export GOBLIN_CONFIG="$CONFIG"
 
-# ---- the security surface (SC-01..SC-09) and the perf baseline (PF-01) -----------------------
+# ---- the security surface (SC-01..SC-08; SC-09 lives in the library manifest) and the perf baseline (PF-01) ----
 # Every one of these is DECLARED in .gob/goblin.yaml. A stack-specific rule guessed from the
 # files on disk is how a matrix starts lying; a declared key that is absent is a skip with a
 # reason, never a silent pass.
@@ -742,56 +749,635 @@ check_hp_05() {
   [ "$found" -eq 1 ]
 }
 
-# ---- the curation wave (CURATION-2026-11-07 §2/§6 phase 1): HV-02, HP-06, HV-01 ----------
-# Three text probes adopted from one project's measured failures, cheapest-and-most-
-# preventative first (§6): an instrument that convicts the product (C2 -> HV-02), a queue
-# that lies (C3 -> HP-06), and a check whose input is not the input the user gets (C1 ->
-# HV-01). All three are the BN-01 class - grep over text, no AST - and each carries its
-# honest limit in its why cell and in docs/LIMITS.md.
+# ---- the curation wave (CURATION-2026-11-07 §2/§6 phase 1): HP-06, HV-01 -------------------
+# Text probes adopted from one project's measured failures, cheapest-and-most-
+# preventative first (§6): a queue that lies (C3 -> HP-06), and a check whose input is
+# not the input the user gets (C1 -> HV-01). Both are the BN-01 class - grep over text,
+# no AST - and each carries its honest limit in its why cell and in docs/LIMITS.md.
+# (The third probe of the wave, HV-02, was withdrawn on 2026-11-25 - its statement bound
+# it to a browser-plus-Node surface only one project has; it lives in
+# docs/AUDIT-2026-11-25-framework-agnostic.md under "withdrawn - where it went".)
 
-check_hv_02() {
-  # C2: a number taken from a live surface carries its guard. Text probe over the harness dir:
-  # PRESENCE of a guard is provable, EFFECTIVENESS is not (a decorative guard passes - the
-  # limit is stated, not hidden). A `guarded: <reason>` marker comment is the escape hatch for
-  # a harness whose guard is not nameable in these tokens.
-  local d="$GOBLIN_HARNESS_DIR" f rel bad=0 n=0 nb=0 np=0
-  if [ -z "$d" ]; then
-    if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
-      printf 'harness_dir %s is declared and scaffold_checks is yes, but the directory is absent\n' \
-        "$GOBLIN_HARNESS_REL"
-      return 1
-    fi
-    printf 'no harness dir (%s absent, scaffold_checks is no) - nothing to guard\n' \
-      "$GOBLIN_HARNESS_REL"
-    return 3
-  fi
-  for f in "$d"/*; do
+# ---- PV-01 (CURATION-2026-11-25, opt-in library row) ---------------------------
+# A plain text probe over a route tree, the same class as check_hv_01: no AST, no
+# runtime, no config key — the framework's own directory conventions are read as
+# HEURISTICS, so a repo without them gets SKIP-with-a-reason, never a RED. PV-02 was
+# withdrawn as framework-specific (see LIMITS #62). Return 0 pass / 1 red / 3 skip, and
+# a skip PRINTS its reason: an opt-in row whose lane is absent says so out loud, it
+# never vanishes into a bare green.
+
+_pv_route_trees() {
+  # the route-tree roots the framework conventions name; any one of them counts
+  local t
+  for t in "$ROOT/app" "$ROOT/src/app" "$ROOT/pages" "$ROOT/routes"; do
+    [ -d "$t" ] && printf '%s\n' "$t"
+  done
+}
+
+_pv_find() {
+  # find under one route-tree root, pruned of vendored and generated trees
+  local root="$1"
+  shift
+  find "$root" \( -name node_modules -o -name .next -o -name dist -o -name .git \) -prune -o "$@" -print
+}
+
+_pv01_imports_of() {
+  # the module specifiers of one file's import / export-from / require / dynamic import()
+  # calls, read over the WHOLE file text, not line by line: prettier wraps a brace list
+  # across lines, so the line-anchored grep this replaces never saw a `} from './x'` line
+  # and a compliant surface was falsely RED (PR #2 review). awk is already a checked
+  # and RS="\001" makes the file one record portably). Text
+  # only: comments are stripped first. The from-clause keyword scan masks quoted runs in the
+  # segment it inspects, so a specifier-shaped string literal no longer vouches for an
+  # in-string ` from '<spec>'` even when the string mentions `import`; the mask itself is
+  # text, not a lexer — an escaped quote or a JSX apostrophe can break it, and the resulting
+  # error is a false RED (docs/LIMITS.md #61).
+  awk -v Q1="'" -v Q2='"' '
+    function seg_has_static_kw(seg,   i, k, p, we, nxt, out, q, j, done) {
+      # the segment between the last consumed specifier and a `from` may only own that
+      # from-clause if a STATIC import/export keyword stands in the SAME statement. Take the
+      # slice after the last statement boundary (`;`) so a bare `import './x'` earlier in the
+      # segment cannot vouch for a stray ` from "` — but MASK QUOTED RUNS FIRST, because a
+      # string literal that merely mentions `import` must not vouch for the in-string
+      # ` from "` either (`const s = "import x from '../shared-a'"` was exactly such a false
+      # GREEN): every quoted run becomes an empty pair, and an UNTERMINATED
+      # quote drops the rest of the segment (an unbalanced quote means the keyword, if any,
+      # sits inside that string). The mask is a text rule, not a lexer: a JSX-text apostrophe
+      # (the possessive kind) or an escaped quote makes it resynchronise at the wrong quote,
+      # and the truncated segment loses keywords — fewer specifiers vouched, a false RED,
+      # never a false GREEN (LIMITS #61). Inside the masked slice the LAST keyword may not
+      # be a dynamic import( call, which owns no from-clause.
+      # Off-by-one, fixed (PR #2 review round 3): the old `we = p + RSTART + RLENGTH - 1`
+      # landed on the last character OF the keyword, so `nxt` was `t(`/`t ` and the `!= "("` test
+      # fired on every segment containing import/export — the loop never continued and the
+      # dynamic exclusion never ran. Now `we = p + RSTART + RLENGTH` is one past the keyword:
+      # for seg = "import x" the match is "^import" (RSTART=1, RLENGTH=7), so we = 8 and
+      # substr(seg, we, 1) is "x", the character after the keyword.
+      out = ""; p = 1; done = 0
+      qqre = "[" Q1 Q2 "]"
+      while (match(substr(seg, p), qqre)) {
+        out = out substr(seg, p, RSTART - 1) Q1 Q1
+        q = substr(seg, p + RSTART - 1, 1)
+        j = index(substr(seg, p + RSTART), q)
+        if (j == 0) { seg = out; done = 1; break }  # unterminated: the rest is string content
+        p = p + RSTART + j                        # one past the closing quote
+      }
+      if (!done) seg = out substr(seg, p)          # after the break seg IS out; appending a slice of it duplicated the masked text (fixed)
+      k = 0; p = 1
+      while ((i = index(substr(seg, p), ";")) > 0) { k = p + i - 1; p = k + 1 }
+      if (k > 0) seg = substr(seg, k + 1)
+      p = 0
+      while (match(substr(seg, p + 1), /(^|[^A-Za-z0-9_$])(import|export)/)) {
+        we = p + RSTART + RLENGTH                 # one past the keyword, absolute in seg
+        nxt = substr(seg, we, 1)                  # the character after the keyword
+        if (nxt != "(") return 1                  # a static import/export owns the from-clause
+        p = we                                    # a dynamic import(: keep scanning
+      }
+      return 0
+    }
+    BEGIN { RS = "\001" }   # the whole file is one record; no source text carries \001
+    {
+      s = $0
+      # strip block comments (they span lines)
+      out = ""
+      while ((i = index(s, "/*")) > 0) {
+        out = out substr(s, 1, i - 1)
+        s = substr(s, i + 2)
+        j = index(s, "*/")
+        if (j == 0) { s = ""; break }
+        s = substr(s, j + 2)
+      }
+      s = out s
+      # strip line comments: a // not preceded by : (a URL scheme) ends at its line end
+      out = ""
+      while ((i = index(s, "//")) > 0) {
+        if (i > 1 && substr(s, i - 1, 1) == ":") {
+          out = out substr(s, 1, i + 1)
+          s = substr(s, i + 2)
+          continue
+        }
+        out = out substr(s, 1, i - 1) "\n"
+        s = substr(s, i)
+        j = index(s, "\n")
+        if (j == 0) { s = ""; break }
+        s = substr(s, j)
+      }
+      s = out s
+      gsub(/[ \t\r\n]+/, " ", s)
+      qq = "[" Q1 Q2 "][^" Q1 Q2 "]*[" Q1 Q2 "]"        # a quoted string
+      fromre = " from [" Q1 Q2 "]"                       # ... from "<spec>"
+      # static import ... from / export ... from. RSTART is relative to the
+      # substr(s, prev) window, so absolute positions add prev - 1.
+      prev = 1
+      while (match(substr(s, prev), fromre)) {
+        seg = substr(s, prev, RSTART - 1)
+        qpos = prev - 1 + RSTART + RLENGTH - 1    # the opening quote, in s
+        if (seg_has_static_kw(seg)) {
+          rest = substr(s, qpos)                  # starts AT the quote
+          if (match(rest, qq)) {
+            sp = substr(rest, RSTART + 1, RLENGTH - 2)
+            if (sp != "") print sp
+            prev = qpos + RSTART + RLENGTH        # one past the closing quote
+            continue
+          }
+        }
+        prev = qpos + 1
+      }
+      # side-effect import "<spec>" - printed with a SE: prefix so the resolver can EXCLUDE
+      # it from the shared-evidence intersection: an import with no from clause loads a
+      # module without naming what renders, so two layouts wiring the same module by side
+      # effect prove nothing about the shell (PR #2 review round 2, theme-is-not-the-shell)
+      imp = "(^|[^A-Za-z0-9_$])import [" Q1 Q2 "]"
+      t = s
+      while (match(t, imp)) {
+        qpos = RSTART + RLENGTH - 1               # the opening quote, in t
+        rest = substr(t, qpos)
+        if (match(rest, qq)) {
+          sp = substr(rest, RSTART + 1, RLENGTH - 2)
+          if (sp != "") print "SE:" sp
+          t = substr(t, qpos + RSTART + RLENGTH)
+        } else {
+          t = substr(t, qpos + 1)
+        }
+      }
+      # dynamic import("<spec>") and require("<spec>") in any position
+      dyn = "(^|[^A-Za-z0-9_$])import ?\\( ?[" Q1 Q2 "]"
+      req = "(^|[^A-Za-z0-9_$])require ?\\( ?[" Q1 Q2 "]"
+      for (di = 1; di <= 2; di++) {
+        t = s
+        pat = (di == 1 ? dyn : req)
+        while (match(t, pat)) {
+          qpos = RSTART + RLENGTH - 1             # the opening quote, in t
+          rest = substr(t, qpos)
+          if (match(rest, qq)) {
+            sp = substr(rest, RSTART + 1, RLENGTH - 2)
+            if (sp != "") print sp
+            t = substr(t, qpos + RSTART + RLENGTH)
+          } else {
+            t = substr(t, qpos + 1)
+          }
+        }
+      }
+    }
+  ' "$1" 2>/dev/null
+}
+
+_pv_norm_spec() {
+  # resolve a relative specifier against the importing file's directory so `../layout` from
+  # a preview dir and `./layout` from the root name the same module; only relative
+  # specifiers reach this function (a bare specifier is resolved or dropped by
+  # _pv01_resolve_spec first)
+  local cur="$1" rest="$2" seg
+  case "$rest" in ./*|../*) ;; *) printf '%s' "$rest"; return ;; esac
+  rest=${rest#./}
+  while [ -n "$rest" ]; do
+    seg="${rest%%/*}"
+    if [ "$rest" = "${rest#*/}" ]; then rest=""; else rest="${rest#*/}"; fi
+    case "$seg" in
+      ""|".") : ;;
+      "..") cur="${cur%/*}" ;;
+      *) cur="$cur/$seg" ;;
+    esac
+  done
+  printf '%s' "$cur"
+}
+
+# ---- PV-01 module resolution: the intersection counts project-resolvable modules only ----
+# A bare specifier (an installed package, a builtin, an alias) used to pass through unchanged
+# and was counted as shared evidence — `react` in both layouts cleared the surface (false
+# GREEN, the worse direction). The rule now: relative specifiers normalise and count as
+# before; a bare specifier counts only when it resolves to a file that exists inside $ROOT
+# (tsconfig.json/jsconfig.json baseUrl+paths first, then <ROOT>/<spec> with extension and
+# index probing); everything else is dropped from the intersection and named in the RED
+# message (LIMITS #61, PR #2 review round 2).
+
+_pv01_tsconfig_load() {
+  # read compilerOptions.baseUrl + paths once per run, best effort and STRICT JSON only: a
+  # commented JSONC file fails the parse and the aliases it declares stay unresolvable (the
+  # documented false-RED direction). Sets _PV01_BASEURL and _PV01_PATHS (pattern<TAB>target
+  # lines, longest pattern first).
+  _PV01_BASEURL=""
+  _PV01_PATHS=""
+  local f parsed
+  for f in "$ROOT/tsconfig.json" "$ROOT/jsconfig.json"; do
     [ -f "$f" ] || continue
-    n=$((n + 1))
-    rel="${f#"$ROOT"/}"
-    # the marker clears every clause in the file: it names the reason the guard lives elsewhere
-    grep -Eq 'guarded:[[:space:]]*[^[:space:]]' "$f" && continue
-    if grep -q 'getBoundingClientRect(' "$f"; then
-      if grep -Eq 'innerWidth|innerHeight|visualViewport' "$f"; then
-        nb=$((nb + 1))
-      else
-        printf '%s measures a bounding box (getBoundingClientRect) with no viewport guard (innerWidth/innerHeight/visualViewport) and no guarded: marker\n' "$rel"
-        bad=1
+    parsed=$(python3 - "$f" <<'PYEOF' 2>/dev/null
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        cfg = json.load(fh)
+except Exception:
+    sys.exit(0)
+co = cfg.get("compilerOptions") or {}
+bu = co.get("baseUrl")
+if isinstance(bu, str):
+    print("BASE\t" + bu)
+paths = co.get("paths")
+if isinstance(paths, dict):
+    for pat, targets in paths.items():
+        if not isinstance(targets, list):
+            continue
+        for tgt in targets:
+            if isinstance(tgt, str):
+                print("PATH\t" + pat + "\t" + tgt)
+PYEOF
+) || parsed=""
+    [ -n "$parsed" ] || continue
+    _PV01_BASEURL=$(printf '%s\n' "$parsed" | awk -F'\t' '$1=="BASE"{print $2; exit}')
+    _PV01_PATHS=$(printf '%s\n' "$parsed" \
+      | awk -F'\t' '$1=="PATH"{print length($2)"\t"$2"\t"$3}' | sort -nr | cut -f2-)
+    return 0
+  done
+}
+
+_pv01_probe() {
+  # does a ROOT-relative candidate exist as a file inside the project? print the found path
+  # (relative to ROOT, with the probed extension) or nothing. Extension probing follows the
+  # bundler's usual order; index probing maps a directory onto its entry file.
+  local p="$1" ext
+  case "$p" in ""|.|/*|./*|../*) return 1 ;; esac
+  [ -f "$ROOT/$p" ] && { printf '%s' "$p"; return 0; }
+  for ext in ts tsx js jsx mjs cjs mts cts json; do
+    [ -f "$ROOT/$p.$ext" ] && { printf '%s' "$p.$ext"; return 0; }
+  done
+  for ext in ts tsx js jsx mjs cjs mts cts; do
+    [ -f "$ROOT/$p/index.$ext" ] && { printf '%s' "$p/index.$ext"; return 0; }
+  done
+  return 1
+}
+
+_pv01_key_of_found() {
+  # canonical comparison key of a resolved file: the ROOT-relative path without its probed
+  # extension and without a trailing /index, so `@/layout`, `./layout.tsx` and an index entry
+  # name the same module as the relative normalisation does
+  local k="$1"
+  case "$k" in *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.mts|*.cts|*.json) k="${k%.*}" ;; esac
+  case "$k" in */index) k="${k%/index}" ;; esac
+  printf '%s' "$k"
+}
+
+_pv01_norm_base() {
+  # a baseUrl of "." or "./" means the tsconfig's own directory (= ROOT): normalise to empty
+  local b="${1#./}"; b="${b#/}"; b="${b%/}"
+  [ "$b" = "." ] && b=""
+  printf '%s' "$b"
+}
+
+_pv01_probe_target() {
+  # substitute the star of a paths target, join the baseUrl (or the tsconfig dir = ROOT when
+  # there is none), and probe. $1 = target (may carry exactly one *), $2 = substituted text
+  local tgt="$1" sub="$2" p b
+  case "$tgt" in
+    *\**) p="${tgt/\*/$sub}" ;;
+    *) [ -z "$sub" ] || return 1; p="$tgt" ;;
+  esac
+  p="${p#./}"
+  case "$p" in
+    ""|.) return 1 ;;
+    /*) p="${p#/}" ;;
+    *)
+      if [ -n "$_PV01_BASEURL" ]; then
+        b=$(_pv01_norm_base "$_PV01_BASEURL")
+        [ -n "$b" ] && p="$b/$p"
       fi
+      ;;
+  esac
+  _pv01_probe "$p"
+}
+
+_pv01_is_asset_spec() {
+  # is this specifier a style/asset import? A shared stylesheet (or image, or font) proves
+  # the same THEME, never the same SHELL: a reported tenant's preview layout and its public
+  # layout both imported the same globals.css and the pre-fix row PASSED on the exact file
+  # that shipped the bug (PR #2 review round 2, measured pre-fix). These extensions are
+  # never evidence.
+  case "$1" in
+    *.css|*.scss|*.sass|*.less|*.styl|*.svg|*.png|*.jpg|*.jpeg|*.webp|*.gif|*.ico|*.woff|*.woff2|*.ttf) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+_pv01_emit_key() {
+  # print the classification line of one resolved module:
+  #   A<TAB><key>  an asset/side-effect import - NEVER shared-shell evidence
+  #   K<TAB><key>  project CODE the layout really pulls in
+  # $1 = canonical key, $2 = the specifier as written, $3 = the resolved ROOT-relative
+  # path, $4 = 1 when the specifier came from a side-effect import
+  local key="$1" spec="$2" found="$3" se="$4" k="K"
+  if [ "$se" -eq 1 ] || _pv01_is_asset_spec "$spec" || _pv01_is_asset_spec "$found"; then k="A"; fi
+  printf '%s\t%s\n' "$k" "$key"
+}
+
+_pv01_resolve_spec() {
+  # classify one import specifier of the layout living in dir $1:
+  #   K<TAB><key>   counts as shared evidence: project CODE (relative specifiers always do,
+  #                 normalised; bare specifiers when they resolve inside the project)
+  #   A<TAB><key>   a style/asset import, or any side-effect import (no from clause) - the
+  #                 theme and the wiring, never evidence of a shared shell; still tracked so
+  #                 the RED message can say when a surface shares ONLY those
+  #   D<TAB><spec>  dropped: a specifier that resolves to nothing inside the project
+  #                 (an installed package, a builtin, an unresolvable alias) or names
+  #                 a module outside the project root (a relative that climbs out)
+  local cur="$1" spec="$2" pat tgt sub prefix suffix found norm se=0
+  case "$spec" in
+    "SE:"*) se=1; spec="${spec#SE:}" ;;
+  esac
+  case "$spec" in
+    ./*|../*)
+      # one canonical key space for every branch: _pv_norm_spec yields an ABSOLUTE path, the
+      # alias/baseUrl branches yield ROOT-relative ones — keys from two different spaces never
+      # intersect, so a surface naming the same module relative while the public layout names it
+      # through a resolvable alias was a guaranteed false RED. Strip $ROOT/ and canonicalise
+      # (extension off, trailing /index off) exactly as _pv01_key_of_found does. A relative
+      # specifier that climbs out of ROOT names a module outside the project: dropped and named
+      # in the RED message like any other unresolvable specifier, never a silent empty key.
+      norm=$(_pv_norm_spec "$cur" "$spec")
+      case "$norm" in
+        "$ROOT"/*) _pv01_emit_key "$(_pv01_key_of_found "${norm#"$ROOT"/}")" "$spec" "${norm#"$ROOT"/}" "$se"; return 0 ;;
+      esac
+      printf 'D\t%s\n' "$spec"; return 0 ;;
+  esac
+  if [ -n "$_PV01_PATHS" ]; then
+    while IFS=$'\t' read -r pat tgt; do
+      [ -n "$pat" ] || continue
+      case "$pat" in
+        *\*)
+          prefix="${pat%\**}"; suffix="${pat#*\*}"
+          case "$spec" in "$prefix"*) ;; *) continue ;; esac
+          sub="${spec#"$prefix"}"
+          case "$sub" in
+            *"$suffix") sub="${sub%"$suffix"}" ;;
+            *) continue ;;
+          esac
+          if found=$(_pv01_probe_target "$tgt" "$sub"); then
+            _pv01_emit_key "$(_pv01_key_of_found "$found")" "$spec" "$found" "$se"; return 0
+          fi
+          ;;
+        *)
+          [ "$spec" = "$pat" ] || continue
+          if found=$(_pv01_probe_target "$tgt" ""); then
+            _pv01_emit_key "$(_pv01_key_of_found "$found")" "$spec" "$found" "$se"; return 0
+          fi
+          ;;
+      esac
+    done <<< "$_PV01_PATHS"
+  fi
+  if [ -n "$_PV01_BASEURL" ]; then
+    sub="$(_pv01_norm_base "$_PV01_BASEURL")"
+    [ -n "$sub" ] && sub="$sub/" || sub=""
+    if found=$(_pv01_probe "$sub${spec#./}"); then
+      _pv01_emit_key "$(_pv01_key_of_found "$found")" "$spec" "$found" "$se"; return 0
     fi
-    if grep -Eq 'execSync|execFileSync|spawnSync|child_process' "$f" \
-       && grep -Eq 'parseFloat|parseInt|Number[[:space:]]*\(' "$f"; then
-      if grep -Eq 'Number[.]isFinite|isNaN|isFinite' "$f"; then
-        np=$((np + 1))
-      else
-        printf '%s parses a number out of another process stdout with no finite guard (Number.isFinite/isNaN) and no guarded: marker\n' "$rel"
-        bad=1
-      fi
+  fi
+  if found=$(_pv01_probe "${spec#./}"); then
+    _pv01_emit_key "$(_pv01_key_of_found "$found")" "$spec" "$found" "$se"; return 0
+  fi
+  printf 'D\t%s\n' "$spec"
+}
+
+_pv01_asset_note() {
+  # called when the code-module intersection is empty: if what the layouts DO share is
+  # only stylesheet/asset (or side-effect) imports, say so in the FAIL message - the theme
+  # is not the shell (PR #2 review round 2). $1 surface path, $2/$3 sorted shared-evidence
+  # A-key lists (one key per line) of the two layouts.
+  local surf="$1" aov
+  aov=$(comm -12 <(printf '%s\n' "$2") <(printf '%s\n' "$3"))
+  [ -n "$aov" ] || return 0
+  if printf '%s\n' "$aov" | grep -Eq '\.(css|scss|sass|less|styl|svg|png|jpe?g|webp|gif|ico|woff2?|ttf)$'; then
+    printf 'note: %s shares only stylesheet/asset imports, which are the theme and not the shell\n' "$surf"
+  else
+    printf 'note: %s shares only side-effect imports, which load modules without naming what renders\n' "$surf"
+  fi
+}
+
+# PV-01 route-layout selection: the first EXISTING exact code basename in this
+# precedence order. The exclusion of layout.test.tsx, layout.spec.tsx, layout.d.ts,
+# layout.css and layout.module.css is structural - they are different basenames, the
+# candidate list simply does not contain them, no suffix blacklist is involved - so a
+# stylesheet or a test sitting beside a layout is never compared and a directory whose
+# only layout.* files are such siblings is reported as NO LAYOUT, not as an import
+# mismatch. Deterministic when two code layouts sit side by side (tsx wins over js).
+_pv01_layout_in() {
+  local f
+  for f in layout.tsx layout.ts layout.jsx layout.js layout.mts layout.mjs layout.cts layout.cjs; do
+    if [ -f "$1/$f" ]; then
+      printf '%s\n' "$1/$f"
+      return 0
     fi
   done
+  return 1
+}
+
+check_pv_01() {
+  # P1 (CURATION-2026-11-25): a surface that exists to be reviewed renders the same shell
+  # the published route renders. A candidate review surface is a directory in a route tree
+  # whose name matches preview|previewed|draft|staging; its layout must import at least one
+  # PROJECT-RESOLVABLE module the public layout at the equivalent position (the same route
+  # tree without that segment, or the nearest code layout above it — chosen by exact
+  # basename, see _pv01_layout_in) also imports — unless the
+  # file carries `preview_differs: <list>` declaring the difference. The intersection is
+  # over CANONICAL KEYS — ROOT-relative module paths, extension and trailing /index
+  # stripped — so both layouts may name the same module relative or through a resolvable
+  # alias (tsconfig.json/jsconfig.json baseUrl+paths first, then <ROOT>/<spec> with
+  # extension and index probing) and still intersect; a relative specifier that climbs
+  # out of the project root names a module outside the repo and is dropped like any
+  # unresolvable specifier — an installed package or a builtin is
+  # never evidence of a shared shell, and a specifier that resolves nowhere is dropped and
+  # named in the RED message. Neither is a style/asset import or a side-effect import: the
+  # shared stylesheet is the THEME the two surfaces agree on, not the SHELL one renders
+  # (the bug that motivated this paragraph passed PV-01 on a preview layout whose only
+  # project imports were globals.css and a banner), and `import '<x>'` wires a module
+  # without naming what renders — the intersection counts project CODE modules only
+  # (_pv01_resolve_spec classes them A and they never count; when a surface shares ONLY
+  # those, the RED message says exactly that). When NO ancestor layout exists inside the route tree, the
+  # public layout is searched among SIBLING route groups of the same tree: every depth-1
+  # entry under the tree that is not on the surface's own path and does not itself look
+  # like a review surface — a grouped sibling contributes EVERY code layout under it, a plain
+  # sibling its depth-1 layout only. This is the shape that produced the rule (the public
+  # shell in `app/(frontend)/[locale]/layout.tsx`, the review surface in
+  # `app/(preview)/preview/layout.tsx`, nothing above it): the ancestor-only walk found no
+  # public layout, printed `not judged` and still returned PASS — a green that judged
+  # nothing. The fallback compares the surface against EACH candidate and passes if ANY
+  # candidate shares at least one project-resolvable module, naming the group and the
+  # shared modules (max 3, then +N more); when candidates exist but none shares a module
+  # the row is RED, naming the candidates tried and the specifiers dropped as
+  # unresolvable. Honest limit (LIMITS #61): an import proves reachability,
+  # never an identical render — a shell imported and then overridden by a local wrapper
+  # passes; the sibling fallback passes if ANY sibling group matches, so a group that
+  # shares only a trivial util clears the surface too; and an unresolvable alias or a
+  # runtime-built specifier is a false RED the
+  # preview_differs: hatch exists to clear. The from-clause keyword scan masks quoted runs
+  # in the segment it inspects, so a specifier-shaped string literal no longer vouches for
+  # an in-string ` from '<spec>'`; the mask is text, not a lexer — an escaped quote or a JSX
+  # apostrophe breaks it toward a false RED, never a false GREEN.
+  local tree d b surf up pub sameshell=0 bad=0 n=0 declared=0 inherited=0 unjudged=0 shared
+  local s_out p_out surf_dropped pub_dropped
+  local trees sibshell=0 cands ent name rel first_seg label cand
+  local sib_ok cand_names cand_dropped sn sdisp sd all_dropped s_a cand_a
+  _pv01_tsconfig_load
+  trees=$(_pv_route_trees)
+  if [ -z "$trees" ]; then
+    printf 'no route tree (no app/, src/app/, pages/ or routes/)\n'
+    return 3
+  fi
+  while IFS= read -r tree; do
+    [ -n "$tree" ] || continue
+    while IFS= read -r d; do
+      [ -n "$d" ] || continue
+      b="${d##*/}"
+      printf '%s\n' "$b" | grep -Eqi 'preview|previewed|draft|staging' || continue
+      surf=$(_pv01_layout_in "$d")
+      if [ -z "$surf" ]; then
+        if [ -n "$(ls "$d"/layout.* 2>/dev/null)" ]; then
+          # layout-shaped files exist but none is an exact code basename: report the
+          # truth - there is no route layout here - instead of comparing a stylesheet
+          bad=1; n=$((n + 1))
+          printf 'no layout file was found in %s - the layout.* files there are not route layouts, nothing to compare against the published shell\n' "${d#"$ROOT"/}"
+          continue
+        fi
+        # no layout of its own: it inherits the public layout, nothing to compare
+        inherited=$((inherited + 1)); n=$((n + 1)); continue
+      fi
+      n=$((n + 1))
+      if grep -Eq 'preview_differs:[[:space:]]*[^[:space:]]' "$surf"; then
+        declared=$((declared + 1)); continue
+      fi
+      # the public layout at the equivalent position, then the nearest layout.* above
+      up="${d%/*}"
+      pub=""
+      while :; do
+        pub=$(_pv01_layout_in "$up")
+        [ -n "$pub" ] && break
+        case "$up" in
+          "$tree") break ;;
+          "$tree"/*) up="${up%/*}" ;;
+          *) break ;;
+        esac
+      done
+      if [ -z "$pub" ]; then
+        # No ancestor layout inside the route tree: fall back to the layouts of SIBLING
+        # route groups of the same tree (see the header comment). Candidates are the
+        # depth-1 entries under the tree except the surface's own depth-1 ancestor and
+        # any entry that itself looks like a review surface — a sibling review surface is
+        # not published furniture, and comparing two surfaces proves nothing.
+        s_out=$(_pv01_imports_of "$surf" | while IFS= read -r s; do _pv01_resolve_spec "${surf%/*}" "$s"; done)
+        rel="${d#"$tree"/}"
+        first_seg="${rel%%/*}"
+        cands=""
+        for ent in "$tree"/*; do
+          [ -d "$ent" ] || continue
+          name="${ent##*/}"
+          case "$name" in
+            .*|node_modules|.next|dist) continue ;;
+          esac
+          [ "$name" = "$first_seg" ] && continue
+          printf '%s' "$name" | grep -Eqi 'preview|previewed|draft|staging' && continue
+          case "$name" in
+            \(*)
+              # a grouped sibling: every code layout in its subtree is a candidate,
+              # chosen by exact basename (_pv01_layout_in) so stylesheets and tests
+              # under the group are never candidates
+              while IFS= read -r sdir; do
+                cand=$(_pv01_layout_in "$sdir")
+                [ -n "$cand" ] || continue
+                cands="$cands$name"$'\t'"$cand"$'\n'
+              done < <(_pv_find "$ent" -type d)
+              ;;
+            *)
+              # a plain sibling: its depth-1 code layout only
+              cand=$(_pv01_layout_in "$ent")
+              [ -n "$cand" ] && cands="$cands$name"$'\t'"$cand"$'\n'
+              ;;
+          esac
+        done
+        if [ -z "$cands" ]; then
+          unjudged=$((unjudged + 1))
+          printf 'note: %s has no public layout above it and no sibling route group layout to fall back to - not judged\n' "${surf#"$ROOT"/}"
+          continue
+        fi
+        sib_ok=0
+        cand_names=""
+        cand_dropped=""
+        s_a=$(printf '%s\n' "$s_out" | awk -F'\t' '$1=="A"{print $2}' | sort -u)
+        cand_a=""
+        while IFS=$'\t' read -r label cand; do
+          [ -n "$cand" ] || continue
+          cand_names="$cand_names ${cand#"$ROOT"/}"
+          p_out=$(_pv01_imports_of "$cand" | while IFS= read -r s; do _pv01_resolve_spec "${cand%/*}" "$s"; done)
+          cand_dropped="$cand_dropped$(printf '%s\n' "$p_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')"
+          cand_a="$cand_a$(printf '%s\n' "$p_out" | awk -F'\t' '$1=="A"{print $2}' | sort -u)"
+          shared=$(comm -12 \
+            <(printf '%s\n' "$s_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u) \
+            <(printf '%s\n' "$p_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u))
+          if [ -n "$shared" ]; then
+            sib_ok=1
+            sn=$(printf '%s\n' "$shared" | grep -c .)
+            sdisp=$(printf '%s\n' "$shared" | head -3 | paste -sd ',' - | sed 's/,/, /g')
+            [ "$sn" -gt 3 ] && sdisp="$sdisp (+$((sn - 3)) more)"
+            sibshell=$((sibshell + 1))
+            # two lines: a single-line PASS payload truncates at the report width under
+            # --only (GOB_VERIFY_VERBOSE=1), which would cut the shared-module list off;
+            # a multi-line PASS payload prints whole (g_pass)
+            printf 'note: %s renders the published shell of group %s\n' \
+              "${surf#"$ROOT"/}" "$label"
+            printf '      shares %s\n' "$sdisp"
+            break
+          fi
+        done <<< "$cands"
+        if [ "$sib_ok" -eq 0 ]; then
+          bad=1
+          printf "%s imports no module any sibling route group's public layout imports and carries no preview_differs: marker - it does not render any published shell (tried:%s)\n" \
+            "${surf#"$ROOT"/}" "$cand_names"
+          _pv01_asset_note "${surf#"$ROOT"/}" "$s_a" "$cand_a"
+          sd=$(printf '%s\n' "$s_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')
+          all_dropped=$(printf '%s%s' "$sd" "$cand_dropped" | tr ' ' '\n' | awk '!seen[$0]++ && $0 != "" {printf "%s ", $0}')
+          if [ -n "$all_dropped" ]; then
+            printf 'note: specifier(s) dropped as unresolvable (not counted as shared evidence): %s\n' "$all_dropped"
+          fi
+        fi
+        continue
+      fi
+      s_out=$(_pv01_imports_of "$surf" | while IFS= read -r s; do _pv01_resolve_spec "${surf%/*}" "$s"; done)
+      p_out=$(_pv01_imports_of "$pub" | while IFS= read -r s; do _pv01_resolve_spec "${pub%/*}" "$s"; done)
+      surf_dropped=$(printf '%s\n' "$s_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')
+      pub_dropped=$(printf '%s\n' "$p_out" | awk -F'\t' '$1=="D"{printf "%s ", $2}')
+      shared=$(comm -12 \
+        <(printf '%s\n' "$s_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u) \
+        <(printf '%s\n' "$p_out" | awk -F'\t' '$1=="K"{print $2}' | sort -u))
+      if [ -z "$shared" ]; then
+        printf '%s imports no module the public layout %s imports and carries no preview_differs: marker - it does not render the published shell\n' \
+          "${surf#"$ROOT"/}" "${pub#"$ROOT"/}"
+        _pv01_asset_note "${surf#"$ROOT"/}" \
+          "$(printf '%s\n' "$s_out" | awk -F'\t' '$1=="A"{print $2}' | sort -u)" \
+          "$(printf '%s\n' "$p_out" | awk -F'\t' '$1=="A"{print $2}' | sort -u)"
+        if [ -n "$surf_dropped" ] || [ -n "$pub_dropped" ]; then
+          printf 'note: %s specifier(s) of those layouts did not resolve inside the project (an installed package, a builtin or an unresolvable alias) and were NOT counted as shared evidence - an alias the bundler resolves but this text probe cannot is a known false RED here; declare the surface with preview_differs: <list> to clear it\n' \
+            "$(printf '%s %s' "$surf_dropped" "$pub_dropped" | wc -w | tr -d ' ')"
+        fi
+        bad=1
+      else
+        sameshell=$((sameshell + 1))
+        sn=$(printf '%s\n' "$shared" | grep -c .)
+        sdisp=$(printf '%s\n' "$shared" | head -3 | paste -sd ',' - | sed 's/,/, /g')
+        [ "$((sn - 3))" -gt 0 ] && sdisp="$sdisp (+$((sn - 3)) more)"
+        # two lines: a single-line PASS payload folds at the report width and would cut
+        # the module list off; each line prints whole - the sibling branch has written its
+        # note as its own line since PV-01 landed
+        printf 'note: %s renders the published shell of %s\n' \
+          "${surf#"$ROOT"/}" "${pub#"$ROOT"/}"
+        printf '      shares %s\n' "$sdisp"
+      fi
+    done < <(_pv_find "$tree" -type d)
+  done <<PV
+$trees
+PV
+  if [ "$n" -eq 0 ]; then
+    printf 'no candidate review surface directory (no dir named *preview*/draft*/staging* under the route tree)\n'
+    return 3
+  fi
   [ "$bad" -eq 0 ] || return 1
-  printf '%d harness file(s); %d guarded bounding-box measurement(s), %d guarded parsed-number measurement(s)\n' \
-    "$n" "$nb" "$np"
+  printf "%d review surface(s): %d share the published shell, %d via a sibling group's shell, %d declared via preview_differs:, %d inherit the public layout, %d not judged (no public layout above and no sibling layout)\n" \
+    "$n" "$sameshell" "$sibshell" "$declared" "$inherited" "$unjudged"
   return 0
 }
 
@@ -867,7 +1453,7 @@ check_hv_01() {
   # beside a hand-written doc/board/payload/fixture literal - never that the call path matches
   # the product wiring. The stronger form needs the product to export a single factory, which is
   # a design change, not a probe (the why cell and docs/LIMITS.md say so).
-  local d="$GOBLIN_HARNESS_DIR" f rel bad=0 n=0 nk=0
+  local d="$GOBLIN_HARNESS_DIR" f rel bad=0 n=0 nk=0 js=0
   if [ -z "$d" ]; then
     if [ "$GOBLIN_HARNESS_STATE" = "absent" ]; then
       printf 'harness_dir %s is declared and scaffold_checks is yes, but the directory is absent\n' \
@@ -880,6 +1466,14 @@ check_hv_01() {
   fi
   for f in "$d"/*; do
     [ -f "$f" ] || continue
+    # OCA: the probe reads import/require syntax it cannot see in other languages. A non-JS
+    # harness file is not examined (it used to be false-REDed on a doc literal alone); a dir
+    # with no JS-family harness at all is a zero-inspection SKIP, not a vacuous PASS.
+    case "$f" in
+      *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.vue|*.svelte) ;;
+      *) continue ;;
+    esac
+    js=$((js + 1))
     n=$((n + 1))
     rel="${f#"$ROOT"/}"
     # a document/board/payload/fixture literal: an object, array or JSON string assigned to a
@@ -898,6 +1492,10 @@ check_hv_01() {
     printf '%s constructs a doc/board/payload/fixture literal with no package import and no produced_by: marker - the input the check asserts is not the input the user gets\n' "$rel"
     bad=1
   done
+  if [ "$js" -eq 0 ]; then
+    printf 'no JS-family harness file in %s - the text probe reads import/require syntax it cannot see in other languages\n' "$GOBLIN_HARNESS_REL"
+    return 3
+  fi
   [ "$bad" -eq 0 ] || return 1
   printf '%d harness file(s); %d constructed input(s), each through a package import or a produced_by marker\n' \
     "$n" "$nk"
@@ -1086,6 +1684,7 @@ check_hs_01() {
 
 check_hs_02() {
   local env cmd commit d tmp bad=0 f rc base name qname pat
+  local replayed=0 excluded=0 excluded_exts="" tail_note=""
   env=$(g_agents_read "$CONFIG" replay.env)
   cmd=$(g_agents_read "$CONFIG" replay.cmd)
   commit=$(g_unquote "$(g_agents_read "$CONFIG" replay.commit)")
@@ -1127,10 +1726,22 @@ check_hs_02() {
   fi
   mkdir -p "$tmp/wt/$GOBLIN_HARNESS_REL"
   cp -a "$d/." "$tmp/wt/$GOBLIN_HARNESS_REL/"
-  for f in "$tmp/wt/$GOBLIN_HARNESS_REL"/*.mjs; do
-    [ -e "$f" ] || continue
+  replayed=0 excluded=0 excluded_exts=""
+  for f in "$tmp/wt/$GOBLIN_HARNESS_REL"/*; do
+    [ -f "$f" ] || continue
     base=$(basename "$f")
-    name=${base%.mjs}
+    case "$base" in
+      *.mjs) name=${base%.mjs} ;;
+      *)
+        # OCA: a harness the replay set does not run is NAMED, never silently outside it.
+        excluded=$((excluded + 1))
+        case " $excluded_exts " in
+          *" .${base##*.} "*) ;;
+          *) excluded_exts="$excluded_exts .${base##*.}" ;;
+        esac
+        continue ;;
+    esac
+    replayed=$((replayed + 1))
     # Z2-3: the name is SHELL-QUOTED before it is substituted, because it now reaches a shell.
     # This row runs the DECLARED command rather than `node "$f"` (Z1-4), so a file in the harness
     # dir - a name the row does not control - is part of the command text `bash -c` parses.
@@ -1154,7 +1765,24 @@ check_hs_02() {
   done
   git -C "$ROOT" worktree remove --force "$tmp/wt" >/dev/null 2>&1
   rm -rf "$tmp"
-  [ "$bad" -eq 0 ] && printf 'every harness was RED at %s (run as: %s)\n' "${commit:0:7}" "$cmd"
+  # OCA: zero harnesses replayed proves nothing about the pre-change tree - SKIP naming the
+  # dir, and (when the dir held files the replay set does not run) the excluded extensions.
+  if [ "$replayed" -eq 0 ]; then
+    if [ "$excluded" -gt 0 ]; then
+      printf 'no harness in %s matched the replay set - %d file(s) present with extension(s)%s, which the replay set (*.mjs) does not run\n' \
+        "$GOBLIN_HARNESS_REL" "$excluded" "${excluded_exts# }"
+    else
+      printf 'no harness in %s matched the replay set\n' "$GOBLIN_HARNESS_REL"
+    fi
+    return 3
+  fi
+  # OCA: the RED-proof line says how many harnesses carried it, and what the replay set did
+  # and did not run - so a PASS can never silently shrink its own coverage.
+  tail_note=""
+  [ "$excluded" -gt 0 ] \
+    && tail_note=$(printf '; not replayed:%s (%d file(s), the replay set runs *.mjs)' "${excluded_exts# }" "$excluded")
+  [ "$bad" -eq 0 ] && printf 'every harness was RED at %s (replayed %d: .mjs; run as: %s)%s\n' \
+    "${commit:0:7}" "$replayed" "$cmd" "$tail_note"
   return $bad
 }
 
@@ -1280,6 +1908,26 @@ check_ds_02() {
   return 0
 }
 
+# The JS-family source set sc_sources greps, as a FILE count. The include/exclude list is
+# duplicated on purpose: find counts the files the grep would read, which is the "examined"
+# denominator the zero-inspection gates (SC-03, SC-04) skip on — a repo where this is 0 is a
+# repo the row saw nothing of. The declared harness directory (AGENTS.md harness_dir:, the
+# installer's default checks/) is excluded: a harness file is scaffold the kit itself wrote,
+# not application source, and counting it let a repo whose ONLY JS-family file was the kit's
+# own checks/assert.mjs answer SC-03 with a green "0 ... name(s)" over zero application
+# source — the same grade-the-scaffold pathology the audit accused HV-02 of.
+js_source_count() {
+  local hd="${GOBLIN_HARNESS_REL#./}"
+  hd="${hd%/}"
+  ( cd "$ROOT" && find . -type f \
+      \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \
+         -o -name '*.mjs' -o -name '*.cjs' -o -name '*.vue' -o -name '*.svelte' \) \
+      -not -path './.next/*' -not -path './node_modules/*' -not -path './.gob/*' \
+      -not -path './.hermes/*' -not -path './dist/*' -not -path './build/*' \
+      -not -path './out/*' -not -path './coverage/*' \
+      ${hd:+-not -path "./$hd/*"} 2>/dev/null | grep -c . )
+}
+
 check_sc_02() {
   # Clause 1 is a file rule; clause 2 is BEHAVIOURAL - it asks git's own matcher, so an ignore
   # rule that looks right but does not match still fails. `git check-ignore -q` accepts exactly
@@ -1310,7 +1958,7 @@ check_sc_03() {
   # Clause 1: a client-visible NAME that is secret-shaped. Clause 2: a known secret PREFIX in
   # real build output. The second clause is reported, never silently skipped: a repo with no
   # build output is told so on the line.
-  local hits hits_all hits_n vs_keys vs_files out n=0 bad=0
+  local hits hits_all hits_n vs_keys vs_files out n=0 bad=0 src_n=0
   hits_all=$(sc_sources 'NEXT_PUBLIC_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD|PASSWD|PRIVATE)')
   # W5-11: this line printed a CHARACTER count as a hit count - `${#hits}` on a multiline
   # string - so ONE matching line of 70 characters was reported as "70 client-visible
@@ -1332,6 +1980,14 @@ check_sc_03() {
     grep -qE '(sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[A-Z0-9]{16}|eyJ[A-Za-z0-9_-]{20,}\.)' "$f" 2>/dev/null \
       && { printf 'a secret-shaped literal is in build output: %s\n' "${f#"$ROOT"/}"; bad=1; }
   done
+  # OCA: the files this row examined are the JS-family source set (js_source_count) plus
+  # whatever clause 2 found. Zero of both means the row inspected nothing - SKIP with the
+  # reason naming what it could not see, never a vacuous green "0 ... name(s)".
+  src_n=$(js_source_count)
+  if [ "$src_n" -eq 0 ] && [ "$n" -eq 0 ]; then
+    printf 'no file in the JS-family set and no declared build output to scan\n'
+    return 3
+  fi
   if [ "$n" -eq 0 ]; then
     printf '%d client-visible secret-shaped name(s); no build output to scan for clause 2\n' "$hits_n"
   else
@@ -1344,7 +2000,8 @@ check_sc_04() {
   # A JS-written cookie needs `secure` + `samesite` in the SAME statement; a server-side set
   # needs `httpOnly` + `sameSite`. Same-statement only: a write spread over three lines is not
   # seen, and the row says so rather than implying it read the statement.
-  local js srv bad=0 n=0 line
+  local js srv bad=0 n=0 line files=0
+  files=$(js_source_count)
   js=$(sc_sources 'document\.cookie[[:space:]]*=')
   srv=$(sc_sources '(cookies\(\)\.set\(|res\.cookie\(|NextResponse\.cookie\()')
   if [ -n "$js" ]; then
@@ -1365,6 +2022,13 @@ EOF
 $srv
 EOF
   fi
+  # OCA: zero cookie writes examined proves nothing about cookies. SKIP with the examined
+  # count - a Python web repo (`response.set_cookie`) is not in the JS-family set, so 0 is
+  # exactly what it gets, instead of the old vacuous PASS.
+  if [ "$n" -eq 0 ]; then
+    printf 'no cookie write found in %d examined file(s)\n' "$files"
+    return 3
+  fi
   printf '%d cookie write(s) checked; a JS-written cookie is readable by any script - reported, not failed\n' "$n"
   [ "$bad" -eq 0 ]
 }
@@ -1374,6 +2038,14 @@ check_sc_05() {
   # or be named in .gob/boundary-waivers. Partial by design: it proves a validator is called,
   # not that the schema is right.
   local d f rel n=0 bad=0 w=0
+  # OCA: an undeclared security.write_routes is a route surface the row cannot see - SKIP
+  # with that reason, per the contract "a declared key that is absent is a skip with a
+  # reason, never a silent pass" (the engine's own contract note). Declared but unmatched
+  # gets the same treatment below: a handler count of 0 examined nothing.
+  if [ -z "$SEC_WRITE_ROUTES" ]; then
+    printf 'security.write_routes is not declared - there is no route surface to check\n'
+    return 3
+  fi
   for d in $SEC_WRITE_ROUTES; do
     [ -d "$ROOT/$d" ] || continue
     while IFS= read -r f; do
@@ -1390,6 +2062,12 @@ check_sc_05() {
 $(find "$ROOT/$d" -type f \( -name 'route.ts' -o -name 'route.js' -o -name 'route.tsx' \) 2>/dev/null)
 EOF
   done
+  # OCA: declared but zero handlers matched is still zero inspection - SKIP naming the
+  # declaration and the 0 matches, never "0 write handler(s)" green.
+  if [ "$n" -eq 0 ]; then
+    printf 'security.write_routes is declared (%s) and no write handler matched it\n' "$SEC_WRITE_ROUTES"
+    return 3
+  fi
   printf '%d write handler(s), %d waived; %d dir(s) declared\n' "$n" "$w" "${#SEC_WRITE_ROUTES}"
   [ "$bad" -eq 0 ]
 }
@@ -1494,13 +2172,6 @@ check_bn_01() { check_bn_run BN-01; }
 check_bn_02() { check_bn_run BN-02; }
 check_bn_03() { check_bn_run BN-03; }
 check_bn_05() { check_bn_run BN-05; }
-# G6 section B.2: the Electron failure surface, as bans. Same engine, same exit contract, same
-# SKIP-when-unlisted behaviour - the mechanism is G5's, only the patterns are new.
-check_bn_06() { check_bn_run BN-06; }
-check_bn_07() { check_bn_run BN-07; }
-check_bn_08() { check_bn_run BN-08; }
-check_bn_09() { check_bn_run BN-09; }
-
 check_pf_01() {
   # The perf NUMBER lives in `ratchet:` (GT-04/GT-05 unchanged). This row is the other half: the
   # baseline must name the commit it was measured on, so raising the ceiling cannot silently
@@ -2213,6 +2884,21 @@ setup_local_override() {
   fi
 }
 setup_local_override
+
+# --only may drive a LIBRARY row directly: probe one shipped row without turning it on
+# repo-wide. Append the row's matrix line to the run set for this run only; an id the run
+# set already carries (the matrix or the local override) is left alone, never duplicated.
+if [ -n "$ONLY" ] && [ -n "$LIBRARY_FILE" ]; then
+  _only_tmp=$(mktemp "${TMPDIR:-/tmp}/gob-only.XXXXXX")
+  cp "$RUN_MANIFEST" "$_only_tmp"
+  for _want in $(printf '%s' "$ONLY" | tr ',' ' '); do
+    [ -n "$_want" ] || continue
+    awk -F'\t' -v x="$_want" '$1==x {f=1} END{exit !f}' "$RUN_MANIFEST" && continue
+    awk -F'\t' -v x="$_want" 'NR>1 && $1==x {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7}' \
+      "$LIBRARY_FILE" >> "$_only_tmp"
+  done
+  RUN_MANIFEST="$_only_tmp"
+fi
 
 PASS=0; FAIL=0; ADV=0; SKIP=0; BAD=0; AG01_SKIP=0
 JSON_ROWS=""

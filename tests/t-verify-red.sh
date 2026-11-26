@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 100 `expect_red` call sites and 29 `expect_green`
-# — 128 calls over all 63 of the rule set's target rows (the four source-scope rows
-# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 63 rows are
+# One control per target-scope row: 105 `expect_red` call sites and 42 `expect_green`
+# — 147 calls over all 58 of the rule set's target rows (the four source-scope rows
+# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 58 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
-# this revision: 62 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
-# without a control. The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `125 over 62 target rows`.
+# this revision: 58 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
+# The census is recomputed from this file by tests/t-doc-promises.sh;
+# README's census sentence must read `142 over 58 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -106,7 +106,7 @@ restore_all() {
   # would expand to it, but an unquoted glob in a restore path is exactly the habit that control
   # exists to break.
   rm -f 'checks/z2;true;#.mjs'
-  rm -f checks/hv02-bbox.mjs checks/hv02-parse.mjs checks/hv01-lit.mjs
+  rm -f checks/hv01-lit.mjs checks/harness.py
   # AG-01's controls leave an approval record behind (the fixture ships none by design):
   # untracked, so no backup copy exists to restore over it.
   rm -f .gob/agents.approved
@@ -162,6 +162,29 @@ function expect_green {
     note "ok   $label -> $id exit 0 ($(printf '%s' "$out" | grep -m1 -E '^PASS' | cut -c1-88))"
   else
     note "FAIL $label -> $id exit $rc, wanted 0"
+    printf '%s\n' "$out" | sed 's/^/        /'
+    fail=1
+  fi
+  if [ -n "$dir" ]; then ( cd "$dir" && "$restore" ); else "$restore"; fi
+}
+
+# expect_skip <label> <row id> <mutate fn> [workdir] [restore fn]
+# The gate contract the SC/HS fixes enforce: a row that inspected ZERO items returns SKIP(3)
+# with a non-empty reason naming what it could not see - never a green count, never a FAIL.
+# Every row's skip except AG-01's stays exit 0 under --only (the engine's single-selection
+# rule), so the control reads the LINE, not the code: it wants a SKIP verdict and a reason.
+# Declared with `function` so `grep -c '^expect_skip'` counts controls, not the definition.
+function expect_skip {
+  local label="$1" id="$2" mutate="$3" dir="${4:-}" restore="${5:-restore_all}"
+  local out rc line
+  if [ -n "$dir" ]; then ( cd "$dir" && enable_lib_row "$id" && "$mutate" ); else enable_lib_row "$id"; "$mutate"; fi
+  if [ -n "$dir" ]; then out=$( cd "$dir" && bash .gob/bin/goblin-verify --only "$id" 2>&1 ); rc=$?
+  else out=$(bash .gob/bin/goblin-verify --only "$id" 2>&1); rc=$?; fi
+  line=$(printf '%s\n' "$out" | grep -m1 -E "^SKIP +$id  ")
+  if [ "$rc" = "0" ] && [ -n "$line" ] && [ -n "$(printf '%s' "$line" | sed -E "s/^SKIP +$id  //")" ]; then
+    note "ok   $label -> $id skip ($(printf '%s' "$line" | cut -c1-88))"
+  else
+    note "FAIL $label -> $id exit $rc, wanted a SKIP with a non-empty reason"
     printf '%s\n' "$out" | sed 's/^/        /'
     fail=1
   fi
@@ -276,6 +299,27 @@ m_replay_cmd_false() { m_replay_all_red; sed -i 's/^replay\.cmd:.*/replay.cmd: f
 # "z2;true;#.mjs was GREEN on the pre-change tree". Quoted, `node` receives ONE argument, the
 # harness runs, exits 1, and the row passes - which is what this control asserts.
 m_replay_meta_name() { rm -f checks/*.mjs; printf 'process.exit(1)\n' > 'checks/z2;true;#.mjs'; pin_pre_change; }
+# D-row gates (audit 2026-11-25): a surface the row cannot see into used to answer with a green
+# count of things it never read. Each mutation strips the surface to zero; the expect_skip
+# controls below assert the SKIP with a reason, and the mirror controls above keep the shapes
+# the row CAN see passing and failing exactly as before.
+m_no_js_files()      { rm -f checks/assert.mjs; }
+# The audit's second defect (found reviewing the SC-03 fix above): the zero-inspection gate
+# counted the kit's OWN scaffold, so a fresh install with zero application JS answered
+# `PASS  SC-03  0 client-visible secret-shaped name(s); no build output to scan for clause 2`
+# over the checks/assert.mjs file the installer itself wrote. The fixture's resting state IS
+# that shape - scaffold installed, no application source - so this control's mutation is a
+# no-op, like m_sc_05_no_handler; js_source_count now excludes the declared harness dir.
+m_sc_03_scaffold_only() { :; }
+m_sc_05_noroutes()   { sed -i 's|^security\.write_routes:.*|security.write_routes:|' AGENTS.md; }
+# SC-05's default-fixture shape: the declaration stands (installed default `app src/app`) and
+# the fixture plants no route file, so the row matches nothing.
+m_sc_05_no_handler() { :; }
+m_hs_02_no_harness() { rm -f checks/*.mjs; pin_pre_change; }
+m_hs_02_py_harness() { rm -f checks/*.mjs; printf 'def test_placeholder():\n    pass\n' > checks/harness.py; pin_pre_change; }
+# HV-01's false-RED fix: the probe reads import/require syntax, so a non-JS harness file is
+# not examined; a dir with only non-JS files is a zero-inspection SKIP.
+m_hv01_py_harness()  { rm -f checks/*.mjs; printf 'doc = {"nodes": [{"id": "a"}]}\nassert doc["nodes"], "has nodes"\n' > checks/harness.py; }
 
 m_cm_02()         { m_row_fails CM-02; }
 m_dirty_tree()    { printf 'untracked\n' > newfile.txt; }
@@ -291,7 +335,9 @@ m_drop_ds_report()  { rm -f .gob/.ds-report; }
 m_doc_01()        { m_row_fails DOC-01; }
 m_doc_02()        { m_row_fails DOC-02; }
 
-# ---- the security and perf rows (G4): SC-01..SC-09, PF-01 -------------------------------------
+# ---- the security and perf rows (G4): SC-01..SC-05, PF-01 --------------------------------------
+# (SC-09 was a library advisory and is withdrawn 2026-11-25; see
+# docs/AUDIT-2026-11-25-framework-agnostic.md.)
 # Every mutation is the exact failure the row's why-cell names, and every one is a file a real
 # repo produces by accident: a dotenv-family file that got added, an ignore rule narrowed by
 # hand, a client-visible key name, a cookie written without flags, a write route with no
@@ -303,7 +349,6 @@ m_sc_03()  { mkdir -p src; printf 'export const k = process.env.NEXT_PUBLIC_API_
 m_sc_04()  { mkdir -p src; printf 'document.cookie = "theme=dark";\n' > src/cookie.ts; }
 m_sc_05()  { mkdir -p app/api/contact; printf 'export async function POST(req) {\n  const b = await req.json();\n  await save(b);\n}\n' > app/api/contact/route.ts; }
 m_sc_06()  { printf '{"name":"fixture","version":"1.0.0"}\n' > package.json; }
-m_sc_09()  { m_row_fails SC-09; }
 m_pf_01()  { sed -i -e 's/^perf\.metric:.*/perf.metric: client_js_bytes/' -e 's/^perf\.baseline_commit:.*/perf.baseline_commit: 0000000000000000000000000000000000000000/' -e 's/^perf\.baseline_value:.*/perf.baseline_value: 1/' -e 's/^perf\.measured:.*/perf.measured: 2026-01-01/' AGENTS.md; }
 # G8-6b: the budget and the measurement have to be the SAME number. Two controls - the honest
 # record passes, and a one-line `ceiling:` raise that leaves the baseline alone FAILs. Before the
@@ -336,18 +381,6 @@ m_bn_05()          { sed -i 's|^layers:\([[:space:]]*\).*|layers: [src/renderer 
 # A tree BN-05 can read (so its globs match) but with no `layers:` declared: the row must SKIP
 # with that reason, never pass vacuously.
 m_bn_05_nolayers() { mkdir -p src/renderer; printf 'export const r = 1;\n' > src/renderer/p.ts; }
-
-# ---- W4/G6: the Electron failure surface, as bans (BN-06..BN-09) -----------------------------
-# FIX 1: selection is the PREDICATE `dep:electron` — the ban runs only when the repo's package.json
-# names electron under dependencies or devDependencies, so these four never run (and never vacuously
-# pass) on a repo with no electron. Each mutation therefore plants BOTH the dep AND the file the
-# ban's scope reads. m_bn_06_disabled is the DISABLE list's control (the only config knob).
-plant_electron() { printf '{"name":"fixture","devDependencies":{"electron":"^30"}}\n' > package.json; }
-m_bn_06()  { plant_electron; mkdir -p src; printf 'export const prefs = { nodeIntegration: true };\n' > src/main-prefs.ts; }
-m_bn_06_disabled() { m_bn_06; sed -i 's/^bans_disabled: \[.*\]/bans_disabled: [BN-06]/' AGENTS.md; }
-m_bn_07()  { plant_electron; mkdir -p src; printf 'export const prefs = { contextIsolation: false };\n' > src/isolate.ts; }
-m_bn_08()  { plant_electron; mkdir -p src; printf 'export const prefs = { webSecurity: false };\n' > src/webs.ts; }
-m_bn_09()  { plant_electron; mkdir -p src; printf 'const v = ipcRenderer.sendSync("chan", 1);\n' > src/ipc.ts; }
 
 # ---- W5-1/W5-2: the two documented escapes, in BOTH directions ---------------------------------
 # `bans_exempt:` and the inline `// BAN-OK(<id>): <reason>` were documented in three places and
@@ -407,7 +440,7 @@ set_bn01_probe() { awk -F'\t' -v OFS='\t' '{ if ($1 == "BN-01") $4 = "test \"$GO
 m_skill_frontmatter() { sed -i '1d' .gob/skills/goblin-handoff/SKILL.md; }
 m_skill_drift()   { printf '\n<!-- drift -->\n' >> .gob/skills/goblin-handoff/SKILL.md; }
 # batch 2b-ii: the default matrix carries NO advisory rows — every advisory row (HP-04, HS-03,
-# CM-02, DOC-01/02, SC-09) moved to the library. So the ceiling can only be exceeded once an
+# CM-02, DOC-01/02) moved to the library. So the ceiling can only be exceeded once an
 # advisory row is present in the run. This control enables the advisory library row HP-04 and
 # sets the ceiling BELOW the resulting count (1) — the exact condition SK-03 must FAIL on.
 m_adv_ceiling()   { awk -F'\t' -v x="HP-04" 'NR>1 && $1==x {print $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7}' .gob/manifest/library.tsv >> .gob/manifest/enforcement.tsv; sed -i 's/^advisory_ceiling: .*/advisory_ceiling: 0/' AGENTS.md; }
@@ -528,8 +561,21 @@ check "W5-11: SC-03 reports ONE hit, not the character count of the matching lin
 restore_all
 expect_red "a JS cookie write with no flags"        SC-04 1 m_sc_04
 expect_red "a write route with no validator"        SC-05 1 m_sc_05
+# ---- D-row gates: zero inspection is SKIP(3) with a reason, never a vacuous green -----------
+# Each of these rows used to answer a foreign shape with a green count of things it never read
+# (measured pre-change: `PASS SC-03 0 client-visible secret-shaped name(s); no build output to
+# scan for clause 2`, `PASS SC-04 0 cookie write(s) checked`, `PASS SC-05 0 write handler(s),
+# 0 waived; 2 dir(s) declared`, and HS-02 `PASS every harness was RED` over zero harnesses).
+# The controls assert the new SKIP; the expect_red/expect_green controls above stay, so a shape
+# the row genuinely inspects still PASSes and FAILs as before.
+expect_skip "a repo whose only JS-family file is the kit's own scaffold" SC-03 m_sc_03_scaffold_only
+expect_skip "a repo with no JS-family file and no build output"        SC-03 m_no_js_files
+expect_skip "a repo with no JS-family file to scan for cookies"        SC-04 m_no_js_files
+expect_skip "a declared route surface with no matching handler"        SC-05 m_sc_05_no_handler
+expect_skip "an undeclared security.write_routes"                      SC-05 m_sc_05_noroutes
+expect_skip "a pinned replay over a harness dir holding no harness"    HS-02 m_hs_02_no_harness
+expect_skip "a pinned replay whose only harness is outside the replay set" HS-02 m_hs_02_py_harness
 expect_red "a manifest with no lockfile"           SC-06 1 m_sc_06
-expect_red "SC-09 (advisory row: wired, not biting)" SC-09 1 m_sc_09
 expect_red "a perf baseline naming no real commit" PF-01 1 m_pf_01
 expect_green "G8-6b: the ceiling matches the recorded baseline"        PF-01 m_pf_ceiling_match
 expect_red   "G8-6b: the ceiling raised by hand, the baseline untouched" PF-01 1 m_pf_ceiling_raise
@@ -572,15 +618,22 @@ expect_red "an import across a declared layer boundary"       BN-05 1 m_bn_05
 # BN-05 is a SKIP (not a FAIL) when no layers are declared - the HS-01 precedent: nothing to
 # read is reported as a reason, never as a pass.
 expect_green "no layers declared -> BN-05 skips with a reason"  BN-05 m_bn_05_nolayers
-# W4/G6 + GAP-3: the Electron surface, one control per row, plus the DISABLE-knob half. A new row
-# has no pre-change tree to be RED on, so PR-03's other branch applies: the mutation writes the
-# file the glob matches (deliberately broken), and the DISABLE control proves the knob is real.
-expect_red   "a renderer with nodeIntegration: true"            BN-06 1 m_bn_06
-expect_green "a ban turned OFF by bans_disabled: skips with the key named" BN-06 m_bn_06_disabled
-expect_red   "a renderer with contextIsolation: false"          BN-07 1 m_bn_07
-expect_red   "a renderer with webSecurity: false"               BN-08 1 m_bn_08
-expect_red   "a synchronous IPC call in a hot path"             BN-09 1 m_bn_09
-
+# ---- the ecosystem-gate half of the B rows (CURATION-2026-11-25 audit) -------------------------
+# A B row names its ecosystem in its artifact cell (an `ecosystem:<token>`), and a fixture of
+# ANOTHER shape must get SKIP(3) with the reason named - never a PASS graded on nothing, never a
+# FAIL. The base fixture carries no TS-family source, so the typescript bans need only a no-op
+# mutation to pin the gate; the library rows get their own foreign-shape deletions.
+m_foreign_noop()    { :; }
+m_sc_02_foreign()   { rm -f .gitignore; }
+m_sc_06_foreign()   { rm -f package.json; }
+expect_skip "a typescript ban over a tree with no typescript source"     BN-01 m_foreign_noop
+expect_skip "  BN-02 under the same gate"                                BN-02 m_foreign_noop
+expect_skip "  BN-03 under the same gate"                                BN-03 m_foreign_noop
+expect_skip "  BN-05 under the same gate"                                BN-05 m_foreign_noop
+expect_skip "the secret surface with no ignore/dependency surface"       SC-02 m_sc_02_foreign
+expect_skip "the lockfile row over a repo with no dependency manifest"   SC-06 m_sc_06_foreign
+expect_skip "the reference row with no declared corpus"                  RC-02 m_foreign_noop
+expect_skip "the acquisition row with no declared manifest"              RC-04 m_foreign_noop
 # ---- W5-1/W5-2: both documented escapes, both directions --------------------------------------
 # The exempt path must PASS with a real violation inside it, and the SAME violation must still
 # FAIL when the exception names another path. That pair is the control whose absence let W5-1 ship.
@@ -740,16 +793,7 @@ expect_red   "Z1-6: an entry path only an untracked file holds" FM-02 1 m_fm_02_
 expect_red   "a verify_doctor that exits non-zero" VA-01 1 m_va_01_fail
 expect_red "the archive waiver flipped by hand"    CL-02 1 m_archive_flip
 
-# ---- the curation wave (CURATION-2026-11-07 §6 phase 1): HV-02, HP-06, HV-01 --------------------
-# Three new text probes; each control is a deliberately-broken copy of the class it checks
-# (PR-03's second branch - a new row has no pre-change tree to be RED on). Every mutation
-# plants the exact violation the row exists to catch into the fixture's own harness dir or
-# HANDOFF, and restore_all takes the planted files back out.
-m_hv02_bbox()    { printf '%s\n' 'const box = document.querySelector("#shot").getBoundingClientRect();' 'assert("inside", box.bottom < 4096);' > checks/hv02-bbox.mjs; }
-m_hv02_bbox_g()  { printf '%s\n' 'const box = document.querySelector("#shot").getBoundingClientRect();' 'if (box.right > window.innerWidth) throw new Error("outside the capture viewport");' > checks/hv02-bbox.mjs; }
-m_hv02_marker()  { printf '%s\n' '// guarded: the frame owns its viewport; the driver asserts the shot target itself' 'const box = document.querySelector("#shot").getBoundingClientRect();' > checks/hv02-bbox.mjs; }
-m_hv02_parse()   { printf '%s\n' 'import { execSync } from "node:child_process";' 'const w = parseFloat(execSync("ttx -w shot.png").toString());' 'assert("wide", w > 100);' > checks/hv02-parse.mjs; }
-m_hv02_parse_g() { printf '%s\n' 'import { execSync } from "node:child_process";' 'const w = parseFloat(execSync("ttx -w shot.png").toString());' 'if (!Number.isFinite(w)) throw new Error("the tool spoke nonsense");' 'assert("wide", w > 100);' > checks/hv02-parse.mjs; }
+# ---- the curation wave (CURATION-2026-11-07 §6 phase 1): HP-06, HV-01 ----------------------
 # HP-06: the bullet is planted INSIDE the Next steps section (an append to the file end would
 # land in NOT verified, a different section the row never reads).
 m_hp06_open()    { awk '/^## Next steps$/ && !d { print; print "- Ship the thing."; d = 1; next } { print }' HANDOFF.md > HANDOFF.md.new && mv HANDOFF.md.new HANDOFF.md; }
@@ -758,17 +802,13 @@ m_hv01_lit()     { printf '%s\n' 'const doc = { nodes: [{ id: "a", x: 0, y: 0 }]
 m_hv01_import()  { printf '%s\n' 'import { toBoardDoc } from "@fixture/core";' 'const doc = toBoardDoc({});' 'assert("has nodes", Array.isArray(doc.nodes));' > checks/hv01-lit.mjs; }
 m_hv01_marker()  { printf '%s\n' '// produced_by: compileGobi pinned-9c3b0cc' 'const doc = { nodes: [{ id: "a" }] };' 'assert("one node", doc.nodes.length === 1);' > checks/hv01-lit.mjs; }
 
-expect_red   "a bounding box measured with no viewport guard"         HV-02 1 m_hv02_bbox
-expect_green "the same measurement guarded by innerWidth"             HV-02 m_hv02_bbox_g
-expect_green "a guarded: marker clears the whole file"                HV-02 m_hv02_marker
-expect_red   "a number parsed from tool stdout with no finite guard"  HV-02 1 m_hv02_parse
-expect_green "the parsed number asserted finite"                      HV-02 m_hv02_parse_g
 expect_red   "an open item with no date and no owner"                 HP-06 1 m_hp06_open
 expect_green "the same item owned with a date"                        HP-06 m_hp06_owned
 expect_green "no HANDOFF.md is a SKIP, never red"                     HP-06 m_drop_handoff
 expect_red   "a hand-written doc literal with no producer"            HV-01 1 m_hv01_lit
 expect_green "the doc built through a package import"                 HV-01 m_hv01_import
 expect_green "a produced_by marker with a pinned id"                  HV-01 m_hv01_marker
+expect_skip  "a harness dir whose only file is not JS-family"         HV-01 m_hv01_py_harness
 
 # ---- AG-01 (CURATION-2026-11-07 §2 C6): an instruction file changes only with a recorded
 # approval. The fixture is a plain install, so every control plants its own record first
@@ -1069,6 +1109,327 @@ check "UX-5a the staleness line is the reader-facing sentence" "$?"
 printf '%s' "$out" | grep -qF 'test -f .gob/last-gate-line'
 check "UX-5b the raw test(1) dump is gone from the failure line" "$([ $? -ne 0 ] && echo 0 || echo 1)"
 git reset -q --hard HEAD~1
+restore_all
+
+# ---- PV-01 (CURATION-2026-11-25): opt-in preview-surface row ----------------------------
+# The row lives in the library and is OFF here by default. Its fixtures plant an app/
+# route tree; restore_all already removes it (rm -rf dist src app features), so no control
+# leaks a route tree into the next.
+
+# Opt-in first: plant the row's violation and run the FULL suite with the row not enabled —
+# a repo that never turns the row on must be untouched (green, and no PV- line anywhere).
+m_pv_optin() {
+  mkdir -p app/preview
+}
+m_pv_optin
+_pv_out=$(bash .gob/bin/goblin-verify 2>&1)
+_pv_rc=$?
+check "opt-in: a full run over the row's violation, row not enabled, stays GREEN" "$([ "$_pv_rc" -eq 0 ] && echo 0 || echo 1)"
+[ -z "$(printf '%s' "$_pv_out" | grep -E '^(FAIL|SKIP|PASS)  PV-')" ]
+check "opt-in: that run prints no PV- line at all" "$?"
+restore_all
+
+# PV-01 red: a review surface whose layout imports nothing the public layout imports,
+# and carries no preview_differs: marker.
+m_pv01_red() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { OwnShell } from './own-shell'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: a review surface rendering its own shell is RED" PV-01 1 m_pv01_red
+
+# PV-01 green, both directions: the SAME specifier (relative paths resolved, so ../site-shell
+# from the surface equals ./site-shell from the root), and the declared-difference hatch.
+m_pv01_green() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a review surface importing the published shell is GREEN" PV-01 m_pv01_green
+m_pv01_declared() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { OwnShell } from './own-shell'\n// preview_differs: preview keeps its own chrome\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a surface declaring preview_differs: is GREEN" PV-01 m_pv01_declared
+
+# Prettier wraps a brace list across lines, so the specifier lives on a `} from` line that the
+# old line-anchored extractor never matched: a compliant surface was falsely RED (PR #2 review).
+m_pv01_multiline() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import {\n  SiteShell,\n} from '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a prettier multi-line import of the published shell is GREEN" PV-01 m_pv01_multiline
+
+# A dynamic import() in any position pulls the shell in too.
+m_pv01_dynamic() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "export default async function Layout() {\n  const m = await import('../site-shell')\n  return null\n}\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a dynamic import() of the published shell is GREEN" PV-01 m_pv01_dynamic
+
+# A multi-line export { ... } from names the shell too.
+m_pv01_exportfrom() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "export {\n  SiteShell,\n} from '../site-shell'\nexport default function Layout() { return null }\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a multi-line export { } from the published shell is GREEN" PV-01 m_pv01_exportfrom
+
+# The negative control survives the broader extractor: a surface whose only import is an
+# unrelated module, formatted the same prettier way, must stay RED — a fix that turns this
+# green is a regression, not a fix.
+m_pv01_multiline_red() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import {\n  OwnShell,\n} from './own-shell'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: a prettier-formatted surface importing only an unrelated module is still RED" PV-01 1 m_pv01_multiline_red
+
+# PR #2 review round 2: a bare specifier used to pass through unchanged, so two layouts both
+# importing `react` cleared the surface — a package is not a shell, and the intersection now
+# counts PROJECT-RESOLVABLE modules only. Each of these three was a false GREEN before the fix.
+m_pv01_pkg_react() {
+  mkdir -p app/preview
+  printf "import { useState } from 'react'\n" > app/layout.tsx
+  printf "import { useState } from 'react'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: two layouts importing only the react package are RED (an installed package is never evidence)" PV-01 1 m_pv01_pkg_react
+m_pv01_pkg_link() {
+  mkdir -p app/preview
+  printf "import Link from 'next/link'\n" > app/layout.tsx
+  printf "import Link from 'next/link'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: two layouts importing only next/link are RED" PV-01 1 m_pv01_pkg_link
+m_pv01_builtin() {
+  mkdir -p app/preview
+  printf "import { readFileSync } from 'node:fs'\n" > app/layout.tsx
+  printf "import { readFileSync } from 'node:fs'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: two layouts importing only a node: builtin are RED" PV-01 1 m_pv01_builtin
+
+# The theme is not the shell (PR #2 review round 2, measured pre-fix on a reporting tenant): the
+# pre-fix row counted a SHARED STYLESHEET as proof the review surface renders the published
+# shell — the two layouts shared globals.css (one via a side-effect import) and PV-01 PASSED
+# on the exact file that shipped the bug. The intersection now counts project CODE modules
+# only: a style/asset import is the theme, a side-effect import is wiring that never names
+# what renders, and neither is evidence. These three controls were GREEN (false) before the
+# fix — proven RED-failing on the pre-change tree in the round log.
+m_pv01_css_se() {
+  mkdir -p app/preview
+  printf '' > app/globals.css
+  printf "import '../globals.css'\n" > app/layout.tsx
+  printf "import '../../globals.css'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: two layouts sharing only a stylesheet via side-effect import are RED - the theme is not the shell (the 8ea81ec shape)" PV-01 1 m_pv01_css_se
+m_pv01_css_from() {
+  mkdir -p app/preview
+  printf '' > app/globals.css
+  printf "import styles from '../globals.css'\n" > app/layout.tsx
+  printf "import styles from '../../globals.css'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: two layouts sharing only a stylesheet through a from-import are RED too" PV-01 1 m_pv01_css_from
+m_pv01_se_code() {
+  mkdir -p app/preview
+  printf 'export const SiteShell = 1\n' > app/site-shell.tsx
+  printf "import './site-shell'\n" > app/layout.tsx
+  printf "import '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: a side-effect import of a code module is not evidence either - wiring proves no render" PV-01 1 m_pv01_se_code
+m_pv01_code_green() {
+  mkdir -p app/preview
+  printf 'export const Nav = 1\nexport const Footer = 2\nexport const FloatingActions = 3\nexport const Lang = 4\n' > app/shell.tsx
+  printf "import { Nav, Footer } from './shell'\n" > app/layout.tsx
+  printf "import { Nav, Footer, FloatingActions, Lang } from '../shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: two layouts sharing project CODE modules are GREEN and the PASS names them" PV-01 m_pv01_code_green
+
+# PR #2 review round 3: the from-clause keyword scan had an off-by-one in its dynamic-import(
+# guard (`we = p + RSTART + RLENGTH - 1` landed on the keyword, not past it), so every segment
+# containing import/export was called static on the first hit — and a specifier-shaped STRING
+# literal could vouch for an in-string ` from '<spec>'`. The scan now masks quoted runs before
+# it looks for keywords. Both fixtures are one line whose only import-ish text lives inside a
+# string; each was GREEN (false) before the fix.
+m_pv01_str_dyn() {
+  mkdir -p app/preview
+  printf "import './shared-a';\n" > app/layout.tsx
+  printf "const s = \"await import('./x') from '../shared-a'\";\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: an in-string dynamic import(...) after a from is RED (the off-by-one fixture)" PV-01 1 m_pv01_str_dyn
+m_pv01_str_kw() {
+  mkdir -p app/preview
+  printf "import './shared-a';\n" > app/layout.tsx
+  printf "const s = \"import x from '../shared-a'\";\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: an in-string 'import x from ...' without parens is RED (the masking fixture)" PV-01 1 m_pv01_str_kw
+
+# Green preserved: a REAL import standing after a string that merely mentions the word — the
+# mask must eat the string only, not the statement outside it.
+m_pv01_str_then_real() {
+  mkdir -p app/preview
+  printf "import { b } from './shared-a';\n" > app/layout.tsx
+  printf "const a = \"import x\"; import { b } from '../shared-a';\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a real import after a string that merely mentions the word is GREEN" PV-01 m_pv01_str_then_real
+
+# The other side of the same rule: a bare specifier DOES count when it resolves to a file
+# inside the repo, so a shared import through a tsconfig paths alias is still evidence.
+# The fixture ships no tsconfig.json, so the control's own copy is removed on restore.
+m_pv01_alias() {
+  mkdir -p app/preview src
+  printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./src/*"]}}}' > tsconfig.json
+  printf 'export const SiteShell = 1\n' > src/site-shell.ts
+  printf "import { SiteShell } from '@/site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '@/site-shell'\n" > app/preview/layout.tsx
+}
+m_pv01_alias_restore() { rm -f tsconfig.json; restore_all; }
+expect_green "PV-01: a shared import through a tsconfig paths alias resolves and is GREEN" PV-01 m_pv01_alias '' m_pv01_alias_restore
+
+# PV-01 round 4 (2026-11-25 preview-surfaces): the relative branch's normalisation keyed on the
+# ABSOLUTE path (cur = the layout's absolute dir) while the alias branch keyed ROOT-relative —
+# keys from two different spaces never intersect, so two layouts naming the SAME module in
+# different styles was a guaranteed false RED in any repo with tsconfig paths. Every branch now
+# emits one canonical key: ROOT-relative, extension stripped, trailing /index stripped. Four
+# controls: mixed styles both directions (GREEN), a directory entry named two ways (GREEN), and
+# the guard against the fix going style-blind (RED — genuinely different modules stay RED).
+# The fixture ships no tsconfig.json, so the controls' own copy is removed on restore.
+m_pv01_rel_vs_alias() {
+  mkdir -p app/preview
+  printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
+  printf 'export const SiteShell = 1\n' > app/site-shell.tsx
+  printf "import { SiteShell } from './site-shell';\n" > app/layout.tsx
+  printf "import { SiteShell } from '@/site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a preview naming the shared module through a resolvable alias while the public layout names it relative is GREEN" PV-01 m_pv01_rel_vs_alias '' m_pv01_alias_restore
+m_pv01_alias_vs_rel() {
+  mkdir -p app/preview
+  printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
+  printf 'export const SiteShell = 1\n' > app/site-shell.tsx
+  printf "import { SiteShell } from '@/site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell';\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: the reverse direction - public layout through the alias, preview relative - is GREEN" PV-01 m_pv01_alias_vs_rel '' m_pv01_alias_restore
+m_pv01_rel_vs_alias_dir() {
+  mkdir -p app/preview app/site-dir
+  printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
+  printf 'export const SiteShell = 1\n' > app/site-dir/index.tsx
+  printf "import { SiteShell } from './site-dir';\n" > app/layout.tsx
+  printf "import { SiteShell } from '@/site-dir/index.tsx'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a directory entry named relative in one layout and as @/dir/index.tsx in the other keys as one module and is GREEN" PV-01 m_pv01_rel_vs_alias_dir '' m_pv01_alias_restore
+m_pv01_rel_vs_alias_red() {
+  mkdir -p app/preview
+  printf '{"compilerOptions":{"baseUrl":".","paths":{"@/*":["./app/*"]}}}' > tsconfig.json
+  printf 'export const A = 1\n' > app/site-a.tsx
+  printf 'export const B = 1\n' > app/site-b.tsx
+  printf "import './site-a';\n" > app/layout.tsx
+  printf "import { B } from '@/site-b'\n" > app/preview/layout.tsx
+}
+expect_red "PV-01: a relative in one layout and an alias naming a DIFFERENT file in the other is still RED" PV-01 1 m_pv01_rel_vs_alias_red '' m_pv01_alias_restore
+
+# Sibling-group fallback (2026-11-25 preview-surfaces round 5): the rule's only real-world
+# instance had NO layout above the review surface - the public shell lived in a SIBLING route
+# group (app/(frontend)/[locale]/layout.tsx beside app/(preview)/preview/layout.tsx), where
+# the ancestor-only walk printed `not judged` and still returned PASS. The check now falls
+# back to sibling route groups' layouts; these controls pin the fallback's three directions.
+# RED: a surface in a group with no ancestor layout whose sibling group's shell shares nothing.
+m_pv01_sib_red() {
+  mkdir -p 'app/(frontend)/site' 'app/(preview)/preview'
+  printf 'export const SiteShell = 1\n' > 'app/(frontend)/site/site-shell.tsx'
+  printf 'export const OwnShell = 1\n' > 'app/(preview)/preview/own-shell.tsx'
+  printf "import { SiteShell } from './site-shell'\n" > 'app/(frontend)/site/layout.tsx'
+  printf "import { OwnShell } from './own-shell'\n" > 'app/(preview)/preview/layout.tsx'
+}
+expect_red "PV-01: a group-less surface falls back to sibling groups - a sibling sharing nothing is still RED" PV-01 1 m_pv01_sib_red
+
+# GREEN: the same topology, but the sibling group's shell shares a project-resolvable module.
+m_pv01_sib_green() {
+  mkdir -p 'app/(frontend)/site' 'app/(preview)/preview'
+  printf 'export const Shell = 1\n' > app/shell.tsx
+  printf "import { Shell } from '../../shell'\n" > 'app/(frontend)/site/layout.tsx'
+  printf "import { Shell } from '../../shell'\n" > 'app/(preview)/preview/layout.tsx'
+}
+expect_green "PV-01: the sibling fallback is GREEN when a sibling group's shell shares a module" PV-01 m_pv01_sib_green
+
+# GREEN: the hatch clears the sibling fallback's RED too.
+m_pv01_sib_declared() {
+  mkdir -p 'app/(frontend)/site' 'app/(preview)/preview'
+  printf 'export const SiteShell = 1\n' > 'app/(frontend)/site/site-shell.tsx'
+  printf 'export const OwnShell = 1\n' > 'app/(preview)/preview/own-shell.tsx'
+  printf "import { SiteShell } from './site-shell'\n" > 'app/(frontend)/site/layout.tsx'
+  printf "import { OwnShell } from './own-shell'\n// preview_differs: preview keeps its own chrome\n" > 'app/(preview)/preview/layout.tsx'
+}
+expect_green "PV-01: the sibling fallback honours the preview_differs: hatch" PV-01 m_pv01_sib_declared
+
+# ---- PV-01 layout selection: exact code basenames only ---------------------------------------
+# The route layout is chosen by EXACT code basename (_pv01_layout_in), never by globbing
+# layout.* and never by suffix blacklist: a stylesheet, a type declaration or a test beside a
+# layout is a different basename, so it is never a candidate. Before the exact-name list,
+# `ls layout.* | head -1` picked the sibling (layout.css, layout.d.ts and layout.test.tsx all
+# sort before layout.tsx) and the RED message told the reader to compare a stylesheet against
+# code. Each of these four was a false RED before the fix, proven RED-failing on the
+# pre-change tree from the same fixtures.
+m_pv01_css_sib() {
+  mkdir -p app/preview
+  printf '' > app/layout.css
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a layout.css beside the public layout is not compared - the shell still matches" PV-01 m_pv01_css_sib
+m_pv01_mcss_sib() {
+  mkdir -p app/preview
+  printf '' > app/layout.module.css
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a layout.module.css beside the public layout is not compared either" PV-01 m_pv01_mcss_sib
+m_pv01_dts_sib() {
+  mkdir -p app/preview
+  printf '' > app/layout.d.ts
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell'\n" > app/preview/layout.tsx
+}
+expect_green "PV-01: a layout.d.ts beside the public layout is not compared either" PV-01 m_pv01_dts_sib
+m_pv01_test_sib() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf "import { SiteShell } from '../site-shell'\n" > app/preview/layout.tsx
+  printf '' > app/preview/layout.test.tsx
+}
+expect_green "PV-01: a layout.test.tsx beside the preview layout is not compared either" PV-01 m_pv01_test_sib
+
+# A preview directory whose ONLY layout.* file is a stylesheet has NO route layout at all -
+# a different failure from "imports no module it shares", and the RED message must say which,
+# so a reader is never told to compare a stylesheet. This is a text assertion rather than
+# part of expect_red because the claim is about the MESSAGE, not just the exit.
+m_pv01_nolayout() {
+  mkdir -p app/preview
+  printf "import { SiteShell } from './site-shell'\n" > app/layout.tsx
+  printf '' > app/preview/layout.css
+}
+expect_red "PV-01: a preview dir whose only layout.* is a stylesheet is RED - no layout, not an import mismatch" PV-01 1 m_pv01_nolayout
+m_pv01_nolayout
+out=$(bash .gob/bin/goblin-verify --only PV-01 2>&1)
+printf '%s' "$out" | grep -qF 'no layout file was found in app/preview'
+check "PV-01: that RED says no layout file was found (the empty/absent-layout failure)" "$?"
+printf '%s' "$out" | grep -qF 'imports no module'
+check "PV-01: and that RED never accuses the surface of an import mismatch" "$([ $? -ne 0 ] && echo 0 || echo 1)"
+restore_all
+
+# SKIP paths, each printing its reason — never a bare pass.
+out=$(bash .gob/bin/goblin-verify --only PV-01 2>&1)
+printf '%s' "$out" | grep -q '^SKIP  PV-01  no route tree'
+check "PV-01 SKIPs with its reason on a repo with no route tree" "$?"
+m_pv01_nolane() {
+  mkdir -p app/p
+  printf "export default function P() { return null }\n" > app/p/page.tsx
+}
+m_pv01_nolane
+out=$(bash .gob/bin/goblin-verify --only PV-01 2>&1)
+printf '%s' "$out" | grep -q '^SKIP  PV-01  no candidate review surface directory'
+check "PV-01 SKIPs with its reason when the route tree has no candidate surface" "$?"
 restore_all
 
 FINAL=$(bash .gob/bin/goblin-verify 2>&1); FINAL_RC=$?
