@@ -198,5 +198,91 @@ AFTER_NEG=$(grep -cE '^(feature_map|verify_doctor|reference_manifest|quarantine_
 check "NEGATIVE CONTROL: the same re-install erases them — 4 in -> $AFTER_NEG out" \
   "$([ "$AFTER_NEG" -eq 0 ] && echo 0 || echo 1)"
 
+# ---- AC1: the render does NOT decide what a re-install keeps -------------------
+# ratchet.ceiling (the render re-measures it), a gate_<name>_cmd key the render does not
+# emit at all (it would be DELETED — a declared gate vanishing), and the comment lines
+# that record why the ceiling is what it is: a plain re-install must keep all three, in
+# place, and be idempotent — the second re-install diffs empty against the first.
+mkfix_ac1() {
+  mkdir -p "$1" && cd "$1"
+  git init -q -b main
+  git config user.name "Test Runner"
+  git config user.email "runner@example.com"
+  printf '# %s\n' "$(basename "$1")" > README.md
+  git add -A && git commit -q -m "chore: seed"
+}
+bcom() { sed -n '/^<!-- gob:begin/,/^<!-- gob:end -->/p' "$1" | grep -c '^# '; }  # comment lines IN the block
+mkfix_ac1 "$WORK/ac1"
+AG1="$WORK/ac1/AGENTS.md"
+bash "$SRC/bin/goblin-install" --target "$WORK/ac1" >/dev/null 2>&1
+sed -i 's|^ratchet.ceiling:.*$|ratchet.ceiling: 1105500|' "$AG1"
+sed -i '/^ratchet.ceiling:/i gate_tsc_build_cmd: npx tsc --noEmit \&\& npx vite build' "$AG1"
+sed -i '/^ratchet.ceiling:/i # ceiling pinned by hand 2026-11-26: the 0.7.1 bundle is 1.05 MB' "$AG1"
+sed -i '/^ratchet.ceiling:/i # measured 1105500 bytes; do not re-measure' "$AG1"
+sed -i '/^ratchet.ceiling:/i # raised past this needs a ROUND spec, not an install' "$AG1"
+check "the ceiling, the gate and 3 comment lines are planted" \
+  "$(grep -qx 'ratchet.ceiling: 1105500' "$AG1" \
+     && grep -qxF 'gate_tsc_build_cmd: npx tsc --noEmit && npx vite build' "$AG1" \
+     && [ "$(bcom "$AG1")" -eq 3 ] && echo 0 || echo 1)"
+bash "$SRC/bin/goblin-install" --target "$WORK/ac1" >/dev/null 2>&1
+check "AC1 plain re-install keeps the declared ceiling (not the re-measured one)" \
+  "$(grep -qx 'ratchet.ceiling: 1105500' "$AG1" && echo 0 || echo 1)"
+check "AC1 keeps the gate key the render does not emit (the gate cannot vanish)" \
+  "$(grep -qxF 'gate_tsc_build_cmd: npx tsc --noEmit && npx vite build' "$AG1" && echo 0 || echo 1)"
+check "AC1 keeps the ratchet comment block (3 lines, in place)" \
+  "$([ "$(bcom "$AG1")" -eq 3 ] \
+     && grep -qxF '# ceiling pinned by hand 2026-11-26: the 0.7.1 bundle is 1.05 MB' "$AG1" \
+     && echo 0 || echo 1)"
+check "AC1 keeps each key exactly once (replace, never append)" \
+  "$([ "$(grep -c '^ratchet.ceiling:' "$AG1")" -eq 1 ] \
+     && [ "$(grep -c '^gate_tsc_build_cmd:' "$AG1")" -eq 1 ] && echo 0 || echo 1)"
+AC1_SNAP=$(sha256sum "$AG1" | awk '{print $1}')
+bash "$SRC/bin/goblin-install" --target "$WORK/ac1" --upgrade >/dev/null 2>&1
+check "AC1 idempotent: the second re-install (--upgrade, same path) leaves AGENTS.md byte-identical" \
+  "$([ "$(sha256sum "$AG1" | awk '{print $1}')" = "$AC1_SNAP" ] && echo 0 || echo 1)"
+
+# ---- AC2: a flag is a decision; the absence of a flag is not --------------------
+bash "$SRC/bin/goblin-install" --target "$WORK/ac1" --gate 'echo gated' tsc_build >/dev/null 2>&1
+check "AC2 an explicit --gate rewrites the key it names" \
+  "$(grep -qxF 'gate_tsc_build_cmd: echo gated' "$AG1" && echo 0 || echo 1)"
+check "AC2 the flag leaves the ceiling alone" \
+  "$(grep -qx 'ratchet.ceiling: 1105500' "$AG1" && echo 0 || echo 1)"
+check "AC2 the flag leaves the comment block alone" \
+  "$([ "$(bcom "$AG1")" -eq 3 ] && echo 0 || echo 1)"
+bash "$SRC/bin/goblin-install" --target "$WORK/ac1" >/dev/null 2>&1
+check "AC2 and the flagged value itself is then carried by the next plain re-install" \
+  "$(grep -qxF 'gate_tsc_build_cmd: echo gated' "$AG1" && echo 0 || echo 1)"
+
+# ---- AC4 for a key the render does NOT emit ------------------------------------
+# A blanked gate_tsc_build_cmd: the render has no line for it, so the re-inserted line
+# must be the BLANK one — never resurrected with an invented value.
+sed -i 's|^gate_tsc_build_cmd:.*$|gate_tsc_build_cmd:|' "$AG1"
+bash "$SRC/bin/goblin-install" --target "$WORK/ac1" >/dev/null 2>&1
+check "AC4 a blanked non-emitted key stays blank (re-inserted, not invented)" \
+  "$(grep -qx 'gate_tsc_build_cmd:' "$AG1" && echo 0 || echo 1)"
+
+# ---- the negative control: the same tree with the carry switched off ------------
+# D: if this harness cannot fail, it proves nothing. The control is the PRE copy (this
+# tree's dirs with the carry call commented out) — for the AC1 keys it is exactly the
+# 0.7.1 behaviour: ceiling re-measured, non-emitted gate deleted, comments deleted.
+mkfix_ac1 "$WORK/neg-ac1"
+AG_NEG1="$WORK/neg-ac1/AGENTS.md"
+bash "$PRE/bin/goblin-install" --target "$WORK/neg-ac1" >/dev/null 2>&1
+sed -i 's|^ratchet.ceiling:.*$|ratchet.ceiling: 1105500|' "$AG_NEG1"
+sed -i '/^ratchet.ceiling:/i gate_tsc_build_cmd: npx tsc --noEmit \&\& npx vite build' "$AG_NEG1"
+sed -i '/^ratchet.ceiling:/i # ceiling pinned by hand 2026-11-26: the 0.7.1 bundle is 1.05 MB' "$AG_NEG1"
+N_CEIL=$(grep -qx 'ratchet.ceiling: 1105500' "$AG_NEG1" && echo 1 || echo 0)
+N_GATE=$(grep -c '^gate_tsc_build_cmd:' "$AG_NEG1")
+N_COM=$(bcom "$AG_NEG1")
+check "the control fixture is planted (ceiling=$N_CEIL gate=$N_GATE comments=$N_COM)" \
+  "$([ "$N_CEIL" -eq 1 ] && [ "$N_GATE" -eq 1 ] && [ "$N_COM" -eq 1 ] && echo 0 || echo 1)"
+bash "$PRE/bin/goblin-install" --target "$WORK/neg-ac1" >/dev/null 2>&1
+NEG_GONE=$(( N_CEIL + N_GATE + N_COM ))
+NEG_KEPT=$(( $(grep -qx 'ratchet.ceiling: 1105500' "$AG_NEG1" && echo 1 || echo 0) \
+           + $(grep -c '^gate_tsc_build_cmd:' "$AG_NEG1") \
+           + $(bcom "$AG_NEG1") ))
+check "NEGATIVE CONTROL (carry off): $NEG_GONE in -> $NEG_KEPT out — the bug this card fixes" \
+  "$([ "$NEG_KEPT" -eq 0 ] && echo 0 || echo 1)"
+
 if [ "$fail" -eq 0 ]; then note "t-install-feature-map-carry: PASS"; else note "t-install-feature-map-carry: FAIL"; fi
 exit "$fail"

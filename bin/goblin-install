@@ -28,7 +28,7 @@
 
 set -uo pipefail
 
-GOBLIN_INSTALL_VERSION="0.7.1"
+GOBLIN_INSTALL_VERSION="0.7.2"
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC=$(cd "$SELF_DIR/.." && pwd)
 # shellcheck source=goblin-lib.sh
@@ -678,44 +678,95 @@ render_config() {
   grep -v '^gate__cmd: $' "$TMP/agents-block.raw" > "$TMP/agents-block"
 }
 
-# Every key the render-call above draws from a HARDCODED LITERAL rather than from a flag or the
-# previous install record — enumerated, not sampled. A re-install must carry the project's
-# previous value forward for each: g_agents_write replaces the block WHOLESALE, so a declared
-# value used to be written over by the literal on every install, and every gate that reads such
-# a key fell back to SKIP. That is a re-install switching a check off by deleting its subject,
-# in silence: FM-01/FM-02 read feature_map:, FM-02 resolves under source_root:, VA-01 reads
-# verify_doctor:, RC-01 reads reference_manifest:, CM-03 reads max_dirty:, and goblin-bans reads
-# bans_exempt:. The render-call's other pairs all come from variables (a flag, or the previous
-# record), so they are not in this list.
-CARRY_KEYS="feature_map source_root verify_doctor reference_manifest quarantine_root max_dirty bans_exempt"
+# The carry is NOT a list of names. It used to be: CARRY_KEYS enumerated seven keys the
+# render-call drew from hardcoded literals, and everything else in the previous block was
+# overwritten with the render's literal — or, for keys the render does not emit at all
+# (a gate_<name>_cmd a newer template never draws, or a hand-added key), silently DELETED,
+# comment lines included. That manufactured absence is this card's bug: a re-install raised
+# a ratchet ceiling back to the template's measured number, deleted the gate that enforced
+# it, and deleted the comment block that recorded why the ceiling is what it is — in
+# silence, on every upgrade. The kit's own doctrine — a declared key that is absent is a
+# skip with a reason, never a silent pass — makes the installer the one writer that must
+# not manufacture it. So carry_forward now reads the previous block as LINES (g_agents_pairs
+# loses comments) and keeps every line the new render did not reproduce under the same key:
+#   - a pair whose key the render emitted -> the previous value replaces the rendered one;
+#   - a pair whose key the render did NOT emit -> re-inserted, so a declared gate or any
+#     key a newer template stopped drawing cannot vanish;
+#   - a `#` comment line or any other non-pair line -> preserved verbatim, in its old
+#     relative position.
+# Two rules sit above the merge:
+#   - A flag is a decision; the absence of a flag is not. A key this run was TOLD a value
+#     for (MERGE_FLAG_KEYS below: --gate, --archive, --opt-out) keeps the rendered value —
+#     the flag's — not the carried one. MERGE_FLAG_KEYS is rebuilt on every run from the
+#     parsed options; it is never read from a record. The practice pin is the DELIBERATE
+#     exception to this rule: IN-02's own contract — an --upgrade must never re-pin the
+#     standard by itself, even when --practice names a file; --re-pin is the decision — is
+#     stronger and sits above the merge (the keep-old-practice sed and the carry agree on
+#     the same answer: the previous pin, until --re-pin).
+#   - A value the project deliberately blanked stays blank (an empty previous value
+#     carries nothing), and a fresh install has no previous block and is untouched: the
+#     render is the answer on day one.
+# The practice pin keeps its own contract above this mechanism: an OMITTED --practice never
+# re-pins the standard (IN-02 — the block below and the sed over the rendered lines), and
+# --re-pin remains the deliberate path for an edited standard.
+MERGE_FLAG_KEYS=""
+[ -n "${GOB_GATE:-}" ] && MERGE_FLAG_KEYS="$MERGE_FLAG_KEYS gate_${GATE_NAME}_cmd"
+[ "$ARCHIVE" = "true" ] && MERGE_FLAG_KEYS="$MERGE_FLAG_KEYS archive"
+[ -n "$OPT_OUT" ] && MERGE_FLAG_KEYS="$MERGE_FLAG_KEYS disabled"
 
-# carry_forward — replace each rendered literal line with the PREVIOUS block's value, byte for
-# byte. The read is the round-trip reader (g_agents_pairs), not g_agents_read: the latter strips
-# after the first colon, so a value carrying ": " (or a raw tab) is rebuilt and drifts on every
-# rewrite. The carry REPLACES the rendered line rather than being appended: g_agents_read stops
-# at the first match, so an appended pair would sit behind the empty rendered one and still read
-# back empty. An EMPTY or absent previous value carries nothing — a value the project blanked
-# stays blank, and a fresh install (no block yet) is untouched: the render is the answer on day
-# one. Called only when the target AGENTS.md exists (it is a no-op over a body with no block).
-# A failure here EXITS: a re-install that cannot read the previous block must not go on and
-# write the literals over it (that is this card's bug by another route).
+# carry_forward — merge the PREVIOUS block into the rendered one, line by line. The rendered
+# file is read first (its key -> line map drives the merge), then the previous block's lines
+# are walked in order: a pair whose key the render emitted prints the rendered line (with the
+# previous value spliced in, unless the key is in MERGE_FLAG_KEYS — the flag wins), a pair
+# the render does not emit prints verbatim, and every other line (comments) prints verbatim.
+# Rendered lines no previous key consumed (the markers, and keys newer than the previous
+# block) are appended in render order afterwards. The value is cut at the FIRST ": " and
+# rebuilt as `key: value`, so a value carrying ": " or a raw tab round-trips byte for byte
+# (the same contract g_agents_pairs gives the write). A duplicated previous key: the first
+# occurrence wins and the rest are dropped — g_agents_read stops at the first match, so a
+# kept duplicate would shadow the carried value. An EMPTY previous value carries nothing —
+# a value the project blanked stays blank. A failure here EXITS: a re-install that cannot
+# read the previous block must not go on and write the render over it.
 carry_forward() {
-  local k v
   [ -f "$CONFIG" ] || return 0
-  g_agents_pairs "$CONFIG" > "$TMP/carry.tsv" \
+  g_agents_block "$CONFIG" > "$TMP/prev-block" 2>/dev/null \
     || { g_err "could not read the previous gob block in $CONFIG"; exit 1; }
-  for k in $CARRY_KEYS; do
-    v=$(awk -F'\t' -v k="$k" '$1 == k { print substr($0, length($1) + 2); exit }' "$TMP/carry.tsv")
-    [ -n "$v" ] || continue
-    CK="$k" CV="$v" awk '
-      BEGIN { k = ENVIRON["CK"]; v = ENVIRON["CV"] }
-      index($0, k ":") == 1 && !done { print k ": " v; done = 1; next }
-      { print }
-      END { if (!done) print k ": " v }
-    ' "$TMP/agents-block" > "$TMP/agents-block.carry" \
-      && mv "$TMP/agents-block.carry" "$TMP/agents-block" \
-      || { g_err "could not carry $k forward into $CONFIG"; exit 1; }
-  done
+  [ -s "$TMP/prev-block" ] || return 0
+  MERGE_FLAG_KEYS="$MERGE_FLAG_KEYS" awk '
+    FNR == NR {                       # pass 1: the rendered block — key -> line index
+      rn++; rline[rn] = $0
+      if (match($0, /^[A-Za-z_][A-Za-z0-9_.-]*:/)) {
+        k = substr($0, 1, RLENGTH - 1)
+        if (!(k in remit)) remit[k] = rn
+      }
+      next
+    }
+    {                                 # pass 2: the previous block, in file order
+      if (match($0, /^[A-Za-z_][A-Za-z0-9_.-]*:/)) {
+        k = substr($0, 1, RLENGTH - 1)
+        if (k in remit) {
+          if (k in pdone) next        # a duplicated previous key: first wins, rest dropped
+          pdone[k] = 1
+          v = ""
+          if (index($0, ": ") > 0) v = substr($0, index($0, ": ") + 2)
+          if (v != "" && index(" " ENVIRON["MERGE_FLAG_KEYS"] " ", " " k " ") == 0) {
+            rline[remit[k]] = k ": " v
+          }
+          print rline[remit[k]]
+          used[remit[k]] = 1
+        } else {
+          print $0                    # the render has no line for this key: re-inserted
+        }
+        next
+      }
+      print $0                        # a comment (or any non-pair line): kept verbatim
+    }
+    END {
+      for (i = 1; i <= rn; i++) if (!(i in used)) print rline[i]
+    }
+  ' "$TMP/agents-block" "$TMP/prev-block" > "$TMP/agents-block.merged" \
+    && mv "$TMP/agents-block.merged" "$TMP/agents-block" \
+    || { g_err "could not carry the previous block forward into $CONFIG"; exit 1; }
 }
 
 render_config
@@ -791,7 +842,9 @@ if [ "$DRY_RUN" -eq 0 ] && [ -f "$CONFIG" ]; then
   # The block file here is the RENDERED template ("key: value" lines, no tabs), so the match
   # anchors on the key prefix, not on a tab field ($1 == "practice" never fired under the
   # rendered shape and the freshly rendered NEW hash flowed straight through — an --upgrade
-  # re-pinned the standard silently, exactly what IN-02 exists to catch).
+  # re-pinned the standard silently, exactly what IN-02 exists to catch). This sits ABOVE the
+  # line merge: even an explicit --practice does not re-pin on a re-install (the merge would
+  # otherwise keep the freshly hashed pin); --re-pin is the decision path for a new pin.
   if [ -n "$PREV_FILES" ]; then
     KEEP_PRACTICE=$(g_agents_read "$CONFIG" practice)
     KEEP_PRACTICE_SHA=$(g_agents_read "$CONFIG" practice_sha256)
@@ -799,10 +852,10 @@ if [ "$DRY_RUN" -eq 0 ] && [ -f "$CONFIG" ]; then
       sed -i "s#^practice: .*\$#practice: $KEEP_PRACTICE#; s#^practice_sha256: .*\$#practice_sha256: $KEEP_PRACTICE_SHA#" "$TMP/agents-block"
     fi
   fi
-  # The install-once contract for the keys the renderer draws from a hardcoded literal
-  # (feature_map, source_root, verify_doctor, reference_manifest, quarantine_root, max_dirty,
-  # bans_exempt — CARRY_KEYS, enumerated above): a re-install must not ERASE a project's
-  # declaration and turn the gate that reads it into a SKIP. Gated on the BLOCK's presence, not
+  # The install-once contract for the block itself: a re-install must not ERASE a project's
+  # declaration and turn the gate that reads it into a SKIP. The merge above keeps every line
+  # the render did not reproduce under the same key — values, keys the render no longer emits,
+  # and comments. Gated on the BLOCK's presence, not
   # on the previous install record: an AGENTS.md that carries a gob block is the project's
   # answers whether or not installed.json survived, and the carry is a no-op when no block
   # exists (so a fresh install still renders today's defaults).
