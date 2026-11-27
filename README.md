@@ -90,7 +90,7 @@ first, and `gob init --write` writes it for you); `SK-01`, `SK-02` and
 `SK-04` **run** (the core procedure tier is vendored under `.gob/skills/` on every install);
 `BN-01`/`BN-02`/`BN-03`/`BN-05` match only `.ts`/`.tsx`/`.js`/`.jsx` and have no such source, so
 each reports itself *not applicable*;
-and `FM-01`/`FM-02` have no feature map yet. **Thirty-two further rows are OFF by default** —
+and `FM-01`/`FM-02` have no feature map yet. **Thirty-four further rows are OFF by default** —
 they are not skipped, they are held in the **library** (`gob verify --library`), the discovery
 surface for the extend mechanism: the spec/round rows (`SP-01`..`SP-03`), the ratchet rows
 (`GT-04`/`GT-05`), the replay rows (`HS-01`..`HS-03`), commit hygiene (`CM-02`/`CM-03`),
@@ -204,7 +204,7 @@ yet, not red). Every run prints what it cannot see.
     bash tests/run-tests.sh
 
 Runs the source-scope rules (PR-01..PR-04) and the test scripts, including `t-verify-red.sh` —
-one control per target-scope row (147 over 58 target rows), each required to go RED and then
+one control per target-scope row (149 over 60 target rows), each required to go RED and then
 restored. **A verifier that only ever prints GREEN is a failure**, so that file is the one that
 matters most.
 
@@ -299,7 +299,9 @@ bounded panel, a pinned-SHA verdict. What does not transfer is cut, with the rea
 #### D1 — the enforcement matrix is an executable artifact, not a document
 
 `manifest/enforcement.tsv` has one row per rule. The `check` column holds a real command, the
-literal `advisory`, or the marker `goblin-verify --only <ID>` for a check that needs more than
+literal `advisory`, prose that names its reader (the library's `GT-06`/`EX-01` rows end in
+", read by a human" and the engine advisories them), or the marker `goblin-verify --only <ID>` for
+a check that needs more than
 one shell line. A self-check row (IN-03) fails the manifest when a row has neither, and SK-03
 caps the advisory count. **The number of unenforceable rules is itself a gate.**
 

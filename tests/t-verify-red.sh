@@ -3,14 +3,14 @@
 # own violation. A verifier that only ever prints GREEN is a failure, and this is the file that
 # proves it is not one. Run by tests/run-tests.sh.
 #
-# One control per target-scope row: 105 `expect_red` call sites and 42 `expect_green`
-# — 147 calls over all 58 of the rule set's target rows (the four source-scope rows
-# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 32 of those 58 rows are
+# One control per target-scope row: 107 `expect_red` call sites and 42 `expect_green`
+# — 149 calls over all 60 of the rule set's target rows (the four source-scope rows
+# carry controls of their own in tests/run-tests.sh). Batch 2b-ii: 34 of those 60 rows are
 # off-by-default (the LIBRARY, manifest/library.tsv); this file drives them by first enabling
 # them (enable_lib_row) exactly as a repo would, so no moved check loses its control. Measured at
-# this revision: 58 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
+# this revision: 60 distinct ids against the matrix+library, 0 phantom ids and 0 target row left
 # The census is recomputed from this file by tests/t-doc-promises.sh;
-# README's census sentence must read `142 over 58 target rows`.
+# README's census sentence must read `149 over 60 target rows`.
 #
 # The rows whose check column is literally `advisory` carry a WIRE control: it replaces the row's
 # check with a command that fails and proves the row is wired into the runner, not that the rule
@@ -1430,6 +1430,18 @@ m_pv01_nolane
 out=$(bash .gob/bin/goblin-verify --only PV-01 2>&1)
 printf '%s' "$out" | grep -q '^SKIP  PV-01  no candidate review surface directory'
 check "PV-01 SKIPs with its reason when the route tree has no candidate surface" "$?"
+restore_all
+
+# ---- GT-06/EX-01 (the 2026-11-27 lessons): the two new advisory rows, wired not biting --------
+# The check column names a READER, not a command ("assertion bodies, read by a human"), so the
+# engine's advisory branch recognises checks ending in ", read by a human" instead of executing
+# the prose as a shell command (which exits 127 — a false RED). These two controls prove the
+# rows are still WIRED: with the row enabled and its check replaced by a failing command, the
+# run goes RED. Same shape as the HP-04 control.
+m_gt_06()         { m_row_fails GT-06; }
+m_ex_01()         { m_row_fails EX-01; }
+expect_red "GT-06 (advisory row: wired, not biting)" GT-06 1 m_gt_06
+expect_red "EX-01 (advisory row: wired, not biting)" EX-01 1 m_ex_01
 restore_all
 
 FINAL=$(bash .gob/bin/goblin-verify 2>&1); FINAL_RC=$?

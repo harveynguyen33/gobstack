@@ -399,7 +399,7 @@ c_ids=$(printf '%s\n' "$c_sites" | grep -oE '[A-Z]{2,3}-[0-9]{2}$' | sort -u)
 c_nids=$(printf '%s\n' "$c_ids" | grep -c .)
 # batch 2b-ii: a control id is legitimate if it names a row of the shipped MATRIX or a row of the
 # shipped LIBRARY (the moved rows keep their controls). 'every target row carries a control' now
-# spans both files: the 27 on-by-default target rows AND the 32 library rows.
+# spans both files: the 26 on-by-default target rows AND the 34 library rows.
 c_phantom=$(comm -23 <(printf '%s\n' "$c_ids") \
               <({ awk -F'\t' 'NR>1 && NF>1 {print $1}' "$ENF_SRC"; awk -F'\t' 'NR>1 && NF>1 {print $1}' "$LIB_SRC"; } | grep -oE '[A-Z]{2,3}-[0-9]{2}' | sort -u) \
             | tr -d '[:space:]')
