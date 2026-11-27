@@ -38,9 +38,10 @@ the rest — in its dated parentheticals; `docs/RECORD-NOTES.md` is the legend.)
 8. **A new surface to maintain.** Per-repo vendored `.gob/` plus `.hermes/skills/` means
    upgrade debt in every adopted repo, plus one more command pair to learn. The counter is that
    the alternative — profile copies — already failed.
-9. **Five rows are labelled `advisory`, and all five are prose with no check at all:**
-   `HP-04`, `HS-03`, `CM-02`, `DOC-01` and `DOC-02` (`SC-09` was withdrawn on 2026-11-25 — see
-   #67 and docs/AUDIT-2026-11-25-framework-agnostic.md). Each is counted and capped, but a
+9. **Seven rows are labelled `advisory`, and all seven are prose a reader, not a command,**
+   **checks:** `HP-04`, `HS-03`, `CM-02`, `DOC-01` and `DOC-02` (`SC-09` was withdrawn on
+   2026-11-25 — see #67 and docs/AUDIT-2026-11-25-framework-agnostic.md), joined on 2026-11-27
+   by `GT-06` and `EX-01` (see #68 and #69). Each is counted and capped, but a
    counted rule is still not an enforced one, and **the cap is a policy, not a proof.**
 10. **It does not reduce the profile-skill surface.** It only stops that surface from growing
     with project procedures; the existing divergence is a separate cleanup.
@@ -657,6 +658,17 @@ the Node the gates ran under.
     docs/AUDIT-2026-11-25-framework-agnostic.md under "withdrawn — where it went", with the
     resurrection recipe; `--only <id>` on a removed row reports it is in neither the manifest,
     the library nor the local override.
+68. **`GT-06` — gate-integrity, advisory (added 2026-11-27).** Detecting "this assertion compares
+    two typed constants" from text is a heuristic, not a proof: a legitimate gate also compares a
+    measurement against a recorded ceiling, and only the diff history tells a recorded number from
+    an invented one. Advisory on purpose - it costs the reviewer one question (what would make this
+    line red?) where a text lint would cost every harness a false positive.
+69. **`EX-01` — fragment-scoped CSS, advisory (added 2026-11-27).** A generated fragment's
+    `<style>` block is a document-wide stylesheet: N instances collide on bare element and class
+    selectors, and the failure is silent and per-instance (one instance's hover rule wins over
+    another's). Not yet an engine check because the engine cannot see the emitter's output - it
+    would have to build the thing first. Fragments assembled at runtime from a string the repo
+    never writes stay outside any check.
 
 ---
 
@@ -678,7 +690,9 @@ rung below must be *demonstrably unable* to see it - the reason is recorded in t
 1. **No network at verify time.** `README.md` K4: a network call at verify time breaks the
    offline dependency contract. A row that needs the network is not a verify-time row.
 2. **`enforced_by` is a closed enum** (`script`, `lint`, `gate`, `advisory`) and `check` is one of:
-   a real command, the literal `advisory`, or `goblin-verify --only <ID>` for a multi-line body.
+   a real command, the literal `advisory`, prose that names its reader (the library's `GT-06`/`EX-01`
+   rows end in ", read by a human" — the engine advisories them instead of executing the prose as a
+   shell command), or `goblin-verify --only <ID>` for a multi-line body.
    Every row here obeys that, and `IN-03` fails the manifest otherwise.
 3. **`advisory_ceiling` is 10 and the labelled count is 0.** The matrix labels no row
    `advisory`, and the ceiling caps that count at **0 of 10** — every advisory row moved to the
