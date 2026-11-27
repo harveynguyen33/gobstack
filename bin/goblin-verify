@@ -2950,6 +2950,16 @@ while IFS=$'\t' read -r id scope rule enforced_by artifact check why; do
       emit "$id" ADV "$rule (advisory)"
       continue
       ;;
+    *" read by a human")
+      # GT-06/EX-01 (the 2026-11-27 lessons): an advisory row may name its reader in the
+      # check column instead of a command. Executing that prose as a shell command exits
+      # 127 - a false RED on a row whose enforced_by is advisory - so it carries the same
+      # verdict as the literal advisory above. A wire control still reaches it: the wire
+      # replaces the WHOLE check with a failing command, which matches neither branch.
+      ADV=$((ADV + 1))
+      emit "$id" ADV "$rule (advisory)"
+      continue
+      ;;
     goblin-verify\ --only\ *)
       fn="check_$(printf '%s' "$id" | tr 'A-Z' 'a-z' | tr '-' '_')"
       if ! command -v "$fn" >/dev/null 2>&1 && ! declare -F "$fn" >/dev/null 2>&1; then
