@@ -299,9 +299,13 @@ check "OPT AC5 and a plain re-install keeps that [mcp]" \
 # ---- RED control: the 0.7.1 renderer, verbatim -----------------------------------
 # The render bug is PRE-EXISTING (it shipped in 0.7.1; the carry only made it sticky). The
 # assertions above must fail on 0.7.1's installer or they prove nothing: run the same fresh
-# --opt-out against an archive of origin/main and require the measured malformation.
+# --opt-out against the v0.7.1 TAG and require the measured malformation.
+# PINNED TO THE TAG, NOT origin/main: this control used to archive origin/main, and when the
+# 0.7.2 fix reached origin/main the "old" tree started carrying the fix, so both assertions
+# turned red against a correct installer (measured 2026-11-27 on 10bb36d). A red control whose
+# premise drifts with the branch proves nothing in either direction. The tag cannot drift.
 PRE071="$WORK/pre071"; mkdir -p "$PRE071"
-git -C "$SRC" archive origin/main | tar -x -C "$PRE071"
+git -C "$SRC" archive v0.7.1 | tar -x -C "$PRE071"
 fixture "$WORK/opt-red"
 AG_OPTRED="$WORK/opt-red/AGENTS.md"
 bash "$PRE071/bin/goblin-install" --target "$WORK/opt-red" --opt-out mcp >/dev/null 2>&1
